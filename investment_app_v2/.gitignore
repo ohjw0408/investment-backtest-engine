@@ -6,9 +6,6 @@ __pycache__/
 *.db
 *.sqlite
 
-# CSV data cache
-*.csv
-
 # Environment files
 .env
 

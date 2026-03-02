@@ -1,0 +1,20 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Database files
+*.db
+*.sqlite
+
+# CSV data cache
+*.csv
+
+# Environment files
+.env
+
+# VSCode settings
+.vscode/
+
+# OS junk
+.DS_Store
+Thumbs.db

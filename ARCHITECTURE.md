@@ -214,3 +214,10 @@ Version: 1.0 (Stable Baseline)
 - 세금 정책
 - Threshold 전략
 - Hybrid 전략
+
+## 2026-03-02
+
+- Repository flattened (removed nested investment_app_v2 folder)
+- Standardized Python 3.11 environment
+- Enforced venv usage
+- requirements.txt is single source of truth

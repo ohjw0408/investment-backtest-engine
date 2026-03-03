@@ -18,3 +18,9 @@ venv/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Price cache (ignore all csv in data)
+data/*.csv
+
+# But keep static ETF list
+!data/us_etf_list.csv

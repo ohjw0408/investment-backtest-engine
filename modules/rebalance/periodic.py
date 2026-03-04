@@ -8,6 +8,30 @@ class PeriodicRebalance(BaseRebalanceStrategy):
     단순 목표 비중 리밸런싱
     """
 
+    def __init__(self, target_weights: Dict[str, float], include_cash: bool = True):
+        super().__init__(target_weights, include_cash)
+        self.last_rebalance = None
+
+    # -------------------------------------------------
+    # 리밸런싱 여부 판단
+    # -------------------------------------------------
+    def should_rebalance(self, date):
+
+        # 첫 날은 항상 리밸런싱
+        if self.last_rebalance is None:
+            self.last_rebalance = date
+            return True
+
+        # 예시: 월 단위 리밸런싱
+        if date.month != self.last_rebalance.month:
+            self.last_rebalance = date
+            return True
+
+        return False
+
+    # -------------------------------------------------
+    # 주문 생성
+    # -------------------------------------------------
     def generate_orders(
         self,
         portfolio: Portfolio,
@@ -21,7 +45,6 @@ class PeriodicRebalance(BaseRebalanceStrategy):
         if total_value == 0:
             return orders
 
-        # 현재 비중
         current_weights = portfolio.current_weights(
             price_dict,
             include_cash=self.include_cash

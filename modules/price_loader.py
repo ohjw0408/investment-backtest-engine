@@ -74,6 +74,10 @@ class PriceLoader:
         if df.empty:
             return df
 
+        # 🔥 MultiIndex 컬럼 평탄화 (중요)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
         df = df.reset_index()
 
         # -----------------------------

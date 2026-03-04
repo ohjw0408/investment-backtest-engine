@@ -1,7 +1,7 @@
 # 투자 백테스트 엔진 - ARCHITECTURE.md
 Version: 1.0 (Stable Baseline)
 목적: 리빌딩 참사 방지 + 레이어 명확화
-
+문서 아래에 있는 내용이 최신 내용이다. 참고 할 수 있도록.
 -------------------------------------------------
 ## 🎯 프로젝트 최종 목표
 
@@ -290,3 +290,164 @@ data_engine.py
 2. 가격 캐시는 Git 저장소에서 제외
 3. 데이터 레이어와 분석 엔진을 분리
 4. 장기 백테스트용 synthetic series 생성 기반 마련
+
+# QuantMaster Architecture
+
+## 1. Data Layer
+
+가격 데이터를 외부 API에서 가져오고 로컬 캐시에 저장한다.
+
+modules
+ ├─ price_loader.py
+ └─ data_engine.py
+
+price_loader
+- Yahoo Finance API 호출
+- price_daily.db 캐싱
+- 필요한 기간만 다운로드
+
+data_engine
+- 백필링
+- 환율 처리
+- 데이터 정규화
+
+
+--------------------------------------------
+
+## 2. Metadata Layer
+
+종목 메타데이터 관리
+
+modules
+ ├─ db_builder.py
+ └─ info_engine.py
+
+symbol_master.db 구조
+
+symbols
+- code
+- name
+- market
+- country
+- is_etf
+- underlying_symbol
+
+underlying_symbol은 ETF 백필링에 사용됨
+
+
+--------------------------------------------
+
+## 3. Portfolio State Layer
+
+포트폴리오 상태를 관리
+
+modules/core
+
+ ├─ portfolio.py
+ └─ position.py
+
+Position
+- quantity
+- avg_price
+- realized_pnl
+
+Portfolio
+- cash
+- positions
+- total_value
+- weight calculation
+
+
+--------------------------------------------
+
+## 4. Execution Layer
+
+주문 실행
+
+modules/execution
+
+ └─ order_executor.py
+
+기능
+
+- 매수
+- 매도
+- 포트폴리오 업데이트
+
+
+--------------------------------------------
+
+## 5. Strategy Layer
+
+리밸런싱 전략
+
+modules/rebalance
+
+ ├─ base_strategy.py
+ └─ periodic.py
+
+BaseRebalanceStrategy
+
+- target_weights
+- generate_orders()
+
+
+--------------------------------------------
+
+## 6. Backtest Engines
+
+두 종류의 백테스트 엔진 존재
+
+### 1️⃣ BacktestEngine
+
+단일 자산 분석
+
+metrics
+
+- Total Return
+- CAGR
+- MDD
+- Volatility
+- Sharpe
+
+--------------------------------------------
+
+### 2️⃣ PortfolioEngine
+
+멀티 자산 포트폴리오 분석
+
+vectorized 방식
+
+기능
+
+- portfolio return
+- contribution
+- MDD analysis
+- recovery analysis
+
+
+--------------------------------------------
+
+## 7. Analyzer Layer
+
+분석 도구
+
+modules/analyzer.py
+
+기능
+
+- 자산 기여도
+- drawdown 분석
+- rolling 분석
+
+
+--------------------------------------------
+
+## 8. Future Expansion
+
+예정 기능
+
+- ETF 백필링
+- dividend reinvestment
+- tax simulation
+- advanced rebalance strategies

@@ -1,13 +1,21 @@
 import pandas as pd
 import numpy as np
 from typing import List, Dict, Any
+
 from modules.price_loader import PriceLoader
+from modules.execution.order_executor import OrderExecutor
+from modules.core.portfolio import Portfolio
 
 
 class PortfolioEngine:
 
     def __init__(self):
         self.loader = PriceLoader()
+        self.executor = OrderExecutor()
+
+    # -------------------------------------------------
+    # Vectorized Portfolio Backtest
+    # -------------------------------------------------
 
     def run(
         self,
@@ -30,11 +38,14 @@ class PortfolioEngine:
         returns_list = []
 
         for t in tickers:
+
             df = self.loader.get_price(t, start_date, end_date)
+
             if df.empty:
                 raise ValueError(f"{t} 가격 데이터 없음")
 
             df["date"] = pd.to_datetime(df["date"])
+
             df = df.sort_values("date")
 
             df["daily_return"] = df["close"].pct_change().fillna(0.0)
@@ -48,6 +59,7 @@ class PortfolioEngine:
         merged = returns_list[0]
 
         for r in returns_list[1:]:
+
             merged = pd.merge(merged, r, on="date", how="inner")
 
         merged = merged.dropna().reset_index(drop=True)
@@ -57,7 +69,9 @@ class PortfolioEngine:
 
         # 개별 기여도
         for i, t in enumerate(tickers):
+
             merged[f"{t}_contribution"] = merged[t] * weights[i]
+
             merged[f"{t}_cum_contribution"] = (
                 1 + merged[f"{t}_contribution"]
             ).cumprod()
@@ -79,6 +93,7 @@ class PortfolioEngine:
         cagr = merged["cum_return"].iloc[-1] ** (1 / years) - 1
 
         merged["cum_max"] = merged["cum_return"].cummax()
+
         merged["drawdown"] = (
             merged["cum_return"] / merged["cum_max"] - 1
         )
@@ -90,57 +105,10 @@ class PortfolioEngine:
         )
 
         excess_return = cagr - risk_free_rate
+
         sharpe = (
             excess_return / volatility if volatility != 0 else np.nan
         )
-
-        # -------------------------
-        # 🔥 MDD 구간 분석
-        # -------------------------
-
-        # 최저점 인덱스
-        mdd_idx = merged["drawdown"].idxmin()
-        mdd_date = merged.loc[mdd_idx, "date"]
-
-        # 시작점 (이전 최고점)
-        peak_idx = merged.loc[:mdd_idx, "cum_return"].idxmax()
-        peak_date = merged.loc[peak_idx, "date"]
-
-        # 회복 시점
-        recovery_idx = None
-        for i in range(mdd_idx + 1, len(merged)):
-            if merged.loc[i, "cum_return"] >= merged.loc[peak_idx, "cum_return"]:
-                recovery_idx = i
-                break
-
-        recovery_date = (
-            merged.loc[recovery_idx, "date"]
-            if recovery_idx is not None
-            else None
-        )
-
-        recovery_days = (
-            (recovery_date - peak_date).days
-            if recovery_date is not None
-            else None
-        )
-
-        # MDD 구간 자산 기여도
-        mdd_period = merged.loc[peak_idx:mdd_idx]
-
-        mdd_contributions = {}
-        for t in tickers:
-            mdd_contributions[t] = float(
-                (1 + mdd_period[f"{t}_contribution"]).prod() - 1
-            )
-
-        # 최종 자산 기여도
-        asset_contributions = {
-            t: float(
-                merged[f"{t}_cum_contribution"].iloc[-1] - 1
-            )
-            for t in tickers
-        }
 
         return {
             "tickers": tickers,
@@ -153,36 +121,92 @@ class PortfolioEngine:
             "mdd": float(mdd),
             "volatility": float(volatility),
             "sharpe": float(sharpe),
-            "asset_contributions": asset_contributions,
-            "mdd_start": peak_date,
-            "mdd_bottom": mdd_date,
-            "recovery_date": recovery_date,
-            "recovery_days": recovery_days,
-            "mdd_contributions": mdd_contributions,
             "history": merged,
         }
 
+    # -------------------------------------------------
+    # Event Driven Simulation Engine
+    # -------------------------------------------------
 
-if __name__ == "__main__":
+    def run_simulation(
+        self,
+        tickers: List[str],
+        strategy,
+        start_date: str,
+        end_date: str,
+        initial_cash: float = 1_000_000,
+    ):
 
-    engine = PortfolioEngine()
+        portfolio = Portfolio(initial_cash)
 
-    result = engine.run(
-        tickers=["QQQ", "SPY", "TLT"],
-        weights=[0.5, 0.3, 0.2],
-        start_date="2015-01-01",
-        end_date="2020-12-31",
-    )
+        price_data = {}
 
-    print("총 수익률:", round(result["total_return"] * 100, 2), "%")
-    print("CAGR:", round(result["cagr"] * 100, 2), "%")
-    print("MDD:", round(result["mdd"] * 100, 2), "%")
+        for ticker in tickers:
 
-    print("\nMDD 시작:", result["mdd_start"])
-    print("MDD 최저점:", result["mdd_bottom"])
-    print("회복일:", result["recovery_date"])
-    print("회복까지 일수:", result["recovery_days"])
+            df = self.loader.get_price(ticker, start_date, end_date)
 
-    print("\nMDD 구간 자산 기여도:")
-    for k, v in result["mdd_contributions"].items():
-        print(k, ":", round(v * 100, 2), "%")
+            if df.empty:
+                raise ValueError(f"{ticker} 가격 데이터 없음")
+
+            df["date"] = pd.to_datetime(df["date"])
+
+            df = df.sort_values("date")
+
+            price_data[ticker] = df[["date", "close"]]
+
+        merged = price_data[tickers[0]].rename(
+            columns={"close": tickers[0]}
+        )
+
+        for t in tickers[1:]:
+
+            df = price_data[t].rename(columns={"close": t})
+
+            merged = pd.merge(
+                merged,
+                df,
+                on="date",
+                how="inner"
+            )
+
+        merged = merged.sort_values("date")
+
+        history = []
+
+        # ---------------------------------
+        # Simulation Loop
+        # ---------------------------------
+
+        for _, row in merged.iterrows():
+
+            date = row["date"]
+
+            price_dict = {t: row[t] for t in tickers}
+
+            # 리밸런싱 여부 판단
+            if strategy.should_rebalance(date):
+
+                orders = strategy.generate_orders(
+                    portfolio,
+                    price_dict
+                )
+
+                self.executor.execute_orders(
+                    portfolio,
+                    orders,
+                    price_dict
+                )
+
+            value = portfolio.total_value(price_dict)
+
+            history.append(
+                {
+                    "date": date,
+                    "portfolio_value": value,
+                    "cash": portfolio.cash
+                }
+            )
+
+        result = pd.DataFrame(history)
+
+        return result

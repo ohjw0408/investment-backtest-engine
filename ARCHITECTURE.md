@@ -221,3 +221,72 @@ Version: 1.0 (Stable Baseline)
 - Standardized Python 3.11 environment
 - Enforced venv usage
 - requirements.txt is single source of truth
+
+
+## ---2026-03-04
+
+# 📁 Data Directory Structure
+
+프로젝트는 데이터 레이어를 다음 두 종류로 분리한다.
+
+## data/meta/
+
+정적 메타데이터 저장 위치
+
+포함 파일:
+
+* symbol_master.db
+  종목 마스터 데이터베이스
+  (티커, 이름, 시장, 국가, ETF 여부 등)
+
+* us_etf_list.csv
+  ETF 초기 데이터 소스
+  db_builder가 symbol_master 생성 시 사용
+
+특징:
+
+* 정적 데이터
+* Git에 포함됨
+* 프로젝트 실행에 필수
+
+## data/price_cache/
+
+시장 가격 캐시 저장 위치
+
+포함 파일:
+
+* price_daily.db
+  SQLite 기반 가격 캐시
+  price_loader.py가 자동 생성
+
+저장 데이터:
+
+* code
+* date
+* close
+* dividend
+
+특징:
+
+* 실행 중 자동 생성
+* API 호출 최소화를 위한 캐시
+* Git에서 제외 (.gitignore)
+
+## 데이터 흐름
+
+yfinance API
+↓
+price_loader.py
+↓
+SQLite cache (price_daily.db)
+↓
+data_engine.py
+↓
+장기 백테스트 데이터 생성 (백필링 포함)
+
+## 설계 목적
+
+1. 메타데이터와 시장 데이터를 분리
+2. 가격 캐시는 Git 저장소에서 제외
+3. 데이터 레이어와 분석 엔진을 분리
+4. 장기 백테스트용 synthetic series 생성 기반 마련

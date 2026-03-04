@@ -1,26 +1,48 @@
+# ----------------------------
 # Python cache
+# ----------------------------
 __pycache__/
 *.pyc
 
-# Database files
-*.db
-*.sqlite
-
+# ----------------------------
 # Virtual environment
+# ----------------------------
 venv/
 
+# ----------------------------
 # Environment files
+# ----------------------------
 .env
 
+# ----------------------------
 # VSCode settings
+# ----------------------------
 .vscode/
 
+# ----------------------------
 # OS junk
+# ----------------------------
 .DS_Store
 Thumbs.db
 
-# Price cache (ignore all csv in data)
+# ----------------------------
+# Database files (global)
+# ----------------------------
+*.sqlite
+
+# ----------------------------
+# Price cache (generated data)
+# ----------------------------
+data/price_cache/
+
+!data/meta/symbol_master.db
+# ----------------------------
+# Old CSV price cache
+# ----------------------------
 data/*.csv
 
-# But keep static ETF list
-!data/us_etf_list.csv
+# ----------------------------
+# Metadata (must keep)
+# ----------------------------
+!data/meta/
+!data/meta/us_etf_list.csv

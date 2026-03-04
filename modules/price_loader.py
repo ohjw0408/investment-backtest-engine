@@ -5,35 +5,42 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # -------------------------------------------------
-# 경로 설정 (항상 루트 data/ 기준)
+# 경로 설정
 # -------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
-DB_PATH = DATA_DIR / "price_daily.db"
+PRICE_CACHE_DIR = DATA_DIR / "price_cache"
+DB_PATH = PRICE_CACHE_DIR / "price_daily.db"
 
 
 class PriceLoader:
+
     def __init__(self):
-        DATA_DIR.mkdir(exist_ok=True)
+
+        # price_cache 폴더 생성
+        PRICE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+        # SQLite 연결
         self.conn = sqlite3.connect(str(DB_PATH))
+
+        # 테이블 생성
         self.create_table()
 
     # -------------------------------------------------
     # 가격 테이블 생성
     # -------------------------------------------------
     def create_table(self):
+
         query = """
         CREATE TABLE IF NOT EXISTS price_daily (
             code TEXT,
             date TEXT,
-            open REAL,
-            high REAL,
-            low REAL,
             close REAL,
-            volume REAL,
+            dividend REAL,
             PRIMARY KEY (code, date)
         )
         """
+
         self.conn.execute(query)
         self.conn.commit()
 
@@ -41,11 +48,13 @@ class PriceLoader:
     # DB에 저장된 날짜 범위 조회
     # -------------------------------------------------
     def get_date_range_in_db(self, code):
+
         query = """
         SELECT MIN(date), MAX(date)
         FROM price_daily
         WHERE code = ?
         """
+
         cur = self.conn.execute(query, (code,))
         return cur.fetchone()
 
@@ -53,6 +62,7 @@ class PriceLoader:
     # API로 가격 다운로드
     # -------------------------------------------------
     def fetch_from_api(self, code, start, end):
+
         df = yf.download(
             code,
             start=start,
@@ -66,30 +76,51 @@ class PriceLoader:
 
         df = df.reset_index()
 
-        # MultiIndex 컬럼 평탄화
-        df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+        # -----------------------------
+        # 배당 데이터 가져오기
+        # -----------------------------
+        ticker = yf.Ticker(code)
+        div = ticker.dividends
+
+        if not div.empty:
+            div = div.reset_index()
+            div["Date"] = div["Date"].dt.strftime("%Y-%m-%d")
+            div = div.rename(columns={"Dividends": "dividend"})
+        else:
+            div = pd.DataFrame(columns=["Date", "dividend"])
+
+        # -----------------------------
+        # 가격 데이터 정리
+        # -----------------------------
+        df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
+
+        df = df.rename(columns={
+            "Date": "date",
+            "Close": "close"
+        })
 
         df["code"] = code
 
-        df = df.rename(
-            columns={
-                "Date": "date",
-                "Open": "open",
-                "High": "high",
-                "Low": "low",
-                "Close": "close",
-                "Volume": "volume",
-            }
+        df = df[["code", "date", "close"]]
+
+        # -----------------------------
+        # 배당 merge
+        # -----------------------------
+        df = df.merge(
+            div.rename(columns={"Date": "date"}),
+            on="date",
+            how="left",
         )
 
-        df["date"] = df["date"].dt.strftime("%Y-%m-%d")
+        df["dividend"] = df["dividend"].fillna(0)
 
-        return df[["code", "date", "open", "high", "low", "close", "volume"]]
+        return df[["code", "date", "close", "dividend"]]
 
     # -------------------------------------------------
-    # 핵심 함수: 요청한 기간만 보충
+    # 핵심 함수: 필요한 구간만 API 호출
     # -------------------------------------------------
     def get_price(self, code, start_date, end_date):
+
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
@@ -98,8 +129,11 @@ class PriceLoader:
         api_calls = []
 
         if db_min is None:
+
             api_calls.append((start_date, end_date))
+
         else:
+
             db_min = datetime.strptime(db_min, "%Y-%m-%d").date()
             db_max = datetime.strptime(db_max, "%Y-%m-%d").date()
 
@@ -109,14 +143,19 @@ class PriceLoader:
             if end_date > db_max:
                 api_calls.append((db_max + timedelta(days=1), end_date))
 
+        # -------------------------------------------------
         # 필요한 구간만 API 호출
+        # -------------------------------------------------
         for s, e in api_calls:
+
             df_new = self.fetch_from_api(
                 code,
                 s.strftime("%Y-%m-%d"),
                 e.strftime("%Y-%m-%d"),
             )
+
             if not df_new.empty:
+
                 df_new.to_sql(
                     "price_daily",
                     self.conn,
@@ -124,12 +163,14 @@ class PriceLoader:
                     index=False,
                 )
 
-        # 최종 결과 반환
+        # -------------------------------------------------
+        # 최종 데이터 반환
+        # -------------------------------------------------
         query = """
-        SELECT date, open, high, low, close, volume
+        SELECT date, close, dividend
         FROM price_daily
         WHERE code = ?
-          AND date BETWEEN ? AND ?
+        AND date BETWEEN ? AND ?
         ORDER BY date
         """
 
@@ -150,6 +191,7 @@ class PriceLoader:
 # 단독 실행 테스트
 # -------------------------------------------------
 if __name__ == "__main__":
+
     loader = PriceLoader()
 
     df = loader.get_price(

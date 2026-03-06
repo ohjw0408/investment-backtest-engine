@@ -451,3 +451,105 @@ modules/analyzer.py
 - dividend reinvestment
 - tax simulation
 - advanced rebalance strategies
+
+---
+
+# Analyzer Layer (New)
+
+A new analyzer layer has been added to evaluate portfolio performance
+and retirement sustainability.
+
+## PortfolioAnalyzer
+
+Calculates core portfolio statistics from simulation history.
+
+Metrics:
+
+- CAGR
+- Maximum Drawdown (MDD)
+- Volatility
+- Sharpe Ratio
+- Drawdown period analysis (start / bottom / recovery)
+
+Input:
+Portfolio history DataFrame from PortfolioEngine
+
+Output:
+Dictionary containing performance statistics.
+
+---
+
+## RetirementAnalyzer
+
+Simulates retirement withdrawals using historical rolling windows.
+
+Purpose:
+Evaluate sustainability of a withdrawal strategy.
+
+Inputs:
+
+- portfolio history
+- initial capital
+- monthly withdrawal
+- simulation years
+- inflation
+
+Outputs:
+
+- success probability
+- best terminal wealth
+- median terminal wealth
+- worst terminal wealth
+
+This allows users to evaluate sequence-of-return risk.
+
+---
+
+# Current Engine Flow
+
+PriceLoader  
+↓  
+PortfolioEngine  
+↓  
+OrderExecutor  
+↓  
+Portfolio History  
+↓  
+Analyzer Layer
+
+    ├ PortfolioAnalyzer  
+    └ RetirementAnalyzer
+
+---
+
+# Next Planned Improvements
+
+1️⃣ Store asset-level values in history
+
+Example future structure:
+
+
+ date
+portfolio_value
+cash
+QQQ_value
+TLT_value
+QQQ_weight
+TLT_weight
+
+
+This will enable:
+
+- rebalance verification
+- asset contribution analysis
+- detailed risk decomposition
+
+2️⃣ Dividend reinvestment toggle
+
+3️⃣ Transaction cost model
+
+4️⃣ Tax module
+
+5️⃣ Inflation-adjusted retirement simulation
+
+6️⃣ Large ETF universe support

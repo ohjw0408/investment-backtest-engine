@@ -1,24 +1,14 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, Any
 
 
 class RetirementAnalyzer:
-    """
-    은퇴 인출 시뮬레이션
-
-    기능
-    - 월 단위 인출 시뮬레이션
-    - 성공 확률 계산
-    - terminal wealth 분포
-    - best / median / worst 결과
-    """
 
     def __init__(
         self,
         monthly_withdrawal: float,
-        years: int = 30,
-        inflation: float = 0.0,
+        years: int,
+        inflation: float = 0.0
     ):
 
         self.monthly_withdrawal = monthly_withdrawal
@@ -26,83 +16,108 @@ class RetirementAnalyzer:
         self.inflation = inflation
 
     # -------------------------------------------------
-    # Daily → Monthly return 변환
+    # Retirement analysis
     # -------------------------------------------------
-    def _get_monthly_returns(self, history: pd.DataFrame):
+
+    def analyze(
+        self,
+        history: pd.DataFrame,
+        initial_capital: float
+    ):
 
         df = history.copy()
 
         df["date"] = pd.to_datetime(df["date"])
+
         df = df.set_index("date")
 
-        monthly = df["portfolio_value"].resample("M").last()
+        # -------------------------------------------------
+        # monthly portfolio value
+        # -------------------------------------------------
 
-        monthly_returns = monthly.pct_change().dropna()
+        monthly = df["portfolio_value"].resample("ME").last()
 
-        return monthly_returns.values
+        # -------------------------------------------------
+        # monthly dividend
+        # -------------------------------------------------
 
-    # -------------------------------------------------
-    # 메인 분석
-    # -------------------------------------------------
-    def analyze(
-        self,
-        history: pd.DataFrame,
-        initial_capital: float,
-    ) -> Dict[str, Any]:
+        if "dividend_income" in df.columns:
 
-        monthly_returns = self._get_monthly_returns(history)
+            dividend = df["dividend_income"].resample("ME").sum()
 
-        months = self.years * 12
+        else:
+
+            dividend = pd.Series(0, index=monthly.index)
 
         terminal_values = []
-        success_count = 0
 
-        paths = []
+        horizon = self.years * 12
 
-        for start in range(len(monthly_returns) - months):
+        for start in range(len(monthly) - horizon):
 
             capital = initial_capital
 
             withdrawal = self.monthly_withdrawal
 
-            path = []
+            for i in range(horizon):
 
-            for m in range(months):
+                date = monthly.index[start + i]
 
-                r = monthly_returns[start + m]
+                portfolio_value = monthly.iloc[start + i]
 
-                capital *= (1 + r)
+                dividend_income = dividend.iloc[start + i]
 
-                capital -= withdrawal
+                # -----------------------------------------
+                # return calculation
+                # -----------------------------------------
 
-                path.append(capital)
+                if i > 0:
+
+                    prev_value = monthly.iloc[start + i - 1]
+
+                    monthly_return = portfolio_value / prev_value - 1
+
+                    capital *= (1 + monthly_return)
+
+                # -----------------------------------------
+                # dividend offsets withdrawal
+                # -----------------------------------------
+
+                net_withdrawal = withdrawal - dividend_income
+
+                if net_withdrawal < 0:
+
+                    net_withdrawal = 0
+
+                capital -= net_withdrawal
 
                 if capital <= 0:
+
+                    capital = 0
                     break
 
+                # -----------------------------------------
                 # inflation adjustment
+                # -----------------------------------------
+
                 withdrawal *= (1 + self.inflation / 12)
 
             terminal_values.append(capital)
 
-            paths.append(path)
-
-            if capital > 0:
-                success_count += 1
-
         terminal_values = np.array(terminal_values)
+
+        success_count = np.sum(terminal_values > 0)
 
         success_rate = success_count / len(terminal_values)
 
-        best = terminal_values.max()
-        worst = terminal_values.min()
-        median = np.median(terminal_values)
-
         return {
+
             "success_rate": success_rate,
-            "best_terminal": best,
-            "median_terminal": median,
-            "worst_terminal": worst,
-            "terminal_values": terminal_values,
-            "paths": paths,
+
+            "best_terminal": np.max(terminal_values),
+
+            "median_terminal": np.median(terminal_values),
+
+            "worst_terminal": np.min(terminal_values)
+
         }

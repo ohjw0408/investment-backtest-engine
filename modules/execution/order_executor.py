@@ -8,16 +8,6 @@ class OrderExecutor:
 
     RebalanceStrategy가 생성한
     value 기반 주문을 실제 거래로 변환한다.
-
-    역할:
-    - value → quantity 변환
-    - 매도 → 매수 순서 실행
-    - Portfolio 상태 업데이트
-
-    하지 않는 것:
-    - 전략 판단
-    - 세금 계산
-    - 거래 비용 계산
     """
 
     def execute_orders(
@@ -31,7 +21,7 @@ class OrderExecutor:
             return
 
         # -----------------------------
-        # 1️⃣ 먼저 매도 실행
+        # 1️⃣ 먼저 매도
         # -----------------------------
         for ticker, value in orders.items():
 
@@ -49,7 +39,6 @@ class OrderExecutor:
             if price <= 0:
                 continue
 
-            # 🔥 정수 주식
             quantity = int(abs(value) / price)
 
             if quantity <= 0:
@@ -58,7 +47,7 @@ class OrderExecutor:
             portfolio.sell(ticker, quantity, price)
 
         # -----------------------------
-        # 2️⃣ 그 다음 매수 실행
+        # 2️⃣ 매수
         # -----------------------------
         for ticker, value in orders.items():
 
@@ -76,7 +65,6 @@ class OrderExecutor:
             if price <= 0:
                 continue
 
-            # 🔥 정수 주식
             quantity = int(value / price)
 
             if quantity <= 0:
@@ -86,5 +74,4 @@ class OrderExecutor:
                 portfolio.buy(ticker, quantity, price)
 
             except ValueError:
-                # 현금 부족 시 주문 무시
                 continue

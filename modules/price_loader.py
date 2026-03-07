@@ -1,15 +1,26 @@
 import sqlite3
 import pandas as pd
 import yfinance as yf
+import logging
+
 from datetime import datetime, timedelta
 from pathlib import Path
+
+
+# yfinance 로그 제거
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+
 
 # -------------------------------------------------
 # 경로 설정
 # -------------------------------------------------
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 DATA_DIR = BASE_DIR / "data"
+
 PRICE_CACHE_DIR = DATA_DIR / "price_cache"
+
 DB_PATH = PRICE_CACHE_DIR / "price_daily.db"
 
 
@@ -17,115 +28,178 @@ class PriceLoader:
 
     def __init__(self):
 
-        # price_cache 폴더 생성
         PRICE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-        # SQLite 연결
         self.conn = sqlite3.connect(str(DB_PATH))
 
-        # 테이블 생성
-        self.create_table()
+        self.create_tables()
 
     # -------------------------------------------------
-    # 가격 테이블 생성
+    # 테이블 생성
     # -------------------------------------------------
-    def create_table(self):
 
-        query = """
+    def create_tables(self):
+
+        price_table = """
+
         CREATE TABLE IF NOT EXISTS price_daily (
+
             code TEXT,
+
             date TEXT,
+
+            open REAL,
+
+            high REAL,
+
+            low REAL,
+
             close REAL,
-            dividend REAL,
+
+            volume REAL,
+
             PRIMARY KEY (code, date)
+
         )
+
         """
 
-        self.conn.execute(query)
+        action_table = """
+
+        CREATE TABLE IF NOT EXISTS corporate_actions (
+
+            code TEXT,
+
+            date TEXT,
+
+            dividend REAL,
+
+            split REAL,
+
+            PRIMARY KEY (code, date)
+
+        )
+
+        """
+
+        self.conn.execute(price_table)
+
+        self.conn.execute(action_table)
+
         self.conn.commit()
 
     # -------------------------------------------------
-    # DB에 저장된 날짜 범위 조회
+    # DB 날짜 범위 조회
     # -------------------------------------------------
+
     def get_date_range_in_db(self, code):
 
         query = """
+
         SELECT MIN(date), MAX(date)
+
         FROM price_daily
+
         WHERE code = ?
+
         """
 
         cur = self.conn.execute(query, (code,))
+
         return cur.fetchone()
 
     # -------------------------------------------------
-    # API로 가격 다운로드
+    # API 다운로드
     # -------------------------------------------------
+
     def fetch_from_api(self, code, start, end):
 
         df = yf.download(
+
             code,
+
             start=start,
+
             end=end,
+
             progress=False,
+
             auto_adjust=False,
+
+            actions=True,
+
+            threads=False
+
         )
 
         if df.empty:
-            return df
 
-        # 🔥 MultiIndex 컬럼 평탄화 (중요)
+            return None, None
+
         if isinstance(df.columns, pd.MultiIndex):
+
             df.columns = df.columns.get_level_values(0)
 
         df = df.reset_index()
 
-        # -----------------------------
-        # 배당 데이터 가져오기
-        # -----------------------------
-        ticker = yf.Ticker(code)
-        div = ticker.dividends
-
-        if not div.empty:
-            div = div.reset_index()
-            div["Date"] = div["Date"].dt.strftime("%Y-%m-%d")
-            div = div.rename(columns={"Dividends": "dividend"})
-        else:
-            div = pd.DataFrame(columns=["Date", "dividend"])
-
-        # -----------------------------
-        # 가격 데이터 정리
-        # -----------------------------
         df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
 
         df = df.rename(columns={
+
             "Date": "date",
-            "Close": "close"
+
+            "Open": "open",
+
+            "High": "high",
+
+            "Low": "low",
+
+            "Close": "close",
+
+            "Volume": "volume",
+
+            "Dividends": "dividend",
+
+            "Stock Splits": "split"
+
         })
 
-        df["code"] = code
+        if "dividend" not in df.columns:
 
-        df = df[["code", "date", "close"]]
+            df["dividend"] = 0
 
-        # -----------------------------
-        # 배당 merge
-        # -----------------------------
-        df = df.merge(
-            div.rename(columns={"Date": "date"}),
-            on="date",
-            how="left",
-        )
+        if "split" not in df.columns:
+
+            df["split"] = 1
 
         df["dividend"] = df["dividend"].fillna(0)
 
-        return df[["code", "date", "close", "dividend"]]
+        df["split"] = df["split"].replace(0, 1).fillna(1)
+
+        df["code"] = code
+
+        price_df = df[
+
+            ["code", "date", "open", "high", "low", "close", "volume"]
+
+        ]
+
+        action_df = df[
+
+            ["code", "date", "dividend", "split"]
+
+        ]
+
+        return price_df, action_df
 
     # -------------------------------------------------
-    # 핵심 함수: 필요한 구간만 API 호출
+    # 핵심 함수
     # -------------------------------------------------
+
     def get_price(self, code, start_date, end_date):
 
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
         db_min, db_max = self.get_date_range_in_db(code)
@@ -139,71 +213,111 @@ class PriceLoader:
         else:
 
             db_min = datetime.strptime(db_min, "%Y-%m-%d").date()
+
             db_max = datetime.strptime(db_max, "%Y-%m-%d").date()
 
             if start_date < db_min:
+
                 api_calls.append((start_date, db_min - timedelta(days=1)))
 
             if end_date > db_max:
+
                 api_calls.append((db_max + timedelta(days=1), end_date))
 
         # -------------------------------------------------
-        # 필요한 구간만 API 호출
+        # API 호출
         # -------------------------------------------------
+
         for s, e in api_calls:
 
-            df_new = self.fetch_from_api(
+            price_df, action_df = self.fetch_from_api(
+
                 code,
+
                 s.strftime("%Y-%m-%d"),
+
                 e.strftime("%Y-%m-%d"),
+
             )
 
-            if not df_new.empty:
+            if price_df is not None:
 
-                df_new.to_sql(
+                price_df.to_sql(
+
                     "price_daily",
+
                     self.conn,
+
                     if_exists="append",
+
                     index=False,
+
+                )
+
+                action_df.to_sql(
+
+                    "corporate_actions",
+
+                    self.conn,
+
+                    if_exists="append",
+
+                    index=False,
+
                 )
 
         # -------------------------------------------------
-        # 최종 데이터 반환
+        # DB 조회
         # -------------------------------------------------
-        query = """
-        SELECT date, close, dividend
+
+        price_query = """
+
+        SELECT date, open, high, low, close, volume
+
         FROM price_daily
+
         WHERE code = ?
+
         AND date BETWEEN ? AND ?
-        ORDER BY date
+
         """
 
-        df = pd.read_sql(
-            query,
+        action_query = """
+
+        SELECT date, dividend, split
+
+        FROM corporate_actions
+
+        WHERE code = ?
+
+        AND date BETWEEN ? AND ?
+
+        """
+
+        price_df = pd.read_sql(
+
+            price_query,
+
             self.conn,
-            params=(
-                code,
-                start_date.strftime("%Y-%m-%d"),
-                end_date.strftime("%Y-%m-%d"),
-            ),
+
+            params=(code, start_date, end_date),
+
         )
 
+        action_df = pd.read_sql(
+
+            action_query,
+
+            self.conn,
+
+            params=(code, start_date, end_date),
+
+        )
+
+        df = price_df.merge(action_df, on="date", how="left")
+
+        df["dividend"] = df["dividend"].fillna(0)
+
+        df["split"] = df["split"].fillna(1)
+
         return df
-
-
-# -------------------------------------------------
-# 단독 실행 테스트
-# -------------------------------------------------
-if __name__ == "__main__":
-
-    loader = PriceLoader()
-
-    df = loader.get_price(
-        code="QQQ",
-        start_date="2015-01-01",
-        end_date="2020-12-31",
-    )
-
-    print(df.head())
-    print(df.tail())
-    print("행 수:", len(df))

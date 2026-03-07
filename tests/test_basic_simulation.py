@@ -36,7 +36,7 @@ def main():
 
         initial_capital=1_000_000,
 
-        reinvest_dividend=True
+        dividend_mode="reinvest"
     )
 
     history = result["history"]

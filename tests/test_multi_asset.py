@@ -1,3 +1,12 @@
+import logging
+import warnings
+import subprocess
+import os
+
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+warnings.filterwarnings("ignore")
+os.environ["PYTHONWARNINGS"] = "ignore"
+
 import sys
 from pathlib import Path
 
@@ -52,7 +61,7 @@ def main():
 
         initial_capital=1_000_000,
 
-        reinvest_dividend=True
+        dividend_mode="cash"
     )
 
     history = result["history"]

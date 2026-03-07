@@ -3,22 +3,52 @@ from modules.core.portfolio import Portfolio
 
 
 class BaseRebalanceStrategy:
-    """
-    리밸런싱 전략의 기본 인터페이스
-    """
 
-    def __init__(self, target_weights: Dict[str, float], include_cash: bool = True):
+    def __init__(self, target_weights: Dict[str, float]):
+
         self.target_weights = target_weights
-        self.include_cash = include_cash
 
     def generate_orders(
+
         self,
+
         portfolio: Portfolio,
+
         price_dict: Dict[str, float],
+
     ) -> Dict[str, float]:
-        """
-        각 자산별 목표 금액 차이 계산
-        반환값:
-            { ticker: 목표 대비 추가 매수(+)/매도(-) 금액 }
-        """
-        raise NotImplementedError
+
+        orders = {}
+
+        total_value = portfolio.total_value(price_dict)
+
+        if total_value == 0:
+            return orders
+
+        # -----------------------------
+        # CASH target 존재 여부
+        # -----------------------------
+
+        include_cash = "CASH" in self.target_weights
+
+        current_weights = portfolio.current_weights(
+
+            price_dict,
+
+            include_cash=include_cash
+        )
+
+        for ticker, target_weight in self.target_weights.items():
+
+            if ticker == "CASH":
+                continue
+
+            current_weight = current_weights.get(ticker, 0.0)
+
+            weight_diff = target_weight - current_weight
+
+            target_value_diff = weight_diff * total_value
+
+            orders[ticker] = target_value_diff
+
+        return orders

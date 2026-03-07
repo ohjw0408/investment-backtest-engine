@@ -25,7 +25,7 @@ def run_test(strategy_name, strategy):
 
         initial_capital=1_000_000,
 
-        reinvest_dividend=True
+        dividend_mode="cash"
     )
 
     history = result["history"]

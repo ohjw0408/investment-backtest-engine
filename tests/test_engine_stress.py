@@ -1,3 +1,12 @@
+import logging
+import warnings
+import subprocess
+import os
+
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+warnings.filterwarnings("ignore")
+os.environ["PYTHONWARNINGS"] = "ignore"
+
 import sys
 from pathlib import Path
 

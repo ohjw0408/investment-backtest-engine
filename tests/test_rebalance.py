@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 
-# 프로젝트 루트 path 추가
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from modules.portfolio_engine import PortfolioEngine
@@ -51,10 +50,7 @@ def main():
         "TLT": 0.4
     }
 
-    # -----------------------------
     # Monthly
-    # -----------------------------
-
     monthly = PeriodicRebalance(
         target_weights=weights,
         rebalance_frequency="monthly"
@@ -62,10 +58,7 @@ def main():
 
     run_test("Monthly Rebalance", monthly)
 
-    # -----------------------------
     # Quarterly
-    # -----------------------------
-
     quarterly = PeriodicRebalance(
         target_weights=weights,
         rebalance_frequency="quarterly"
@@ -73,10 +66,7 @@ def main():
 
     run_test("Quarterly Rebalance", quarterly)
 
-    # -----------------------------
     # Yearly
-    # -----------------------------
-
     yearly = PeriodicRebalance(
         target_weights=weights,
         rebalance_frequency="yearly"
@@ -84,10 +74,7 @@ def main():
 
     run_test("Yearly Rebalance", yearly)
 
-    # -----------------------------
     # No rebalance
-    # -----------------------------
-
     none = PeriodicRebalance(
         target_weights=weights,
         rebalance_frequency=None
@@ -95,15 +82,13 @@ def main():
 
     run_test("No Rebalance", none)
 
-    # -----------------------------
     # Drift rebalance
-    # -----------------------------
-
     drift = PeriodicRebalance(
         target_weights=weights,
-        rebalance_frequency=None,
-        drift_threshold=0.05
+        rebalance_frequency=None
     )
+
+    drift.drift_threshold = 0.05
 
     run_test("Drift Rebalance (5%)", drift)
 

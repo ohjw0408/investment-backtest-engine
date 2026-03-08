@@ -20,6 +20,7 @@ tests = [
     "test_missing_price.py",
     "test_engine_integrity.py",
     "test_dca_engine.py",
+    "test_cash_and_dividend_engine.py"
 ]
 
 print("\n====================================")

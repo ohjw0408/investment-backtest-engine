@@ -30,9 +30,23 @@ class PriceLoader:
 
         PRICE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-        self.conn = sqlite3.connect(str(DB_PATH))
+        # ✅ 수정 1 : thread-safe 옵션 추가
+        self.conn = sqlite3.connect(
+            str(DB_PATH),
+            check_same_thread=False
+        )
 
         self.create_tables()
+
+    # -------------------------------------------------
+    # 프로그램 종료 시 DB 연결 종료
+    # -------------------------------------------------
+
+    def __del__(self):
+        try:
+            self.conn.close()
+        except Exception:
+            pass
 
     # -------------------------------------------------
     # 테이블 생성

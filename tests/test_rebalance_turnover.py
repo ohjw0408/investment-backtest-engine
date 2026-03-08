@@ -56,16 +56,18 @@ def main():
     print("Rebalance Turnover Test")
     print("====================================")
 
+    weights = {
+        "QQQ": 0.6,
+        "TLT": 0.4
+    }
+
     # -----------------------------
     # Rebalance 전략
     # -----------------------------
 
     rebalance_strategy = PeriodicRebalance(
 
-        target_weights={
-            "QQQ": 0.6,
-            "TLT": 0.4
-        },
+        target_weights=weights,
 
         rebalance_frequency="monthly"
 
@@ -79,7 +81,15 @@ def main():
     # Buy & Hold 전략
     # -----------------------------
 
-    history_hold = run_simulation(None)
+    hold_strategy = PeriodicRebalance(
+
+        target_weights=weights,
+
+        rebalance_frequency=None
+
+    )
+
+    history_hold = run_simulation(hold_strategy)
 
     turnover_hold = calculate_turnover(history_hold)
 

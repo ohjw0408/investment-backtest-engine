@@ -39,7 +39,29 @@ class OrderExecutor:
             if price <= 0:
                 continue
 
+            # ---------------------------------
+            # 매도 수량 계산
+            # ---------------------------------
+
             quantity = int(abs(value) / price)
+
+            if quantity <= 0:
+                continue
+
+            # ---------------------------------
+            # 포지션 확인
+            # ---------------------------------
+
+            position = portfolio.positions.get(ticker)
+
+            if position is None:
+                continue
+
+            # ---------------------------------
+            # 보유 수량으로 clamp
+            # ---------------------------------
+
+            quantity = min(quantity, int(position.quantity))
 
             if quantity <= 0:
                 continue
@@ -74,4 +96,5 @@ class OrderExecutor:
                 portfolio.buy(ticker, quantity, price)
 
             except ValueError:
+                # 현금 부족
                 continue

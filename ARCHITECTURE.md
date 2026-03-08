@@ -553,3 +553,11 @@ This will enable:
 5️⃣ Inflation-adjusted retirement simulation
 
 6️⃣ Large ETF universe support
+
+
+2026 03 07 추가한 내용
+portfolio analyzer, retirement analyzer, portfolio simulation engine 추가
+
+여러가지 테스트를 한번에 진행할 수 있는 파일들을 만듦. ex-test_cash_and_dividend.py,engine_integrity.py 등등
+
+Implement dividend modes (reinvest/cash/withdraw), greedy cash allocator, withdrawal logic and integration tests

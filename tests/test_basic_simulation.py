@@ -107,12 +107,17 @@ def main():
     print("Weight Sum Check")
     print("====================================")
 
-    print(
-        (
-            history["QQQ_weight"]
-            + history["TLT_weight"]
-        ).head()
+    weight_sum = (
+        history["QQQ_weight"]
+        + history["TLT_weight"]
     )
+
+    print(weight_sum.head())
+
+    if (abs(weight_sum - 1) < 0.01).all():
+        print("PASS: Weight sum valid")
+    else:
+        print("FAIL: Weight sum incorrect")
 
     # -----------------------------
     # 배당 확인
@@ -128,6 +133,11 @@ def main():
 
     print(history["dividend_income"].sum())
 
+    if history["dividend_income"].sum() > 0:
+        print("PASS: Dividend detected")
+    else:
+        print("FAIL: Dividend missing")
+
     # -----------------------------
     # cash drift 확인
     # -----------------------------
@@ -137,6 +147,11 @@ def main():
     print("====================================")
 
     print(history["cash"].describe())
+
+    if history["cash"].mean() < 2000:
+        print("PASS: Cash drift controlled")
+    else:
+        print("FAIL: Cash drift too large")
 
     # -----------------------------
     # Portfolio Analyzer
@@ -157,8 +172,6 @@ def main():
     print("Bottom Date:", analysis["mdd_bottom"])
     print("Recovery Date:", analysis["recovery_date"])
     print("Recovery Days:", analysis["recovery_days"])
-    
-    print(history["cash"].head(50))
 
 
 if __name__ == "__main__":

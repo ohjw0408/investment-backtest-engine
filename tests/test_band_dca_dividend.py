@@ -3,6 +3,8 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+import numpy as np
+
 from modules.portfolio_engine import PortfolioEngine
 from modules.rebalance.periodic import PeriodicRebalance
 from modules.analyzer.engine_rolling_analyzer import EngineRollingAnalyzer
@@ -14,20 +16,32 @@ def main():
 
     engine = PortfolioEngine()
 
+    # ---------------------------------
+    # 포트폴리오 설정
+    # ---------------------------------
+
     weights = {
         "SCHD": 0.7,
         "QQQ": 0.3
     }
 
     strategy = PeriodicRebalance(
+
         target_weights=weights,
-        rebalance_frequency=None,
+
+        rebalance_frequency="monthly",
+
         drift_threshold=0.05
     )
+
+    # ---------------------------------
+    # Rolling Analyzer
+    # ---------------------------------
 
     analyzer = EngineRollingAnalyzer(
 
         engine=engine,
+
         strategy=strategy,
 
         tickers=["SCHD", "QQQ"],
@@ -38,6 +52,7 @@ def main():
         horizon_years=5,
 
         initial_capital=0,
+
         monthly_contribution=5_000_000,
 
         dividend_mode="reinvest"
@@ -46,32 +61,55 @@ def main():
     result = analyzer.run()
 
     wealth = result["wealth_distribution"]
-    dividend = result["dividend_distribution"]
+    terminal_dividend = result["terminal_dividend_distribution"]
+
+    # ---------------------------------
+    # 기본 출력
+    # ---------------------------------
 
     print("\nScenarios:", result["scenario_count"])
 
     print("\nWealth sample:")
     print(wealth[:10])
 
-    print("\nDividend sample:")
-    print(dividend[:10])
+    print("\nTerminal dividend sample:")
+    print(terminal_dividend[:10])
 
-    print("\nAverage wealth:", wealth.mean())
-    print("Median wealth:", wealth.mean())
-    print("Max wealth:", wealth.max())
-    print("Min wealth:", wealth.min())
+    # ---------------------------------
+    # Wealth statistics
+    # ---------------------------------
 
-    print("\nDividend mean:", dividend.mean())
+    print("\n========== Wealth Statistics ==========")
+
+    print("Average wealth:", np.mean(wealth))
+    print("Median wealth:", np.median(wealth))
+    print("Max wealth:", np.max(wealth))
+    print("Min wealth:", np.min(wealth))
+
+    # ---------------------------------
+    # Dividend statistics
+    # ---------------------------------
+
+    print("\n========== Dividend Statistics ==========")
+
+    print("Average terminal dividend:", np.mean(terminal_dividend))
+    print("Median terminal dividend:", np.median(terminal_dividend))
+    print("Max terminal dividend:", np.max(terminal_dividend))
+    print("Min terminal dividend:", np.min(terminal_dividend))
+
+    # ---------------------------------
+    # Sanity check
+    # ---------------------------------
 
     print("\n========== SANITY CHECK ==========")
 
-    if wealth.mean() > 1:
+    if np.mean(wealth) > 1:
         print("✔ DCA investment working")
 
-    if dividend.mean() > 0:
-        print("✔ Dividend reinvest working")
+    if np.mean(terminal_dividend) > 0:
+        print("✔ Dividend generation working")
 
-    if wealth.max() - wealth.min() > 0.2:
+    if np.max(wealth) - np.min(wealth) > 0.2:
         print("✔ Rebalancing / market variance detected")
 
     print("\nTest completed")

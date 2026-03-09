@@ -1,14 +1,13 @@
-import pandas as pd
 import numpy as np
-from dateutil.relativedelta import relativedelta
+import pandas as pd
 
 
 class EngineRollingAnalyzer:
     """
-    Engine-based rolling scenario analyzer
+    PortfolioEngine 기반 Rolling Scenario Analyzer
 
-    PortfolioEngine을 반복 실행하여
-    terminal wealth / dividend distribution을 생성한다.
+    각 시작 시점마다 엔진을 실행하여
+    wealth / dividend distribution 생성
     """
 
     def __init__(
@@ -21,11 +20,12 @@ class EngineRollingAnalyzer:
         horizon_years,
         initial_capital=0,
         monthly_contribution=0,
-        dividend_mode="reinvest",
+        dividend_mode="reinvest"
     ):
 
         self.engine = engine
         self.strategy = strategy
+
         self.tickers = tickers
 
         self.start_date = pd.to_datetime(start_date)
@@ -36,18 +36,6 @@ class EngineRollingAnalyzer:
         self.initial_capital = initial_capital
         self.monthly_contribution = monthly_contribution
 
-        # ---------------------------------
-        # 사용자 선택 배당 처리 방식
-        # ---------------------------------
-
-        allowed_modes = ["reinvest", "cash", "withdraw"]
-
-        if dividend_mode not in allowed_modes:
-            raise ValueError(
-                f"Invalid dividend_mode: {dividend_mode}. "
-                f"Allowed: {allowed_modes}"
-            )
-
         self.dividend_mode = dividend_mode
 
     # -------------------------------------------------
@@ -57,16 +45,21 @@ class EngineRollingAnalyzer:
     def run(self):
 
         wealth_distribution = []
-        dividend_distribution = []
+        total_dividend_distribution = []
+        terminal_dividend_distribution = []
 
         current_start = self.start_date
 
         while True:
 
-            scenario_end = current_start + relativedelta(years=self.horizon_years)
+            scenario_end = current_start + pd.DateOffset(years=self.horizon_years)
 
             if scenario_end > self.end_date:
                 break
+
+            # ---------------------------------
+            # 엔진 실행
+            # ---------------------------------
 
             result = self.engine.run_simulation(
 
@@ -77,61 +70,82 @@ class EngineRollingAnalyzer:
 
                 initial_capital=self.initial_capital,
 
-                strategy=self.strategy,
-
                 monthly_contribution=self.monthly_contribution,
+
+                strategy=self.strategy,
 
                 dividend_mode=self.dividend_mode
             )
 
-            history = result["history"]
+            history = result["history"].copy()
 
-            # ---------------------------------------------
-            # terminal wealth
-            # ---------------------------------------------
+            history["date"] = pd.to_datetime(history["date"])
+            history = history.set_index("date")
 
-            final_value = history["portfolio_value"].iloc[-1]
+            # ---------------------------------
+            # Wealth multiple 계산 (DCA 포함)
+            # ---------------------------------
 
-            invested_capital = (
-                self.initial_capital
-                + self.monthly_contribution * self.horizon_years * 12
+            end_value = history["portfolio_value"].iloc[-1]
+
+            monthly_points = history.resample("ME").last()
+            months = len(monthly_points)
+
+            total_invested = (
+                self.initial_capital +
+                self.monthly_contribution * months
             )
 
-            if invested_capital > 0:
+            if total_invested <= 0:
+                wealth = 0
+            else:
+                wealth = end_value / total_invested
 
-                wealth_multiple = final_value / invested_capital
+            wealth_distribution.append(wealth)
 
-                wealth_distribution.append(wealth_multiple)
-
-            # ---------------------------------------------
-            # dividend distribution
-            # ---------------------------------------------
+            # ---------------------------------
+            # Dividend 계산
+            # ---------------------------------
 
             if "dividend_income" in history.columns:
 
-                total_dividend = history["dividend_income"].sum()
+                monthly_dividend = history["dividend_income"].resample("ME").sum()
 
-                if invested_capital > 0:
+                # 전체 기간 배당
+                total_dividend = monthly_dividend.sum()
 
-                    dividend_yield = total_dividend / invested_capital
+                # 마지막 12개월 배당
+                if len(monthly_dividend) >= 12:
+                    terminal_dividend = monthly_dividend.iloc[-12:].sum()
+                else:
+                    terminal_dividend = monthly_dividend.sum()
 
-                    dividend_distribution.append(dividend_yield)
+            else:
 
-            # ---------------------------------------------
-            # next scenario
-            # ---------------------------------------------
+                total_dividend = 0
+                terminal_dividend = 0
 
-            current_start += relativedelta(months=1)
+            total_dividend_distribution.append(total_dividend)
+            terminal_dividend_distribution.append(terminal_dividend)
+
+            # ---------------------------------
+            # 다음 시작점 (1개월 이동)
+            # ---------------------------------
+
+            current_start = current_start + pd.DateOffset(months=1)
 
         wealth_distribution = np.array(wealth_distribution)
-        dividend_distribution = np.array(dividend_distribution)
+        total_dividend_distribution = np.array(total_dividend_distribution)
+        terminal_dividend_distribution = np.array(terminal_dividend_distribution)
 
         return {
 
+            "scenario_count": len(wealth_distribution),
+
             "wealth_distribution": wealth_distribution,
 
-            "dividend_distribution": dividend_distribution,
+            "total_dividend_distribution": total_dividend_distribution,
 
-            "scenario_count": len(wealth_distribution)
+            "terminal_dividend_distribution": terminal_dividend_distribution
 
         }

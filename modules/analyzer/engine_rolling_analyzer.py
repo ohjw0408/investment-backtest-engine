@@ -3,12 +3,6 @@ import pandas as pd
 
 
 class EngineRollingAnalyzer:
-    """
-    PortfolioEngine 기반 Rolling Scenario Analyzer
-
-    각 시작 시점마다 엔진을 실행하여
-    wealth / dividend distribution 생성
-    """
 
     def __init__(
         self,
@@ -25,7 +19,6 @@ class EngineRollingAnalyzer:
 
         self.engine = engine
         self.strategy = strategy
-
         self.tickers = tickers
 
         self.start_date = pd.to_datetime(start_date)
@@ -39,14 +32,18 @@ class EngineRollingAnalyzer:
         self.dividend_mode = dividend_mode
 
     # -------------------------------------------------
-    # main
-    # -------------------------------------------------
 
     def run(self):
 
         wealth_distribution = []
+        cagr_distribution = []
+        volatility_distribution = []
+        max_drawdown_distribution = []
+
         total_dividend_distribution = []
         terminal_dividend_distribution = []
+        yield_on_cost_distribution = []
+        dividend_cagr_distribution = []
 
         current_start = self.start_date
 
@@ -57,23 +54,16 @@ class EngineRollingAnalyzer:
             if scenario_end > self.end_date:
                 break
 
-            # ---------------------------------
-            # 엔진 실행
-            # ---------------------------------
-
             result = self.engine.run_simulation(
 
                 tickers=self.tickers,
-
                 start_date=current_start.strftime("%Y-%m-%d"),
                 end_date=scenario_end.strftime("%Y-%m-%d"),
 
                 initial_capital=self.initial_capital,
-
                 monthly_contribution=self.monthly_contribution,
 
                 strategy=self.strategy,
-
                 dividend_mode=self.dividend_mode
             )
 
@@ -82,13 +72,16 @@ class EngineRollingAnalyzer:
             history["date"] = pd.to_datetime(history["date"])
             history = history.set_index("date")
 
-            # ---------------------------------
-            # Wealth multiple 계산 (DCA 포함)
-            # ---------------------------------
+            portfolio_series = history["portfolio_value"]
 
-            end_value = history["portfolio_value"].iloc[-1]
+            # -------------------------------------------------
+            # Wealth multiple
+            # -------------------------------------------------
 
-            monthly_points = history.resample("ME").last()
+            end_value = portfolio_series.iloc[-1]
+
+            monthly_points = portfolio_series.resample("ME").last()
+
             months = len(monthly_points)
 
             total_invested = (
@@ -96,31 +89,93 @@ class EngineRollingAnalyzer:
                 self.monthly_contribution * months
             )
 
-            if total_invested <= 0:
-                wealth = 0
+            if total_invested > 0:
+                wealth_multiple = end_value / total_invested
             else:
-                wealth = end_value / total_invested
+                wealth_multiple = 0
 
-            wealth_distribution.append(wealth)
+            wealth_distribution.append(wealth_multiple)
 
-            # ---------------------------------
-            # Dividend 계산
-            # ---------------------------------
+            # -------------------------------------------------
+            # CAGR
+            # -------------------------------------------------
+
+            years = self.horizon_years
+
+            if wealth_multiple > 0:
+                cagr = wealth_multiple ** (1 / years) - 1
+            else:
+                cagr = 0
+
+            cagr_distribution.append(cagr)
+
+            # -------------------------------------------------
+            # Volatility (DCA 제거 return)
+            # -------------------------------------------------
+
+            returns = []
+
+            prev_value = None
+            prev_month = None
+
+            for date, value in portfolio_series.items():
+
+                if prev_value is None:
+                    prev_value = value
+                    prev_month = date.month
+                    continue
+
+                contribution = 0
+
+                if date.month != prev_month:
+                    contribution = self.monthly_contribution
+
+                r = (value - prev_value - contribution) / prev_value
+
+                returns.append(r)
+
+                prev_value = value
+                prev_month = date.month
+
+            returns = np.array(returns)
+
+            if len(returns) > 0:
+                volatility = returns.std() * np.sqrt(252)
+            else:
+                volatility = 0
+
+            volatility_distribution.append(volatility)
+
+            # -------------------------------------------------
+            # Max Drawdown
+            # -------------------------------------------------
+
+            cummax = portfolio_series.cummax()
+
+            drawdown = (portfolio_series - cummax) / cummax
+
+            mdd = drawdown.min()
+
+            max_drawdown_distribution.append(mdd)
+
+            # -------------------------------------------------
+            # Dividend
+            # -------------------------------------------------
 
             if "dividend_income" in history.columns:
 
-                monthly_dividend = history["dividend_income"].resample("ME").sum()
+                monthly_div = history["dividend_income"].resample("ME").sum()
 
-                # 전체 기간 배당
-                total_dividend = monthly_dividend.sum()
+                total_dividend = monthly_div.sum()
 
-                # 마지막 12개월 배당
-                if len(monthly_dividend) >= 12:
-                    terminal_dividend = monthly_dividend.iloc[-12:].sum()
+                if len(monthly_div) >= 12:
+                    terminal_dividend = monthly_div.iloc[-12:].sum()
                 else:
-                    terminal_dividend = monthly_dividend.sum()
+                    terminal_dividend = monthly_div.sum()
 
             else:
+
+                monthly_div = pd.Series(dtype=float)
 
                 total_dividend = 0
                 terminal_dividend = 0
@@ -128,24 +183,91 @@ class EngineRollingAnalyzer:
             total_dividend_distribution.append(total_dividend)
             terminal_dividend_distribution.append(terminal_dividend)
 
-            # ---------------------------------
-            # 다음 시작점 (1개월 이동)
-            # ---------------------------------
+            # -------------------------------------------------
+            # Yield on Cost
+            # -------------------------------------------------
+
+            if total_invested > 0:
+                yoc = terminal_dividend / total_invested
+            else:
+                yoc = 0
+
+            yield_on_cost_distribution.append(yoc)
+
+            # -------------------------------------------------
+            # Dividend CAGR (DCA 보정)
+            # -------------------------------------------------
+
+            if len(monthly_div) >= 12:
+
+                months = len(monthly_div)
+
+                invested_capital = (
+                    self.initial_capital +
+                    np.arange(1, months + 1) * self.monthly_contribution
+                )
+
+                ttm_div = monthly_div.rolling(12).sum()
+
+                yield_series = ttm_div / invested_capital
+
+                yield_series = yield_series.dropna()
+
+                # 🔧 초기 TTM 안정화 구간 제거 (추가된 한 줄)
+                yield_series = yield_series.iloc[12:]
+
+                if len(yield_series) > 1:
+
+                    first_yield = yield_series.iloc[0]
+                    last_yield = yield_series.iloc[-1]
+
+                    if first_yield > 0 and last_yield > 0:
+
+                        dividend_cagr = (
+                            (last_yield / first_yield) ** (1 / years) - 1
+                        )
+
+                    else:
+
+                        dividend_cagr = 0
+
+                else:
+
+                    dividend_cagr = 0
+
+            else:
+
+                dividend_cagr = 0
+
+            dividend_cagr_distribution.append(dividend_cagr)
+
+            # -------------------------------------------------
 
             current_start = current_start + pd.DateOffset(months=1)
 
+        # -------------------------------------------------
+
         wealth_distribution = np.array(wealth_distribution)
+        cagr_distribution = np.array(cagr_distribution)
+        volatility_distribution = np.array(volatility_distribution)
+        max_drawdown_distribution = np.array(max_drawdown_distribution)
+
         total_dividend_distribution = np.array(total_dividend_distribution)
         terminal_dividend_distribution = np.array(terminal_dividend_distribution)
+        yield_on_cost_distribution = np.array(yield_on_cost_distribution)
+        dividend_cagr_distribution = np.array(dividend_cagr_distribution)
 
         return {
 
             "scenario_count": len(wealth_distribution),
 
             "wealth_distribution": wealth_distribution,
+            "cagr_distribution": cagr_distribution,
+            "volatility_distribution": volatility_distribution,
+            "max_drawdown_distribution": max_drawdown_distribution,
 
             "total_dividend_distribution": total_dividend_distribution,
-
-            "terminal_dividend_distribution": terminal_dividend_distribution
-
+            "terminal_dividend_distribution": terminal_dividend_distribution,
+            "yield_on_cost_distribution": yield_on_cost_distribution,
+            "dividend_cagr_distribution": dividend_cagr_distribution
         }

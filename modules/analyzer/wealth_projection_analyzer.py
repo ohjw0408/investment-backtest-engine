@@ -5,15 +5,10 @@ class WealthProjectionAnalyzer:
     """
     Wealth Projection Analyzer
 
-    RollingScenarioAnalyzer가 생성한
-    wealth multiple distribution을 분석한다.
+    EngineRollingAnalyzer가 생성한
+    wealth 관련 distribution을 분석한다.
 
-    반환값은 다음을 포함한다.
-
-    - raw distribution
-    - summary statistics
-    - percentiles
-    - distribution shape metrics
+    raw distribution은 반환하지 않는다.
     """
 
     def analyze(self, wealth_distribution):
@@ -73,13 +68,8 @@ class WealthProjectionAnalyzer:
 
         result = {
 
-            # raw distribution
-            "distribution": dist,
-
-            # scenario count
             "scenario_count": dist.size,
 
-            # summary
             "summary": {
                 "mean": mean,
                 "median": median,
@@ -87,16 +77,13 @@ class WealthProjectionAnalyzer:
                 "variance": variance
             },
 
-            # percentiles
             "percentiles": percentiles,
 
-            # extremes
             "extremes": {
                 "best": best,
                 "worst": worst
             },
 
-            # distribution shape
             "shape": {
                 "skewness": skewness,
                 "kurtosis": kurtosis

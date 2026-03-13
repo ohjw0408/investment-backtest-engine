@@ -17,14 +17,20 @@ tests = [
     "test_dividend_projection_analyzer.py",
     "test_engine_dca_simulation.py",
     "test_engine_integrity.py",
+    "test_engine_rolling_analyzer.py",
     "test_engine_stress.py",
-    "test_multi_asset.py",
-    "test_rebalance.py",
-    "test_portfolio_accounting.py",
-    "test_weight_drift.py",
-    "test_dividend_flow.py",
-    "test_rebalance_turnover.py",
     "test_missing_price.py",
+    "test_multi_asset.py",
+    "test_portfolio_accounting.py",
+    "test_projection_analyzers.py",
+    "test_rebalance_turnover.py",
+    "test_rebalance.py",
+    "test_retirement_simulation.py",
+    "test_rolling_scenario_analyzer.py",
+    "test_wealth projection_analyzer.py",
+    "test_weight_drift.py",
+    
+    
     
     
     

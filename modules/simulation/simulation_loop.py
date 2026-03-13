@@ -58,6 +58,7 @@ class SimulationLoop:
             # ── 첫날: 초기 현금을 주식으로 매수 ──────────────
             if is_first_day:
                 is_first_day = False
+                self._initial_capital_cf = getattr(config, "initial_capital", 0.0)
                 cash_target  = config.target_weights.get("CASH", 0)
                 if cash_target == 0 and portfolio.cash > 0:
                     self.cash_allocator.allocate_cash(
@@ -74,6 +75,12 @@ class SimulationLoop:
                 date,
                 config.dividend_mode
             )
+
+            # ── withdraw 모드: 배당금을 sweep 전에 미리 차감 ──
+            # contribution sweep이 배당금까지 매수하는 것을 방지
+            dividend_total = sum(dividend_by_ticker.values())
+            if config.dividend_mode == "withdraw" and dividend_total > 0:
+                portfolio.cash -= dividend_total
 
             # ── contribution (월 1회) ─────────────────────────
             last_month = self.contribution_engine.process(
@@ -112,9 +119,11 @@ class SimulationLoop:
                 orders = strategy.generate_orders(portfolio, price_dict)
                 self.executor.execute_orders(portfolio, orders, price_dict)
 
-            # ── dividend reinvest cash sweep ──────────────────
-            # withdrawal 모드가 아닐 때만 배당 재투자
-            if config.dividend_mode == "reinvest" and config.withdrawal_amount == 0:
+            # ── dividend reinvest / withdraw cash sweep ───────
+            # reinvest: 배당 재투자
+            # withdraw: 배당은 이미 차감, 리밸런싱 잔돈 sweep
+            # 둘 다 withdrawal_amount == 0 일 때만
+            if config.dividend_mode in ("reinvest", "withdraw") and config.withdrawal_amount == 0:
                 cash_target = config.target_weights.get("CASH", 0)
                 if cash_target == 0:
                     self.cash_allocator.allocate_cash(
@@ -129,6 +138,11 @@ class SimulationLoop:
             if current_month_key != getattr(self, "_last_cf_month", None):
                 self._last_cf_month = current_month_key
                 cash_flow = config.monthly_contribution - config.withdrawal_amount
+                # 첫 달: 초기자본 추가
+                initial_cf = getattr(self, "_initial_capital_cf", 0.0)
+                if initial_cf > 0:
+                    cash_flow += initial_cf
+                    self._initial_capital_cf = 0.0
             else:
                 cash_flow = 0.0
 

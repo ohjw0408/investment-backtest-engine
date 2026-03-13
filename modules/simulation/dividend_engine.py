@@ -9,7 +9,6 @@ class DividendEngine:
         dividend_mode
     ):
 
-        # ✅ 합산값 대신 ticker별 딕셔너리로 반환
         dividend_by_ticker = {}
 
         for ticker, position in portfolio.positions.items():
@@ -28,13 +27,8 @@ class DividendEngine:
 
                 dividend_by_ticker[ticker] = dividend_cash
 
-                if dividend_mode == "reinvest":
-                    portfolio.cash += dividend_cash
-
-                elif dividend_mode == "cash":
-                    portfolio.cash += dividend_cash
-
-                elif dividend_mode == "withdraw":
-                    pass
+                # 모든 모드에서 일단 현금에 입금
+                # withdraw 모드의 출금 처리는 simulation_loop에서 담당
+                portfolio.cash += dividend_cash
 
         return dividend_by_ticker

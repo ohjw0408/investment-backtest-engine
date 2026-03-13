@@ -46,7 +46,7 @@ ACC_CONFIG = dict(
     data_start           = "2012-01-01",
     data_end             = "2022-01-01",
     accumulation_years   = 5,
-    monthly_contribution = 5_000_000,
+    monthly_contribution = 500_000,
     initial_capital      = 0,
     dividend_mode        = "reinvest",
     step_months          = 6,
@@ -234,7 +234,7 @@ try:
         wd_config          = {k: v for k, v in WD_CONFIG.items()
                               if k not in ("initial_capital", "monthly_withdrawal",
                                            "withdrawal_years", "inflation", "verbose")},
-        monthly_withdrawal = 20_000_000,
+        monthly_withdrawal = 2_000_000,
         withdrawal_years   = 5,
         inflation          = 0.0,
         verbose            = True,

@@ -190,12 +190,16 @@ class AccumulationAnalyzer:
             # 마지막 시점 종료자산을 현금유출(음수)로 추가
             terminal_cf = pd.DataFrame([{
                 "date":      history["date"].iloc[-1],
-                "cash_flow": -float(pv.iloc[-1]),
+                "cash_flow": float(pv.iloc[-1]),  # 회수: 양수
             }])
             cf = pd.concat([cf, terminal_cf], ignore_index=True)
             cf["date"] = pd.to_datetime(cf["date"])
             cf = cf.sort_values("date").reset_index(drop=True)
-            cashflows = cf["cash_flow"].tolist()
+            # IRR 부호 규칙: 납입(지출)=음수, 회수(수입)=양수
+            # terminal_cf(종료자산)는 양수, 나머지 납입은 음수로 변환
+            contrib_cfs = [-c for c in cf["cash_flow"].iloc[:-1].tolist()]
+            terminal    = float(cf["cash_flow"].iloc[-1])
+            cashflows   = contrib_cfs + [terminal]
 
             # Newton-Raphson으로 월간 IRR 계산
             if len(cashflows) >= 2 and any(c < 0 for c in cashflows) and any(c > 0 for c in cashflows):
@@ -211,7 +215,7 @@ class AccumulationAnalyzer:
                             rate = new_rate
                             break
                         rate = new_rate
-                    if -0.5 < rate < 1.0:
+                    if -0.9 < rate < 10.0:
                         mwr = (1 + rate) ** 12 - 1  # 월간 → 연간
                 except Exception:
                     mwr = 0.0

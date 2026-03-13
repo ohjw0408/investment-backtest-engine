@@ -7,7 +7,7 @@ class EngineRollingAnalyzer:
     def __init__(
         self,
         engine,
-        strategy,
+        strategy_factory,
         tickers,
         start_date,
         end_date,
@@ -18,7 +18,7 @@ class EngineRollingAnalyzer:
     ):
 
         self.engine = engine
-        self.strategy = strategy
+        self.strategy_factory = strategy_factory
         self.tickers = tickers
 
         self.start_date = pd.to_datetime(start_date)
@@ -54,6 +54,9 @@ class EngineRollingAnalyzer:
             if scenario_end > self.end_date:
                 break
 
+            # ✅ 매 회차마다 전략 객체 새로 생성
+            strategy = self.strategy_factory()
+
             result = self.engine.run_simulation(
 
                 tickers=self.tickers,
@@ -63,7 +66,7 @@ class EngineRollingAnalyzer:
                 initial_capital=self.initial_capital,
                 monthly_contribution=self.monthly_contribution,
 
-                strategy=self.strategy,
+                strategy=strategy,
                 dividend_mode=self.dividend_mode
             )
 
@@ -110,37 +113,20 @@ class EngineRollingAnalyzer:
             cagr_distribution.append(cagr)
 
             # -------------------------------------------------
-            # Volatility (DCA 제거 return)
+            # Volatility (월간 수익률 기반)
             # -------------------------------------------------
 
-            returns = []
+            monthly_points = portfolio_series.resample("ME").last()
 
-            prev_value = None
-            prev_month = None
+            if self.monthly_contribution > 0:
+                prev_values = monthly_points.shift(1)
+                adjusted = monthly_points - self.monthly_contribution
+                monthly_returns = (adjusted / prev_values - 1).dropna()
+            else:
+                monthly_returns = monthly_points.pct_change().dropna()
 
-            for date, value in portfolio_series.items():
-
-                if prev_value is None:
-                    prev_value = value
-                    prev_month = date.month
-                    continue
-
-                contribution = 0
-
-                if date.month != prev_month:
-                    contribution = self.monthly_contribution
-
-                r = (value - prev_value - contribution) / prev_value
-
-                returns.append(r)
-
-                prev_value = value
-                prev_month = date.month
-
-            returns = np.array(returns)
-
-            if len(returns) > 0:
-                volatility = returns.std() * np.sqrt(252)
+            if len(monthly_returns) > 0:
+                volatility = monthly_returns.std() * np.sqrt(12)
             else:
                 volatility = 0
 
@@ -159,7 +145,7 @@ class EngineRollingAnalyzer:
             max_drawdown_distribution.append(mdd)
 
             # -------------------------------------------------
-            # Dividend
+            # Dividend (합산)
             # -------------------------------------------------
 
             if "dividend_income" in history.columns:
@@ -195,49 +181,14 @@ class EngineRollingAnalyzer:
             yield_on_cost_distribution.append(yoc)
 
             # -------------------------------------------------
-            # Dividend CAGR (DCA 보정)
+            # ✅ Dividend CAGR — DPS 기반 (수량 증가 효과 제거)
+            #
+            # 각 종목별로:
+            #   DPS(t) = ticker_dividend(t) / ticker_quantity(t)
+            # 연간 DPS 합산 후 CAGR 계산
             # -------------------------------------------------
 
-            if len(monthly_div) >= 12:
-
-                months = len(monthly_div)
-
-                invested_capital = (
-                    self.initial_capital +
-                    np.arange(1, months + 1) * self.monthly_contribution
-                )
-
-                ttm_div = monthly_div.rolling(12).sum()
-
-                yield_series = ttm_div / invested_capital
-
-                yield_series = yield_series.dropna()
-
-                # 🔧 초기 TTM 안정화 구간 제거 (추가된 한 줄)
-                yield_series = yield_series.iloc[12:]
-
-                if len(yield_series) > 1:
-
-                    first_yield = yield_series.iloc[0]
-                    last_yield = yield_series.iloc[-1]
-
-                    if first_yield > 0 and last_yield > 0:
-
-                        dividend_cagr = (
-                            (last_yield / first_yield) ** (1 / years) - 1
-                        )
-
-                    else:
-
-                        dividend_cagr = 0
-
-                else:
-
-                    dividend_cagr = 0
-
-            else:
-
-                dividend_cagr = 0
+            dividend_cagr = self._calc_dividend_cagr(history)
 
             dividend_cagr_distribution.append(dividend_cagr)
 
@@ -271,3 +222,81 @@ class EngineRollingAnalyzer:
             "yield_on_cost_distribution": yield_on_cost_distribution,
             "dividend_cagr_distribution": dividend_cagr_distribution
         }
+
+    # -------------------------------------------------
+    # DPS 기반 Dividend CAGR 계산
+    # -------------------------------------------------
+
+    def _calc_dividend_cagr(self, history: pd.DataFrame) -> float:
+        """
+        종목별 DPS(주당배당금) 기반 가중평균으로 배당 성장률 계산.
+
+        각 배당 발생일마다:
+            weighted_DPS(t) = Σ ( ticker_weight(t) × ticker_DPS(t) )
+            ticker_DPS(t)   = ticker_dividend(t) / ticker_quantity(t)
+
+        연간 weighted_DPS 합산 후:
+            CAGR = (마지막해 DPS / 첫해 DPS) ^ (1/n) - 1
+        """
+
+        # 배당 발생한 날 전체 수집 (어느 종목이든 배당 있는 날)
+        div_cols = [f"{t}_dividend" for t in self.tickers
+                    if f"{t}_dividend" in history.columns]
+
+        if not div_cols:
+            return 0.0
+
+        any_div_mask = history[div_cols].sum(axis=1) > 0
+        div_days = history[any_div_mask].copy()
+
+        if len(div_days) == 0:
+            return 0.0
+
+        weighted_dps_series = pd.Series(0.0, index=div_days.index)
+
+        for ticker in self.tickers:
+
+            div_col    = f"{ticker}_dividend"
+            qty_col    = f"{ticker}_quantity"
+            weight_col = f"{ticker}_weight"
+
+            if div_col not in history.columns:
+                continue
+            if qty_col not in history.columns:
+                continue
+            if weight_col not in history.columns:
+                continue
+
+            div     = div_days[div_col]
+            qty     = div_days[qty_col]
+            weight  = div_days[weight_col]
+
+            # 배당 발생 + 수량 > 0 인 날만 유효
+            valid = (div > 0) & (qty > 0)
+
+            dps = pd.Series(0.0, index=div_days.index)
+            dps[valid] = div[valid] / qty[valid]
+
+            weighted_dps_series += weight * dps
+
+        # 연간 weighted DPS 합산
+        yearly_dps = weighted_dps_series.resample("YE").sum()
+        yearly_dps = yearly_dps[yearly_dps > 0]
+
+        # ✅ 첫해/마지막해 무조건 제거
+        # 윈도우 시작/종료가 1월이 아니면 첫해·마지막해 배당이 불완전함
+        # (예: 4월 시작이면 첫해는 4~12월 배당만 잡힘)
+        if len(yearly_dps) > 2:
+            yearly_dps = yearly_dps.iloc[1:-1]
+
+        if len(yearly_dps) < 2:
+            return 0.0
+
+        first_dps = yearly_dps.iloc[0]
+        last_dps  = yearly_dps.iloc[-1]
+        n         = len(yearly_dps) - 1
+
+        if first_dps <= 0:
+            return 0.0
+
+        return float((last_dps / first_dps) ** (1 / n) - 1)

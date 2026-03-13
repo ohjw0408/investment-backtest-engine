@@ -9,7 +9,14 @@ os.environ["PYTHONWARNINGS"] = "ignore"
 
 
 tests = [
+    "test_band_dca_dividend.py",
     "test_basic_simulation.py",
+    "test_cash_and_dividend_engine.py",
+    "test_dca_engine.py",
+    "test_dividend_flow.py",
+    "test_dividend_projection_analyzer.py",
+    "test_engine_dca_simulation.py",
+    "test_engine_integrity.py",
     "test_engine_stress.py",
     "test_multi_asset.py",
     "test_rebalance.py",
@@ -18,9 +25,9 @@ tests = [
     "test_dividend_flow.py",
     "test_rebalance_turnover.py",
     "test_missing_price.py",
-    "test_engine_integrity.py",
-    "test_dca_engine.py",
-    "test_cash_and_dividend_engine.py"
+    
+    
+    
 ]
 
 print("\n====================================")

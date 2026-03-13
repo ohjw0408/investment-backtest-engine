@@ -43,36 +43,15 @@ def main():
     engine = PortfolioEngine()
 
     weights = {
-        "SCHD": 0.7,
-        "QQQ": 0.3
+        "SCHD": 1.0,
+        "QQQ": 0.0
     }
 
-    strategy = PeriodicRebalance(
+    # ✅ 단일 시뮬 확인용은 별도 strategy 객체 사용
+    test_strategy = PeriodicRebalance(
         target_weights=weights,
         rebalance_frequency="monthly"
     )
-
-    # -------------------------------------------------
-    # 🔎 history 구조 확인용 단일 시뮬레이션
-    # -------------------------------------------------
-
-    test = engine.run_simulation(
-        tickers=["SCHD", "QQQ"],
-        start_date="2012-01-01",
-        end_date="2017-01-01",
-        initial_capital=0,
-        monthly_contribution=5_000_000,
-        strategy=strategy
-    )
-
-    print("\n===== HISTORY COLUMNS =====")
-    print(test["history"].columns)
-
-    print("\n===== HISTORY SAMPLE HEAD =====")
-    print(test["history"].head(10))
-
-    print("\n===== HISTORY SAMPLE TAIL =====")
-    print(test["history"].tail(10))
 
     # -------------------------------------------------
     # Rolling analyzer 실행
@@ -81,7 +60,12 @@ def main():
     analyzer = EngineRollingAnalyzer(
 
         engine=engine,
-        strategy=strategy,
+
+        # ✅ BUG-1 픽스: lambda로 감싸서 매 회차마다 새 객체 생성
+        strategy_factory=lambda: PeriodicRebalance(
+            target_weights=weights,
+            rebalance_frequency="monthly"
+        ),
 
         tickers=["SCHD", "QQQ"],
 

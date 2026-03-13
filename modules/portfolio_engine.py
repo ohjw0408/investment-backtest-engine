@@ -67,8 +67,9 @@ class PortfolioEngine:
         history_df = recorder.to_dataframe()
 
         return {
-            "history": history_df,
-            "final_value": history_df["portfolio_value"].iloc[-1]
+            "history":     history_df,
+            "final_value": history_df["portfolio_value"].iloc[-1],
+            "portfolio":   portfolio  # ✅ 추가: 인출기 인계용
         }
 
     # -------------------------------------------------
@@ -83,23 +84,25 @@ class PortfolioEngine:
         end_date,
         initial_capital,
         strategy,
-        monthly_contribution=0,
-        withdrawal_amount=0,
-        dividend_mode="reinvest"
+        monthly_contribution = 0,
+        withdrawal_amount    = 0,
+        dividend_mode        = "reinvest",
+        inflation            = 0.0,  # ✅ 추가
 
     ):
 
         config = SimulationConfig(
 
-            start_date=start_date,
-            end_date=end_date,
-            tickers=tickers,
-            target_weights=strategy.target_weights,
-            initial_capital=initial_capital,
-            monthly_contribution=monthly_contribution,
-            withdrawal_amount=withdrawal_amount,
-            dividend_mode=dividend_mode,
-            rebalance_frequency=strategy.rebalance_frequency
+            start_date           = start_date,
+            end_date             = end_date,
+            tickers              = tickers,
+            target_weights       = strategy.target_weights,
+            initial_capital      = initial_capital,
+            monthly_contribution = monthly_contribution,
+            withdrawal_amount    = withdrawal_amount,
+            dividend_mode        = dividend_mode,
+            rebalance_frequency  = strategy.rebalance_frequency,
+            inflation            = inflation,  # ✅ 추가
         )
 
         return self.run(config, strategy)

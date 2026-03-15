@@ -11,9 +11,10 @@ class ContributionEngine:
         if monthly_contribution <= 0:
             return last_month
 
-        if last_month != date.month:
+        current_month = (date.year, date.month)
 
+        if last_month != current_month:
             portfolio.cash += monthly_contribution
-            last_month = date.month
+            last_month = current_month
 
         return last_month

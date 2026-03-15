@@ -1,21 +1,163 @@
-code,name
-SPY,SPDR S&P 500 ETF Trust
-QQQ,Invesco QQQ Trust
-DIA,SPDR Dow Jones Industrial Average ETF
-IWM,iShares Russell 2000 ETF
-TLT,iShares 20+ Year Treasury Bond ETF
-IEF,iShares 7-10 Year Treasury Bond ETF
-SHY,iShares 1-3 Year Treasury Bond ETF
-LQD,iShares iBoxx Investment Grade Corporate Bond ETF
-HYG,iShares iBoxx High Yield Corporate Bond ETF
-GLD,SPDR Gold Shares
-SLV,iShares Silver Trust
-DBC,Invesco DB Commodity Index Tracking Fund
-USO,United States Oil Fund
-VNQ,Vanguard Real Estate ETF
-SCHH,Schwab U.S. REIT ETF
-VEA,Vanguard FTSE Developed Markets ETF
-VWO,Vanguard FTSE Emerging Markets ETF
-MTUM,iShares MSCI USA Momentum Factor ETF
-QUAL,iShares MSCI USA Quality Factor ETF
-USMV,iShares MSCI USA Min Vol Factor ETF
+code,name,category
+SPY,SPDR S&P 500 ETF Trust,US Equity - Large Cap Blend
+VOO,Vanguard S&P 500 ETF,US Equity - Large Cap Blend
+IVV,iShares Core S&P 500 ETF,US Equity - Large Cap Blend
+VTI,Vanguard Total Stock Market ETF,US Equity - Total Market
+ITOT,iShares Core S&P Total U.S. Stock Market ETF,US Equity - Total Market
+SCHB,Schwab U.S. Broad Market ETF,US Equity - Total Market
+QQQ,Invesco QQQ Trust,US Equity - Large Cap Growth
+QQQM,Invesco Nasdaq 100 ETF,US Equity - Large Cap Growth
+VUG,Vanguard Growth ETF,US Equity - Large Cap Growth
+IWF,iShares Russell 1000 Growth ETF,US Equity - Large Cap Growth
+SCHG,Schwab U.S. Large-Cap Growth ETF,US Equity - Large Cap Growth
+VTV,Vanguard Value ETF,US Equity - Large Cap Value
+IWD,iShares Russell 1000 Value ETF,US Equity - Large Cap Value
+SCHV,Schwab U.S. Large-Cap Value ETF,US Equity - Large Cap Value
+DIA,SPDR Dow Jones Industrial Average ETF,US Equity - Large Cap Blend
+IWM,iShares Russell 2000 ETF,US Equity - Small Cap Blend
+VB,Vanguard Small-Cap ETF,US Equity - Small Cap Blend
+SCHA,Schwab U.S. Small-Cap ETF,US Equity - Small Cap Blend
+IJR,iShares Core S&P Small-Cap ETF,US Equity - Small Cap Blend
+VBK,Vanguard Small-Cap Growth ETF,US Equity - Small Cap Growth
+VBR,Vanguard Small-Cap Value ETF,US Equity - Small Cap Value
+VO,Vanguard Mid-Cap ETF,US Equity - Mid Cap Blend
+IJH,iShares Core S&P Mid-Cap ETF,US Equity - Mid Cap Blend
+SCHM,Schwab U.S. Mid-Cap ETF,US Equity - Mid Cap Blend
+SCHD,Schwab U.S. Dividend Equity ETF,US Equity - Dividend
+VYM,Vanguard High Dividend Yield ETF,US Equity - Dividend
+DVY,iShares Select Dividend ETF,US Equity - Dividend
+HDV,iShares Core High Dividend ETF,US Equity - Dividend
+DGRO,iShares Core Dividend Growth ETF,US Equity - Dividend Growth
+VIG,Vanguard Dividend Appreciation ETF,US Equity - Dividend Growth
+NOBL,ProShares S&P 500 Dividend Aristocrats ETF,US Equity - Dividend Growth
+DGRW,WisdomTree U.S. Quality Dividend Growth Fund,US Equity - Dividend Growth
+MTUM,iShares MSCI USA Momentum Factor ETF,US Equity - Factor
+QUAL,iShares MSCI USA Quality Factor ETF,US Equity - Factor
+USMV,iShares MSCI USA Min Vol Factor ETF,US Equity - Factor
+VLUE,iShares MSCI USA Value Factor ETF,US Equity - Factor
+SIZE,iShares MSCI USA Size Factor ETF,US Equity - Factor
+SPHQ,Invesco S&P 500 Quality ETF,US Equity - Factor
+XLK,Technology Select Sector SPDR Fund,US Sector - Technology
+VGT,Vanguard Information Technology ETF,US Sector - Technology
+SOXX,iShares Semiconductor ETF,US Sector - Technology
+SMH,VanEck Semiconductor ETF,US Sector - Technology
+XLV,Health Care Select Sector SPDR Fund,US Sector - Healthcare
+VHT,Vanguard Health Care ETF,US Sector - Healthcare
+XLF,Financial Select Sector SPDR Fund,US Sector - Financials
+VFH,Vanguard Financials ETF,US Sector - Financials
+KRE,SPDR S&P Regional Banking ETF,US Sector - Financials
+XLE,Energy Select Sector SPDR Fund,US Sector - Energy
+VDE,Vanguard Energy ETF,US Sector - Energy
+XLU,Utilities Select Sector SPDR Fund,US Sector - Utilities
+VPU,Vanguard Utilities ETF,US Sector - Utilities
+XLP,Consumer Staples Select Sector SPDR Fund,US Sector - Consumer Staples
+VDC,Vanguard Consumer Staples ETF,US Sector - Consumer Staples
+XLY,Consumer Discretionary Select Sector SPDR Fund,US Sector - Consumer Discretionary
+VCR,Vanguard Consumer Discretionary ETF,US Sector - Consumer Discretionary
+XLI,Industrial Select Sector SPDR Fund,US Sector - Industrials
+VIS,Vanguard Industrials ETF,US Sector - Industrials
+XLB,Materials Select Sector SPDR Fund,US Sector - Materials
+VAW,Vanguard Materials ETF,US Sector - Materials
+XLRE,Real Estate Select Sector SPDR Fund,US Sector - Real Estate
+VNQ,Vanguard Real Estate ETF,US Sector - Real Estate
+SCHH,Schwab U.S. REIT ETF,US Sector - Real Estate
+XLC,Communication Services Select Sector SPDR Fund,US Sector - Communication
+VOX,Vanguard Communication Services ETF,US Sector - Communication
+TLT,iShares 20+ Year Treasury Bond ETF,US Bond - Long Treasury
+IEF,iShares 7-10 Year Treasury Bond ETF,US Bond - Intermediate Treasury
+SHY,iShares 1-3 Year Treasury Bond ETF,US Bond - Short Treasury
+SCHO,Schwab Short-Term U.S. Treasury ETF,US Bond - Short Treasury
+SCHR,Schwab Intermediate-Term U.S. Treasury ETF,US Bond - Intermediate Treasury
+SCHQ,Schwab Long-Term U.S. Treasury ETF,US Bond - Long Treasury
+VGLT,Vanguard Long-Term Treasury ETF,US Bond - Long Treasury
+VGIT,Vanguard Intermediate-Term Treasury ETF,US Bond - Intermediate Treasury
+VGSH,Vanguard Short-Term Treasury ETF,US Bond - Short Treasury
+TIP,iShares TIPS Bond ETF,US Bond - TIPS
+VTIP,Vanguard Short-Term Inflation-Protected Securities ETF,US Bond - TIPS
+STIP,iShares 0-5 Year TIPS Bond ETF,US Bond - TIPS
+AGG,iShares Core U.S. Aggregate Bond ETF,US Bond - Aggregate
+BND,Vanguard Total Bond Market ETF,US Bond - Aggregate
+SCHZ,Schwab U.S. Aggregate Bond ETF,US Bond - Aggregate
+LQD,iShares iBoxx Investment Grade Corporate Bond ETF,US Bond - Corporate IG
+VCIT,Vanguard Intermediate-Term Corporate Bond ETF,US Bond - Corporate IG
+VCSH,Vanguard Short-Term Corporate Bond ETF,US Bond - Corporate IG
+USIG,iShares Broad USD Investment Grade Corporate Bond ETF,US Bond - Corporate IG
+HYG,iShares iBoxx High Yield Corporate Bond ETF,US Bond - High Yield
+JNK,SPDR Bloomberg High Yield Bond ETF,US Bond - High Yield
+USHY,iShares Broad USD High Yield Corporate Bond ETF,US Bond - High Yield
+MUB,iShares National Muni Bond ETF,US Bond - Municipal
+VTEB,Vanguard Tax-Exempt Bond ETF,US Bond - Municipal
+MBB,iShares MBS ETF,US Bond - MBS
+VMBS,Vanguard Mortgage-Backed Securities ETF,US Bond - MBS
+BNDX,Vanguard Total International Bond ETF,International Bond
+IAGG,iShares Core International Aggregate Bond ETF,International Bond
+EMB,iShares JP Morgan USD Emerging Markets Bond ETF,Emerging Markets Bond
+VWOB,Vanguard Emerging Markets Government Bond ETF,Emerging Markets Bond
+VEA,Vanguard FTSE Developed Markets ETF,International Equity - Developed
+IEFA,iShares Core MSCI EAFE ETF,International Equity - Developed
+EFA,iShares MSCI EAFE ETF,International Equity - Developed
+SCHF,Schwab International Equity ETF,International Equity - Developed
+VWO,Vanguard FTSE Emerging Markets ETF,International Equity - Emerging
+IEMG,iShares Core MSCI Emerging Markets ETF,International Equity - Emerging
+EEM,iShares MSCI Emerging Markets ETF,International Equity - Emerging
+VT,Vanguard Total World Stock ETF,Global Equity
+ACWI,iShares MSCI ACWI ETF,Global Equity
+URTH,iShares MSCI World ETF,Global Equity
+EWJ,iShares MSCI Japan ETF,International Equity - Country
+EWG,iShares MSCI Germany ETF,International Equity - Country
+EWU,iShares MSCI United Kingdom ETF,International Equity - Country
+EWC,iShares MSCI Canada ETF,International Equity - Country
+EWA,iShares MSCI Australia ETF,International Equity - Country
+EWZ,iShares MSCI Brazil ETF,International Equity - Country
+EWY,iShares MSCI South Korea ETF,International Equity - Country
+MCHI,iShares MSCI China ETF,International Equity - Country
+FXI,iShares China Large-Cap ETF,International Equity - Country
+INDA,iShares MSCI India ETF,International Equity - Country
+GLD,SPDR Gold Shares,Commodity - Gold
+IAU,iShares Gold Trust,Commodity - Gold
+GLDM,SPDR Gold MiniShares Trust,Commodity - Gold
+SLV,iShares Silver Trust,Commodity - Silver
+PPLT,abrdn Physical Platinum Shares ETF,Commodity - Precious Metals
+DBC,Invesco DB Commodity Index Tracking Fund,Commodity - Broad
+PDBC,Invesco Optimum Yield Diversified Commodity Strategy,Commodity - Broad
+GSG,iShares S&P GSCI Commodity-Indexed Trust,Commodity - Broad
+USO,United States Oil Fund,Commodity - Energy
+BNO,United States Brent Oil Fund,Commodity - Energy
+UNG,United States Natural Gas Fund,Commodity - Energy
+CORN,Teucrium Corn Fund,Commodity - Agriculture
+WEAT,Teucrium Wheat Fund,Commodity - Agriculture
+SOYB,Teucrium Soybean Fund,Commodity - Agriculture
+PDBC,Invesco Optimum Yield Diversified Commodity Strategy No K-1,Commodity - Broad
+AOR,iShares Core Growth Allocation ETF,Asset Allocation
+AOM,iShares Core Moderate Allocation ETF,Asset Allocation
+AOA,iShares Core Aggressive Allocation ETF,Asset Allocation
+AOK,iShares Core Conservative Allocation ETF,Asset Allocation
+GAL,SPDR SSgA Global Allocation ETF,Asset Allocation
+VSMX,Vanguard LifeStrategy Moderate Growth Fund,Asset Allocation
+SSO,ProShares Ultra S&P500,Leveraged
+UPRO,ProShares UltraPro S&P500,Leveraged
+QLD,ProShares Ultra QQQ,Leveraged
+TQQQ,ProShares UltraPro QQQ,Leveraged
+SPXU,ProShares UltraPro Short S&P500,Inverse
+SH,ProShares Short S&P500,Inverse
+PSQ,ProShares Short QQQ,Inverse
+SQQQ,ProShares UltraPro Short QQQ,Inverse
+TMF,Direxion Daily 20+ Year Treasury Bull 3X Shares,Leveraged
+TMV,Direxion Daily 20+ Year Treasury Bear 3X Shares,Inverse
+JEPI,JPMorgan Equity Premium Income ETF,Covered Call
+JEPQ,JPMorgan Nasdaq Equity Premium Income ETF,Covered Call
+XYLD,Global X S&P 500 Covered Call ETF,Covered Call
+QYLD,Global X Nasdaq 100 Covered Call ETF,Covered Call
+RYLD,Global X Russell 2000 Covered Call ETF,Covered Call
+ARKK,ARK Innovation ETF,Thematic
+ARKQ,ARK Autonomous Technology & Robotics ETF,Thematic
+ARKG,ARK Genomic Revolution ETF,Thematic
+BOTZ,Global X Robotics & Artificial Intelligence ETF,Thematic
+AIQ,Global X Artificial Intelligence & Technology ETF,Thematic
+ROBO,Robo Global Robotics and Automation Index ETF,Thematic
+ICLN,iShares Global Clean Energy ETF,Thematic
+CNRG,SPDR S&P Kensho Clean Power ETF,Thematic
+BITO,ProShares Bitcoin Strategy ETF,Crypto
+BITB,Bitwise Bitcoin ETF,Crypto
+IBIT,iShares Bitcoin Trust ETF,Crypto
+FBTC,Fidelity Wise Origin Bitcoin Fund,Crypto

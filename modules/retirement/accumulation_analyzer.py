@@ -160,8 +160,20 @@ class AccumulationAnalyzer:
         drawdown = (pv - roll_max) / roll_max
         mdd      = float(drawdown.min())
 
-        # ── 일간 수익률 ──────────────────────────────────────
+        # ── 일간 수익률 (납입일 제거) ────────────────────────
+        # 납입일은 자산이 점프해서 수익률이 왜곡됨 → 제거
         daily_returns = pv.pct_change().dropna()
+        if "cash_flow" in history.columns:
+            contribution_dates = set(
+                pd.to_datetime(
+                    history.loc[history["cash_flow"] > 0, "date"]
+                ).dt.normalize().tolist()
+            )
+            date_index = pd.to_datetime(
+                history.loc[daily_returns.index, "date"]
+            ).dt.normalize()
+            mask = ~date_index.isin(contribution_dates)
+            daily_returns = daily_returns[mask.values]
 
         # ── Sharpe (연환산, 무위험수익률 0 가정) ──────────────
         if daily_returns.std() > 0:

@@ -27,10 +27,12 @@ class SimulationLoop:
 
         last_month             = None
         # 첫 달을 시작 월로 초기화 → 첫날 인출 방지, 두 번째 달부터 인출
-        last_withdrawal_month  = dates[0].month if dates else None
+        last_withdrawal_month  = (dates[0].year, dates[0].month) if dates else None
         elapsed_months         = 0
         last_inflation_month   = None
         is_first_day           = True
+        self._last_cf_month    = None
+        self._initial_capital_cf = 0.0
 
         for date in dates:
 

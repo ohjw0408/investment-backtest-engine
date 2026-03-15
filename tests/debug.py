@@ -1,278 +1,293 @@
 """
-test_comprehensive.py
+crawl_kr_etf_list.py
 ────────────────────────────────────────────────────────────────────────────────
-종합 통합 테스트
-
-변수: 종목/비중, 월납입금, 초기납입금, 인출금액
-적립 1년 → 인출 3년
-
-테스트 항목:
-  1. 단조성 검증 (납입↑→자산↑, 인출↑→성공률↓, 초기자본↑→자산↑)
-  2. 경계값 검증 (초기자본 0, 월납입 0, 인출 0, 극단값)
-  3. 모드별 검증 (reinvest / cash / withdraw)
-  4. 종목 조합별 검증 (SCHD/QQQ, SCHD/TLT, QQQ/TLT, SCHD단독)
+FinanceDataReader로 KRX 전체 ETF 목록 가져오기
+메타데이터 파싱:
+  - 기초지수 (S&P500, 나스닥100, 코스피200, 미국채 등)
+  - 환노출 여부 (환헤지 H, 환노출)
+  - 레버리지 배수 (1x, 2x, -1x, -2x)
+  - 운용사 (KODEX, TIGER, KBSTAR 등)
 ────────────────────────────────────────────────────────────────────────────────
 """
 
 import sys
+import re
 from pathlib import Path
+
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from modules.portfolio_engine import PortfolioEngine
-from modules.rebalance.periodic import PeriodicRebalance
-from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
-from modules.retirement.withdrawal_analyzer import WithdrawalAnalyzer
-from modules.retirement.retirement_planner import RetirementPlanner
+import pandas as pd
+import FinanceDataReader as fdr
 
-PASS = "✅ PASS"
-FAIL = "🔴 FAIL"
-engine = PortfolioEngine()
+OUTPUT = Path(__file__).resolve().parent.parent / "data" / "meta" / "kr_etf_list.csv"
 
-def check(label, condition, detail=""):
-    status = PASS if condition else FAIL
-    print(f"  {status} {label}")
-    if detail:
-        print(f"         {detail}")
-    return condition
+# ── 기초지수 매핑 키워드 ─────────────────────────────────
+INDEX_MAP = [
+    # 미국 주식
+    (["S&P500", "S&P 500", "미국S&P", "미국 S&P"],           "SP500",        "US"),
+    (["나스닥100", "나스닥 100", "Nasdaq100", "QQQ",
+      "미국나스닥100", "미국 나스닥100"],                       "NASDAQ100",    "US"),
+    (["나스닥",  "Nasdaq"],                                    "NASDAQ",       "US"),
+    (["다우",    "DOW"],                                       "DOW",          "US"),
+    (["러셀2000", "Russell2000"],                              "RUSSELL2000",  "US"),
+    (["미국빅테크", "미국테크", "미국 테크", "빅테크"],           "US_TECH",      "US"),
+    (["미국AI", "미국 AI"],                                    "US_AI",        "US"),
+    (["미국배당", "미국 배당"],                                  "US_DIVIDEND",  "US"),
+    (["미국리츠", "미국 리츠"],                                  "US_REIT",      "US"),
+    (["미국대형", "미국 대형"],                                  "SP500",        "US"),
+    (["미국소형", "미국 소형"],                                  "RUSSELL2000",  "US"),
 
-def make_strategy(weights, freq="yearly"):
-    def _factory():
-        return PeriodicRebalance(target_weights=weights, rebalance_frequency=freq)
-    return _factory
+    # 한국 주식 - 주요 지수
+    (["코스피200", "KOSPI200", "코스피 200", " 200TR",
+      "MSCI Korea", " 200 ", "KODEX 200", "TIGER 200",
+      "RISE 200", "ACE 200", "PLUS 200", "KIWOOM 200",
+      "Top5Plus", "KoreaTop10", "코리아TOP"],                  "KOSPI200",     "KR"),
+    (["코스피",    "KOSPI"],                                    "KOSPI",        "KR"),
+    (["코스닥150", "KOSDAQ150"],                                "KOSDAQ150",    "KR"),
+    (["코스닥",    "KOSDAQ"],                                   "KOSDAQ",       "KR"),
+    (["KRX300"],                                               "KRX300",       "KR"),
 
-def run_acc(tickers, weights, monthly, initial, step=6):
-    return AccumulationAnalyzer(
-        portfolio_engine     = engine,
-        tickers              = tickers,
-        strategy_factory     = make_strategy(weights),
-        data_start           = "2012-01-01",
-        data_end             = "2026-01-01",
-        accumulation_years   = 1,
-        monthly_contribution = monthly,
-        initial_capital      = initial,
-        dividend_mode        = "reinvest",
-        step_months          = step,
-        verbose              = False,
-    ).run()
+    # 한국 주식 - 섹터/테마
+    (["반도체", "Semiconductor", "SEMICONDUCTOR"],              "KR_SEMICONDUCTOR", "KR"),
+    (["2차전지", "배터리", "Battery"],                          "KR_BATTERY",   "KR"),
+    (["AI반도체", "AI 반도체"],                                  "KR_AI_CHIP",   "KR"),
+    (["AI전력", "AI 전력"],                                     "KR_AI_POWER",  "KR"),
+    (["인공지능", "AI액티브"],                                   "KR_AI",        "KR"),
+    (["방산", "K방산", "방위"],                                  "KR_DEFENSE",   "KR"),
+    (["조선"],                                                  "KR_SHIPBUILDING","KR"),
+    (["바이오", "Bio"],                                        "KR_BIO",       "KR"),
+    (["헬스케어", "Healthcare"],                                "KR_HEALTHCARE","KR"),
+    (["로봇", "Robot"],                                        "KR_ROBOT",     "KR"),
+    (["자동차", "미래차"],                                      "KR_AUTO",      "KR"),
+    (["삼성그룹", "삼성전자"],                                   "KR_SAMSUNG",   "KR"),
+    (["고배당", "배당주", "배당"],                               "KR_DIVIDEND",  "KR"),
+    (["리츠", "부동산인프라"],                                   "KR_REIT",      "KR"),
+    (["커버드콜"],                                              "KR_COVERED_CALL","KR"),
+    (["레버리지"],                                              "KOSPI200",     "KR"),
+    (["인버스"],                                               "KOSPI200",     "KR"),
 
-def run_wd(tickers, weights, monthly_wd, initial, mode="reinvest", inflation=0.0, step=6):
-    return WithdrawalAnalyzer(
-        portfolio_engine    = engine,
-        tickers             = tickers,
-        strategy_factory    = make_strategy(weights),
-        data_start          = "2012-01-01",
-        data_end            = "2026-01-01",
-        withdrawal_years    = 5,
-        monthly_withdrawal  = monthly_wd,
-        initial_capital     = initial,
-        dividend_mode       = mode,
-        inflation           = inflation,
-        step_months         = step,
-        verbose             = False,
-    ).run()
+    # 한국 채권/단기 (구체적인 것 먼저)
+    (["단기통안채", "단기국공채", "단기채권액티브",
+      "단기채권PLUS", "초단기채권", "전단채",
+      "머니마켓", "MoneyMarket", "CD금리"],                    "KR_MONEY_MARKET","KR"),
+    (["종합채권"],                                              "KR_BOND_AGGREGATE","KR"),
+    (["국고채30", "국고채 30"],                                  "KR_TREASURY_30Y","KR"),
+    (["국고채10", "국고채 10"],                                  "KR_TREASURY_10Y","KR"),
+    (["국고채",   "국채", "통안채", "특수채"],                    "KR_TREASURY",  "KR"),
+    (["회사채"],                                               "KR_CORPORATE", "KR"),
 
-# ════════════════════════════════════════════════════════════════════════════════
-# 종목 조합 정의
-# ════════════════════════════════════════════════════════════════════════════════
+    (["원자력", "원자력SMR", "SMR"],                           "KR_NUCLEAR",   "KR"),
+    (["밸류업", "코리아밸류업", "Value Up"],                     "KR_VALUEUP",   "KR"),
+    (["TDF"],                                                  "TDF",          "KR"),
+    (["우주항공", "항공우주", "UAM"],                            "AEROSPACE",    "GLOBAL"),
+    (["양자컴퓨팅", "양자컴"],                                   "QUANTUM",      "GLOBAL"),
+    (["구리"],                                                  "COPPER",       "COMMODITY"),
+    (["증권"],                                                  "KR_SECURITIES","KR"),
+    (["화장품", "뷰티"],                                        "KR_BEAUTY",    "KR"),
+    (["지주회사"],                                              "KR_HOLDING",   "KR"),
+    (["성장주"],                                               "KR_GROWTH",    "KR"),
+    (["자산배분", "TRF"],                                       "ASSET_ALLOCATION","GLOBAL"),
+    (["토탈월드", "Total World"],                               "MSCI_WORLD",   "GLOBAL"),
+    (["미국달러", "달러"],                                       "USD",          "CURRENCY"),
+    (["채권혼합"],                                              "KR_BOND_MIX",  "KR"),
+    (["테슬라"],                                               "TESLA",        "US"),
+    (["엔비디아"],                                              "NVIDIA",       "US"),
+    (["구글"],                                                  "GOOGLE",       "US"),
+    (["현대차", "기아"],                                        "KR_AUTO",      "KR"),
+    (["한화그룹"],                                              "KR_HANWHA",    "KR"),
+    (["미국서학개미"],                                           "US_POPULAR",   "US"),
+    (["ESG"],                                                  "KR_ESG",       "KR"),
+    (["네트워크인프라", "인프라"],                                "INFRASTRUCTURE","GLOBAL"),
+    (["신재생에너지", "클린에너지"],                              "CLEAN_ENERGY", "GLOBAL"),
+    (["단기채권"],                                              "KR_MONEY_MARKET","KR"),
+    (["골드선물"],                                              "GOLD",         "COMMODITY"),
+    (["수소"],                                                  "HYDROGEN",     "GLOBAL"),
+    (["메타버스"],                                              "METAVERSE",    "GLOBAL"),
+    (["소프트웨어"],                                            "KR_SOFTWARE",  "KR"),
+    (["건설"],                                                  "KR_CONSTRUCTION","KR"),
+    (["하이일드", "HighYield"],                                  "US_HIGH_YIELD","US"),
+    (["자율주행"],                                              "AUTONOMOUS",   "GLOBAL"),
+    (["4차산업", "혁신기술"],                                    "TECH_INNOVATION","GLOBAL"),
+    (["미디어", "컨텐츠", "KPOP", "K-POP"],                    "KR_CULTURE",   "KR"),
+    (["여행", "레저"],                                          "KR_LEISURE",   "KR"),
+    (["전력", "에너지"],                                        "KR_ENERGY",    "KR"),
+    (["중장기국공채"],                                           "KR_TREASURY",  "KR"),
+    (["국공채"],                                               "KR_TREASURY",  "KR"),
+    (["주주환원", "밸류"],                                       "KR_VALUE",     "KR"),
+    (["IT플러스", "코리아테크", "메가테크"],                      "KR_TECH",      "KR"),
+    (["포스코"],                                               "KR_POSCO",     "KR"),
+    (["SK하이닉스"],                                            "KR_SKHYNIX",   "KR"),
+    (["희토류", "전략자원"],                                     "RARE_EARTH",   "GLOBAL"),
+    (["버크셔"],                                               "BERKSHIRE",    "US"),
+    (["소버린AI"],                                              "KR_AI",        "KR"),
+    ([" 200"],                                                 "KOSPI200",     "KR"),
+    (["미국채30", "미국 30년", "장기미국채"],                    "US_TREASURY_30Y","US"),
+    (["미국채10", "미국 10년", "중기미국채"],                    "US_TREASURY_10Y","US"),
+    (["미국채",   "미국 국채"],                                  "US_TREASURY",  "US"),
 
-COMBOS = {
-    "SCHD/QQQ": (["SCHD", "QQQ"], {"SCHD": 0.7, "QQQ": 0.3}),
-    "SCHD/TLT": (["SCHD", "TLT"], {"SCHD": 0.7, "TLT": 0.3}),
-    "QQQ/TLT":  (["QQQ",  "TLT"], {"QQQ":  0.6, "TLT": 0.4}),
-    "SCHD단독":  (["SCHD"],        {"SCHD": 1.0}),
+    # 원자재
+    (["금"],                                                   "GOLD",         "COMMODITY"),
+    (["은"],                                                   "SILVER",       "COMMODITY"),
+    (["원유", "WTI", "Oil"],                                   "OIL",          "COMMODITY"),
+
+    # 글로벌
+    (["선진국", "MSCI World", "글로벌AI", "글로벌 AI"],          "MSCI_WORLD",   "GLOBAL"),
+    (["신흥국", "EM", "이머징"],                                 "MSCI_EM",      "GLOBAL"),
+    (["일본"],                                                  "JAPAN",        "JAPAN"),
+    (["중국", "차이나", "China"],                               "CHINA",        "CHINA"),
+    (["유럽"],                                                  "EUROPE",       "EUROPE"),
+    (["인도"],                                                  "INDIA",        "INDIA"),
+    (["베트남"],                                               "VIETNAM",      "VIETNAM"),
+    (["브라질"],                                               "BRAZIL",       "BRAZIL"),
+]
+
+# ── 운용사 파싱 ───────────────────────────────────────────
+ISSUER_MAP = {
+    "KODEX":   "삼성자산운용",
+    "TIGER":   "미래에셋자산운용",
+    "KBSTAR":  "KB자산운용",
+    "ARIRANG": "한화자산운용",
+    "KOSEF":   "키움투자자산운용",
+    "HANARO":  "NH아문디자산운용",
+    "SOL":     "신한자산운용",
+    "ACE":     "한국투자신탁운용",
+    "PLUS":    "우리자산운용",
+    "TIMEFOLIO": "타임폴리오자산운용",
+    "KINDEX":  "한국투자신탁운용",
+    "SMART":   "스마트자산운용",
 }
 
-passed = 0
-failed = 0
+def parse_leverage(name: str) -> float:
+    """레버리지 배수 파싱"""
+    name_upper = name.upper()
+    if "인버스2X" in name or "곱버스" in name or "-2X" in name_upper:
+        return -2.0
+    if "인버스" in name or "-1X" in name_upper:
+        return -1.0
+    if "레버리지" in name or "2X" in name_upper:
+        return 2.0
+    if "3X" in name_upper:
+        return 3.0
+    return 1.0
 
-def tcheck(label, condition, detail=""):
-    global passed, failed
-    ok = check(label, condition, detail)
-    if ok: passed += 1
-    else:  failed += 1
-    return ok
+def parse_hedge(name: str, market: str) -> str:
+    """환헤지 여부 파싱"""
+    if "(H)" in name or "환헤지" in name or "_H" in name:
+        return "hedge"
+    # 한국 자산은 환율 무관
+    if market == "KR":
+        return "none"
+    return "unhedged"  # 해외 자산 기본값: 환노출
 
-# ════════════════════════════════════════════════════════════════════════════════
-# 1. 단조성 검증
-# ════════════════════════════════════════════════════════════════════════════════
+def parse_index(name: str):
+    """기초지수 파싱 - 구체적인 것 먼저 매칭"""
+    # 미국 자산 명시적 키워드 먼저 체크
+    us_explicit = ["미국", "US ", "America", "S&P", "나스닥", "Nasdaq",
+                   "다우", "DOW", "러셀", "Russell", "MSCI"]
+    is_us_asset = any(kw in name for kw in us_explicit)
 
-print("\n" + "="*60)
-print("1. 단조성 검증")
-print("="*60)
+    for keywords, index_code, market in INDEX_MAP:
+        for kw in keywords:
+            if kw in name:
+                # 미국 자산인데 KR market으로 분류된 경우 US로 보정
+                if is_us_asset and market == "KR":
+                    # 단, 순수 한국 섹터/테마는 KR 유지 (예: KODEX 미국반도체 → 미국반도체)
+                    # 채권/배당/머니마켓은 기초자산 시장 기준
+                    if index_code in ["KR_TREASURY", "KR_MONEY_MARKET",
+                                      "KR_BOND_AGGREGATE", "KR_CORPORATE",
+                                      "KR_REIT", "KR_DIVIDEND"]:
+                        return index_code.replace("KR_", "US_"), "US"
+                    # 반도체/AI 등 섹터는 미국 자산이면 US
+                    if index_code in ["KR_SEMICONDUCTOR", "KR_NUCLEAR",
+                                      "KR_ROBOT", "KR_DEFENSE", "KR_BIO",
+                                      "KR_HEALTHCARE", "KR_ENERGY"]:
+                        return index_code.replace("KR_", "US_"), "US"
+                return index_code, market
+    return "UNKNOWN", "UNKNOWN"
 
-tickers, weights = COMBOS["SCHD/QQQ"]
+def parse_issuer(name: str) -> str:
+    """운용사 파싱"""
+    for brand, issuer in ISSUER_MAP.items():
+        if name.upper().startswith(brand):
+            return brand
+    return name.split()[0] if name else "UNKNOWN"
 
-# 1-1. 월납입↑ → 종료자산↑
-print("\n  [1-1] 월납입 증가 → 종료자산 증가")
-r1 = run_acc(tickers, weights, monthly=100_000,   initial=0)
-r2 = run_acc(tickers, weights, monthly=500_000,   initial=0)
-r3 = run_acc(tickers, weights, monthly=1_000_000, initial=0)
-v1 = r1["distribution"]["end_value"]["p50"]
-v2 = r2["distribution"]["end_value"]["p50"]
-v3 = r3["distribution"]["end_value"]["p50"]
-print(f"    월 10만: {v1:,.0f}  월 50만: {v2:,.0f}  월 100만: {v3:,.0f}")
-tcheck("월납입 단조성", v1 < v2 < v3)
-
-# 1-2. 초기자본↑ → 종료자산↑
-print("\n  [1-2] 초기자본 증가 → 종료자산 증가")
-r1 = run_acc(tickers, weights, monthly=300_000, initial=0)
-r2 = run_acc(tickers, weights, monthly=300_000, initial=10_000_000)
-r3 = run_acc(tickers, weights, monthly=300_000, initial=50_000_000)
-v1 = r1["distribution"]["end_value"]["p50"]
-v2 = r2["distribution"]["end_value"]["p50"]
-v3 = r3["distribution"]["end_value"]["p50"]
-print(f"    초기 0: {v1:,.0f}  초기 1천만: {v2:,.0f}  초기 5천만: {v3:,.0f}")
-tcheck("초기자본 단조성", v1 < v2 < v3)
-
-# 1-3. 인출액↑ → 성공률↓
-print("\n  [1-3] 인출액 증가 → 성공률 감소")
-initial = 15_000_000
-r1 = run_wd(tickers, weights, monthly_wd=300_000,   initial=initial)
-r2 = run_wd(tickers, weights, monthly_wd=500_000,   initial=initial)
-r3 = run_wd(tickers, weights, monthly_wd=1_000_000, initial=initial)
-s1, s2, s3 = r1["success_rate"], r2["success_rate"], r3["success_rate"]
-print(f"    월 30만: {s1:.1%}  월 50만: {s2:.1%}  월 100만: {s3:.1%}")
-tcheck("인출액 단조성", s1 >= s2 >= s3)
-
-# 1-4. 인플레이션↑ → 종료자산 배수↓
-print("\n  [1-4] 인플레이션 증가 → 종료자산 배수 감소")
-r1 = run_wd(tickers, weights, monthly_wd=500_000, initial=initial, inflation=0.0)
-r2 = run_wd(tickers, weights, monthly_wd=500_000, initial=initial, inflation=0.03)
-v1 = r1["distribution"]["end_value_ratio"]["p50"]
-v2 = r2["distribution"]["end_value_ratio"]["p50"]
-print(f"    인플레이션 0%: {v1:.3f}x  3%: {v2:.3f}x")
-tcheck("인플레이션 단조성", v2 <= v1)
-
-# ════════════════════════════════════════════════════════════════════════════════
-# 2. 경계값 검증
-# ════════════════════════════════════════════════════════════════════════════════
-
-print("\n" + "="*60)
-print("2. 경계값 검증")
-print("="*60)
-
-# 2-1. 초기자본 0 + 월납입만
-print("\n  [2-1] 초기자본 0, 월납입만")
-r = run_acc(tickers, weights, monthly=500_000, initial=0)
-v = r["distribution"]["end_value"]["p50"]
-print(f"    종료자산 p50: {v:,.0f}")
-tcheck("초기자본 0 정상 실행", v > 0)
-
-# 2-2. 월납입 0 + 초기자본만
-print("\n  [2-2] 월납입 0, 초기자본만")
-r = run_acc(tickers, weights, monthly=0, initial=10_000_000)
-v = r["distribution"]["end_value"]["p50"]
-print(f"    종료자산 p50: {v:,.0f}")
-tcheck("월납입 0 정상 실행", v > 0)
-
-# 2-3. 인출 0 (생존율 100% 이어야 함)
-print("\n  [2-3] 인출액 0")
-r = run_wd(tickers, weights, monthly_wd=0, initial=50_000_000)
-print(f"    성공률: {r['success_rate']:.1%}")
-tcheck("인출 0 → 성공률 100%", r["success_rate"] == 1.0)
-
-# 2-4. 극단적 인출 (초기자본보다 첫달 인출이 큰 경우)
-print("\n  [2-4] 극단적 인출 (월 5천만, 초기자본 1천만)")
-r = run_wd(tickers, weights, monthly_wd=50_000_000, initial=10_000_000)
-print(f"    성공률: {r['success_rate']:.1%}")
-tcheck("극단적 인출 → 성공률 0%", r["success_rate"] == 0.0)
-
-# ════════════════════════════════════════════════════════════════════════════════
-# 3. 모드별 검증
-# ════════════════════════════════════════════════════════════════════════════════
-
-print("\n" + "="*60)
-print("3. 모드별 검증")
-print("="*60)
-
-initial = 50_000_000
-
-# 3-1. reinvest > cash > withdraw (종료자산 기준)
-print("\n  [3-1] reinvest 종료자산 > withdraw 종료자산")
-r_reinvest = run_wd(tickers, weights, monthly_wd=300_000, initial=initial, mode="reinvest")
-r_cash     = run_wd(tickers, weights, monthly_wd=300_000, initial=initial, mode="cash")
-r_withdraw = run_wd(tickers, weights, monthly_wd=300_000, initial=initial, mode="withdraw")
-v_r = r_reinvest["distribution"]["end_value_ratio"]["p50"]
-v_c = r_cash["distribution"]["end_value_ratio"]["p50"]
-v_w = r_withdraw["distribution"]["end_value_ratio"]["p50"]
-print(f"    reinvest: {v_r:.3f}x  cash: {v_c:.3f}x  withdraw: {v_w:.3f}x")
-tcheck("reinvest >= withdraw (배당 재투자 효과)", v_r >= v_w)
-tcheck("cash >= withdraw (배당 보유 효과)", v_c >= v_w)
-
-# 3-2. withdraw 모드: 배당이 포트폴리오에서 빠져나감
-print("\n  [3-2] withdraw 모드 배당 출금 확인")
-# reinvest 대비 종료자산이 작아야 함
-tcheck("withdraw 종료자산 < reinvest 종료자산", v_w < v_r,
-       f"{v_w:.3f}x < {v_r:.3f}x")
-
-# ════════════════════════════════════════════════════════════════════════════════
-# 4. 종목 조합별 검증
-# ════════════════════════════════════════════════════════════════════════════════
-
-print("\n" + "="*60)
-print("4. 종목 조합별 검증")
-print("="*60)
-
-for name, (tickers, weights) in COMBOS.items():
-    print(f"\n  [{name}]")
+def main():
+    print("KRX ETF 목록 가져오는 중...")
+    
     try:
-        # 적립
-        acc = run_acc(tickers, weights, monthly=500_000, initial=5_000_000)
-        d = acc["distribution"]
-        acc_p50      = d["end_value"]["p50"]
-        acc_cagr     = d["cagr"]["p50"]
-        acc_mdd      = d["mdd"]["p50"]
-        acc_sharpe   = d["sharpe"]["p50"]
-        acc_div_cagr = d["dividend_cagr"]["p50"]
-        acc_div_mdd  = d["dividend_mdd"]["p50"]
-        acc_sortino  = d["sortino"]["p50"]
-        acc_calmar   = d["calmar"]["p50"]
-        acc_mwr      = d["mwr"]["p50"]
-
-        print(f"    ── 적립 지표 (p50) ──────────────────────────")
-        print(f"    종료자산:     {acc_p50:>20,.0f}원")
-        print(f"    CAGR:         {acc_cagr:>19.2%}")
-        print(f"    MDD:          {acc_mdd:>19.2%}")
-        print(f"    Sharpe:       {acc_sharpe:>20.2f}")
-        print(f"    Sortino:      {acc_sortino:>20.2f}")
-        print(f"    Calmar:       {acc_calmar:>20.2f}")
-        print(f"    MWR:          {acc_mwr:>19.2%}")
-        print(f"    배당CAGR:     {acc_div_cagr:>19.2%}")
-        print(f"    배당MDD:      {acc_div_mdd:>19.2%}")
-
-        # 인출: 적립 종료자산을 3년 안에 소진 직전 수준 (간당간당)
-        # 수익률 감안해도 고갈 가능한 수준: 종료자산 / 24개월
-        monthly_wd = int(acc_p50 / 24)
-        wd = run_wd(tickers, weights, monthly_wd=monthly_wd, initial=acc_p50)
-        wd_d     = wd["distribution"]
-        wd_sr    = wd["success_rate"]
-        wd_ratio = wd_d["end_value_ratio"]["p50"]
-        wd_mdd   = wd_d["mdd"]["p50"]
-        wd_cov   = wd_d["withdrawal_coverage"]["p50"]
-        wd_seqr  = wd_d["sequence_risk"]["p50"]
-        wd_divmdd= wd_d["dividend_mdd"]["p50"]
-        wd_total_div = wd_d["total_dividend"]["p50"]
-
-        print(f"    ── 인출 지표 (월 {monthly_wd:,.0f}원, p50) ─────────────")
-        print(f"    성공률:       {wd_sr:>19.1%}")
-        print(f"    종료자산 배수:{wd_ratio:>20.2f}x")
-        print(f"    MDD:          {wd_mdd:>19.2%}")
-        print(f"    총배당금:     {wd_total_div:>20,.0f}원")
-        print(f"    배당커버리지: {wd_cov:>19.2%}")
-        print(f"    Sequence Risk:{wd_seqr:>19.2%}")
-        print(f"    배당MDD:      {wd_divmdd:>19.2%}")
-
-        tcheck(f"{name} 적립 정상 실행", acc_p50 > 0)
-        tcheck(f"{name} 인출 성공률 범위", 0 <= wd_sr <= 1)
-        tcheck(f"{name} 종료자산 배수 범위", wd_ratio >= 0)
-
+        etf_list = fdr.StockListing("ETF/KR")
+        print(f"총 {len(etf_list)}개 ETF 발견")
+        print(f"컬럼: {etf_list.columns.tolist()}")
+        print(etf_list.head())
     except Exception as e:
-        tcheck(f"{name} 실행 오류 없음", False, str(e))
+        print(f"ETF 목록 가져오기 실패: {e}")
+        return
 
-# ════════════════════════════════════════════════════════════════════════════════
-# 결과 요약
-# ════════════════════════════════════════════════════════════════════════════════
+    # 컬럼명 표준화
+    col_map = {}
+    for col in etf_list.columns:
+        col_lower = col.lower()
+        if "code" in col_lower or "symbol" in col_lower or col_lower in ["종목코드"]:
+            col_map[col] = "code"
+        elif "name" in col_lower or col_lower in ["종목명", "etf명"]:
+            col_map[col] = "name"
 
-print("\n" + "="*60)
-print(f"종합 결과: {passed}개 통과 / {failed}개 실패 / 총 {passed+failed}개")
-print("="*60)
+    etf_list = etf_list.rename(columns=col_map)
+
+    if "code" not in etf_list.columns or "name" not in etf_list.columns:
+        print(f"컬럼 매핑 실패. 현재 컬럼: {etf_list.columns.tolist()}")
+        return
+
+    # 메타데이터 파싱
+    records = []
+    for _, row in etf_list.iterrows():
+        code = str(row["code"]).zfill(6)
+        name = str(row["name"])
+
+        index_code, market = parse_index(name)
+        leverage           = parse_leverage(name)
+        hedge              = parse_hedge(name, market)
+        issuer             = parse_issuer(name)
+
+        records.append({
+            "code":        code,
+            "name":        name,
+            "issuer":      issuer,
+            "index":       index_code,
+            "market":      market,
+            "leverage":    leverage,
+            "hedge":       hedge,
+        })
+
+    result_df = pd.DataFrame(records)
+
+    # 저장
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    result_df.to_csv(OUTPUT, index=False, encoding="utf-8-sig")
+
+    print(f"\n저장 완료: {OUTPUT}")
+    print(f"총 {len(result_df)}개 ETF")
+    print()
+
+    # 통계 출력
+    print("── 운용사별 ─────────────────────────────")
+    print(result_df["issuer"].value_counts().head(15).to_string())
+    print()
+    print("── 기초지수별 ───────────────────────────")
+    print(result_df["index"].value_counts().head(20).to_string())
+    print()
+    print("── 레버리지별 ───────────────────────────")
+    print(result_df["leverage"].value_counts().to_string())
+    print()
+    print("── 환헤지별 ─────────────────────────────")
+    print(result_df["hedge"].value_counts().to_string())
+    print()
+    print("── UNKNOWN 샘플 (50개) ──────────────────")
+    unknown = result_df[result_df["index"] == "UNKNOWN"]["name"]
+    print(f"UNKNOWN 총 {len(unknown)}개")
+    print(unknown.head(50).to_string())
+
+
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,6 @@
+import math
+
+
 class WithdrawalEngine:
 
     def process(
@@ -11,25 +14,17 @@ class WithdrawalEngine:
         elapsed_months: int = 0,
         inflation: float = 0.0,
     ):
-        """
-        월 1회만 인출 실행 (ContributionEngine과 동일 패턴).
-
-        Parameters
-        ----------
-        date           : 현재 날짜
-        last_month     : 직전 인출 월 (중복 방지)
-        elapsed_months : 시뮬 시작 시점으로부터 경과한 월수 (인플레이션용)
-        inflation      : 연간 인플레이션율 (예: 0.02 = 2%)
-        """
 
         if withdrawal_amount <= 0:
             return last_month
 
+        current_month = (date.year, date.month)
+
         # ✅ 월 1회만 실행
-        if last_month == date.month:
+        if last_month == current_month:
             return last_month
 
-        last_month = date.month
+        last_month = current_month
 
         # ✅ 인플레이션 반영
         if inflation > 0 and elapsed_months > 0:
@@ -74,7 +69,17 @@ class WithdrawalEngine:
 
         for ticker, overweight, price, value in sell_candidates:
 
-            sell_qty = int(min(value, needed) / price)
+            # ✅ ceil로 변경: 부족분 전액 매도 (잔여 현금 방지)
+            sell_qty = math.ceil(min(value, needed) / price)
+
+            if sell_qty <= 0:
+                continue
+
+            # 보유 수량 초과 방지
+            position = portfolio.positions.get(ticker)
+            if position is None:
+                continue
+            sell_qty = min(sell_qty, int(position.quantity))
 
             if sell_qty <= 0:
                 continue

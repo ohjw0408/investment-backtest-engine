@@ -39,6 +39,9 @@ class PortfolioEngine:
             self.cash_allocator
         )
 
+        # 🔥 핵심: price cache
+        self._price_cache = {}
+
     # -------------------------------------------------
     # 핵심 실행
     # -------------------------------------------------
@@ -47,11 +50,26 @@ class PortfolioEngine:
 
         portfolio = Portfolio(config.initial_capital)
 
-        price_data, dates = self.price_loader.load(
-            config.tickers,
+        # 🔥 캐시 key
+        key = (
+            tuple(config.tickers),
             config.start_date,
             config.end_date
         )
+
+        # 🔥 캐시 사용
+        if key not in self._price_cache:
+            price_data, dates = self.price_loader.load(
+                config.tickers,
+                config.start_date,
+                config.end_date
+            )
+            self._price_cache[key] = (price_data, dates)
+        else:
+            price_data, dates = self._price_cache[key]
+
+        # 🔒 안전: copy로 완전 동일성 보장
+        price_data = price_data.copy()
 
         recorder = HistoryRecorder()
 
@@ -69,11 +87,11 @@ class PortfolioEngine:
         return {
             "history":     history_df,
             "final_value": history_df["portfolio_value"].iloc[-1],
-            "portfolio":   portfolio  # ✅ 추가: 인출기 인계용
+            "portfolio":   portfolio
         }
 
     # -------------------------------------------------
-    # 테스트 / 편의 함수
+    # 편의 함수
     # -------------------------------------------------
 
     def run_simulation(
@@ -87,7 +105,7 @@ class PortfolioEngine:
         monthly_contribution = 0,
         withdrawal_amount    = 0,
         dividend_mode        = "reinvest",
-        inflation            = 0.0,  # ✅ 추가
+        inflation            = 0.0,
 
     ):
 
@@ -102,7 +120,7 @@ class PortfolioEngine:
             withdrawal_amount    = withdrawal_amount,
             dividend_mode        = dividend_mode,
             rebalance_frequency  = strategy.rebalance_frequency,
-            inflation            = inflation,  # ✅ 추가
+            inflation            = inflation,
         )
 
         return self.run(config, strategy)

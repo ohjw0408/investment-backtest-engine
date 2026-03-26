@@ -46,3 +46,7 @@ data/*.csv
 # ----------------------------
 !data/meta/
 !data/meta/us_etf_list.csv
+
+
+
+*.db

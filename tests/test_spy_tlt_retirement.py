@@ -19,7 +19,10 @@ SPY/TLT 포트폴리오
             배당CAGR/배당MDD/Sequence Risk 전 지표
 ────────────────────────────────────────────────────────────────────────────────
 """
-
+import warnings
+warnings.filterwarnings("ignore")
+import pandas as pd
+pd.set_option('future.no_silent_downcasting', True)
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -34,9 +37,9 @@ from modules.retirement.withdrawal_analyzer import WithdrawalAnalyzer
 # ★ 입력 변수 (여기만 수정)
 # ════════════════════════════════════════════════════════════════════════════════
 
-MONTHLY_CONTRIBUTION = 1_000_000   # 월 납입금 (원)
+MONTHLY_CONTRIBUTION = 500_000    # 월 납입금 (원)
 INITIAL_CAPITAL      = 0           # 초기 납입금 (원)
-MONTHLY_WITHDRAWAL   = 3_000_000   # 월 인출금 (원)
+MONTHLY_WITHDRAWAL   = 2_000_000   # 월 인출금 (원)
 DIVIDEND_MODE        = "reinvest"  # "reinvest" | "cash" | "withdraw"
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -45,10 +48,10 @@ DIVIDEND_MODE        = "reinvest"  # "reinvest" | "cash" | "withdraw"
 
 TICKERS    = ["SPY", "TLT"]
 WEIGHTS    = {"SPY": 0.6, "TLT": 0.4}
-DATA_START = "2003-01-01"
+DATA_START = "1977-01-01"
 DATA_END   = "2025-12-31"
-ACC_YEARS  = 10
-WD_YEARS   = 15
+ACC_YEARS  = 20
+WD_YEARS   = 30
 STEP       = 1
 
 SAMPLE_PERCENTILES = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99]
@@ -66,7 +69,7 @@ def sep(char="─", n=60):
 # ════════════════════════════════════════════════════════════════════════════════
 
 print("\n" + "=" * 60)
-print("SPY/TLT 은퇴 시뮬레이션")
+print("SPY/TLT 은퇴 시뮬레이션 (장기)")
 print("=" * 60)
 print(f"  포트폴리오  : SPY {WEIGHTS['SPY']:.0%} / TLT {WEIGHTS['TLT']:.0%}")
 print(f"  데이터 기간 : {DATA_START} ~ {DATA_END}")

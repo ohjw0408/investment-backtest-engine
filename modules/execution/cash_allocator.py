@@ -65,7 +65,9 @@ class CashAllocator:
             if deficit <= 0:
                 continue
 
-            price = price_dict[ticker]
+            price = price_dict.get(ticker)
+            if not price or price != price:  # None 또는 NaN
+                continue
 
             quantity = int(min(deficit, portfolio.cash) / price)
 
@@ -118,7 +120,9 @@ class CashAllocator:
                 break
 
             ticker = deficits[0][0]
-            price = price_dict[ticker]
+            price = price_dict.get(ticker)
+            if not price or price != price:  # None 또는 NaN
+                break
 
             if portfolio.cash < price:
                 break

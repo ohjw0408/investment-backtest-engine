@@ -9,7 +9,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 # -------------------------
 # DB 경로
 # -------------------------
-SYMBOL_DB_PATH = os.path.join(DATA_DIR, "symbol_master.db")
+SYMBOL_DB_PATH = os.path.join(DATA_DIR, "meta", "symbol_master.db")
 PRICE_DB_PATH = os.path.join(DATA_DIR, "price_daily.db")
 
 # -------------------------

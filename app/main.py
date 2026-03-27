@@ -1,54 +1,124 @@
-# app/main.py
-
 import streamlit as st
-
+import numpy as np
+import pandas as pd
 
 def render():
 
-    st.title("🏠 QuantMaster")
+    st.set_page_config(layout="wide")
 
-    st.markdown("### 📊 내 투자 대시보드")
+    # 🔥 전체 배경을 밝게 강제
+    st.markdown("""
+    <style>
+    body {
+        background-color: #f5f6fa;
+    }
 
-    # 포트폴리오 상태 가져오기
-    portfolio = st.session_state.get("portfolio", [])
-    weights   = st.session_state.get("weights", {})
+    .main {
+        background-color: #f5f6fa;
+    }
 
-    # -------------------------
-    # 포트폴리오 요약
-    # -------------------------
-    st.subheader("🧺 내 포트폴리오")
+    /* 헤더 */
+    .header {
+        background: #2f5fb3;
+        padding: 20px;
+        border-radius: 15px;
+        color: white;
+        font-weight: bold;
+    }
 
-    if not portfolio:
-        st.info("아직 포트폴리오가 없습니다. 종목 검색에서 추가하세요.")
-        return
+    /* 카드 */
+    .card {
+        background: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
 
-    col1, col2 = st.columns(2)
+    .metric {
+        font-size: 32px;
+        font-weight: bold;
+    }
 
-    with col1:
-        st.write("보유 종목 수")
-        st.metric("종목 수", len(portfolio))
+    .green {
+        color: #00c853;
+    }
 
-    with col2:
-        total_weight = sum(weights.values()) if weights else 0
-        st.write("총 비중")
-        st.metric("합계", f"{total_weight:.2f}")
+    /* 사이드 카드 */
+    .menu-card {
+        background: white;
+        padding: 12px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
 
-    st.divider()
+    </style>
+    """, unsafe_allow_html=True)
 
-    # -------------------------
-    # 종목 리스트
-    # -------------------------
-    st.subheader("📋 구성 종목")
+    # ---------------- HEADER ----------------
+    st.markdown("""
+    <div class="header">
+        🎲 Domino Invest
+    </div>
+    """, unsafe_allow_html=True)
 
-    for ticker in portfolio:
-        w = weights.get(ticker, 0)
-        st.write(f"{ticker} - {w:.2f}")
+    st.write("")
 
-    st.divider()
+    # ---------------- LAYOUT ----------------
+    left, center, right = st.columns([1, 3, 1.2])
 
-    # -------------------------
-    # 시장 참고 정보 (간단)
-    # -------------------------
-    st.subheader("🌎 시장 참고")
+    # ---------------- LEFT ----------------
+    with left:
+        st.markdown("### 📂 메뉴")
 
-    st.write("S&P500, NASDAQ 등은 추후 연결")
+        st.markdown('<div class="menu-card">📊 포트폴리오</div>', unsafe_allow_html=True)
+        st.markdown('<div class="menu-card">🏦 은퇴 시뮬레이션</div>', unsafe_allow_html=True)
+        st.markdown('<div class="menu-card">💰 목돈 모으기</div>', unsafe_allow_html=True)
+        st.markdown('<div class="menu-card">⚖️ 자산 배분</div>', unsafe_allow_html=True)
+
+    # ---------------- CENTER ----------------
+    with center:
+
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+
+        st.markdown("### 💼 내 포트폴리오")
+
+        st.markdown(
+            '<div class="metric">₩15,870,200 <span class="green">(+1.8%)</span></div>',
+            unsafe_allow_html=True
+        )
+
+        # 차트
+        data = np.cumsum(np.random.randn(200)) + 100
+        st.line_chart(pd.DataFrame({"value": data}))
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.write("")
+
+        # 시장 지수 카드
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+
+        st.markdown("### ⭐ 시장 지수")
+
+        c1, c2, c3 = st.columns(3)
+
+        c1.metric("S&P 500", "5,420", "+10.8%")
+        c2.metric("NASDAQ", "17,500", "+17.5%")
+        c3.metric("KOSPI", "2,750", "+12.5%")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # ---------------- RIGHT ----------------
+    with right:
+
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+
+        st.markdown("### 📊 자산군 비교")
+
+        st.metric("주식", "+7%")
+        st.metric("채권", "+2.5%")
+        st.metric("금", "+1.5%")
+        st.metric("원자재", "-0.5%")
+
+        st.markdown('</div>', unsafe_allow_html=True)

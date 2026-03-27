@@ -1,62 +1,35 @@
 import sqlite3
 import pandas as pd
+import os
 from config import SYMBOL_DB_PATH
 
 
 class InfoEngine:
+
     def __init__(self):
         self.db_path = SYMBOL_DB_PATH
 
+    # -----------------------------
+    # DB 연결 (안전)
+    # -----------------------------
     def _connect(self):
+
+        if not os.path.exists(self.db_path):
+            raise FileNotFoundError(f"DB 없음: {self.db_path}")
+
         return sqlite3.connect(self.db_path)
 
-    # ---------------------------------------------------
-    # 전체 종목 조회
-    # ---------------------------------------------------
-    def get_all_symbols(self):
-        conn = self._connect()
-        query = "SELECT * FROM symbols"
-        df = pd.read_sql(query, conn)
-        conn.close()
-        return df
-
-    # ---------------------------------------------------
-    # 티커 정확 검색
-    # ---------------------------------------------------
-    def get_symbol_by_ticker(self, ticker: str):
-        conn = self._connect()
-        query = "SELECT * FROM symbols WHERE code = ?"
-        df = pd.read_sql(query, conn, params=(ticker.upper(),))
-        conn.close()
-        return df
-
-    # ---------------------------------------------------
-    # 기본 부분 검색
-    # ---------------------------------------------------
-    def search_symbol(self, keyword: str):
-        if not keyword:
-            return pd.DataFrame()
+    # -----------------------------
+    # symbol_master 검색
+    # -----------------------------
+    def _search_symbol_master(self, keyword: str):
 
         conn = self._connect()
-        query = """
-        SELECT *
-        FROM symbols
-        WHERE code LIKE ?
-        OR name LIKE ?
-        """
-        like_keyword = f"%{keyword}%"
-        df = pd.read_sql(query, conn, params=(like_keyword, like_keyword))
-        conn.close()
-        return df
 
-    # ---------------------------------------------------
-    # Fuzzy 검색 (app.py 호환)
-    # ---------------------------------------------------
-    def search_fuzzy(self, keyword: str):
-        if not keyword:
-            return pd.DataFrame()
+        like = f"%{keyword}%"
+        exact = keyword.upper()
+        prefix = f"{keyword.upper()}%"
 
-        conn = self._connect()
         query = """
         SELECT *
         FROM symbols
@@ -69,28 +42,104 @@ class InfoEngine:
                 WHEN name LIKE ? THEN 3
                 ELSE 4
             END
-        LIMIT 20
+        LIMIT 50
         """
-
-        exact = keyword.upper()
-        like_code_prefix = f"{keyword.upper()}%"
-        like_name = f"%{keyword}%"
 
         df = pd.read_sql(
             query,
             conn,
-            params=(like_name, like_name, exact, like_code_prefix, like_name),
+            params=(like, like, exact, prefix, like)
         )
 
         conn.close()
+
         return df
 
-    # ---------------------------------------------------
-    # ETF만 조회
-    # ---------------------------------------------------
-    def get_etfs(self):
+    # -----------------------------
+    # ETF CSV 로드 (🔥 meta 폴더 기준)
+    # -----------------------------
+    def _load_etf_csv(self):
+
+        BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+
+        kr_path = os.path.join(BASE_DIR, "data", "meta", "kr_etf_list.csv")
+        us_path = os.path.join(BASE_DIR, "data", "meta", "us_etf_list.csv")
+
+        if not os.path.exists(kr_path):
+            raise FileNotFoundError(f"KR ETF 없음: {kr_path}")
+
+        if not os.path.exists(us_path):
+            raise FileNotFoundError(f"US ETF 없음: {us_path}")
+
+        kr = pd.read_csv(kr_path)
+        us = pd.read_csv(us_path)
+
+        return pd.concat([kr, us], ignore_index=True)
+
+    # -----------------------------
+    # ETF 검색
+    # -----------------------------
+    def _search_etf_csv(self, keyword: str):
+
+        etf = self._load_etf_csv()
+
+        mask = (
+            etf["code"].str.contains(keyword, case=False, na=False) |
+            etf["name"].str.contains(keyword, case=False, na=False)
+        )
+
+        return etf[mask]
+
+    # -----------------------------
+    # 🔥 최종 검색 (중복 제거)
+    # -----------------------------
+    def search_fuzzy(self, keyword: str):
+
+        if not keyword:
+            return pd.DataFrame()
+
+        # 1️⃣ symbol_master
+        base_df = self._search_symbol_master(keyword)
+
+        # 2️⃣ ETF CSV
+        etf_df = self._search_etf_csv(keyword)
+
+        # 3️⃣ symbol_master 우선
+        existing_codes = set(base_df["code"].str.upper())
+
+        etf_df = etf_df[
+            ~etf_df["code"].str.upper().isin(existing_codes)
+        ]
+
+        # 4️⃣ 병합
+        result = pd.concat([base_df, etf_df], ignore_index=True)
+
+        return result.head(20)
+
+    # -----------------------------
+    # 전체 조회
+    # -----------------------------
+    def get_all_symbols(self):
+
         conn = self._connect()
-        query = "SELECT * FROM symbols WHERE is_etf = 1"
-        df = pd.read_sql(query, conn)
+        df = pd.read_sql("SELECT * FROM symbols", conn)
         conn.close()
+
+        return df
+
+    # -----------------------------
+    # 티커 조회
+    # -----------------------------
+    def get_symbol_by_ticker(self, ticker: str):
+
+        conn = self._connect()
+
+        df = pd.read_sql(
+            "SELECT * FROM symbols WHERE code = ?",
+            conn,
+            params=(ticker.upper(),)
+        )
+
+        conn.close()
+
         return df

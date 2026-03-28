@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}투자 계산기 — Domino Invest{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="calc-layout">
+
+  <!-- ===== 왼쪽: 입력 패널 ===== -->
+  <div class="calc-input-panel">
+
+    <div class="calc-panel-header">
+      <h2 class="calc-title">투자 계산기</h2>
+      <p class="calc-sub">포트폴리오를 구성하고 미래 자산을 시뮬레이션해보세요</p>
+    </div>
+
+    <!-- 01. 포트폴리오 구성 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">01</span> 포트폴리오 구성</div>
+      <div class="ticker-search-wrap">
+        <div class="ticker-search-box">
+          <span class="ts-icon">🔍</span>
+          <input type="text" id="tickerSearchInput" placeholder="종목 또는 ETF 검색 (예: SPY, QQQ)" autocomplete="off">
+          <div class="ticker-dropdown" id="tickerDropdown"></div>
+        </div>
+      </div>
+      <div id="tickerList" class="ticker-list">
+        <div class="ticker-empty" id="tickerEmpty">종목을 검색해서 추가해보세요</div>
+      </div>
+      <div class="weight-summary">
+        <div class="weight-summary-row">
+          <span>비중 합계</span>
+          <span id="weightTotal" class="weight-total-num">0%</span>
+        </div>
+        <div class="weight-track"><div class="weight-fill" id="weightFill"></div></div>
+        <div class="weight-warn" id="weightWarn"></div>
+      </div>
+    </div>
+
+    <!-- 02. 투자 금액 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">02</span> 투자 금액</div>
+      <div class="input-row">
+        <label>초기 투자금</label>
+        <div class="input-group">
+          <input type="number" id="initialCapital" class="calc-input" value="10000000" min="0" step="1000000">
+          <span class="unit">원</span>
+        </div>
+        <div class="input-hint" id="initialHint">₩10,000,000</div>
+      </div>
+      <div class="input-row">
+        <label>월 적립액</label>
+        <div class="input-group">
+          <input type="number" id="monthlyContrib" class="calc-input" value="500000" min="0" step="100000">
+          <span class="unit">원</span>
+        </div>
+        <div class="input-hint" id="monthlyHint">₩500,000</div>
+      </div>
+      <div class="input-row">
+        <label>투자 기간 <span id="yearsLabel" class="label-val">20년</span></label>
+        <input type="range" id="yearsSlider" class="calc-slider" min="1" max="40" value="20">
+        <div class="slider-marks">
+          <span>1년</span><span>10년</span><span>20년</span><span>30년</span><span>40년</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 03. 리밸런싱 전략 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">03</span> 리밸런싱 전략</div>
+      <div class="rebal-options">
+        <label class="rebal-option"><input type="radio" name="rebal" value="monthly" checked><span class="rebal-label">매월</span></label>
+        <label class="rebal-option"><input type="radio" name="rebal" value="quarterly"><span class="rebal-label">분기</span></label>
+        <label class="rebal-option"><input type="radio" name="rebal" value="yearly"><span class="rebal-label">매년</span></label>
+        <label class="rebal-option"><input type="radio" name="rebal" value="band"><span class="rebal-label">밴드</span></label>
+        <label class="rebal-option"><input type="radio" name="rebal" value="none"><span class="rebal-label">안 함</span></label>
+      </div>
+      <div class="band-settings" id="bandSettings" style="display:none">
+        <div class="input-row">
+          <label>밴드 폭 <span id="bandLabel" class="label-val">5%</span></label>
+          <input type="range" id="bandSlider" class="calc-slider" min="1" max="30" value="5">
+          <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
+        </div>
+        <div class="band-note">비중이 목표에서 <strong id="bandNoteVal">5%</strong> 이상 벗어나면 리밸런싱</div>
+      </div>
+    </div>
+
+    <!-- 04. 배당 처리 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">04</span> 배당금 처리</div>
+      <div class="rebal-options">
+        <label class="rebal-option"><input type="radio" name="dividend" value="reinvest" checked><span class="rebal-label">재투자</span></label>
+        <label class="rebal-option"><input type="radio" name="dividend" value="hold"><span class="rebal-label">현금 보유</span></label>
+        <label class="rebal-option"><input type="radio" name="dividend" value="withdraw"><span class="rebal-label">인출</span></label>
+      </div>
+    </div>
+
+    <button class="calc-run-btn" id="runBtn" onclick="runCalculator()">
+      <span id="runBtnText">시뮬레이션 실행</span>
+      <span id="runBtnSpinner" class="btn-spinner" style="display:none">⏳</span>
+    </button>
+
+  </div>
+
+  <!-- ===== 오른쪽: 결과 패널 ===== -->
+  <div class="calc-result-panel" id="resultPanel">
+
+    <div class="result-empty" id="resultEmpty">
+      <div class="result-empty-icon">📊</div>
+      <div class="result-empty-title">시뮬레이션 결과가 여기에 표시됩니다</div>
+      <div class="result-empty-sub">왼쪽에서 포트폴리오를 구성하고 실행해보세요</div>
+    </div>
+
+    <div class="result-content" id="resultContent" style="display:none">
+
+      <!-- 헤더 -->
+      <div class="result-header">
+        <div class="result-title-row">
+          <h3 class="result-title">시뮬레이션 결과</h3>
+          <span class="result-period" id="resultPeriodLabel"></span>
+        </div>
+      </div>
+
+      <!-- 자산 분포 카드 -->
+      <div class="dist-cards">
+        <div class="dist-card pessimistic">
+          <div class="dist-card-label">비관적 (하위 10%)</div>
+          <div class="dist-card-value" id="distP10">—</div>
+        </div>
+        <div class="dist-card median">
+          <div class="dist-card-label">중간값 (50%)</div>
+          <div class="dist-card-value" id="distP50">—</div>
+        </div>
+        <div class="dist-card optimistic">
+          <div class="dist-card-label">낙관적 (상위 10%)</div>
+          <div class="dist-card-value" id="distP90">—</div>
+        </div>
+      </div>
+
+      <!-- 시작 시점별 종료 자산 -->
+      <div class="result-card">
+        <div class="result-card-title">시작 시점별 종료 자산</div>
+        <div class="chart-wrap-lg">
+          <canvas id="rollingChart"></canvas>
+        </div>
+      </div>
+
+      <!-- 지표 히스토그램 그리드 -->
+      <div class="hist-section-title">지표 분포</div>
+      <div class="hist-grid">
+        <div class="result-card">
+          <div class="result-card-title">종료 자산 분포</div>
+          <div class="chart-wrap-sm"><canvas id="histEndValue"></canvas></div>
+          <div class="hist-stats" id="statsEndValue"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-card-title">CAGR 분포</div>
+          <div class="chart-wrap-sm"><canvas id="histCagr"></canvas></div>
+          <div class="hist-stats" id="statsCagr"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-card-title">MDD 분포</div>
+          <div class="chart-wrap-sm"><canvas id="histMdd"></canvas></div>
+          <div class="hist-stats" id="statsMdd"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-card-title">Sharpe Ratio 분포</div>
+          <div class="chart-wrap-sm"><canvas id="histSharpe"></canvas></div>
+          <div class="hist-stats" id="statsSharpe"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-card-title">Sortino Ratio 분포</div>
+          <div class="chart-wrap-sm"><canvas id="histSortino"></canvas></div>
+          <div class="hist-stats" id="statsSortino"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-card-title">Calmar Ratio 분포</div>
+          <div class="chart-wrap-sm"><canvas id="histCalmar"></canvas></div>
+          <div class="hist-stats" id="statsCalmar"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-card-title">총 배당금 분포</div>
+          <div class="chart-wrap-sm"><canvas id="histDiv"></canvas></div>
+          <div class="hist-stats" id="statsDiv"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-card-title">배당 CAGR 분포</div>
+          <div class="chart-wrap-sm"><canvas id="histDivCagr"></canvas></div>
+          <div class="hist-stats" id="statsDivCagr"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/calculator.js') }}"></script>
+{% endblock %}

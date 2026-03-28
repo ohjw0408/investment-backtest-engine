@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Domino Invest{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar">
+  <div class="logo">
+    <div class="logo-icon">🁢</div>
+    Domino <span>Invest</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">홈</a>
+    <a class="nav-link {% if request.path.startswith('/calculator') %}active{% endif %}" href="/calculator">투자 계산기</a>
+    <a class="nav-link {% if request.path.startswith('/retirement') %}active{% endif %}" href="/retirement">은퇴 설계</a>
+    <a class="nav-link {% if request.path.startswith('/backtest') %}active{% endif %}" href="/backtest">포트폴리오 분석</a>
+    <a class="nav-link {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">내 자산</a>
+  </div>
+  <div class="nav-search-wrap">
+    <div class="nav-search-box">
+      <span class="nav-search-icon">🔍</span>
+      <input type="text" placeholder="종목, ETF 검색..." id="navSearchInput" autocomplete="off">
+      <div class="nav-search-dropdown" id="navSearchDropdown"></div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <span class="user-greeting">안녕하세요, 김투자님!</span>
+    <div class="nav-icon-btn">✉️<span class="badge"></span></div>
+    <div class="nav-icon-btn">🤖</div>
+    <div class="nav-icon-btn nav-help">⚙</div>
+  </div>
+</nav>
+
+<!-- ===== LAYOUT ===== -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-label">메뉴</div>
+    <a class="sidebar-item {% if request.path == '/' %}active{% endif %}" href="/">
+      <span>🏠</span> 홈
+    </a>
+    <a class="sidebar-item {% if request.path.startswith('/calculator') %}active{% endif %}" href="/calculator">
+      <span>🧮</span> 투자 계산기
+    </a>
+    <a class="sidebar-item {% if request.path.startswith('/retirement') %}active{% endif %}" href="/retirement">
+      <span>🌅</span> 은퇴 설계
+    </a>
+    <a class="sidebar-item {% if request.path.startswith('/backtest') %}active{% endif %}" href="/backtest">
+      <span>📊</span> 포트폴리오 분석
+    </a>
+    <a class="sidebar-item {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">
+      <span>💼</span> 내 자산
+    </a>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% block scripts %}{% endblock %}
+
+<script>
+// ── 네비 검색창 ──
+const navInput    = document.getElementById('navSearchInput');
+const navDropdown = document.getElementById('navSearchDropdown');
+
+let searchTimer = null;
+
+function badgeColor(badge) {
+  if (badge === 'KR ETF' || badge === 'KOSPI' || badge === 'KOSDAQ') return '#1976D2';
+  if (badge === 'US ETF' || badge === 'NASDAQ' || badge === 'NYSE')   return '#2E7D32';
+  return '#78909C';
+}
+
+if (navInput) {
+  navInput.addEventListener('input', (e) => {
+    const q = e.target.value.trim();
+    if (!q) { navDropdown.style.display = 'none'; return; }
+
+    clearTimeout(searchTimer);
+    navDropdown.innerHTML = '<div class="nav-search-hint">검색 중...</div>';
+    navDropdown.style.display = 'block';
+
+    searchTimer = setTimeout(async () => {
+      try {
+        const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+
+        if (!data.length) {
+          navDropdown.innerHTML = '<div class="nav-search-hint">검색 결과 없음</div>';
+          return;
+        }
+
+        navDropdown.innerHTML = data.map(item => `
+          <div class="nav-search-result" onclick="selectSymbol('${item.code}', '${item.name.replace(/'/g, "\'")}')">
+            <span class="nav-search-badge" style="background:${badgeColor(item.badge)}22; color:${badgeColor(item.badge)}">${item.badge}</span>
+            <div class="nav-search-info">
+              <div class="nav-search-code">${item.code}</div>
+              <div class="nav-search-name">${item.name}</div>
+              ${item.subtitle ? `<div class="nav-search-sub">${item.subtitle}</div>` : ''}
+            </div>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        navDropdown.innerHTML = '<div class="nav-search-hint">오류가 발생했어요</div>';
+      }
+    }, 250);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!navInput.closest('.nav-search-box').contains(e.target)) {
+      navDropdown.style.display = 'none';
+    }
+  });
+
+  navInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      navDropdown.style.display = 'none';
+      navInput.blur();
+    }
+  });
+}
+
+function selectSymbol(code, name) {
+  navInput.value = '';
+  navDropdown.style.display = 'none';
+  // TODO: 종목 상세 페이지로 이동하거나 다른 동작 연결
+  console.log('선택된 종목:', code, name);
+}
+</script>
+</body>
+</html>

@@ -1,45 +1,61 @@
-import yfinance as yf
+import sqlite3
 import pandas as pd
-import os
+import yfinance as yf
+from pathlib import Path
+
+BASE_DIR       = Path(__file__).resolve().parent
+DATA_DIR       = BASE_DIR / "data"
+META_DIR       = DATA_DIR / "meta"
+INDEX_DB_PATH  = META_DIR / "index_master.db"
 
 
 class DataEngine:
 
     def __init__(self, start_date="1950-01-01"):
         self.start_date = start_date
-        self.base_path = "data"
+        self._cache = {}
 
-        if not os.path.exists(self.base_path):
-            os.makedirs(self.base_path)
+        # index_master.db 연결
+        if INDEX_DB_PATH.exists():
+            self._index_conn = sqlite3.connect(str(INDEX_DB_PATH), check_same_thread=False)
+        else:
+            self._index_conn = None
+            print(f"[DataEngine] index_master.db 없음: {INDEX_DB_PATH}")
+
+    def __del__(self):
+        try:
+            if self._index_conn:
+                self._index_conn.close()
+        except:
+            pass
 
     def get_symbol_data(self, ticker):
-        """로컬 캐시 확인 후 없으면 다운로드"""
+        """
+        index_master.db에서 먼저 조회,
+        없으면 yfinance에서 다운로드 (메모리 캐시만, CSV 저장 안 함)
+        """
 
-        file_path = os.path.join(self.base_path, f"{ticker}.csv")
+        # ── 메모리 캐시 ──────────────────────────────────
+        if ticker in self._cache:
+            return self._cache[ticker]
 
-        # -------------------------------------------------
-        # 1️⃣ 캐시 존재하면 로드
-        # -------------------------------------------------
-        if os.path.exists(file_path):
+        # ── index_master.db 조회 ─────────────────────────
+        if self._index_conn:
             try:
-                df = pd.read_csv(file_path)
-
-                # 날짜 정리
-                df["Date"] = pd.to_datetime(df["Date"])
-
-                df = df.set_index("Date")
-
-                # 숫자형 강제 변환
-                df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
-
-                return df["Close"].dropna()
-
+                df = pd.read_sql(
+                    "SELECT date, close FROM index_daily WHERE code=? ORDER BY date",
+                    self._index_conn,
+                    params=(ticker,)
+                )
+                if not df.empty:
+                    df["date"] = pd.to_datetime(df["date"])
+                    series = df.set_index("date")["close"].astype(float)
+                    self._cache[ticker] = series
+                    return series
             except Exception as e:
-                print("Cache read error:", e)
+                print(f"[DataEngine] DB 조회 오류 ({ticker}): {e}")
 
-        # -------------------------------------------------
-        # 2️⃣ 다운로드
-        # -------------------------------------------------
+        # ── yfinance 다운로드 (DB에 없는 경우) ──────────
         try:
             df = yf.download(
                 ticker,
@@ -47,17 +63,11 @@ class DataEngine:
                 auto_adjust=True,
                 progress=False
             )
-
             if not df.empty:
-
-                # 저장 전에 Date 컬럼 생성
-                df_reset = df.reset_index()
-
-                df_reset.to_csv(file_path, index=False)
-
-                return df["Close"]
-
+                series = df["Close"].squeeze()
+                self._cache[ticker] = series
+                return series
         except Exception as e:
-            print(f"Error fetching {ticker}: {e}")
+            print(f"[DataEngine] yfinance 오류 ({ticker}): {e}")
 
         return pd.Series(dtype=float)

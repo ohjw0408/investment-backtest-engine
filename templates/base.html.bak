@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Domino Invest{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar">
+  <div class="logo">
+    <div class="logo-icon">🁢</div>
+    Domino <span>Invest</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">홈</a>
+    <a class="nav-link {% if request.path == '/retirement' %}active{% endif %}" href="/retirement">은퇴</a>
+    <a class="nav-link" href="#">모으기</a>
+    <a class="nav-link" href="#">투자</a>
+    <a class="nav-link {% if request.path == '/portfolio' %}active{% endif %}" href="/portfolio">포트폴리오</a>
+    <a class="nav-link" href="#">설정</a>
+  </div>
+  <div class="nav-right">
+    <span class="user-greeting">안녕하세요, 김투자님!</span>
+    <div class="nav-icon-btn">✉️<span class="badge"></span></div>
+    <div class="nav-icon-btn">🤖</div>
+    <div class="nav-icon-btn nav-help">도움 ▾</div>
+  </div>
+</nav>
+
+<!-- ===== LAYOUT ===== -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-label">즐겨찾기</div>
+    <a class="sidebar-item {% if request.path == '/portfolio' %}active{% endif %}" href="/portfolio">
+      <span>🥧</span> 포트폴리오
+    </a>
+    <a class="sidebar-item {% if request.path == '/retirement' %}active{% endif %}" href="/retirement">
+      <span>📈</span> 은퇴시뮬레이션
+    </a>
+    <a class="sidebar-item" href="#">
+      <span>🏦</span> 목돈모으기
+    </a>
+    <a class="sidebar-item {% if request.path == '/' %}active{% endif %}" href="/">
+      <span>📊</span> 자산배분
+    </a>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

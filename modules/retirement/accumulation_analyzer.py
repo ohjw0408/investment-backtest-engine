@@ -8,7 +8,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 
 class AccumulationAnalyzer:
@@ -26,6 +26,7 @@ class AccumulationAnalyzer:
         dividend_mode:        str   = "reinvest",
         step_months:          int   = 1,
         verbose:              bool  = False,
+        div_start:            Optional[str] = None,   # 배당 계산 시작일
     ):
         self.portfolio_engine      = portfolio_engine
         self.tickers               = tickers
@@ -38,6 +39,7 @@ class AccumulationAnalyzer:
         self.dividend_mode         = dividend_mode
         self.step_months           = step_months
         self.verbose               = verbose
+        self.div_start             = pd.Timestamp(div_start) if div_start else None
 
     def run(self) -> dict:
         cases = self._run_rolling()
@@ -137,26 +139,35 @@ class AccumulationAnalyzer:
                 except Exception:
                     mwr = 0.0
 
-        # 배당 CAGR / MDD (history에서 직접 계산, get_price 호출 없음)
-        div_col       = "dividend_income"
-        dividend_cagr = 0.0
-        dividend_mdd  = 0.0
+        # 배당 계산 (div_start 이후 구간만)
+        div_col        = "dividend_income"
+        dividend_cagr  = 0.0
+        dividend_mdd   = 0.0
         total_dividend = 0.0
 
         if div_col in history.columns:
-            total_dividend = float(history[div_col].sum())
             h = history.copy()
             h["_date"]  = pd.to_datetime(h["date"])
-            h["_year"]  = h["_date"].dt.year
-            h["_month"] = h["_date"].dt.month
+
+            # div_start 이후 구간만 사용
+            if self.div_start is not None:
+                h_div = h[h["_date"] >= self.div_start]
+            else:
+                h_div = h
+
+            total_dividend = float(h_div[div_col].sum())
+
+            h_div = h_div.copy()
+            h_div["_year"]  = h_div["_date"].dt.year
+            h_div["_month"] = h_div["_date"].dt.month
 
             # 완전한 연도만 (12개월 거래일 있는 해)
-            full_years  = set(
-                h.groupby("_year")["_month"].nunique()
+            full_years = set(
+                h_div.groupby("_year")["_month"].nunique()
                 .pipe(lambda s: s[s >= 12]).index
             )
             annual_div = (
-                h[h["_year"].isin(full_years)]
+                h_div[h_div["_year"].isin(full_years)]
                 .groupby("_year")[div_col].sum()
             )
             annual_div = annual_div[annual_div > 0]

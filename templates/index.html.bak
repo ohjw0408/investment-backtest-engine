@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}홈 — Domino Invest{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid">
+
+  <!-- ===== 포트폴리오 카드 ===== -->
+  <div class="card portfolio-card">
+    <div class="portfolio-header">
+      <div>
+        <div class="card-label">내 포트폴리오</div>
+        <div class="portfolio-amount">
+          <span id="portfolioValue">₩15,870,200</span>
+          <span class="portfolio-change up" id="portfolioChange">(+1.8%)</span>
+        </div>
+      </div>
+      <div class="period-selector">
+        <button class="period-btn active" data-period="1m">1개월</button>
+        <button class="period-btn" data-period="3m">3개월</button>
+        <button class="period-btn" data-period="1y">1년</button>
+        <button class="period-btn" data-period="all">전체</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="portfolioChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ===== 시장 지수 카드 ===== -->
+  <div class="card market-card">
+    <div class="market-header">
+      <span class="star">★</span>
+      <span class="market-title">시장 지수</span>
+      <span class="market-news">📰</span>
+    </div>
+    <div class="market-grid" id="marketGrid">
+      <!-- JS로 렌더링 -->
+      <div class="market-loading">데이터 불러오는 중...</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== 우측 패널 ===== -->
+<div class="right-panel">
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input type="text" placeholder="검색" id="searchInput">
+  </div>
+
+  <div class="card asset-card">
+    <div class="asset-header">
+      <span class="asset-title">자산군별 비교</span>
+      <span class="asset-arrow">›</span>
+    </div>
+    <div id="assetList" class="asset-list">
+      <!-- JS로 렌더링 -->
+    </div>
+    <div class="asset-bar-wrap">
+      <div class="asset-bar-label">금액</div>
+      <div class="stacked-bar" id="stackedBar"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  loadPortfolio();
+  loadMarket();
+  loadAssets();
+
+  // 기간 버튼
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadPortfolio(btn.dataset.period);
+    });
+  });
+});
+
+// ── 포트폴리오 차트 ──
+let portfolioChart = null;
+async function loadPortfolio(period = '1m') {
+  const res = await fetch('/api/portfolio/history');
+  const { labels, values } = await res.json();
+
+  const slices = { '1m': 20, '3m': 40, '1y': 60, 'all': 80 };
+  const n = slices[period] || 20;
+  const slicedLabels = labels.slice(-n);
+  const slicedValues = values.slice(-n);
+
+  const canvas = document.getElementById('portfolioChart');
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 200);
+  grad.addColorStop(0, 'rgba(33,150,243,0.3)');
+  grad.addColorStop(1, 'rgba(33,150,243,0)');
+
+  if (portfolioChart) portfolioChart.destroy();
+  portfolioChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: slicedLabels,
+      datasets: [{
+        data: slicedValues,
+        borderColor: '#1976D2',
+        borderWidth: 2.5,
+        fill: true,
+        backgroundColor: grad,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: '#1976D2',
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: c => '₩' + c.raw.toLocaleString() }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          ticks: { maxTicksLimit: 6, font: { size: 10 }, color: '#90A4AE' },
+          grid: { display: false }
+        },
+        y: {
+          display: true,
+          ticks: {
+            font: { family: 'DM Mono', size: 10 },
+            color: '#90A4AE',
+            callback: v => '₩' + (v / 1000000).toFixed(1) + 'M'
+          },
+          grid: { color: 'rgba(0,0,0,0.04)' }
+        }
+      }
+    }
+  });
+}
+
+// ── 시장 지수 ──
+async function loadMarket() {
+  const res = await fetch('/api/market');
+  const items = await res.json();
+  const grid = document.getElementById('marketGrid');
+  grid.innerHTML = '';
+
+  items.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'market-item';
+    div.style.borderRight = (i === 2 || i === 4) ? 'none' : '1px solid var(--border)';
+    div.style.borderBottom = i >= 3 ? 'none' : '1px solid var(--border)';
+    div.innerHTML = `
+      <span class="market-tag">${item.tag}</span>
+      <div class="market-name">${item.name}</div>
+      <div class="market-value">${item.value}</div>
+      <div class="market-change ${item.up ? 'up' : 'down'}">
+        ${item.up ? '▲' : '▼'} ${item.change}
+      </div>
+      <canvas id="spark-${item.id}" class="sparkline" width="100" height="36"></canvas>
+    `;
+    grid.appendChild(div);
+    // 스파크라인
+    requestAnimationFrame(() => drawSparkline(`spark-${item.id}`, item.spark, item.up));
+  });
+}
+
+// ── 자산군별 ──
+async function loadAssets() {
+  const res = await fetch('/api/assets');
+  const items = await res.json();
+
+  // 목록
+  const list = document.getElementById('assetList');
+  list.innerHTML = items.map(a => `
+    <div class="asset-item">
+      <div class="asset-dot" style="background:${a.color}22">${a.icon}</div>
+      <div class="asset-info">
+        <div class="asset-name">${a.name}</div>
+        <div class="asset-change ${a.up ? 'up' : 'down'}">${a.change}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // 스택 바
+  const bar = document.getElementById('stackedBar');
+  bar.innerHTML = '';
+  ['현재', '목표'].forEach((label, ci) => {
+    const col = document.createElement('div');
+    col.className = 'bar-col';
+    items.forEach(a => {
+      const seg = document.createElement('div');
+      seg.className = 'bar-seg';
+      const pct = a.pct + (ci === 1 ? (Math.random() - 0.5) * 0.08 : 0);
+      seg.style.height = (pct * 130) + 'px';
+      seg.style.background = a.color;
+      col.appendChild(seg);
+    });
+    const lbl = document.createElement('div');
+    lbl.className = 'bar-col-label';
+    lbl.textContent = label;
+    col.appendChild(lbl);
+    bar.appendChild(col);
+  });
+}
+</script>
+{% endblock %}

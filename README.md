@@ -48,3 +48,45 @@ Plaintext
 │   └── info_engine.py  # 종목 사전 및 인터넷 정보 수집
 ├── app.py              # 메인 실행 파일 (Streamlit UI)
 └── README.md           # 본 로드맵 파일
+
+# Domino Invest — Flask Dashboard
+
+## 로컬 실행
+
+```bash
+pip install -r requirements.txt
+python app.py
+```
+
+브라우저에서 http://localhost:5000 접속
+
+## 파일 구조
+
+```
+├── app.py                  # Flask 진입점 + API 엔드포인트
+├── requirements.txt
+├── Procfile                # Render 배포용
+├── templates/
+│   ├── base.html           # 공통 레이아웃 (navbar, sidebar)
+│   ├── index.html          # 홈 대시보드
+│   ├── portfolio.html      # 포트폴리오
+│   └── retirement.html     # 은퇴 시뮬레이션
+└── static/
+    ├── css/style.css
+    └── js/charts.js        # 공통 스파크라인 유틸
+```
+
+## API 엔드포인트
+
+| 경로 | 설명 |
+|------|------|
+| `GET /api/portfolio/history` | 포트폴리오 히스토리 데이터 |
+| `GET /api/market` | 시장 지수 (S&P500, NASDAQ, KOSPI, 금, 환율) |
+| `GET /api/assets` | 자산군별 비교 데이터 |
+
+## Render 배포
+
+1. GitHub에 push
+2. Render.com → New Web Service → 리포지토리 연결
+3. Start command: `gunicorn app:app`
+4. 무료 플랜으로 배포 완료

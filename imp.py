@@ -146,16 +146,71 @@ for _, row in kr_df.iterrows():
             INSERT INTO symbols
                 (code, name, market, country, is_etf, issuer, index_name, leverage, hedge)
             VALUES (?, ?, 'KRX', 'KR', 1, ?, ?, ?, ?)
-        """, (code, name, "KRX", 1, issuer, index_name, leverage, hedge))
+        """, (code, name, issuer, index_name, leverage, hedge))
         inserted_kr += 1
 
 conn.commit()
 print(f"  → KR ETF: {inserted_kr}개 추가, {updated_kr}개 보완")
 
 # -----------------------------------------------
-# 5. 결과 요약
+# 5. KRX 전체 종목 (코스피 + 코스닥) — fdr
 # -----------------------------------------------
-print("[5/5] 완료!")
+print("[5/6] KRX 종목 (코스피 + 코스닥) 추가 중...")
+
+try:
+    import FinanceDataReader as fdr
+
+    inserted_stock = 0
+    updated_stock  = 0
+
+    for market in ["KOSPI", "KOSDAQ"]:
+        print(f"  · {market} 불러오는 중...")
+        df = fdr.StockListing(market)
+
+        # 컬럼명 정규화
+        df.columns = [c.strip() for c in df.columns]
+        code_col = next((c for c in df.columns if c in ("Code", "code", "Symbol")), None)
+        name_col = next((c for c in df.columns if c in ("Name", "name")), None)
+
+        if not code_col or not name_col:
+            print(f"  [WARN] {market} 컬럼 인식 실패: {df.columns.tolist()}")
+            continue
+
+        for _, row in df.iterrows():
+            code = str(row[code_col]).strip().zfill(6)
+            name = str(row[name_col]).strip()
+
+            if not code or not name:
+                continue
+
+            cur.execute("SELECT id, is_etf FROM symbols WHERE code = ?", (code,))
+            existing = cur.fetchone()
+
+            if existing:
+                cur.execute(
+                    "UPDATE symbols SET name=?, market=?, country='KR' WHERE code=?",
+                    (name, market, code)
+                )
+                updated_stock += 1
+            else:
+                cur.execute(
+                    "INSERT INTO symbols (code, name, market, country, is_etf) VALUES (?, ?, ?, 'KR', 0)",
+                    (code, name, market)
+                )
+                inserted_stock += 1
+
+    conn.commit()
+    print(f"  → KRX 종목: {inserted_stock}개 추가, {updated_stock}개 보완")
+
+except ImportError:
+    print("  [SKIP] FinanceDataReader 미설치 — pip install finance-datareader")
+except Exception as e:
+    print(f"  [ERROR] KRX 종목 추가 실패: {e}")
+
+# -----------------------------------------------
+# 6. 결과 요약
+# -----------------------------------------------
+print("[6/6] 완료!")
 
 cur.execute("SELECT COUNT(*) FROM symbols")
 total = cur.fetchone()[0]
@@ -169,6 +224,12 @@ kr_total = cur.fetchone()[0]
 cur.execute("SELECT COUNT(*) FROM symbols WHERE country='US'")
 us_total = cur.fetchone()[0]
 
+cur.execute("SELECT COUNT(*) FROM symbols WHERE market='KOSPI'")
+kospi_total = cur.fetchone()[0]
+
+cur.execute("SELECT COUNT(*) FROM symbols WHERE market='KOSDAQ'")
+kosdaq_total = cur.fetchone()[0]
+
 conn.close()
 
 print(f"""
@@ -178,6 +239,9 @@ print(f"""
   │ 전체 종목      : {total:>6}개    │
   │ ETF 합계       : {etf_total:>6}개    │
   │ 한국 (KR)      : {kr_total:>6}개    │
+  │   - KOSPI      : {kospi_total:>6}개    │
+  │   - KOSDAQ     : {kosdaq_total:>6}개    │
+  │   - KR ETF     : {kr_total - kospi_total - kosdaq_total:>6}개    │
   │ 미국 (US)      : {us_total:>6}개    │
   └─────────────────────────────┘
   백업: {BACKUP_PATH}

@@ -79,7 +79,7 @@ def search():
         return jsonify([])
 
 # -----------------------------------------------
-# API - 투자 계산기
+# API - 투자 계산기 헬퍼
 # -----------------------------------------------
 
 def get_dividend_start(ticker: str):
@@ -95,6 +95,24 @@ def get_dividend_start(ticker: str):
         print(f"[get_dividend_start] {ticker} 오류: {e}")
         return None
 
+
+def get_price_start(ticker: str):
+    """티커의 실제 가격 데이터 시작일 조회"""
+    try:
+        cur = portfolio_engine.loader.conn.execute(
+            "SELECT MIN(date) FROM price_daily WHERE code=?",
+            (ticker,)
+        )
+        row = cur.fetchone()
+        return row[0] if row and row[0] else None
+    except Exception as e:
+        print(f"[get_price_start] {ticker} 오류: {e}")
+        return None
+
+
+# -----------------------------------------------
+# API - 투자 계산기
+# -----------------------------------------------
 
 @app.route('/api/calculator/run', methods=['POST'])
 def calculator_run():
@@ -130,13 +148,49 @@ def calculator_run():
                 drift_threshold     = drift_threshold,
             )
 
-        # 배당 시작일: 모든 티커 중 가장 늦은 배당 데이터 시작일
+        # ── 데이터 시작일 계산 ──────────────────────────
+        # 1. USD/KRW 환율 시작일
+        usdkrw_start = portfolio_engine.loader.USD_KRW_START
+
+        # 2. 각 티커의 실제 가격 데이터 시작일
+        # (DB에 없으면 yfinance에서 먼저 받아오게 get_price 호출)
+        for ticker in ticker_codes:
+            try:
+                portfolio_engine.loader.get_price(
+                    ticker,
+                    usdkrw_start,
+                    datetime.date.today().strftime('%Y-%m-%d')
+                )
+            except Exception as e:
+                print(f"[calculator] {ticker} 데이터 로드 오류: {e}")
+
+        price_starts = [get_price_start(t) for t in ticker_codes]
+        price_starts = [d for d in price_starts if d]
+
+        # 3. 세 날짜 중 가장 늦은 날짜를 시작일로
+        if price_starts:
+            data_start = max([usdkrw_start] + price_starts)
+        else:
+            data_start = usdkrw_start
+
+        data_end = datetime.date.today().strftime('%Y-%m-%d')
+
+        # ── 가능한 최대 롤링 기간 체크 ──────────────────
+        from dateutil.relativedelta import relativedelta
+        start_dt = datetime.datetime.strptime(data_start, '%Y-%m-%d').date()
+        end_dt   = datetime.date.today()
+        max_years = (end_dt - start_dt).days // 365
+
+        if years > max_years:
+            return jsonify({
+                'error': f"데이터 부족: {ticker_codes}의 데이터는 {data_start}부터 있어서 "
+                         f"최대 {max_years}년 시뮬레이션이 가능합니다."
+            }), 400
+
+        # ── 배당 시작일 ──────────────────────────────────
         div_starts = [get_dividend_start(t) for t in ticker_codes]
         div_starts = [d for d in div_starts if d]
         div_start  = max(div_starts) if div_starts else None
-
-        data_start = portfolio_engine.loader.USD_KRW_START
-        data_end   = datetime.date.today().strftime('%Y-%m-%d')
 
         analyzer = AccumulationAnalyzer(
             portfolio_engine     = portfolio_engine,
@@ -150,19 +204,18 @@ def calculator_run():
             dividend_mode        = dividend_mode,
             step_months          = 3,
             verbose              = False,
-            div_start            = div_start,   # 배당 계산 시작일 전달
+            div_start            = div_start,
         )
 
         result = analyzer.run()
 
-        # 배당 관련 메타 정보 추가
+        # 배당 메타 정보
         if div_start:
             result['distribution']['div_data_start']  = div_start
             result['distribution']['div_cases_count'] = len(result['cases'])
         else:
             result['distribution']['no_dividend'] = True
 
-        # JSON 직렬화용 케이스 요약
         cases_summary = [
             {
                 'run_id':    c['run_id'],

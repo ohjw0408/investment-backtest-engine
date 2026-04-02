@@ -247,8 +247,10 @@ function renderResult(data, payload) {
     { id: 'histSharpe',   key: 'sharpe',    fmt: v => v.toFixed(2), color: '#1976D2', div: false },
     { id: 'histSortino',  key: 'sortino',   fmt: v => v.toFixed(2), color: '#7B1FA2', div: false },
     { id: 'histCalmar',   key: 'calmar',    fmt: v => v.toFixed(2), color: '#F57C00', div: false },
-    { id: 'histDiv',      key: 'total_dividend', fmt: fmtKRW,       color: '#00897B', div: true  },
-    { id: 'histDivCagr',  key: 'dividend_cagr',  fmt: fmtPct,       color: '#00897B', div: true  },
+    { id: 'histDiv',             key: 'total_dividend',         fmt: fmtKRW, color: '#00897B', div: true  },
+    { id: 'histDivCagr',         key: 'dividend_cagr',          fmt: fmtPct, color: '#00897B', div: true  },
+    { id: 'histLastYearDiv',     key: 'last_year_dividend',     fmt: fmtKRW, color: '#00897B', div: true  },
+    { id: 'histDivYieldOnCost',  key: 'dividend_yield_on_cost', fmt: fmtPct, color: '#00897B', div: true  },
   ];
 
   const noDividend = dist.no_dividend === true;
@@ -282,6 +284,20 @@ function renderResult(data, payload) {
         card.appendChild(note);
       }
       note.textContent = divNote;
+    }
+
+    // 배당 CAGR 최소 기간 안내
+    if (cfg.id === 'histDivCagr' && !noDividend) {
+      const card = document.getElementById(cfg.id).closest('.result-card');
+      let warn = card.querySelector('.div-cagr-warn');
+      if (!warn) {
+        warn = document.createElement('div');
+        warn.className = 'div-cagr-warn';
+        warn.style.cssText = 'font-size:0.7rem;color:#F9A825;margin-top:4px;';
+        card.appendChild(warn);
+      }
+      const years = Number(document.getElementById('yearsSlider').value);
+      warn.textContent = years < 3 ? '⚠ 배당 CAGR은 최소 3년 이상 시뮬레이션 시 의미 있는 값이 나옵니다' : '';
     }
   });
 }

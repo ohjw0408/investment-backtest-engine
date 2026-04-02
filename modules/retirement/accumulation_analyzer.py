@@ -26,7 +26,7 @@ class AccumulationAnalyzer:
         dividend_mode:        str   = "reinvest",
         step_months:          int   = 1,
         verbose:              bool  = False,
-        div_start:            Optional[str] = None,   # 배당 계산 시작일
+        div_start:            Optional[str] = None,
     ):
         self.portfolio_engine      = portfolio_engine
         self.tickers               = tickers
@@ -84,10 +84,12 @@ class AccumulationAnalyzer:
     def _calc_metrics(self, history: pd.DataFrame, years: int) -> dict:
         pv = history["portfolio_value"]
 
-        # CAGR
+        # 원금 (총 납입액)
         total_contribution = self.monthly_contribution * years * 12 + self.initial_capital
-        end_value          = pv.iloc[-1]
-        start_value        = pv.iloc[0]
+
+        # CAGR
+        end_value   = pv.iloc[-1]
+        start_value = pv.iloc[0]
         if total_contribution > 0 and end_value > 0:
             cagr = (end_value / total_contribution) ** (1 / years) - 1
         elif start_value > 0 and end_value > 0:
@@ -140,60 +142,102 @@ class AccumulationAnalyzer:
                     mwr = 0.0
 
         # 배당 계산 (div_start 이후 구간만)
-        div_col        = "dividend_income"
-        dividend_cagr  = 0.0
-        dividend_mdd   = 0.0
-        total_dividend = 0.0
+        div_col             = "dividend_income"
+        dividend_cagr       = 0.0
+        dividend_mdd        = 0.0
+        total_dividend      = 0.0
+        last_year_dividend  = 0.0   # 마지막 연도 연간 배당금
+        dividend_yield_on_cost = 0.0  # 마지막 연도 배당금 / 원금
 
         if div_col in history.columns:
             h = history.copy()
-            h["_date"]  = pd.to_datetime(h["date"])
+            h["_date"] = pd.to_datetime(h["date"])
 
-            # div_start 이후 구간만 사용
             if self.div_start is not None:
                 h_div = h[h["_date"] >= self.div_start]
             else:
                 h_div = h
 
+            # total_dividend는 절대액 그대로
             total_dividend = float(h_div[div_col].sum())
 
             h_div = h_div.copy()
             h_div["_year"]  = h_div["_date"].dt.year
             h_div["_month"] = h_div["_date"].dt.month
 
-            # 완전한 연도만 (12개월 거래일 있는 해)
+            # 완전한 연도만
             full_years = set(
                 h_div.groupby("_year")["_month"].nunique()
                 .pipe(lambda s: s[s >= 12]).index
             )
-            annual_div = (
-                h_div[h_div["_year"].isin(full_years)]
-                .groupby("_year")[div_col].sum()
-            )
-            annual_div = annual_div[annual_div > 0]
 
-            if len(annual_div) >= 2:
-                n_y = len(annual_div) - 1
-                if annual_div.iloc[0] > 0 and n_y > 0:
-                    dividend_cagr = (annual_div.iloc[-1] / annual_div.iloc[0]) ** (1 / n_y) - 1
-                roll_max     = annual_div.cummax()
-                dividend_mdd = float(((annual_div - roll_max) / roll_max).min())
+            h_full = h_div[h_div["_year"].isin(full_years)]
+
+            if not h_full.empty:
+                annual_div_abs = h_full.groupby("_year")[div_col].sum()
+                qty_cols       = [c for c in h_full.columns if c.endswith("_quantity")]
+
+                if qty_cols:
+                    annual_avg_qty = h_full.groupby("_year")[qty_cols].mean().sum(axis=1)
+                    valid          = annual_avg_qty[annual_avg_qty > 0].index
+                    annual_div_abs = annual_div_abs[annual_div_abs.index.isin(valid)]
+                    annual_avg_qty = annual_avg_qty[annual_avg_qty.index.isin(valid)]
+
+                    # 주당 배당금(DPS) 성장률
+                    annual_dps = annual_div_abs / annual_avg_qty
+                    annual_dps = annual_dps[annual_dps > 0]
+
+                    if len(annual_dps) >= 2:
+                        n_y = len(annual_dps) - 1
+                        if annual_dps.iloc[0] > 0 and n_y > 0:
+                            dividend_cagr = (annual_dps.iloc[-1] / annual_dps.iloc[0]) ** (1 / n_y) - 1
+                        roll_max     = annual_dps.cummax()
+                        dividend_mdd = float(((annual_dps - roll_max) / roll_max).min())
+
+                    # 마지막 연도 연간 배당금
+                    if len(annual_div_abs) > 0:
+                        last_year_dividend = float(annual_div_abs.iloc[-1])
+
+                else:
+                    # 수량 컬럼 없으면 배당수익률로 fallback
+                    annual_pv_mean = h_full.groupby("_year")["portfolio_value"].mean()
+                    annual_yield   = annual_div_abs / annual_pv_mean
+                    annual_yield   = annual_yield[annual_yield > 0]
+
+                    if len(annual_yield) >= 2:
+                        n_y = len(annual_yield) - 1
+                        if annual_yield.iloc[0] > 0 and n_y > 0:
+                            dividend_cagr = (annual_yield.iloc[-1] / annual_yield.iloc[0]) ** (1 / n_y) - 1
+                        roll_max     = annual_yield.cummax()
+                        dividend_mdd = float(((annual_yield - roll_max) / roll_max).min())
+
+                    if len(annual_div_abs) > 0:
+                        last_year_dividend = float(annual_div_abs.iloc[-1])
+
+                # 배당률 (원금 기준) = 마지막 연도 배당금 / 총 납입액
+                if total_contribution > 0 and last_year_dividend > 0:
+                    dividend_yield_on_cost = last_year_dividend / total_contribution
 
         return {
-            "cagr":           cagr,
-            "mdd":            mdd,
-            "sharpe":         sharpe,
-            "sortino":        sortino,
-            "calmar":         calmar,
-            "mwr":            mwr,
-            "dividend_cagr":  dividend_cagr,
-            "dividend_mdd":   dividend_mdd,
-            "total_dividend": total_dividend,
+            "cagr":                    cagr,
+            "mdd":                     mdd,
+            "sharpe":                  sharpe,
+            "sortino":                 sortino,
+            "calmar":                  calmar,
+            "mwr":                     mwr,
+            "dividend_cagr":           dividend_cagr,
+            "dividend_mdd":            dividend_mdd,
+            "total_dividend":          total_dividend,
+            "last_year_dividend":      last_year_dividend,       # 마지막 연도 배당금
+            "dividend_yield_on_cost":  dividend_yield_on_cost,   # 배당률 (원금 기준)
         }
 
     def _fit_distribution(self, cases: List[dict]) -> dict:
-        keys   = ["end_value", "cagr", "mdd", "sharpe", "sortino",
-                  "calmar", "mwr", "dividend_cagr", "dividend_mdd", "total_dividend"]
+        keys = [
+            "end_value", "cagr", "mdd", "sharpe", "sortino",
+            "calmar", "mwr", "dividend_cagr", "dividend_mdd",
+            "total_dividend", "last_year_dividend", "dividend_yield_on_cost",
+        ]
         result = {}
         for key in keys:
             v = np.array([c[key] for c in cases])

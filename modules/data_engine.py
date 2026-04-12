@@ -3,7 +3,7 @@ import pandas as pd
 import yfinance as yf
 from pathlib import Path
 
-BASE_DIR       = Path(__file__).resolve().parent
+BASE_DIR       = Path(__file__).resolve().parent.parent
 DATA_DIR       = BASE_DIR / "data"
 META_DIR       = DATA_DIR / "meta"
 INDEX_DB_PATH  = META_DIR / "index_master.db"

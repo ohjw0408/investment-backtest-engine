@@ -19,6 +19,7 @@
   <div class="nav-links">
     <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">홈</a>
     <a class="nav-link {% if request.path.startswith('/calculator') %}active{% endif %}" href="/calculator">투자 계산기</a>
+    <a class="nav-link {% if request.path.startswith('/dividend-target') %}active{% endif %}" href="/dividend-target">배당금 계산기</a>
     <a class="nav-link {% if request.path.startswith('/retirement') %}active{% endif %}" href="/retirement">은퇴 설계</a>
     <a class="nav-link {% if request.path.startswith('/backtest') %}active{% endif %}" href="/backtest">포트폴리오 분석</a>
     <a class="nav-link {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">내 자산</a>
@@ -49,6 +50,9 @@
     </a>
     <a class="sidebar-item {% if request.path.startswith('/calculator') %}active{% endif %}" href="/calculator">
       <span>🧮</span> 투자 계산기
+    </a>
+    <a class="sidebar-item {% if request.path.startswith('/dividend-target') %}active{% endif %}" href="/dividend-target">
+      <span>💰</span> 배당금 계산기
     </a>
     <a class="sidebar-item {% if request.path.startswith('/retirement') %}active{% endif %}" href="/retirement">
       <span>🌅</span> 은퇴 설계
@@ -138,7 +142,6 @@ if (navInput) {
 function selectSymbol(code, name) {
   navInput.value = '';
   navDropdown.style.display = 'none';
-  // TODO: 종목 상세 페이지로 이동하거나 다른 동작 연결
   console.log('선택된 종목:', code, name);
 }
 </script>

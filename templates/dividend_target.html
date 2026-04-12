@@ -1,0 +1,760 @@
+{% extends "base.html" %}
+{% block title %}배당금 계산기 — Domino Invest{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="calc-layout">
+
+  <!-- ===== 왼쪽: 입력 패널 ===== -->
+  <div class="calc-input-panel">
+
+    <div class="calc-panel-header">
+      <h2 class="calc-title">배당금 계산기</h2>
+      <p class="calc-sub">목표 배당금 달성을 위한 투자 조건을 계산해드려요</p>
+    </div>
+
+    <!-- 01. 포트폴리오 구성 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">01</span> 포트폴리오 구성</div>
+      <div class="ticker-search-wrap">
+        <div class="ticker-search-box">
+          <span class="ts-icon">🔍</span>
+          <input type="text" id="dtSearchInput" placeholder="종목 또는 ETF 검색 (예: SCHD, QQQ)" autocomplete="off">
+          <div class="ticker-dropdown" id="dtSearchDropdown"></div>
+        </div>
+      </div>
+      <div id="dtTickerList" class="ticker-list">
+        <div class="ticker-empty" id="dtTickerEmpty">종목을 검색해서 추가해보세요</div>
+      </div>
+      <div class="weight-summary">
+        <div class="weight-summary-row">
+          <span>비중 합계</span>
+          <span id="dtWeightTotal" class="weight-total-num">0%</span>
+        </div>
+        <div class="weight-track"><div class="weight-fill" id="dtWeightFill"></div></div>
+        <div class="weight-warn" id="dtWeightWarn"></div>
+      </div>
+    </div>
+
+    <!-- 02. 목표 설정 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">02</span> 목표 설정</div>
+      <div class="input-row">
+        <label>목표 월 배당금</label>
+        <div class="input-group">
+          <input type="number" id="dtTargetDiv" class="calc-input" value="1000000" min="0" step="100000">
+          <span class="unit">원</span>
+        </div>
+        <div class="input-hint" id="dtTargetDivHint">₩1,000,000</div>
+      </div>
+      <div class="input-row">
+        <label>달성 확률 <span id="dtProbLabel" class="label-val">90%</span></label>
+        <input type="range" id="dtProbSlider" class="calc-slider" min="50" max="99" value="90" step="1">
+        <div class="slider-marks"><span>50%</span><span>70%</span><span>90%</span><span>99%</span></div>
+      </div>
+    </div>
+
+    <!-- 03. 시나리오 설정 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">03</span> 시나리오 설정</div>
+      <p class="calc-sub" style="margin-bottom:14px;">스텝수=0이면 고정값, 스텝수≥1이면 중심값±N스텝으로 여러 선 표시</p>
+
+      <div style="display:grid;grid-template-columns:40px 1fr 1fr 60px;gap:6px;align-items:center;font-size:10px;color:var(--text-muted);margin-bottom:4px;padding:0 2px;">
+        <div></div><div>중심값</div><div>스텝 간격</div><div>스텝수</div>
+      </div>
+
+      <!-- 초기 투자금 -->
+      <div class="input-row" style="margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:40px 1fr 1fr 60px;gap:6px;align-items:center;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);">시드</div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtSeedCenter" class="calc-input" value="10000000" min="0" step="1000000">
+            <span class="unit">원</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtSeedStep" class="calc-input" value="5000000" min="0" step="1000000">
+            <span class="unit">원</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtSeedN" class="calc-input" value="0" min="0" max="4" step="1">
+          </div>
+        </div>
+        <div class="input-hint" id="dtSeedPreview" style="margin-top:3px;"></div>
+      </div>
+
+      <!-- 월 적립금 -->
+      <div class="input-row" style="margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:40px 1fr 1fr 60px;gap:6px;align-items:center;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);">월납</div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtMonthlyCenter" class="calc-input" value="500000" min="0" step="100000">
+            <span class="unit">원</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtMonthlyStep" class="calc-input" value="500000" min="0" step="100000">
+            <span class="unit">원</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtMonthlyN" class="calc-input" value="0" min="0" max="4" step="1">
+          </div>
+        </div>
+        <div class="input-hint" id="dtMonthlyPreview" style="margin-top:3px;"></div>
+      </div>
+
+      <!-- 투자 기간 -->
+      <div class="input-row" style="margin-bottom:4px;">
+        <div style="display:grid;grid-template-columns:40px 1fr 1fr 60px;gap:6px;align-items:center;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);">기간</div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtYearsCenter" class="calc-input" value="20" min="1" max="50" step="1">
+            <span class="unit">년</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtYearsStep" class="calc-input" value="5" min="0" max="20" step="1">
+            <span class="unit">년</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtYearsN" class="calc-input" value="0" min="0" max="4" step="1">
+          </div>
+        </div>
+        <div class="input-hint" id="dtYearsPreview" style="margin-top:3px;"></div>
+      </div>
+
+      <div id="dtScenarioWarn" style="display:none;color:var(--red-light);font-size:0.78rem;margin-top:6px;">
+        ⚠ 스텝수가 0이 아닌 변수는 최대 2개입니다.
+      </div>
+    </div>
+
+    <!-- 04. 배당 처리 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">04</span> 배당금 처리</div>
+      <div class="rebal-options">
+        <label class="rebal-option"><input type="radio" name="dtDividend" value="reinvest" checked><span class="rebal-label">재투자</span></label>
+        <label class="rebal-option"><input type="radio" name="dtDividend" value="hold"><span class="rebal-label">현금 보유</span></label>
+        <label class="rebal-option"><input type="radio" name="dtDividend" value="withdraw"><span class="rebal-label">인출</span></label>
+      </div>
+    </div>
+
+    <button class="calc-run-btn" id="dtRunBtn" onclick="runDividendTarget()">
+      <span id="dtRunBtnText">시뮬레이션 실행</span>
+      <span id="dtRunBtnSpinner" class="btn-spinner" style="display:none">⏳</span>
+    </button>
+
+    <div style="margin-top:12px; padding:10px 12px; background:#FFF8E1; border-radius:8px; font-size:11px; color:#795548; line-height:1.6;">
+      ⚠ 실제 데이터보다 긴 기간으로 시뮬레이션할 경우 정확성이 떨어질 수 있습니다.<br>
+      본 시뮬레이션은 과거 데이터 기반 통계적 추정이며, 미래의 결과를 보장하지 않습니다.
+    </div>
+
+  </div>
+
+  <!-- ===== 오른쪽: 결과 패널 ===== -->
+  <div class="calc-result-panel" id="dtResultPanel">
+
+    <div class="result-empty" id="dtResultEmpty">
+      <div class="result-empty-icon">💰</div>
+      <div class="result-empty-title">시뮬레이션 결과가 여기에 표시됩니다</div>
+      <div class="result-empty-sub">왼쪽에서 조건을 입력하고 실행해보세요</div>
+    </div>
+
+    <div class="result-content" id="dtResultContent" style="display:none;">
+
+      <!-- 역산 결과 카드 -->
+      <div id="dtSolveSection" style="display:none;">
+        <div class="result-header">
+          <div class="result-title-row">
+            <h3 class="result-title">역산 결과</h3>
+          </div>
+        </div>
+        <div class="dist-cards" id="dtSolveCards"></div>
+      </div>
+
+      <!-- 달성 확률 곡선 -->
+      <div class="result-card" id="dtProbCurveCard" style="display:none;">
+        <div class="result-card-title">달성 확률 곡선 — 목표 배당금별 달성 확률</div>
+        <div style="height:420px;position:relative;"><canvas id="dtProbCurveChart"></canvas></div>
+        <div class="input-hint" id="dtProbCurveNote" style="text-align:right;margin-top:4px;"></div>
+      </div>
+
+      <!-- 등위곡선 -->
+      <div class="result-card" id="dtIsocurveCard" style="display:none;">
+        <div class="result-card-title" id="dtIsocurveTitle">등위곡선</div>
+        <div style="height:420px;position:relative;"><canvas id="dtIsocurveChart"></canvas></div>
+        <div class="input-hint" id="dtIsocurveNote" style="margin-top:4px;"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── 티커 관리 ────────────────────────────────────────
+let dtTickers = [];
+let dtSearchTimer = null;
+let dtCharts = {};
+
+const dtInput    = document.getElementById('dtSearchInput');
+const dtDropdown = document.getElementById('dtSearchDropdown');
+
+function badgeColor(badge) {
+  if (badge === 'KR ETF' || badge === 'KOSPI' || badge === 'KOSDAQ') return '#1976D2';
+  if (badge === 'US ETF' || badge === 'NASDAQ' || badge === 'NYSE')   return '#2E7D32';
+  return '#78909C';
+}
+
+dtInput.addEventListener('input', e => {
+  const q = e.target.value.trim();
+  if (!q) { dtDropdown.style.display = 'none'; return; }
+  clearTimeout(dtSearchTimer);
+  dtDropdown.innerHTML = '<div class="ticker-drop-item"><span class="ticker-drop-name">검색 중...</span></div>';
+  dtDropdown.style.display = 'block';
+  dtSearchTimer = setTimeout(async () => {
+    const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (!data.length) {
+      dtDropdown.innerHTML = '<div class="ticker-drop-item"><span class="ticker-drop-name">결과 없음</span></div>';
+      return;
+    }
+    dtDropdown.innerHTML = data.map(item => `
+      <div class="ticker-drop-item" onclick="dtAddTicker('${item.code}','${item.name.replace(/'/g,"\\'")}','${item.badge}')">
+        <span class="ticker-drop-badge" style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
+        <div>
+          <div class="ticker-drop-code">${item.code}</div>
+          <div class="ticker-drop-name">${item.name}</div>
+        </div>
+      </div>`).join('');
+  }, 250);
+});
+
+document.addEventListener('click', e => {
+  if (!dtInput.closest('.ticker-search-box').contains(e.target))
+    dtDropdown.style.display = 'none';
+});
+
+function dtAddTicker(code, name, badge) {
+  if (dtTickers.find(t => t.code === code)) {
+    dtDropdown.style.display = 'none';
+    dtInput.value = '';
+    return;
+  }
+  dtTickers.push({ code, name, badge, weight: dtTickers.length === 0 ? 100 : 0 });
+  renderDtTickers();
+  dtDropdown.style.display = 'none';
+  dtInput.value = '';
+}
+
+function dtRemoveTicker(code) {
+  dtTickers = dtTickers.filter(t => t.code !== code);
+  renderDtTickers();
+}
+
+function dtUpdateWeight(code, val) {
+  const t = dtTickers.find(t => t.code === code);
+  if (t) t.weight = Math.max(0, Math.min(100, parseInt(val) || 0));
+  renderDtTickers();
+}
+
+function renderDtTickers() {
+  const list  = document.getElementById('dtTickerList');
+  const empty = document.getElementById('dtTickerEmpty');
+  const fill  = document.getElementById('dtWeightFill');
+  const total = document.getElementById('dtWeightTotal');
+  const warn  = document.getElementById('dtWeightWarn');
+  const sum   = dtTickers.reduce((s, t) => s + t.weight, 0);
+
+  if (dtTickers.length === 0) {
+    list.innerHTML = '<div class="ticker-empty" id="dtTickerEmpty">종목을 검색해서 추가해보세요</div>';
+  } else {
+    list.innerHTML = dtTickers.map(t => `
+      <div class="ticker-item">
+        <span class="ticker-item-code">${t.code}</span>
+        <span class="ticker-item-name">${t.name}</span>
+        <div class="ticker-item-weight">
+          <input class="weight-input" type="number" value="${t.weight}" min="0" max="100"
+            onchange="dtUpdateWeight('${t.code}', this.value)">
+          <span class="weight-pct">%</span>
+        </div>
+        <input type="range" min="0" max="100" value="${t.weight}" class="ticker-item-slider"
+          oninput="dtUpdateWeight('${t.code}', this.value); this.previousElementSibling.previousElementSibling.querySelector('input').value=this.value">
+        <button class="ticker-remove" onclick="dtRemoveTicker('${t.code}')">✕</button>
+      </div>`).join('');
+  }
+
+  fill.style.width      = Math.min(sum, 100) + '%';
+  fill.style.background = sum === 100 ? 'var(--green-light)' : sum > 100 ? 'var(--red-light)' : 'var(--blue)';
+  total.textContent     = sum + '%';
+  total.className       = 'weight-total-num' + (sum === 100 ? ' ok' : sum > 100 ? ' over' : '');
+  warn.textContent      = sum > 100 ? '⚠ 비중 합계가 100%를 초과했어요' : sum > 0 && sum < 100 ? `나머지 ${100-sum}%는 현금으로 유지됩니다` : '';
+}
+
+// ── 입력 포맷 ──────────────────────────────────────────
+function fmtKRW(v) {
+  if (v >= 100000000) return '₩' + (v/100000000).toFixed(1) + '억';
+  if (v >= 10000)     return '₩' + Math.round(v/10000) + '만';
+  return '₩' + Math.round(v).toLocaleString();
+}
+
+document.getElementById('dtTargetDiv').addEventListener('input', function() {
+  document.getElementById('dtTargetDivHint').textContent = fmtKRW(parseFloat(this.value)||0);
+});
+document.getElementById('dtProbSlider').addEventListener('input', function() {
+  document.getElementById('dtProbLabel').textContent = this.value + '%';
+});
+
+// 시나리오 프리뷰 업데이트
+function expandVar(center, step, n, minVal=0) {
+  if (n === 0 || step === 0) return [center];
+  const vals = [];
+  for (let i = -n; i <= n; i++) vals.push(center + step * i);
+  return vals.filter(v => v >= minVal);
+}
+
+function updatePreviews() {
+  const vars = [
+    { cId:'dtSeedCenter',    sId:'dtSeedStep',    nId:'dtSeedN',    pId:'dtSeedPreview',    unit:'원', minVal:0 },
+    { cId:'dtMonthlyCenter', sId:'dtMonthlyStep', nId:'dtMonthlyN', pId:'dtMonthlyPreview', unit:'원', minVal:0 },
+    { cId:'dtYearsCenter',   sId:'dtYearsStep',   nId:'dtYearsN',   pId:'dtYearsPreview',   unit:'년', minVal:1 },
+  ];
+  let varyCount = 0;
+  vars.forEach(v => {
+    const c = parseFloat(document.getElementById(v.cId).value)||0;
+    const s = parseFloat(document.getElementById(v.sId).value)||0;
+    const n = parseInt(document.getElementById(v.nId).value)||0;
+    const preview = document.getElementById(v.pId);
+    const vals = expandVar(c, s, n, v.minVal);
+    if (n > 0 && s > 0) {
+      varyCount++;
+      const labels = vals.map(x => v.unit==='년' ? x+'년' : fmtKRW(x));
+      preview.textContent = '→ ' + labels.join(', ');
+    } else {
+      preview.textContent = '→ ' + (v.unit==='년' ? c+'년' : fmtKRW(c)) + ' (고정)';
+    }
+  });
+  const warn = document.getElementById('dtScenarioWarn');
+  warn.style.display = varyCount > 2 ? 'block' : 'none';
+}
+
+['dtSeedCenter','dtSeedStep','dtSeedN',
+ 'dtMonthlyCenter','dtMonthlyStep','dtMonthlyN',
+ 'dtYearsCenter','dtYearsStep','dtYearsN'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updatePreviews);
+});
+updatePreviews();
+
+// ── 시뮬레이션 실행 ────────────────────────────────────
+async function runDividendTarget() {
+  if (dtTickers.length === 0) { alert('종목을 최소 1개 추가해주세요.'); return; }
+  const sum = dtTickers.reduce((s, t) => s + t.weight, 0);
+  if (sum !== 100) { alert('비중 합계가 100%여야 해요.'); return; }
+
+  // 스텝수 검증
+  const seedN    = parseInt(document.getElementById('dtSeedN').value)    || 0;
+  const monthlyN = parseInt(document.getElementById('dtMonthlyN').value) || 0;
+  const yearsN   = parseInt(document.getElementById('dtYearsN').value)   || 0;
+  const seedS    = parseFloat(document.getElementById('dtSeedStep').value)    || 0;
+  const monthlyS = parseFloat(document.getElementById('dtMonthlyStep').value) || 0;
+  const yearsS   = parseFloat(document.getElementById('dtYearsStep').value)   || 0;
+
+  const varyCount = [seedN>0&&seedS>0, monthlyN>0&&monthlyS>0, yearsN>0&&yearsS>0].filter(Boolean).length;
+  if (varyCount > 2) { alert('스텝수가 0이 아닌 변수는 최대 2개입니다.'); return; }
+
+  const btn     = document.getElementById('dtRunBtn');
+  const btnText = document.getElementById('dtRunBtnText');
+  const spinner = document.getElementById('dtRunBtnSpinner');
+  btn.disabled        = true;
+  btnText.textContent = '계산 중...';
+  spinner.style.display = 'inline';
+
+  const body = {
+    tickers:            dtTickers.map(t => ({ code: t.code, weight: t.weight / 100 })),
+    target_monthly_div: parseFloat(document.getElementById('dtTargetDiv').value) || 0,
+    probability:        parseFloat(document.getElementById('dtProbSlider').value) / 100,
+    dividend_mode:      document.querySelector('input[name="dtDividend"]:checked').value,
+    seed:    { center: parseFloat(document.getElementById('dtSeedCenter').value)||0,    step: seedS,    n: seedN    },
+    monthly: { center: parseFloat(document.getElementById('dtMonthlyCenter').value)||0, step: monthlyS, n: monthlyN },
+    years:   { center: parseInt(document.getElementById('dtYearsCenter').value)||20,    step: yearsS,   n: yearsN   },
+  };
+
+  try {
+    const res  = await fetch('/api/dividend-target/scenario', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.error) { alert('오류: ' + data.error); return; }
+    renderScenarioResult(data, body);
+  } catch (e) {
+    alert('오류: ' + e.message);
+  } finally {
+    btn.disabled          = false;
+    btnText.textContent   = '시뮬레이션 실행';
+    spinner.style.display = 'none';
+  }
+}
+
+
+function renderScenarioResult(data, body) {
+  document.getElementById('dtResultEmpty').style.display  = 'none';
+  document.getElementById('dtResultContent').style.display = 'block';
+  document.getElementById('dtSolveSection').style.display  = 'none';
+  document.getElementById('dtIsocurveCard').style.display  = 'none';
+
+  const mode = data.mode;
+
+  if (mode === 'probability') {
+    // 단일 확률값
+    document.getElementById('dtSolveSection').style.display = 'block';
+    const p = data.result ? Math.round(data.result.probability * 100) : 0;
+    document.getElementById('dtSolveCards').innerHTML = `
+      <div class="dist-card median">
+        <div class="dist-card-label">달성 확률</div>
+        <div class="dist-card-value">${p}%</div>
+      </div>
+      <div class="dist-card pessimistic">
+        <div class="dist-card-label">목표 월 배당금</div>
+        <div class="dist-card-value">${fmtKRW(body.target_monthly_div)}</div>
+      </div>
+      <div class="dist-card optimistic">
+        <div class="dist-card-label">기준 확률</div>
+        <div class="dist-card-value">${Math.round(body.probability*100)}%</div>
+      </div>`;
+    document.getElementById('dtProbCurveCard').style.display = 'none';
+    return;
+  }
+
+  // scenario_1var or scenario_2var
+  document.getElementById('dtProbCurveCard').style.display = 'block';
+
+  const xKey   = data.x_key;
+  const lines  = data.lines;
+
+  const xFmt = v => xKey === 'years' ? v+'년' : fmtKRW(v);
+
+  // 모든 선의 X값 합집합으로 레이블 생성
+  const allX = [...new Set(lines.flatMap(l => l.points.map(p => p[xKey])))].sort((a,b)=>a-b);
+  const labels = allX.map(xFmt);
+
+  // Y축 fitting
+  const allProbs = lines.flatMap(l => l.points.map(p => Math.round(p.probability*100)));
+  const minP = Math.max(0,   Math.floor(Math.min(...allProbs)/10)*10 - 10);
+  const maxP = Math.min(100, Math.ceil(Math.max(...allProbs) /10)*10 + 10);
+
+  const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0',
+                   '#00BCD4','#FF5722','#607D8B','#795548','#F48FB1'];
+
+  const datasets = lines.map((line, i) => ({
+    label: line.label || '달성 확률',
+    data: allX.map(xv => {
+      const pt = line.points.find(p => p[xKey] === xv);
+      return pt ? Math.round(pt.probability * 100) : null;
+    }),
+    borderColor: palette[i % palette.length],
+    backgroundColor: palette[i % palette.length] + '15',
+    fill: lines.length === 1,
+    tension: 0.35,
+    pointRadius: 5, pointHoverRadius: 7,
+    borderWidth: 2.5,
+    spanGaps: true,
+  }));
+
+  // 제목
+  const xLabel   = xKey === 'seed' ? '초기 투자금' : xKey === 'monthly' ? '월 적립금' : '투자 기간';
+  const lineLabel = data.line_key === 'seed' ? '초기 투자금' : data.line_key === 'monthly' ? '월 적립금' : data.line_key === 'years' ? '투자 기간' : '';
+  document.querySelector('#dtProbCurveCard .result-card-title').textContent =
+    lineLabel ? `${xLabel} × 달성 확률 (${lineLabel}별)` : `${xLabel} × 달성 확률`;
+
+  if (dtCharts['prob']) dtCharts['prob'].destroy();
+  const ctx = document.getElementById('dtProbCurveChart').getContext('2d');
+  dtCharts['prob'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: lines.length > 1, position: 'top', labels: { font:{size:11}, padding:12 } },
+        tooltip: {
+          callbacks: {
+            title: items => xLabel+': '+labels[items[0].dataIndex],
+            label: c => `${c.dataset.label}: ${c.raw}%`
+          }
+        }
+      },
+      scales: {
+        x: { ticks:{font:{size:11,weight:'600'}, color:'#546E7A', maxRotation:0}, grid:{display:false} },
+        y: { min:minP, max:maxP,
+             ticks:{font:{size:11}, color:'#90A4AE', callback: v => v+'%', stepSize:10},
+             grid:{color:'rgba(0,0,0,0.05)'} }
+      }
+    }
+  });
+
+  // 기존 앵커 테이블 제거
+  const old = document.getElementById('dtAnchorTable');
+  if (old) old.remove();
+}
+
+function renderDtResult(solveData, curveData, body) {
+  document.getElementById('dtResultEmpty').style.display  = 'none';
+  document.getElementById('dtResultContent').style.display = 'block';
+
+  const mode = solveData.mode;
+
+  // ── 역산 / 확률 결과 카드 ──
+  const solveSection = document.getElementById('dtSolveSection');
+  const solveCards   = document.getElementById('dtSolveCards');
+
+  if (['solve_years','solve_seed','solve_monthly','probability'].includes(mode)) {
+    solveSection.style.display = 'block';
+    const val = solveData.result;
+    let label, display;
+    if (mode === 'solve_years') {
+      label   = '필요 투자 기간';
+      display = val !== null ? val + '년' : '50년 내 달성 불가';
+    } else if (mode === 'solve_seed') {
+      label   = '필요 초기 투자금';
+      display = val !== null ? fmtKRW(val) : '달성 불가';
+    } else if (mode === 'solve_monthly') {
+      label   = '필요 월 적립금';
+      display = val !== null ? fmtKRW(val) : '달성 불가';
+    } else {
+      const p = val ? Math.round(val.probability * 100) : 0;
+      label   = '달성 확률';
+      display = p + '%';
+    }
+
+    // 커브에서 역산값에 가장 가까운 포인트의 실측 확률 찾기
+    let actualProb = Math.round(body.probability * 100);
+    const curve = solveData.curve;
+    if (curve && curve.length > 0 && val !== null) {
+      const xKey = mode === 'solve_years' ? 'years'
+                 : mode === 'solve_seed'   ? 'seed' : 'monthly';
+      const closest = curve.reduce((best, d) =>
+        Math.abs((d[xKey] ?? 0) - val) < Math.abs((best[xKey] ?? 0) - val) ? d : best
+      );
+      if (closest) actualProb = Math.round(closest.probability * 100);
+    }
+
+    solveCards.innerHTML = `
+      <div class="dist-card median">
+        <div class="dist-card-label">${label}</div>
+        <div class="dist-card-value">${display}</div>
+      </div>
+      <div class="dist-card pessimistic">
+        <div class="dist-card-label">목표 월 배당금</div>
+        <div class="dist-card-value">${fmtKRW(body.target_monthly_div)}</div>
+      </div>
+      <div class="dist-card optimistic">
+        <div class="dist-card-label">달성 확률 기준</div>
+        <div class="dist-card-value">${actualProb}%</div>
+      </div>
+    `;
+  } else {
+    solveSection.style.display = 'none';
+  }
+
+  // ── 달성 확률 곡선 ──
+  // 역산 결과면 curve 사용, 아니면 curveData 사용
+  const probCard = document.getElementById('dtProbCurveCard');
+  const curvePoints = solveData.curve || curveData;
+  if (curvePoints && curvePoints.length > 0) {
+    probCard.style.display = 'block';
+    renderSolveCurve(mode, curvePoints, body, solveData);
+  } else {
+    probCard.style.display = 'none';
+  }
+
+  // ── 등위곡선 ──
+  const isoCard = document.getElementById('dtIsocurveCard');
+  if (mode.startsWith('isocurve') && solveData.isocurve && solveData.isocurve.length > 0) {
+    isoCard.style.display = 'block';
+    renderIsocurve(mode, solveData.isocurve);
+  } else {
+    isoCard.style.display = 'none';
+  }
+}
+
+function renderSolveCurve(mode, data, body, solveData) {
+  if (dtCharts['prob']) dtCharts['prob'].destroy();
+
+  // 기존 앵커 테이블 제거
+  const oldTable = document.getElementById('dtAnchorTable');
+  if (oldTable) oldTable.remove();
+
+  const ctx = document.getElementById('dtProbCurveChart').getContext('2d');
+
+  let labels, title, xKey;
+  if (mode === 'solve_years') {
+    xKey = 'years'; labels = data.map(d => d.years + '년'); title = '투자 기간별 달성 확률';
+  } else if (mode === 'solve_seed') {
+    xKey = 'seed'; labels = data.map(d => fmtKRW(d.seed)); title = '초기 투자금별 달성 확률';
+  } else if (mode === 'solve_monthly') {
+    xKey = 'monthly'; labels = data.map(d => fmtKRW(d.monthly)); title = '월 적립금별 달성 확률';
+  } else {
+    xKey = 'target_monthly'; labels = data.map(d => fmtKRW(d.target_monthly)); title = '목표 배당금별 달성 확률';
+  }
+
+  document.querySelector('#dtProbCurveCard .result-card-title').textContent = title;
+
+  const probs = data.map(d => Math.round((d.probability ?? 0) * 100));
+
+  // Y축 데이터 범위에 맞게 fitting
+  const minP = Math.max(0,   Math.floor(Math.min(...probs) / 10) * 10 - 10);
+  const maxP = Math.min(100, Math.ceil(Math.max(...probs)  / 10) * 10 + 10);
+
+  dtCharts['prob'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '달성 확률',
+        data: probs,
+        borderColor: '#1976D2',
+        backgroundColor: 'rgba(25,118,210,0.10)',
+        fill: true, tension: 0.35,
+        pointRadius: 7, pointHoverRadius: 9,
+        pointBackgroundColor: probs.map(p => p >= Math.round(body.probability * 100) ? '#1976D2' : '#90A4AE'),
+        borderWidth: 2.5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => labels[items[0].dataIndex],
+            label: c => `달성 확률: ${c.raw}%`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { font:{size:12, weight:'600'}, color:'#546E7A', maxRotation:0 },
+          grid: { display: false }
+        },
+        y: {
+          min: minP, max: maxP,
+          ticks: { font:{size:11}, color:'#90A4AE', callback: v => v+'%', stepSize: 10 },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        }
+      }
+    }
+  });
+
+  // 여러 확률 기준 앵커 카드
+  const multiAnchors = solveData?.multi_anchors;
+  if (!multiAnchors) return;
+
+  const probMeta = [
+    { key: '0.5',  label: '50% 달성', color: '#43A047' },
+    { key: '0.75', label: '75% 달성', color: '#FB8C00' },
+    { key: '0.9',  label: '90% 달성', color: '#1976D2' },
+    { key: '0.95', label: '95% 달성', color: '#E53935' },
+  ];
+
+  const wrap = document.createElement('div');
+  wrap.id = 'dtAnchorTable';
+  wrap.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px;';
+
+  // 커브 데이터에서 각 확률 기준에 가장 가까운 실제값 찾기
+  function findClosest(targetProb) {
+    if (!data || !data.length) return null;
+    return data.reduce((best, d) => {
+      if (!best) return d;
+      return Math.abs(d.probability - targetProb) < Math.abs(best.probability - targetProb) ? d : best;
+    }, null);
+  }
+
+  probMeta.forEach(({ key, label, color }) => {
+    const targetProb = parseFloat(key);
+    const closest = findClosest(targetProb);
+    const val = closest ? closest[xKey] : multiAnchors[key];
+    const actualProb = closest ? Math.round(closest.probability * 100) : null;
+
+    const display = (val === null || val === undefined) ? '달성 불가'
+                  : xKey === 'years' ? val + '년' : fmtKRW(val);
+    const probDisplay = actualProb !== null ? `실제 ${actualProb}%` : '';
+
+    const card = document.createElement('div');
+    card.style.cssText = `background:white;border-radius:8px;padding:14px 10px;
+      text-align:center;border-top:3px solid ${color};
+      box-shadow:0 1px 6px rgba(0,0,0,0.07);`;
+    card.innerHTML = `
+      <div style="font-size:11px;color:#90A4AE;margin-bottom:4px;">${label}</div>
+      <div style="font-size:1.05rem;font-weight:900;color:#333;font-family:'DM Mono',monospace;">${display}</div>
+      ${probDisplay ? `<div style="font-size:10px;color:${color};margin-top:3px;">${probDisplay}</div>` : ''}
+    `;
+    wrap.appendChild(card);
+  });
+
+  document.getElementById('dtProbCurveCard').appendChild(wrap);
+}
+
+function renderIsocurve(mode, points) {
+  if (dtCharts['iso']) dtCharts['iso'].destroy();
+  const ctx = document.getElementById('dtIsocurveChart').getContext('2d');
+
+  let xKey, yKey, xLabel, yLabel, xFmt, yFmt;
+  if (mode === 'isocurve_seed_years') {
+    xKey='seed'; yKey='years'; xLabel='초기 투자금'; yLabel='필요 기간(년)';
+    xFmt = v => v>=100000000?(v/100000000).toFixed(1)+'억':fmtKRW(v);
+    yFmt = v => v+'년';
+  } else if (mode === 'isocurve_monthly_years') {
+    xKey='monthly'; yKey='years'; xLabel='월 적립금'; yLabel='필요 기간(년)';
+    xFmt = v => fmtKRW(v);
+    yFmt = v => v+'년';
+  } else {
+    xKey='seed'; yKey='monthly'; xLabel='초기 투자금'; yLabel='월 적립금';
+    xFmt = v => fmtKRW(v);
+    yFmt = v => fmtKRW(v);
+  }
+
+  document.getElementById('dtIsocurveTitle').textContent =
+    `등위곡선 — ${xLabel} × ${yLabel}`;
+
+  dtCharts['iso'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        data: points.map(p => ({ x: p[xKey], y: p[yKey] })),
+        borderColor: '#1976D2',
+        backgroundColor: 'rgba(25,118,210,0.06)',
+        fill: true, tension: 0.4, pointRadius: 4,
+        pointBackgroundColor: '#1976D2',
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => xLabel+': '+xFmt(items[0].parsed.x),
+            label: c => yLabel+': '+yFmt(c.parsed.y),
+          }
+        }
+      },
+      scales: {
+        x: {
+          type:'linear',
+          title:{display:true, text:xLabel, font:{size:11}, color:'#90A4AE'},
+          ticks:{ font:{size:10}, color:'#90A4AE', callback: xFmt },
+          grid:{color:'rgba(0,0,0,0.04)'}
+        },
+        y: {
+          title:{display:true, text:yLabel, font:{size:11}, color:'#90A4AE'},
+          ticks:{ font:{size:10}, color:'#90A4AE', callback: yFmt },
+          grid:{color:'rgba(0,0,0,0.04)'}
+        }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

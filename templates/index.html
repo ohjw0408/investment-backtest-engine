@@ -34,7 +34,6 @@
       <span class="market-news">📰</span>
     </div>
     <div class="market-grid" id="marketGrid">
-      <!-- JS로 렌더링 -->
       <div class="market-loading">데이터 불러오는 중...</div>
     </div>
   </div>
@@ -48,9 +47,7 @@
       <span class="asset-title">자산군별 비교</span>
       <span class="asset-arrow">›</span>
     </div>
-    <div id="assetList" class="asset-list">
-      <!-- JS로 렌더링 -->
-    </div>
+    <div id="assetList" class="asset-list"></div>
     <div class="asset-bar-wrap">
       <div class="asset-bar-label">금액</div>
       <div class="stacked-bar" id="stackedBar"></div>
@@ -66,7 +63,6 @@ document.addEventListener('DOMContentLoaded', () => {
   loadMarket();
   loadAssets();
 
-  // 기간 버튼
   document.querySelectorAll('.period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
@@ -115,9 +111,7 @@ async function loadPortfolio(period = '1m') {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: {
-          callbacks: { label: c => '₩' + c.raw.toLocaleString() }
-        }
+        tooltip: { callbacks: { label: c => '₩' + c.raw.toLocaleString() } }
       },
       scales: {
         x: {
@@ -140,17 +134,25 @@ async function loadPortfolio(period = '1m') {
 }
 
 // ── 시장 지수 ──
+// 순서: S&P500, NASDAQ, KOSPI, KRX금, USD/KRW
+// API가 반환하는 순서에서 KRX금(id=krx_gold)을 4번째,
+// 환율(id=usdkrw)을 5번째로 재정렬
 async function loadMarket() {
-  const res = await fetch('/api/market');
+  const res   = await fetch('/api/market');
   const items = await res.json();
-  const grid = document.getElementById('marketGrid');
+  const grid  = document.getElementById('marketGrid');
   grid.innerHTML = '';
 
+  // API에서 이미 순서대로 반환: sp500, nasdaq, kospi, gold(국제), krx_gold, usdkrw
   items.forEach((item, i) => {
+    const colIdx = i % 3;
+    const rowIdx = Math.floor(i / 3);
+    const lastRow = Math.floor((items.length - 1) / 3);
+
     const div = document.createElement('div');
     div.className = 'market-item';
-    div.style.borderRight = (i === 2 || i === 4) ? 'none' : '1px solid var(--border)';
-    div.style.borderBottom = i >= 3 ? 'none' : '1px solid var(--border)';
+    div.style.borderRight  = (colIdx === 2) ? 'none' : '1px solid var(--border)';
+    div.style.borderBottom = (rowIdx >= lastRow) ? 'none' : '1px solid var(--border)';
     div.innerHTML = `
       <span class="market-tag">${item.tag}</span>
       <div class="market-name">${item.name}</div>
@@ -161,17 +163,15 @@ async function loadMarket() {
       <canvas id="spark-${item.id}" class="sparkline" width="100" height="36"></canvas>
     `;
     grid.appendChild(div);
-    // 스파크라인
     requestAnimationFrame(() => drawSparkline(`spark-${item.id}`, item.spark, item.up));
   });
 }
 
 // ── 자산군별 ──
 async function loadAssets() {
-  const res = await fetch('/api/assets');
+  const res   = await fetch('/api/assets');
   const items = await res.json();
 
-  // 목록
   const list = document.getElementById('assetList');
   list.innerHTML = items.map(a => `
     <div class="asset-item">
@@ -183,7 +183,6 @@ async function loadAssets() {
     </div>
   `).join('');
 
-  // 스택 바
   const bar = document.getElementById('stackedBar');
   bar.innerHTML = '';
   ['현재', '목표'].forEach((label, ci) => {

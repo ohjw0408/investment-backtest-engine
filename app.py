@@ -1,17 +1,22 @@
 from flask import Flask, render_template, jsonify, request
 import random
 import datetime
+import sqlite3
+from pathlib import Path
 
 from modules.data_engine import DataEngine
 from modules.info_engine import InfoEngine
 from modules.portfolio_engine import PortfolioEngine
 from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
+from modules.dividend_simulator import DividendSimulator
 from modules.rebalance.periodic import PeriodicRebalance
 
 app = Flask(__name__)
 data_engine      = DataEngine()
 info_engine      = InfoEngine()
 portfolio_engine = PortfolioEngine()
+
+INDEX_DB_PATH = Path(__file__).parent / "data" / "meta" / "index_master.db"
 
 # -----------------------------------------------
 # 페이지 라우트
@@ -24,6 +29,10 @@ def index():
 @app.route('/calculator')
 def calculator():
     return render_template('calculator.html')
+
+@app.route('/dividend-target')
+def dividend_target():
+    return render_template('dividend_target.html')
 
 @app.route('/retirement')
 def retirement():
@@ -83,7 +92,6 @@ def search():
 # -----------------------------------------------
 
 def get_dividend_start(ticker: str):
-    """티커의 실제 첫 배당일 조회"""
     try:
         cur = portfolio_engine.loader.conn.execute(
             "SELECT MIN(date) FROM corporate_actions WHERE code=? AND dividend > 0",
@@ -97,7 +105,6 @@ def get_dividend_start(ticker: str):
 
 
 def get_price_start(ticker: str):
-    """티커의 실제 가격 데이터 시작일 조회"""
     try:
         cur = portfolio_engine.loader.conn.execute(
             "SELECT MIN(date) FROM price_daily WHERE code=?",
@@ -108,6 +115,26 @@ def get_price_start(ticker: str):
     except Exception as e:
         print(f"[get_price_start] {ticker} 오류: {e}")
         return None
+
+
+def _make_strategy_factory(target_weights, rebal_mode, band_width=0.05):
+    if rebal_mode == 'none':
+        rebalance_frequency = None
+        drift_threshold     = None
+    elif rebal_mode == 'band':
+        rebalance_frequency = None
+        drift_threshold     = band_width
+    else:
+        rebalance_frequency = rebal_mode
+        drift_threshold     = None
+
+    def strategy_factory():
+        return PeriodicRebalance(
+            target_weights      = target_weights,
+            rebalance_frequency = rebalance_frequency,
+            drift_threshold     = drift_threshold,
+        )
+    return strategy_factory
 
 
 # -----------------------------------------------
@@ -130,30 +157,10 @@ def calculator_run():
         ticker_codes   = [t['code'] for t in tickers_input]
         target_weights = {t['code']: t['weight'] for t in tickers_input}
 
-        # 리밸런싱 전략
-        if rebal_mode == 'none':
-            rebalance_frequency = None
-            drift_threshold     = None
-        elif rebal_mode == 'band':
-            rebalance_frequency = None
-            drift_threshold     = band_width
-        else:
-            rebalance_frequency = rebal_mode
-            drift_threshold     = None
+        strategy_factory = _make_strategy_factory(target_weights, rebal_mode, band_width)
 
-        def strategy_factory():
-            return PeriodicRebalance(
-                target_weights      = target_weights,
-                rebalance_frequency = rebalance_frequency,
-                drift_threshold     = drift_threshold,
-            )
-
-        # ── 데이터 시작일 계산 ──────────────────────────
-        # 1. USD/KRW 환율 시작일
         usdkrw_start = portfolio_engine.loader.USD_KRW_START
 
-        # 2. 각 티커의 실제 가격 데이터 시작일
-        # (DB에 없으면 yfinance에서 먼저 받아오게 get_price 호출)
         for ticker in ticker_codes:
             try:
                 portfolio_engine.loader.get_price(
@@ -167,7 +174,6 @@ def calculator_run():
         price_starts = [get_price_start(t) for t in ticker_codes]
         price_starts = [d for d in price_starts if d]
 
-        # 3. 세 날짜 중 가장 늦은 날짜를 시작일로
         if price_starts:
             data_start = max([usdkrw_start] + price_starts)
         else:
@@ -175,10 +181,9 @@ def calculator_run():
 
         data_end = datetime.date.today().strftime('%Y-%m-%d')
 
-        # ── 가능한 최대 롤링 기간 체크 ──────────────────
         from dateutil.relativedelta import relativedelta
-        start_dt = datetime.datetime.strptime(data_start, '%Y-%m-%d').date()
-        end_dt   = datetime.date.today()
+        start_dt  = datetime.datetime.strptime(data_start, '%Y-%m-%d').date()
+        end_dt    = datetime.date.today()
         max_years = (end_dt - start_dt).days // 365
 
         if years > max_years:
@@ -187,7 +192,6 @@ def calculator_run():
                          f"최대 {max_years}년 시뮬레이션이 가능합니다."
             }), 400
 
-        # ── 배당 시작일 ──────────────────────────────────
         div_starts = [get_dividend_start(t) for t in ticker_codes]
         div_starts = [d for d in div_starts if d]
         div_start  = max(div_starts) if div_starts else None
@@ -209,7 +213,6 @@ def calculator_run():
 
         result = analyzer.run()
 
-        # 배당 메타 정보
         if div_start:
             result['distribution']['div_data_start']  = div_start
             result['distribution']['div_cases_count'] = len(result['cases'])
@@ -239,6 +242,85 @@ def calculator_run():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+
+# -----------------------------------------------
+# API - 배당 목표 역산
+# -----------------------------------------------
+
+def _make_dividend_analyzer(body):
+    tickers_input  = body['tickers']
+    ticker_codes   = [t['code'] for t in tickers_input]
+    target_weights = {t['code']: t['weight'] for t in tickers_input}
+
+    return DividendSimulator(
+        loader      = portfolio_engine.loader,
+        tickers     = ticker_codes,
+        weights     = target_weights,
+        div_mode    = body.get('dividend_mode', 'reinvest'),
+        step_months = 3,
+    )
+
+
+@app.route('/api/dividend-target/probability', methods=['POST'])
+def dividend_target_probability():
+    try:
+        body     = request.get_json()
+        analyzer = _make_dividend_analyzer(body)
+        result   = analyzer.get_probability(
+            seed               = float(body['seed']),
+            monthly            = float(body['monthly']),
+            years              = int(body['years']),
+            target_monthly_div = float(body['target_monthly_div']),
+        )
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dividend-target/probability-curve', methods=['POST'])
+def dividend_target_probability_curve():
+    try:
+        body     = request.get_json()
+        analyzer = _make_dividend_analyzer(body)
+        result   = analyzer.get_probability_curve(
+            seed    = float(body['seed']),
+            monthly = float(body['monthly']),
+            years   = int(body['years']),
+            targets = [float(t) for t in body['targets']],
+        )
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/dividend-target/solve', methods=['POST'])
+def dividend_target_solve():
+    try:
+        body     = request.get_json()
+        analyzer = _make_dividend_analyzer(body)
+
+        seed    = float(body['seed'])    if body.get('seed')    is not None else None
+        monthly = float(body['monthly']) if body.get('monthly') is not None else None
+        years   = int(body['years'])     if body.get('years')   is not None else None
+
+        result = analyzer.solve(
+            target_monthly_div = float(body['target_monthly_div']),
+            probability        = float(body.get('probability', 0.90)),
+            seed               = seed,
+            monthly            = monthly,
+            years              = years,
+        )
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 # -----------------------------------------------
 # API - 포트폴리오 히스토리 (임시 더미)
 # -----------------------------------------------
@@ -255,21 +337,101 @@ def portfolio_history():
     labels = [f"{2017 + i//12}년 {i%12+1}월" for i in range(80)]
     return jsonify({"labels": labels, "values": data, "current": 15870200, "change": 1.8})
 
+
 # -----------------------------------------------
-# API - 시장 지수 (yfinance 실시간)
+# API - 시장 지수
 # -----------------------------------------------
+
+def _get_krx_gold():
+    """index_master.db에서 KRX 금현물 최근 2일치 조회"""
+    try:
+        if not INDEX_DB_PATH.exists():
+            return None
+        conn = sqlite3.connect(str(INDEX_DB_PATH))
+        rows = conn.execute(
+            "SELECT date, close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date DESC LIMIT 2"
+        ).fetchall()
+        conn.close()
+
+        if len(rows) >= 2:
+            cur_price  = float(rows[0][1])
+            prev_price = float(rows[1][1])
+            cur_date   = rows[0][0]
+            change     = round((cur_price - prev_price) / prev_price * 100, 2)
+            # 스파크라인용 최근 20일
+            conn2 = sqlite3.connect(str(INDEX_DB_PATH))
+            spark_rows = conn2.execute(
+                "SELECT close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date DESC LIMIT 20"
+            ).fetchall()
+            conn2.close()
+            spark = [round(float(r[0]), 0) for r in reversed(spark_rows)]
+            return {
+                "id":     "krx_gold",
+                "name":   "금 (KRX 현물)",
+                "tag":    "원/g",
+                "value":  f"₩{cur_price:,.0f}",
+                "change": f"{'+' if change >= 0 else ''}{change}%",
+                "up":     change >= 0,
+                "spark":  spark,
+                "note":   cur_date,
+            }
+        elif len(rows) == 1:
+            # 1개만 있으면 KRX API로 최신 받아오기
+            try:
+                from modules.krx.krx_client import KRXClient
+                client = KRXClient()
+                df = client.get_gold_price()
+                if not df.empty and float(df.iloc[0]["close"]) > 0:
+                    cur_price  = float(df.iloc[0]["close"])
+                    prev_price = float(rows[0][1])
+                    change     = round((cur_price - prev_price) / prev_price * 100, 2)
+                    return {
+                        "id":     "krx_gold",
+                        "name":   "금 (KRX 현물)",
+                        "tag":    "원/g",
+                        "value":  f"₩{cur_price:,.0f}",
+                        "change": f"{'+' if change >= 0 else ''}{change}%",
+                        "up":     change >= 0,
+                        "spark":  [],
+                    }
+            except Exception as e:
+                print(f"[market] KRX 금 최신 조회 실패: {e}")
+        else:
+            # DB에 없으면 KRX API로 받아오기
+            try:
+                from modules.krx.krx_client import KRXClient
+                client = KRXClient()
+                df = client.get_gold_price()
+                if not df.empty and float(df.iloc[0]["close"]) > 0:
+                    return {
+                        "id":     "krx_gold",
+                        "name":   "금 (KRX 현물)",
+                        "tag":    "원/g",
+                        "value":  f"₩{df.iloc[0]['close']:,.0f}",
+                        "change": "—",
+                        "up":     True,
+                        "spark":  [],
+                    }
+            except Exception as e:
+                print(f"[market] KRX 금 조회 실패: {e}")
+    except Exception as e:
+        print(f"[market] KRX 금현물 오류: {e}")
+    return None
+
 
 @app.route('/api/market')
 def market():
-    tickers = [
-        {"id": "sp500",  "name": "S&P 500",       "tag": "S&P",     "ticker": "^GSPC", "prefix": "",  "fmt": "int"},
-        {"id": "nasdaq", "name": "NASDAQ",          "tag": "NASDAQ",  "ticker": "^IXIC", "prefix": "",  "fmt": "int"},
-        {"id": "kospi",  "name": "코스피 (KOSPI)",  "tag": "KOSPI",   "ticker": "^KS11", "prefix": "",  "fmt": "int"},
-        {"id": "gold",   "name": "금값 (국제)",     "tag": "USD/oz",  "ticker": "GC=F",  "prefix": "$", "fmt": "float"},
-        {"id": "usdkrw", "name": "환율",            "tag": "USD/KRW", "ticker": "KRW=X", "prefix": "₩", "fmt": "float"},
+    # 순서: sp500, nasdaq, kospi / 국제금, KRX금현물, 환율
+    yf_tickers = [
+        {"id": "sp500",  "name": "S&P 500",      "tag": "S&P",    "ticker": "^GSPC", "prefix": "",  "fmt": "int"},
+        {"id": "nasdaq", "name": "NASDAQ",         "tag": "NASDAQ", "ticker": "^IXIC", "prefix": "",  "fmt": "int"},
+        {"id": "kospi",  "name": "코스피 (KOSPI)", "tag": "KOSPI",  "ticker": "^KS11", "prefix": "",  "fmt": "int"},
+        {"id": "gold",   "name": "금 (국제)",      "tag": "USD/oz", "ticker": "GC=F",  "prefix": "$", "fmt": "float"},
+        {"id": "usdkrw", "name": "환율",           "tag": "USD/KRW","ticker": "KRW=X", "prefix": "₩", "fmt": "float"},
     ]
-    result = []
-    for info in tickers:
+
+    yf_result = {}
+    for info in yf_tickers:
         try:
             series = data_engine.get_symbol_data(info["ticker"])
             if hasattr(series, 'squeeze'):
@@ -281,15 +443,82 @@ def market():
             change  = round((current - prev) / prev * 100, 2)
             spark   = [round(float(v), 2) for v in series.iloc[-20:].values.flatten().tolist()]
             value_str = f"{info['prefix']}{current:,.0f}" if info["fmt"] == "int" else f"{info['prefix']}{current:,.2f}"
-            result.append({
-                "id": info["id"], "name": info["name"], "tag": info["tag"],
-                "value": value_str,
+            yf_result[info["id"]] = {
+                "id":     info["id"],
+                "name":   info["name"],
+                "tag":    info["tag"],
+                "value":  value_str,
                 "change": f"{'+' if change >= 0 else ''}{change}%",
-                "up": change >= 0, "spark": spark,
-            })
+                "up":     change >= 0,
+                "spark":  spark,
+            }
         except Exception as e:
             print(f"[market] {info['id']} 오류: {e}")
+
+    # 순서 고정: sp500, nasdaq, kospi, gold(국제), krx_gold(한국), usdkrw
+    result = []
+    for id_ in ["sp500", "nasdaq", "kospi"]:
+        if id_ in yf_result:
+            result.append(yf_result[id_])
+
+    if "gold" in yf_result:
+        result.append(yf_result["gold"])
+
+    krx_gold = _get_krx_gold()
+    if krx_gold:
+        result.append(krx_gold)
+
+    if "usdkrw" in yf_result:
+        result.append(yf_result["usdkrw"])
+
     return jsonify(result)
+
+
+
+
+@app.route('/api/dividend-target/scenario', methods=['POST'])
+def dividend_target_scenario():
+    """
+    시나리오 기반 다중 계산
+
+    요청:
+    {
+        "tickers": [...],
+        "target_monthly_div": 1000000,
+        "probability": 0.90,
+        "dividend_mode": "reinvest",
+        "seed":    {"center": 10000000, "step": 5000000, "n": 2},
+        "monthly": {"center": 500000,   "step": 0,       "n": 0},
+        "years":   {"center": 20,       "step": 5,       "n": 1}
+    }
+    """
+    try:
+        body = request.get_json()
+        tickers_input  = body['tickers']
+        ticker_codes   = [t['code'] for t in tickers_input]
+        target_weights = {t['code']: t['weight'] for t in tickers_input}
+
+        from modules.dividend_simulator import DividendSimulator
+        sim = DividendSimulator(
+            loader      = portfolio_engine.loader,
+            tickers     = ticker_codes,
+            weights     = target_weights,
+            div_mode    = body.get('dividend_mode', 'reinvest'),
+            step_months = 3,
+        )
+
+        result = sim.run_scenario(
+            target_monthly_div = float(body['target_monthly_div']),
+            probability        = float(body.get('probability', 0.90)),
+            seed_cfg           = body.get('seed',    {"center": 0,      "step": 0, "n": 0}),
+            monthly_cfg        = body.get('monthly', {"center": 500000, "step": 0, "n": 0}),
+            years_cfg          = body.get('years',   {"center": 20,     "step": 0, "n": 0}),
+        )
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 # -----------------------------------------------
 # API - 자산군별 비교 (임시 더미)
@@ -303,6 +532,7 @@ def assets():
         {"name": "금",                  "icon": "🥇", "color": "#F9A825", "change": "+1.5%", "up": True,  "pct": 0.12},
         {"name": "원자재 (Commodities)","icon": "🪨", "color": "#EF5350", "change": "-0.5%", "up": False, "pct": 0.08},
     ])
+
 
 # -----------------------------------------------
 

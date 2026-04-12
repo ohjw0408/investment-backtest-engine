@@ -2,6 +2,8 @@ import sqlite3
 import pandas as pd
 import yfinance as yf
 import logging
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
 
 from datetime import datetime, timedelta
 from pathlib import Path

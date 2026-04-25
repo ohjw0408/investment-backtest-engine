@@ -57,48 +57,78 @@
       </div>
     </div>
 
-    <!-- 03. 알고 있는 조건 -->
+    <!-- 03. 시나리오 설정 -->
     <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">03</span> 알고 있는 조건 입력</div>
-      <p class="calc-sub" style="margin-bottom:14px;">비워두면 해당 변수를 역산하거나 등위곡선으로 표시해요</p>
+      <div class="calc-section-title"><span class="calc-section-num">03</span> 시나리오 설정</div>
+      <p class="calc-sub" style="margin-bottom:14px;">
+        <b>스텝수=0</b>: 고정값 (선 1개) &nbsp;|&nbsp;
+        <b>스텝수=N</b>: 중심값 기준 ±N×간격으로 최대 2N+1개 선 생성<br>
+        <span style="color:var(--text-muted);font-size:0.78rem;">예) 중심 20년, 간격 5년, 스텝수 2 → 10년, 15년, 20년, 25년, 30년</span>
+      </p>
 
-      <div class="input-row">
-        <label style="display:flex;justify-content:space-between;align-items:center;">
-          <span>초기 투자금</span>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:4px;">
-            <input type="checkbox" id="dtSeedNull" style="cursor:pointer;"> 모름 (역산)
-          </label>
-        </label>
-        <div class="input-group">
-          <input type="number" id="dtSeed" class="calc-input" value="10000000" min="0" step="1000000">
-          <span class="unit">원</span>
-        </div>
-        <div class="input-hint" id="dtSeedHint">₩10,000,000</div>
+      <div style="display:grid;grid-template-columns:40px 1fr 1fr 60px;gap:6px;align-items:center;font-size:10px;color:var(--text-muted);margin-bottom:4px;padding:0 2px;">
+        <div></div><div>중심값</div><div>스텝 간격</div><div>스텝수</div>
       </div>
 
-      <div class="input-row">
-        <label style="display:flex;justify-content:space-between;align-items:center;">
-          <span>월 적립금</span>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:4px;">
-            <input type="checkbox" id="dtMonthlyNull" style="cursor:pointer;"> 모름 (역산)
-          </label>
-        </label>
-        <div class="input-group">
-          <input type="number" id="dtMonthly" class="calc-input" value="500000" min="0" step="100000">
-          <span class="unit">원</span>
+      <!-- 초기 투자금 -->
+      <div class="input-row" style="margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:40px 1fr 1fr 60px;gap:6px;align-items:center;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);">시드</div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtSeedCenter" class="calc-input" value="10000000" min="0" step="1000000">
+            <span class="unit">원</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtSeedStep" class="calc-input" value="5000000" min="0" step="1000000">
+            <span class="unit">원</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtSeedN" class="calc-input" value="0" min="0" max="4" step="1">
+          </div>
         </div>
-        <div class="input-hint" id="dtMonthlyHint">₩500,000</div>
+        <div class="input-hint" id="dtSeedPreview" style="margin-top:3px;"></div>
       </div>
 
-      <div class="input-row">
-        <label style="display:flex;justify-content:space-between;align-items:center;">
-          <span>투자 기간 <span id="dtYearsLabel" class="label-val">20년</span></span>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:4px;">
-            <input type="checkbox" id="dtYearsNull" style="cursor:pointer;"> 모름 (역산)
-          </label>
-        </label>
-        <input type="range" id="dtYearsSlider" class="calc-slider" min="1" max="50" value="20">
-        <div class="slider-marks"><span>1년</span><span>10년</span><span>20년</span><span>30년</span><span>50년</span></div>
+      <!-- 월 적립금 -->
+      <div class="input-row" style="margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:40px 1fr 1fr 60px;gap:6px;align-items:center;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);">월납</div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtMonthlyCenter" class="calc-input" value="500000" min="0" step="100000">
+            <span class="unit">원</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtMonthlyStep" class="calc-input" value="500000" min="0" step="100000">
+            <span class="unit">원</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtMonthlyN" class="calc-input" value="0" min="0" max="4" step="1">
+          </div>
+        </div>
+        <div class="input-hint" id="dtMonthlyPreview" style="margin-top:3px;"></div>
+      </div>
+
+      <!-- 투자 기간 -->
+      <div class="input-row" style="margin-bottom:4px;">
+        <div style="display:grid;grid-template-columns:40px 1fr 1fr 60px;gap:6px;align-items:center;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);">기간</div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtYearsCenter" class="calc-input" value="20" min="1" max="50" step="1">
+            <span class="unit">년</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtYearsStep" class="calc-input" value="5" min="0" max="20" step="1">
+            <span class="unit">년</span>
+          </div>
+          <div class="input-group" style="margin-bottom:0;">
+            <input type="number" id="dtYearsN" class="calc-input" value="0" min="0" max="4" step="1">
+          </div>
+        </div>
+        <div class="input-hint" id="dtYearsPreview" style="margin-top:3px;"></div>
+      </div>
+
+      <div id="dtScenarioWarn" style="display:none;color:var(--red-light);font-size:0.78rem;margin-top:6px;">
+        ⚠ 스텝수가 0이 아닌 변수는 최대 2개입니다.
       </div>
     </div>
 
@@ -276,43 +306,66 @@ function fmtKRW(v) {
 document.getElementById('dtTargetDiv').addEventListener('input', function() {
   document.getElementById('dtTargetDivHint').textContent = fmtKRW(parseFloat(this.value)||0);
 });
-document.getElementById('dtSeed').addEventListener('input', function() {
-  document.getElementById('dtSeedHint').textContent = fmtKRW(parseFloat(this.value)||0);
-});
-document.getElementById('dtMonthly').addEventListener('input', function() {
-  document.getElementById('dtMonthlyHint').textContent = fmtKRW(parseFloat(this.value)||0);
-});
 document.getElementById('dtProbSlider').addEventListener('input', function() {
   document.getElementById('dtProbLabel').textContent = this.value + '%';
 });
-document.getElementById('dtYearsSlider').addEventListener('input', function() {
-  document.getElementById('dtYearsLabel').textContent = this.value + '년';
-  if (!document.getElementById('dtYearsNull').checked) {
-    document.getElementById('dtYearsLabel').textContent = this.value + '년';
-  }
-});
 
-// null 토글
-['Seed','Monthly'].forEach(name => {
-  document.getElementById('dt'+name+'Null').addEventListener('change', function() {
-    const inp  = document.getElementById('dt'+name);
-    const hint = document.getElementById('dt'+name+'Hint');
-    inp.disabled      = this.checked;
-    inp.style.opacity = this.checked ? '0.3' : '1';
-    if (hint) hint.style.opacity = this.checked ? '0.3' : '1';
+// 시나리오 프리뷰 업데이트
+function expandVar(center, step, n, minVal=0) {
+  if (n === 0 || step === 0) return [center];
+  const vals = [];
+  for (let i = -n; i <= n; i++) vals.push(center + step * i);
+  return vals.filter(v => v >= minVal);
+}
+
+function updatePreviews() {
+  const vars = [
+    { cId:'dtSeedCenter',    sId:'dtSeedStep',    nId:'dtSeedN',    pId:'dtSeedPreview',    unit:'원', minVal:0 },
+    { cId:'dtMonthlyCenter', sId:'dtMonthlyStep', nId:'dtMonthlyN', pId:'dtMonthlyPreview', unit:'원', minVal:0 },
+    { cId:'dtYearsCenter',   sId:'dtYearsStep',   nId:'dtYearsN',   pId:'dtYearsPreview',   unit:'년', minVal:1 },
+  ];
+  let varyCount = 0;
+  vars.forEach(v => {
+    const c = parseFloat(document.getElementById(v.cId).value)||0;
+    const s = parseFloat(document.getElementById(v.sId).value)||0;
+    const n = parseInt(document.getElementById(v.nId).value)||0;
+    const preview = document.getElementById(v.pId);
+    const vals = expandVar(c, s, n, v.minVal);
+    if (n > 0 && s > 0) {
+      varyCount++;
+      const labels = vals.map(x => v.unit==='년' ? x+'년' : fmtKRW(x));
+      preview.textContent = '→ ' + labels.join(', ');
+    } else {
+      preview.textContent = '→ ' + (v.unit==='년' ? c+'년' : fmtKRW(c)) + ' (고정)';
+    }
   });
+  const warn = document.getElementById('dtScenarioWarn');
+  warn.style.display = varyCount > 2 ? 'block' : 'none';
+}
+
+['dtSeedCenter','dtSeedStep','dtSeedN',
+ 'dtMonthlyCenter','dtMonthlyStep','dtMonthlyN',
+ 'dtYearsCenter','dtYearsStep','dtYearsN'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updatePreviews);
 });
-document.getElementById('dtYearsNull').addEventListener('change', function() {
-  const slider = document.getElementById('dtYearsSlider');
-  slider.disabled      = this.checked;
-  slider.style.opacity = this.checked ? '0.3' : '1';
-});
+updatePreviews();
 
 // ── 시뮬레이션 실행 ────────────────────────────────────
 async function runDividendTarget() {
   if (dtTickers.length === 0) { alert('종목을 최소 1개 추가해주세요.'); return; }
   const sum = dtTickers.reduce((s, t) => s + t.weight, 0);
   if (sum !== 100) { alert('비중 합계가 100%여야 해요.'); return; }
+
+  // 스텝수 검증
+  const seedN    = parseInt(document.getElementById('dtSeedN').value)    || 0;
+  const monthlyN = parseInt(document.getElementById('dtMonthlyN').value) || 0;
+  const yearsN   = parseInt(document.getElementById('dtYearsN').value)   || 0;
+  const seedS    = parseFloat(document.getElementById('dtSeedStep').value)    || 0;
+  const monthlyS = parseFloat(document.getElementById('dtMonthlyStep').value) || 0;
+  const yearsS   = parseFloat(document.getElementById('dtYearsStep').value)   || 0;
+
+  const varyCount = [seedN>0&&seedS>0, monthlyN>0&&monthlyS>0, yearsN>0&&yearsS>0].filter(Boolean).length;
+  if (varyCount > 2) { alert('스텝수가 0이 아닌 변수는 최대 2개입니다.'); return; }
 
   const btn     = document.getElementById('dtRunBtn');
   const btnText = document.getElementById('dtRunBtnText');
@@ -321,58 +374,25 @@ async function runDividendTarget() {
   btnText.textContent = '계산 중...';
   spinner.style.display = 'inline';
 
-  const seedNull    = document.getElementById('dtSeedNull').checked;
-  const monthlyNull = document.getElementById('dtMonthlyNull').checked;
-  const yearsNull   = document.getElementById('dtYearsNull').checked;
-
-  const targetDiv = parseFloat(document.getElementById('dtTargetDiv').value) || 0;
-  const prob      = parseFloat(document.getElementById('dtProbSlider').value) / 100;
-  const years     = parseInt(document.getElementById('dtYearsSlider').value) || 20;
-
   const body = {
     tickers:            dtTickers.map(t => ({ code: t.code, weight: t.weight / 100 })),
-    target_monthly_div: targetDiv,
-    probability:        prob,
-    seed:               seedNull    ? null : parseFloat(document.getElementById('dtSeed').value)    || 0,
-    monthly:            monthlyNull ? null : parseFloat(document.getElementById('dtMonthly').value) || 0,
-    years:              yearsNull   ? null : years,
+    target_monthly_div: parseFloat(document.getElementById('dtTargetDiv').value) || 0,
+    probability:        parseFloat(document.getElementById('dtProbSlider').value) / 100,
     dividend_mode:      document.querySelector('input[name="dtDividend"]:checked').value,
-    rebal_mode:         'yearly',
+    seed:    { center: parseFloat(document.getElementById('dtSeedCenter').value)||0,    step: seedS,    n: seedN    },
+    monthly: { center: parseFloat(document.getElementById('dtMonthlyCenter').value)||0, step: monthlyS, n: monthlyN },
+    years:   { center: parseInt(document.getElementById('dtYearsCenter').value)||20,    step: yearsS,   n: yearsN   },
   };
 
   try {
-    // 달성 확률 곡선 targets
-    const targets = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.4, 1.6, 2.0]
-      .map(m => targetDiv * m);
-
-    const curveBody = {
-      ...body,
-      targets,
-      seed:    body.seed    ?? 0,
-      monthly: body.monthly ?? 0,
-      years:   body.years   ?? years,
-    };
-
-    const [solveRes, curveRes] = await Promise.all([
-      fetch('/api/dividend-target/solve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      }),
-      fetch('/api/dividend-target/probability-curve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(curveBody)
-      }),
-    ]);
-
-    const solveData = await solveRes.json();
-    const curveData = await curveRes.json();
-
-    if (solveData.error) { alert('오류: ' + solveData.error); return; }
-
-    renderDtResult(solveData, curveData, body);
-
+    const res  = await fetch('/api/dividend-target/scenario', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.error) { alert('오류: ' + data.error); return; }
+    renderScenarioResult(data, body);
   } catch (e) {
     alert('오류: ' + e.message);
   } finally {
@@ -380,6 +400,172 @@ async function runDividendTarget() {
     btnText.textContent   = '시뮬레이션 실행';
     spinner.style.display = 'none';
   }
+}
+
+
+function renderScenarioResult(data, body) {
+  document.getElementById('dtResultEmpty').style.display  = 'none';
+  document.getElementById('dtResultContent').style.display = 'block';
+  document.getElementById('dtSolveSection').style.display  = 'none';
+  document.getElementById('dtIsocurveCard').style.display  = 'none';
+
+  const mode = data.mode;
+
+  if (mode === 'probability') {
+    // 단일 확률값
+    document.getElementById('dtSolveSection').style.display = 'block';
+    const p = data.result ? Math.round(data.result.probability * 100) : 0;
+    document.getElementById('dtSolveCards').innerHTML = `
+      <div class="dist-card median">
+        <div class="dist-card-label">달성 확률</div>
+        <div class="dist-card-value">${p}%</div>
+      </div>
+      <div class="dist-card pessimistic">
+        <div class="dist-card-label">목표 월 배당금</div>
+        <div class="dist-card-value">${fmtKRW(body.target_monthly_div)}</div>
+      </div>
+      <div class="dist-card optimistic">
+        <div class="dist-card-label">기준 확률</div>
+        <div class="dist-card-value">${Math.round(body.probability*100)}%</div>
+      </div>`;
+    document.getElementById('dtProbCurveCard').style.display = 'none';
+    return;
+  }
+
+  // scenario_1var or scenario_2var
+  document.getElementById('dtProbCurveCard').style.display = 'block';
+
+  const xKey   = data.x_key;
+  const lines  = data.lines;
+
+  const xFmt = v => xKey === 'years' ? v+'년' : fmtKRW(v);
+
+  // 모든 선의 X값 합집합으로 레이블 생성
+  const allX = [...new Set(lines.flatMap(l => l.points.map(p => p[xKey])))].sort((a,b)=>a-b);
+  const labels = allX.map(xFmt);
+
+  // Y축 fitting (상단 여백 넉넉히)
+  const allProbs = lines.flatMap(l => l.points.map(p => Math.round(p.probability*100)));
+  const minP = Math.max(0,   Math.floor(Math.min(...allProbs)/10)*10 - 10);
+  const maxP = Math.min(100, Math.ceil(Math.max(...allProbs) /10)*10 + 15);  // 여백 15%
+
+  const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0',
+                   '#00BCD4','#FF5722','#607D8B','#795548','#F48FB1'];
+
+  const labelOf = v => xKey === 'years' ? v+'년' : fmtKRW(v);
+  const lineLabelOf = (key, v) => key === 'years' ? v+'년' : fmtKRW(v);
+
+  const buildDatasets = (curXKey, curLines, curAllX) => curLines.map((line, i) => ({
+    label: line.label || '달성 확률',
+    data: curAllX.map(xv => {
+      const pt = line.points.find(p => p[curXKey] === xv);
+      return pt ? Math.round(pt.probability * 100) : null;
+    }),
+    borderColor: palette[i % palette.length],
+    backgroundColor: palette[i % palette.length] + '15',
+    fill: curLines.length === 1,
+    tension: 0.35,
+    pointRadius: 5, pointHoverRadius: 7,
+    borderWidth: 2.5,
+    spanGaps: true,
+  }));
+
+  // X축/선 전환을 위해 데이터 저장
+  window._scenarioData = data;
+  window._scenarioFlipped = false;
+
+  function drawScenarioChart(flipped) {
+    let curXKey, curLines, curAllX, curXLabel, curLineLabel;
+
+    if (!flipped || data.mode === 'scenario_1var') {
+      curXKey     = data.x_key;
+      curLines    = data.lines;
+      curAllX     = [...new Set(data.lines.flatMap(l => l.points.map(p => p[data.x_key])))].sort((a,b)=>a-b);
+      curXLabel   = data.x_key === 'seed' ? '초기 투자금' : data.x_key === 'monthly' ? '월 적립금' : '투자 기간';
+      curLineLabel = data.line_key ? (data.line_key === 'seed' ? '초기 투자금' : data.line_key === 'monthly' ? '월 적립금' : '투자 기간') : '';
+    } else {
+      // X축과 선 swap
+      curXKey      = data.line_key;
+      curLineLabel = data.x_key === 'seed' ? '초기 투자금' : data.x_key === 'monthly' ? '월 적립금' : '투자 기간';
+      curXLabel    = data.line_key === 'seed' ? '초기 투자금' : data.line_key === 'monthly' ? '월 적립금' : '투자 기간';
+
+      // 기존 x_key 값 목록 → 새 lines
+      const origXVals = [...new Set(data.lines[0].points.map(p => p[data.x_key]))].sort((a,b)=>a-b);
+      const newLineVals = [...new Set(data.lines.map(l => l[data.line_key]))].sort((a,b)=>a-b);
+      curAllX = newLineVals;
+
+      curLines = origXVals.map(xv => {
+        const lbl = lineLabelOf(data.x_key, xv);
+        return {
+          label: `${curLineLabel}=${lbl}`,
+          [data.x_key]: xv,
+          points: newLineVals.map(lv => {
+            const srcLine = data.lines.find(l => l[data.line_key] === lv);
+            const pt = srcLine?.points.find(p => p[data.x_key] === xv);
+            return { [curXKey]: lv, probability: pt ? pt.probability : null };
+          })
+        };
+      });
+    }
+
+    const curLabels  = curAllX.map(v => curXKey === 'years' ? v+'년' : fmtKRW(v));
+    const datasets   = buildDatasets(curXKey, curLines, curAllX);
+    const titleText  = curLineLabel ? `${curXLabel} × 달성 확률 (${curLineLabel}별)` : `${curXLabel} × 달성 확률`;
+    document.querySelector('#dtProbCurveCard .result-card-title').textContent = titleText;
+
+    if (dtCharts['prob']) dtCharts['prob'].destroy();
+    const ctx2 = document.getElementById('dtProbCurveChart').getContext('2d');
+    dtCharts['prob'] = new Chart(ctx2, {
+      type: 'line',
+      data: { labels: curLabels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: curLines.length > 1, position: 'top',
+                    labels: { font:{size:11}, padding:12, boxWidth:20 } },
+          tooltip: {
+            callbacks: {
+              title: items => curXLabel+': '+curLabels[items[0].dataIndex],
+              label: c => `${c.dataset.label}: ${c.raw}%`
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { font:{size:11,weight:'600'}, color:'#546E7A', maxRotation:0 },
+            grid:  { display:true, color:'rgba(0,0,0,0.06)' }  // 세로선 추가
+          },
+          y: {
+            min: minP, max: maxP,
+            ticks: { font:{size:11}, color:'#90A4AE', callback: v => v+'%', stepSize:10 },
+            grid:  { color:'rgba(0,0,0,0.07)' }
+          }
+        }
+      }
+    });
+  }
+
+  drawScenarioChart(false);
+
+  // 전환 버튼 추가 (2변수인 경우만)
+  const oldBtn = document.getElementById('dtSwapBtn');
+  if (oldBtn) oldBtn.remove();
+  if (data.mode === 'scenario_2var') {
+    const btn = document.createElement('button');
+    btn.id = 'dtSwapBtn';
+    btn.textContent = '⇄ X축 / 선 전환';
+    btn.style.cssText = `margin-top:10px;padding:6px 14px;border:1.5px solid var(--blue-bright);
+      border-radius:8px;background:white;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;`;
+    btn.onclick = () => {
+      window._scenarioFlipped = !window._scenarioFlipped;
+      drawScenarioChart(window._scenarioFlipped);
+    };
+    document.getElementById('dtProbCurveCard').appendChild(btn);
+  }
+
+  // 기존 앵커 테이블 제거
+  const oldTbl = document.getElementById('dtAnchorTable');
+  if (oldTbl) oldTbl.remove();
 }
 
 function renderDtResult(solveData, curveData, body) {

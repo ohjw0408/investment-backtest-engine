@@ -474,6 +474,52 @@ def market():
     return jsonify(result)
 
 
+
+
+@app.route('/api/dividend-target/scenario', methods=['POST'])
+def dividend_target_scenario():
+    """
+    시나리오 기반 다중 계산
+
+    요청:
+    {
+        "tickers": [...],
+        "target_monthly_div": 1000000,
+        "probability": 0.90,
+        "dividend_mode": "reinvest",
+        "seed":    {"center": 10000000, "step": 5000000, "n": 2},
+        "monthly": {"center": 500000,   "step": 0,       "n": 0},
+        "years":   {"center": 20,       "step": 5,       "n": 1}
+    }
+    """
+    try:
+        body = request.get_json()
+        tickers_input  = body['tickers']
+        ticker_codes   = [t['code'] for t in tickers_input]
+        target_weights = {t['code']: t['weight'] for t in tickers_input}
+
+        from modules.dividend_simulator import DividendSimulator
+        sim = DividendSimulator(
+            loader      = portfolio_engine.loader,
+            tickers     = ticker_codes,
+            weights     = target_weights,
+            div_mode    = body.get('dividend_mode', 'reinvest'),
+            step_months = 3,
+        )
+
+        result = sim.run_scenario(
+            target_monthly_div = float(body['target_monthly_div']),
+            probability        = float(body.get('probability', 0.90)),
+            seed_cfg           = body.get('seed',    {"center": 0,      "step": 0, "n": 0}),
+            monthly_cfg        = body.get('monthly', {"center": 500000, "step": 0, "n": 0}),
+            years_cfg          = body.get('years',   {"center": 20,     "step": 0, "n": 0}),
+        )
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 # -----------------------------------------------
 # API - 자산군별 비교 (임시 더미)
 # -----------------------------------------------

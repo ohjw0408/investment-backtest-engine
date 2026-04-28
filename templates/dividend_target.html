@@ -4,38 +4,35 @@
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
 <style>
-.var-mode-btn {
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1.5px solid var(--border);
-  font-size: 0.75rem;
-  font-weight: 700;
-  cursor: pointer;
-  background: var(--bg);
-  color: var(--text-muted);
-  transition: all 0.15s;
+.var-section { margin-bottom: 14px; }
+.var-header { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.var-name { font-size:0.8rem; font-weight:700; color:var(--text-muted); min-width:32px; }
+.var-radio-group { display:flex; gap:4px; }
+.var-radio { display:none; }
+.var-radio-label {
+  padding:3px 10px; border-radius:6px; border:1.5px solid var(--border);
+  font-size:0.75rem; font-weight:600; color:var(--text-muted);
+  background:var(--bg); cursor:pointer; transition:all 0.15s;
 }
-.var-mode-btn.active-fixed   { background:#F5F5F5; color:#546E7A; border-color:#B0BEC5; }
-.var-mode-btn.active-explore { background:var(--blue-pale); color:var(--blue); border-color:var(--blue-bright); }
-.var-mode-btn.active-optimize{ background:#E8F5E9; color:#2E7D32; border-color:#66BB6A; }
-.var-row { display:grid; grid-template-columns:44px 1fr 1fr 72px; gap:6px; align-items:center; }
-.var-label { font-size:11px; font-weight:700; color:var(--text-muted); }
-.var-hint { font-size:11px; color:var(--blue); margin-top:2px; min-height:16px; }
+.var-radio:checked + .var-radio-label { border-color:var(--blue-bright); background:var(--blue-pale); color:var(--blue); }
+.var-radio.auto:checked + .var-radio-label { border-color:#66BB6A; background:#E8F5E9; color:#2E7D32; }
+.var-body { display:flex; gap:8px; align-items:center; }
+.var-range-extra { margin-top:6px; display:none; }
+.var-range-extra.show { display:flex; gap:8px; align-items:center; }
+.var-hint { font-size:11px; color:var(--blue); margin-top:3px; min-height:15px; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="calc-layout">
 
-  <!-- ===== 왼쪽: 입력 패널 ===== -->
   <div class="calc-input-panel">
-
     <div class="calc-panel-header">
       <h2 class="calc-title">배당금 계산기</h2>
       <p class="calc-sub">목표 배당금 달성을 위한 투자 조건을 시뮬레이션해드려요</p>
     </div>
 
-    <!-- 01. 포트폴리오 구성 -->
+    <!-- 01. 포트폴리오 -->
     <div class="calc-section">
       <div class="calc-section-title"><span class="calc-section-num">01</span> 포트폴리오 구성</div>
       <div class="ticker-search-wrap">
@@ -46,7 +43,7 @@
         </div>
       </div>
       <div id="dtTickerList" class="ticker-list">
-        <div class="ticker-empty" id="dtTickerEmpty">종목을 검색해서 추가해보세요</div>
+        <div class="ticker-empty">종목을 검색해서 추가해보세요</div>
       </div>
       <div class="weight-summary">
         <div class="weight-summary-row">
@@ -58,7 +55,7 @@
       </div>
     </div>
 
-    <!-- 02. 목표 설정 -->
+    <!-- 02. 목표 -->
     <div class="calc-section">
       <div class="calc-section-title"><span class="calc-section-num">02</span> 목표 설정</div>
       <div class="input-row">
@@ -76,99 +73,110 @@
       </div>
     </div>
 
-    <!-- 03. 시나리오 설정 -->
+    <!-- 03. 조건 -->
     <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">03</span> 시나리오 설정</div>
-      <p class="calc-sub" style="margin-bottom:12px;">
-        각 변수의 모드를 선택하세요.<br>
-        <span style="font-size:0.78rem;color:var(--text-muted);">
-          <b>고정</b>: 해당 값으로 고정 &nbsp;|&nbsp;
-          <b>탐색</b>: 중심값 ±스텝으로 여러 선 &nbsp;|&nbsp;
-          <b>최적화</b>: 목표 달성 최소값 자동 계산
-        </span>
-      </p>
+      <div class="calc-section-title"><span class="calc-section-num">03</span> 투자 조건</div>
 
-      <!-- 헤더 -->
-      <div style="display:grid;grid-template-columns:44px 1fr 1fr 72px;gap:6px;font-size:10px;color:var(--text-muted);margin-bottom:6px;padding:0 2px;">
-        <div></div><div>값 / 중심값</div><div>스텝 간격</div><div>스텝 수</div>
-      </div>
-
-      <!-- 초기 투자금 -->
-      <div class="input-row" style="margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-          <span class="var-label" style="min-width:30px;">시드</span>
-          <button class="var-mode-btn active-fixed"  data-var="seed" data-mode="fixed"    onclick="setVarMode('seed','fixed')">고정</button>
-          <button class="var-mode-btn"               data-var="seed" data-mode="explore"  onclick="setVarMode('seed','explore')">탐색</button>
-          <button class="var-mode-btn"               data-var="seed" data-mode="optimize" onclick="setVarMode('seed','optimize')">최적화</button>
+      <!-- 시드 -->
+      <div class="var-section">
+        <div class="var-header">
+          <span class="var-name">시드</span>
+          <div class="var-radio-group">
+            <input class="var-radio" type="radio" name="seedMode" id="seedFixed"  value="fixed"   checked>
+            <label class="var-radio-label" for="seedFixed">고정</label>
+            <input class="var-radio" type="radio" name="seedMode" id="seedRange"  value="explore">
+            <label class="var-radio-label" for="seedRange">범위</label>
+            <input class="var-radio auto" type="radio" name="seedMode" id="seedAuto" value="optimize">
+            <label class="var-radio-label" for="seedAuto">자동</label>
+          </div>
         </div>
-        <div class="var-row">
-          <div></div>
-          <div class="input-group" style="margin-bottom:0;">
-            <input type="number" id="dtSeedCenter" class="calc-input" value="10000000" min="0" step="1000000">
+        <div class="var-body">
+          <div class="input-group" style="margin-bottom:0;flex:1;">
+            <input type="number" id="dtSeedVal" class="calc-input" value="10000000" min="0" step="1000000">
             <span class="unit">원</span>
           </div>
-          <div class="input-group" style="margin-bottom:0;" id="dtSeedStepWrap">
+        </div>
+        <div class="var-range-extra" id="seedRangeExtra">
+          <span style="font-size:11px;color:var(--text-muted);">간격</span>
+          <div class="input-group" style="margin-bottom:0;width:120px;">
             <input type="number" id="dtSeedStep" class="calc-input" value="5000000" min="0" step="1000000">
             <span class="unit">원</span>
           </div>
-          <div class="input-group" style="margin-bottom:0;" id="dtSeedNWrap">
-            <input type="number" id="dtSeedN" class="calc-input" value="0" min="0" max="4" step="1">
+          <span style="font-size:11px;color:var(--text-muted);">스텝</span>
+          <div class="input-group" style="margin-bottom:0;width:70px;">
+            <input type="number" id="dtSeedN" class="calc-input" value="2" min="1" max="4" step="1">
           </div>
         </div>
-        <div class="var-hint" id="dtSeedPreview"></div>
+        <div class="var-hint" id="dtSeedHint">₩1,000만 (고정)</div>
       </div>
 
-      <!-- 월 적립금 -->
-      <div class="input-row" style="margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-          <span class="var-label" style="min-width:30px;">월납</span>
-          <button class="var-mode-btn active-fixed"  data-var="monthly" data-mode="fixed"    onclick="setVarMode('monthly','fixed')">고정</button>
-          <button class="var-mode-btn"               data-var="monthly" data-mode="explore"  onclick="setVarMode('monthly','explore')">탐색</button>
-          <button class="var-mode-btn"               data-var="monthly" data-mode="optimize" onclick="setVarMode('monthly','optimize')">최적화</button>
+      <!-- 월납 -->
+      <div class="var-section">
+        <div class="var-header">
+          <span class="var-name">월납</span>
+          <div class="var-radio-group">
+            <input class="var-radio" type="radio" name="monthlyMode" id="monthlyFixed"  value="fixed" checked>
+            <label class="var-radio-label" for="monthlyFixed">고정</label>
+            <input class="var-radio" type="radio" name="monthlyMode" id="monthlyRange"  value="explore">
+            <label class="var-radio-label" for="monthlyRange">범위</label>
+            <input class="var-radio auto" type="radio" name="monthlyMode" id="monthlyAuto" value="optimize">
+            <label class="var-radio-label" for="monthlyAuto">자동</label>
+          </div>
         </div>
-        <div class="var-row">
-          <div></div>
-          <div class="input-group" style="margin-bottom:0;">
-            <input type="number" id="dtMonthlyCenter" class="calc-input" value="500000" min="0" step="100000">
+        <div class="var-body">
+          <div class="input-group" style="margin-bottom:0;flex:1;">
+            <input type="number" id="dtMonthlyVal" class="calc-input" value="500000" min="0" step="100000">
             <span class="unit">원</span>
           </div>
-          <div class="input-group" style="margin-bottom:0;" id="dtMonthlyStepWrap">
+        </div>
+        <div class="var-range-extra" id="monthlyRangeExtra">
+          <span style="font-size:11px;color:var(--text-muted);">간격</span>
+          <div class="input-group" style="margin-bottom:0;width:120px;">
             <input type="number" id="dtMonthlyStep" class="calc-input" value="500000" min="0" step="100000">
             <span class="unit">원</span>
           </div>
-          <div class="input-group" style="margin-bottom:0;" id="dtMonthlyNWrap">
-            <input type="number" id="dtMonthlyN" class="calc-input" value="0" min="0" max="4" step="1">
+          <span style="font-size:11px;color:var(--text-muted);">스텝</span>
+          <div class="input-group" style="margin-bottom:0;width:70px;">
+            <input type="number" id="dtMonthlyN" class="calc-input" value="2" min="1" max="4" step="1">
           </div>
         </div>
-        <div class="var-hint" id="dtMonthlyPreview"></div>
+        <div class="var-hint" id="dtMonthlyHint">₩50만 (고정)</div>
       </div>
 
-      <!-- 투자 기간 -->
-      <div class="input-row" style="margin-bottom:4px;">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-          <span class="var-label" style="min-width:30px;">기간</span>
-          <button class="var-mode-btn active-fixed"  data-var="years" data-mode="fixed"    onclick="setVarMode('years','fixed')">고정</button>
-          <button class="var-mode-btn"               data-var="years" data-mode="explore"  onclick="setVarMode('years','explore')">탐색</button>
-          <button class="var-mode-btn"               data-var="years" data-mode="optimize" onclick="setVarMode('years','optimize')">최적화</button>
-        </div>
-        <div class="var-row">
-          <div></div>
-          <div class="input-group" style="margin-bottom:0;">
-            <input type="number" id="dtYearsCenter" class="calc-input" value="20" min="1" max="50" step="1">
-            <span class="unit">년</span>
-          </div>
-          <div class="input-group" style="margin-bottom:0;" id="dtYearsStepWrap">
-            <input type="number" id="dtYearsStep" class="calc-input" value="5" min="0" max="20" step="1">
-            <span class="unit">년</span>
-          </div>
-          <div class="input-group" style="margin-bottom:0;" id="dtYearsNWrap">
-            <input type="number" id="dtYearsN" class="calc-input" value="0" min="0" max="4" step="1">
+      <!-- 기간 -->
+      <div class="var-section">
+        <div class="var-header">
+          <span class="var-name">기간</span>
+          <div class="var-radio-group">
+            <input class="var-radio" type="radio" name="yearsMode" id="yearsFixed"  value="fixed" checked>
+            <label class="var-radio-label" for="yearsFixed">고정</label>
+            <input class="var-radio" type="radio" name="yearsMode" id="yearsRange"  value="explore">
+            <label class="var-radio-label" for="yearsRange">범위</label>
+            <input class="var-radio auto" type="radio" name="yearsMode" id="yearsAuto" value="optimize">
+            <label class="var-radio-label" for="yearsAuto">자동</label>
           </div>
         </div>
-        <div class="var-hint" id="dtYearsPreview"></div>
+        <div class="var-body">
+          <div class="input-group" style="margin-bottom:0;flex:1;">
+            <input type="number" id="dtYearsVal" class="calc-input" value="20" min="1" max="50" step="1">
+            <span class="unit">년</span>
+          </div>
+        </div>
+        <div class="var-range-extra" id="yearsRangeExtra">
+          <span style="font-size:11px;color:var(--text-muted);">간격</span>
+          <div class="input-group" style="margin-bottom:0;width:80px;">
+            <input type="number" id="dtYearsStep" class="calc-input" value="5" min="1" max="20" step="1">
+            <span class="unit">년</span>
+          </div>
+          <span style="font-size:11px;color:var(--text-muted);">스텝</span>
+          <div class="input-group" style="margin-bottom:0;width:70px;">
+            <input type="number" id="dtYearsN" class="calc-input" value="2" min="1" max="4" step="1">
+          </div>
+        </div>
+        <div class="var-hint" id="dtYearsHint">20년 (고정)</div>
       </div>
 
-      <div id="dtScenarioWarn" style="display:none;color:var(--red-light);font-size:0.78rem;margin-top:6px;"></div>
+      <div id="dtScenarioWarn" style="display:none;color:var(--red-light);font-size:0.78rem;margin-top:4px;"></div>
     </div>
 
     <!-- 04. 배당 처리 -->
@@ -186,49 +194,35 @@
       <span id="dtRunBtnSpinner" class="btn-spinner" style="display:none">⏳</span>
     </button>
 
-    <!-- 경고/안내 문구 -->
-    <div style="margin-top:12px; padding:10px 12px; background:#FFF8E1; border-radius:8px; font-size:11px; color:#795548; line-height:1.7;">
-      ⚠ <b>최적화 모드</b>를 사용하면 계산에 <b>약 1~2분</b>이 소요될 수 있습니다.<br>
+    <div style="margin-top:12px;padding:10px 12px;background:#FFF8E1;border-radius:8px;font-size:11px;color:#795548;line-height:1.7;">
+      ⚠ <b>자동</b> 모드 사용 시 계산에 <b>약 1~2분</b>이 소요될 수 있습니다.<br>
       ⚠ 실제 데이터보다 긴 기간 시뮬레이션 시 정확성이 떨어질 수 있습니다.<br>
       📊 본 시뮬레이션은 과거 데이터 기반 통계적 추정이며, <b>미래의 결과를 보장하지 않습니다.</b>
     </div>
-
   </div>
 
-  <!-- ===== 오른쪽: 결과 패널 ===== -->
+  <!-- 결과 패널 -->
   <div class="calc-result-panel" id="dtResultPanel">
-
     <div class="result-empty" id="dtResultEmpty">
       <div class="result-empty-icon">💰</div>
       <div class="result-empty-title">시뮬레이션 결과가 여기에 표시됩니다</div>
       <div class="result-empty-sub">왼쪽에서 조건을 입력하고 실행해보세요</div>
     </div>
-
     <div class="result-content" id="dtResultContent" style="display:none;">
-
-      <!-- 역산 결과 카드 -->
       <div id="dtSolveSection" style="display:none;">
         <div class="result-header">
-          <div class="result-title-row">
-            <h3 class="result-title">역산 결과</h3>
-          </div>
+          <div class="result-title-row"><h3 class="result-title" id="dtSolveTitle">결과</h3></div>
         </div>
         <div class="dist-cards" id="dtSolveCards"></div>
       </div>
-
-      <!-- 달성 확률 곡선 -->
       <div class="result-card" id="dtProbCurveCard" style="display:none;">
-        <div class="result-card-title">달성 확률 곡선</div>
+        <div class="result-card-title" id="dtChartTitle">달성 확률 곡선</div>
         <div style="height:420px;position:relative;"><canvas id="dtProbCurveChart"></canvas></div>
-        <div class="input-hint" id="dtProbCurveNote" style="text-align:right;margin-top:4px;"></div>
       </div>
-
-      <!-- 등위곡선 -->
       <div class="result-card" id="dtIsocurveCard" style="display:none;">
-        <div class="result-card-title" id="dtIsocurveTitle">등위곡선</div>
+        <div class="result-card-title" id="dtIsocurveTitle">등위선</div>
         <div style="height:420px;position:relative;"><canvas id="dtIsocurveChart"></canvas></div>
       </div>
-
     </div>
   </div>
 
@@ -237,441 +231,371 @@
 
 {% block scripts %}
 <script>
-// ── 티커 관리 ────────────────────────────────────────
-let dtTickers = [];
-let dtSearchTimer = null;
-let dtCharts = {};
-const dtVarModes = { seed: 'fixed', monthly: 'fixed', years: 'fixed' };
-
-const dtInput    = document.getElementById('dtSearchInput');
+let dtTickers = [], dtSearchTimer = null, dtCharts = {};
+const dtInput = document.getElementById('dtSearchInput');
 const dtDropdown = document.getElementById('dtSearchDropdown');
 
-function badgeColor(badge) {
-  if (badge === 'KR ETF' || badge === 'KOSPI' || badge === 'KOSDAQ') return '#1976D2';
-  if (badge === 'US ETF' || badge === 'NASDAQ' || badge === 'NYSE')   return '#2E7D32';
+function badgeColor(b) {
+  if (b==='KR ETF'||b==='KOSPI'||b==='KOSDAQ') return '#1976D2';
+  if (b==='US ETF'||b==='NASDAQ'||b==='NYSE')   return '#2E7D32';
   return '#78909C';
 }
 
 dtInput.addEventListener('input', e => {
   const q = e.target.value.trim();
-  if (!q) { dtDropdown.style.display = 'none'; return; }
+  if (!q) { dtDropdown.style.display='none'; return; }
   clearTimeout(dtSearchTimer);
   dtDropdown.innerHTML = '<div class="ticker-drop-item"><span class="ticker-drop-name">검색 중...</span></div>';
   dtDropdown.style.display = 'block';
   dtSearchTimer = setTimeout(async () => {
-    const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    if (!data.length) {
-      dtDropdown.innerHTML = '<div class="ticker-drop-item"><span class="ticker-drop-name">결과 없음</span></div>';
-      return;
-    }
-    dtDropdown.innerHTML = data.map(item => `
+    const data = await fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r=>r.json());
+    if (!data.length) { dtDropdown.innerHTML='<div class="ticker-drop-item"><span class="ticker-drop-name">결과 없음</span></div>'; return; }
+    dtDropdown.innerHTML = data.map(item=>`
       <div class="ticker-drop-item" onclick="dtAddTicker('${item.code}','${item.name.replace(/'/g,"\\'")}','${item.badge}')">
         <span class="ticker-drop-badge" style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
-        <div>
-          <div class="ticker-drop-code">${item.code}</div>
-          <div class="ticker-drop-name">${item.name}</div>
-        </div>
+        <div><div class="ticker-drop-code">${item.code}</div><div class="ticker-drop-name">${item.name}</div></div>
       </div>`).join('');
   }, 250);
 });
-
 document.addEventListener('click', e => {
-  if (!dtInput.closest('.ticker-search-box').contains(e.target))
-    dtDropdown.style.display = 'none';
+  if (!dtInput.closest('.ticker-search-box').contains(e.target)) dtDropdown.style.display='none';
 });
 
 function dtAddTicker(code, name, badge) {
-  if (dtTickers.find(t => t.code === code)) {
-    dtDropdown.style.display = 'none'; dtInput.value = ''; return;
-  }
-  dtTickers.push({ code, name, badge, weight: dtTickers.length === 0 ? 100 : 0 });
-  renderDtTickers();
-  dtDropdown.style.display = 'none'; dtInput.value = '';
+  if (dtTickers.find(t=>t.code===code)) { dtDropdown.style.display='none'; dtInput.value=''; return; }
+  dtTickers.push({code, name, badge, weight: dtTickers.length===0?100:0});
+  renderDtTickers(); dtDropdown.style.display='none'; dtInput.value='';
 }
-
-function dtRemoveTicker(code) {
-  dtTickers = dtTickers.filter(t => t.code !== code);
-  renderDtTickers();
-}
-
+function dtRemoveTicker(code) { dtTickers=dtTickers.filter(t=>t.code!==code); renderDtTickers(); }
 function dtUpdateWeight(code, val) {
-  const t = dtTickers.find(t => t.code === code);
-  if (t) t.weight = Math.max(0, Math.min(100, parseInt(val) || 0));
+  const t=dtTickers.find(t=>t.code===code);
+  if(t) t.weight=Math.max(0,Math.min(100,parseInt(val)||0));
   renderDtTickers();
 }
-
 function renderDtTickers() {
-  const list  = document.getElementById('dtTickerList');
-  const fill  = document.getElementById('dtWeightFill');
-  const total = document.getElementById('dtWeightTotal');
-  const warn  = document.getElementById('dtWeightWarn');
-  const sum   = dtTickers.reduce((s, t) => s + t.weight, 0);
-
-  if (dtTickers.length === 0) {
-    list.innerHTML = '<div class="ticker-empty">종목을 검색해서 추가해보세요</div>';
-  } else {
-    list.innerHTML = dtTickers.map(t => `
+  const list=document.getElementById('dtTickerList');
+  const fill=document.getElementById('dtWeightFill');
+  const total=document.getElementById('dtWeightTotal');
+  const warn=document.getElementById('dtWeightWarn');
+  const sum=dtTickers.reduce((s,t)=>s+t.weight,0);
+  list.innerHTML = dtTickers.length===0
+    ? '<div class="ticker-empty">종목을 검색해서 추가해보세요</div>'
+    : dtTickers.map(t=>`
       <div class="ticker-item">
         <span class="ticker-item-code">${t.code}</span>
         <span class="ticker-item-name">${t.name}</span>
         <div class="ticker-item-weight">
           <input class="weight-input" type="number" value="${t.weight}" min="0" max="100"
-            onchange="dtUpdateWeight('${t.code}', this.value)">
-          <span class="weight-pct">%</span>
+            onchange="dtUpdateWeight('${t.code}',this.value)"><span class="weight-pct">%</span>
         </div>
         <input type="range" min="0" max="100" value="${t.weight}" class="ticker-item-slider"
-          oninput="dtUpdateWeight('${t.code}', this.value); this.previousElementSibling.previousElementSibling.querySelector('input').value=this.value">
+          oninput="dtUpdateWeight('${t.code}',this.value);this.previousElementSibling.previousElementSibling.querySelector('input').value=this.value">
         <button class="ticker-remove" onclick="dtRemoveTicker('${t.code}')">✕</button>
       </div>`).join('');
-  }
-
-  fill.style.width      = Math.min(sum, 100) + '%';
-  fill.style.background = sum === 100 ? 'var(--green-light)' : sum > 100 ? 'var(--red-light)' : 'var(--blue)';
-  total.textContent     = sum + '%';
-  total.className       = 'weight-total-num' + (sum === 100 ? ' ok' : sum > 100 ? ' over' : '');
-  warn.textContent      = sum > 100 ? '⚠ 비중 합계가 100%를 초과했어요' : sum > 0 && sum < 100 ? `나머지 ${100-sum}%는 현금으로 유지됩니다` : '';
+  fill.style.width = Math.min(sum,100)+'%';
+  fill.style.background = sum===100?'var(--green-light)':sum>100?'var(--red-light)':'var(--blue)';
+  total.textContent = sum+'%';
+  total.className = 'weight-total-num'+(sum===100?' ok':sum>100?' over':'');
+  warn.textContent = sum>100?'⚠ 비중 합계가 100%를 초과했어요':sum>0&&sum<100?`나머지 ${100-sum}%는 현금으로 유지됩니다`:'';
 }
 
-// ── 포맷 ──
 function fmtKRW(v) {
-  if (v >= 100000000) return '₩' + (v/100000000).toFixed(1) + '억';
-  if (v >= 10000)     return '₩' + Math.round(v/10000) + '만';
-  return '₩' + Math.round(v).toLocaleString();
+  if (v>=100000000) return '₩'+(v/100000000).toFixed(1)+'억';
+  if (v>=10000)     return '₩'+Math.round(v/10000)+'만';
+  return '₩'+Math.round(v).toLocaleString();
 }
 
 document.getElementById('dtTargetDiv').addEventListener('input', function() {
   document.getElementById('dtTargetDivHint').textContent = fmtKRW(parseFloat(this.value)||0);
 });
 document.getElementById('dtProbSlider').addEventListener('input', function() {
-  document.getElementById('dtProbLabel').textContent = this.value + '%';
+  document.getElementById('dtProbLabel').textContent = this.value+'%';
 });
 
-// ── 모드 설정 ──
-function setVarMode(varName, mode) {
-  dtVarModes[varName] = mode;
+// ── 모드 변경 핸들러 ──
+function getMode(name) {
+  return document.querySelector(`input[name="${name}Mode"]:checked`)?.value || 'fixed';
+}
 
-  // 버튼 스타일 업데이트
-  document.querySelectorAll(`[data-var="${varName}"]`).forEach(btn => {
-    btn.className = 'var-mode-btn';
-    if (btn.dataset.mode === mode) {
-      btn.classList.add(
-        mode === 'fixed' ? 'active-fixed' :
-        mode === 'explore' ? 'active-explore' : 'active-optimize'
-      );
-    }
+function onModeChange() {
+  ['seed','monthly','years'].forEach(v => {
+    const mode = getMode(v);
+    const extra = document.getElementById(`${v}RangeExtra`);
+    const valInput = document.getElementById(`dt${v.charAt(0).toUpperCase()+v.slice(1)}Val`);
+
+    extra.classList.toggle('show', mode === 'explore');
+    valInput.disabled = mode === 'optimize';
+    valInput.style.opacity = mode === 'optimize' ? '0.3' : '1';
+
+    updateHint(v);
   });
-
-  // 스텝 입력 표시/숨김
-  const showStep = mode === 'explore';
-  const cap = varName.charAt(0).toUpperCase() + varName.slice(1);
-  document.getElementById(`dt${cap}StepWrap`).style.opacity = showStep ? '1' : '0.3';
-  document.getElementById(`dt${cap}NWrap`).style.opacity    = showStep ? '1' : '0.3';
-  document.getElementById(`dt${cap}Step`).disabled = !showStep;
-  document.getElementById(`dt${cap}N`).disabled    = !showStep;
-
-  updatePreviews();
   validateModes();
 }
 
-function validateModes() {
-  const exploreCnt  = Object.values(dtVarModes).filter(m => m === 'explore').length;
-  const optimizeCnt = Object.values(dtVarModes).filter(m => m === 'optimize').length;
-  const warn = document.getElementById('dtScenarioWarn');
+function updateHint(v) {
+  const mode = getMode(v);
+  const cap  = v.charAt(0).toUpperCase() + v.slice(1);
+  const hint = document.getElementById(`dt${cap}Hint`);
+  const unit = v === 'years' ? '년' : '원';
 
-  if (exploreCnt > 2) {
-    warn.style.display = 'block';
-    warn.textContent = '⚠ 탐색 변수는 최대 2개입니다.';
-  } else if (optimizeCnt > 1) {
-    warn.style.display = 'block';
-    warn.textContent = '⚠ 최적화 변수는 최대 1개입니다.';
+  if (mode === 'optimize') {
+    hint.textContent = '→ 목표 달성 최소값 자동 계산';
+    hint.style.color = '#2E7D32';
+    return;
+  }
+  hint.style.color = '';
+
+  const center = parseFloat(document.getElementById(`dt${cap}Val`).value)||0;
+  if (mode === 'fixed') {
+    hint.textContent = '→ ' + (unit==='년' ? center+'년' : fmtKRW(center)) + ' (고정)';
   } else {
-    warn.style.display = 'none';
+    const step = parseFloat(document.getElementById(`dt${cap}Step`).value)||0;
+    const n    = parseInt(document.getElementById(`dt${cap}N`).value)||0;
+    if (step > 0 && n > 0) {
+      const vals = [];
+      for (let i=-n; i<=n; i++) {
+        const x = center + step*i;
+        if ((v==='years'&&x>=1)||(v!=='years'&&x>=0)) vals.push(x);
+      }
+      hint.textContent = '→ ' + vals.map(x=>unit==='년'?x+'년':fmtKRW(x)).join(', ');
+    } else {
+      hint.textContent = '→ 간격/스텝 입력 필요';
+    }
   }
 }
 
-// ── 프리뷰 ──
-function expandVar(center, step, n, minVal=0) {
-  if (n === 0 || step === 0) return [center];
-  const vals = [];
-  for (let i = -n; i <= n; i++) vals.push(center + step * i);
-  return vals.filter(v => v >= minVal);
+document.querySelectorAll('input[name="seedMode"], input[name="monthlyMode"], input[name="yearsMode"]')
+  .forEach(el => el.addEventListener('change', onModeChange));
+['dtSeedVal','dtSeedStep','dtSeedN','dtMonthlyVal','dtMonthlyStep','dtMonthlyN','dtYearsVal','dtYearsStep','dtYearsN']
+  .forEach(id => document.getElementById(id).addEventListener('input', () => {
+    const v = id.includes('Seed')?'seed':id.includes('Monthly')?'monthly':'years';
+    updateHint(v);
+  }));
+
+function validateModes() {
+  const modes = ['seed','monthly','years'].map(getMode);
+  const rangeCnt = modes.filter(m=>m==='explore').length;
+  const autoCnt  = modes.filter(m=>m==='optimize').length;
+  const warn = document.getElementById('dtScenarioWarn');
+  if (rangeCnt > 2) { warn.style.display='block'; warn.textContent='⚠ 범위 변수는 최대 2개입니다.'; }
+  else if (autoCnt > 1) { warn.style.display='block'; warn.textContent='⚠ 자동 변수는 최대 1개입니다.'; }
+  else warn.style.display='none';
 }
 
-function updatePreviews() {
-  const vars = [
-    { name:'seed',    cId:'dtSeedCenter',    sId:'dtSeedStep',    nId:'dtSeedN',    pId:'dtSeedPreview',    unit:'원', minVal:0 },
-    { name:'monthly', cId:'dtMonthlyCenter', sId:'dtMonthlyStep', nId:'dtMonthlyN', pId:'dtMonthlyPreview', unit:'원', minVal:0 },
-    { name:'years',   cId:'dtYearsCenter',   sId:'dtYearsStep',   nId:'dtYearsN',   pId:'dtYearsPreview',   unit:'년', minVal:1 },
-  ];
-  vars.forEach(v => {
-    const c    = parseFloat(document.getElementById(v.cId).value)||0;
-    const s    = parseFloat(document.getElementById(v.sId).value)||0;
-    const n    = parseInt(document.getElementById(v.nId).value)||0;
-    const mode = dtVarModes[v.name];
-    const preview = document.getElementById(v.pId);
+onModeChange();
 
-    if (mode === 'explore' && n > 0 && s > 0) {
-      const vals   = expandVar(c, s, n, v.minVal);
-      const labels = vals.map(x => v.unit==='년' ? x+'년' : fmtKRW(x));
-      preview.textContent = '→ ' + labels.join(', ');
-    } else if (mode === 'optimize') {
-      preview.textContent = '→ 목표 달성 최소값 자동 계산';
-      preview.style.color = '#2E7D32';
-    } else {
-      preview.textContent = '→ ' + (v.unit==='년' ? c+'년' : fmtKRW(c)) + ' (고정)';
-      preview.style.color = '';
-    }
-  });
-}
-
-['dtSeedCenter','dtSeedStep','dtSeedN',
- 'dtMonthlyCenter','dtMonthlyStep','dtMonthlyN',
- 'dtYearsCenter','dtYearsStep','dtYearsN'].forEach(id => {
-  document.getElementById(id).addEventListener('input', updatePreviews);
-});
-updatePreviews();
-validateModes();
-
-// ── 시뮬레이션 실행 ──
+// ── 실행 ──
 async function runDividendTarget() {
-  if (dtTickers.length === 0) { alert('종목을 최소 1개 추가해주세요.'); return; }
-  const sum = dtTickers.reduce((s, t) => s + t.weight, 0);
-  if (sum !== 100) { alert('비중 합계가 100%여야 해요.'); return; }
+  if (!dtTickers.length) { alert('종목을 최소 1개 추가해주세요.'); return; }
+  if (dtTickers.reduce((s,t)=>s+t.weight,0) !== 100) { alert('비중 합계가 100%여야 해요.'); return; }
 
-  const exploreCnt  = Object.values(dtVarModes).filter(m => m === 'explore').length;
-  const optimizeCnt = Object.values(dtVarModes).filter(m => m === 'optimize').length;
-  if (exploreCnt > 2)  { alert('탐색 변수는 최대 2개입니다.'); return; }
-  if (optimizeCnt > 1) { alert('최적화 변수는 최대 1개입니다.'); return; }
-  if (exploreCnt === 0 && optimizeCnt === 0) { alert('탐색 또는 최적화 변수가 최소 1개 필요합니다.'); return; }
+  const modes = ['seed','monthly','years'].map(getMode);
+  if (modes.filter(m=>m==='explore').length > 2) { alert('범위 변수는 최대 2개입니다.'); return; }
+  if (modes.filter(m=>m==='optimize').length > 1) { alert('자동 변수는 최대 1개입니다.'); return; }
 
-  const btn     = document.getElementById('dtRunBtn');
-  const btnText = document.getElementById('dtRunBtnText');
-  const spinner = document.getElementById('dtRunBtnSpinner');
-  btn.disabled          = true;
-  btnText.textContent   = optimizeCnt > 0 ? '최적화 계산 중... (1~2분 소요)' : '계산 중...';
-  spinner.style.display = 'inline';
+  const btn=document.getElementById('dtRunBtn');
+  const btnText=document.getElementById('dtRunBtnText');
+  const spinner=document.getElementById('dtRunBtnSpinner');
+  btn.disabled=true;
+  btnText.textContent = modes.includes('optimize') ? '자동 계산 중... (1~2분 소요)' : '계산 중...';
+  spinner.style.display='inline';
 
-  const seedS    = parseFloat(document.getElementById('dtSeedStep').value)    || 0;
-  const monthlyS = parseFloat(document.getElementById('dtMonthlyStep').value) || 0;
-  const yearsS   = parseFloat(document.getElementById('dtYearsStep').value)   || 0;
-  const seedN    = parseInt(document.getElementById('dtSeedN').value)    || 0;
-  const monthlyN = parseInt(document.getElementById('dtMonthlyN').value) || 0;
-  const yearsN   = parseInt(document.getElementById('dtYearsN').value)   || 0;
+  const mkCfg = (v) => {
+    const cap  = v.charAt(0).toUpperCase()+v.slice(1);
+    const mode = getMode(v);
+    return {
+      center: parseFloat(document.getElementById(`dt${cap}Val`).value)||0,
+      step:   parseFloat(document.getElementById(`dt${cap}Step`)?.value)||0,
+      n:      parseInt(document.getElementById(`dt${cap}N`)?.value)||0,
+      mode,
+    };
+  };
 
   const body = {
-    tickers:            dtTickers.map(t => ({ code: t.code, weight: t.weight / 100 })),
-    target_monthly_div: parseFloat(document.getElementById('dtTargetDiv').value) || 0,
-    probability:        parseFloat(document.getElementById('dtProbSlider').value) / 100,
+    tickers:            dtTickers.map(t=>({code:t.code, weight:t.weight/100})),
+    target_monthly_div: parseFloat(document.getElementById('dtTargetDiv').value)||0,
+    probability:        parseFloat(document.getElementById('dtProbSlider').value)/100,
     dividend_mode:      document.querySelector('input[name="dtDividend"]:checked').value,
-    seed:    { center: parseFloat(document.getElementById('dtSeedCenter').value)||0,    step: seedS,    n: seedN,    mode: dtVarModes.seed    },
-    monthly: { center: parseFloat(document.getElementById('dtMonthlyCenter').value)||0, step: monthlyS, n: monthlyN, mode: dtVarModes.monthly },
-    years:   { center: parseInt(document.getElementById('dtYearsCenter').value)||20,    step: yearsS,   n: yearsN,   mode: dtVarModes.years   },
+    seed:    mkCfg('seed'),
+    monthly: mkCfg('monthly'),
+    years:   mkCfg('years'),
   };
 
   try {
-    const res  = await fetch('/api/dividend-target/scenario', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
-    if (data.error) { alert('오류: ' + data.error); return; }
-    renderScenarioResult(data, body);
-  } catch (e) {
-    alert('오류: ' + e.message);
+    const data = await fetch('/api/dividend-target/scenario', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    }).then(r=>r.json());
+    if (data.error) { alert('오류: '+data.error); return; }
+    renderResult(data, body);
+  } catch(e) {
+    alert('오류: '+e.message);
   } finally {
-    btn.disabled          = false;
-    btnText.textContent   = '시뮬레이션 실행';
-    spinner.style.display = 'none';
+    btn.disabled=false; btnText.textContent='시뮬레이션 실행'; spinner.style.display='none';
   }
 }
 
 // ── 결과 렌더링 ──
-function renderScenarioResult(data, body) {
+const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0','#00BCD4','#FF5722','#607D8B'];
+
+function renderResult(data, body) {
   document.getElementById('dtResultEmpty').style.display   = 'none';
   document.getElementById('dtResultContent').style.display = 'block';
   document.getElementById('dtSolveSection').style.display  = 'none';
+  document.getElementById('dtProbCurveCard').style.display = 'none';
   document.getElementById('dtIsocurveCard').style.display  = 'none';
+  const oldBtn = document.getElementById('dtSwapBtn');
+  if (oldBtn) oldBtn.remove();
 
   const mode = data.mode;
 
+  // 단일 결과 (확률 또는 자동 계산)
   if (mode === 'probability') {
     document.getElementById('dtSolveSection').style.display = 'block';
-    const p = data.result ? Math.round(data.result.probability * 100) : 0;
-    document.getElementById('dtSolveCards').innerHTML = `
+    const res = data.result || {};
+    const p   = res.probability ? Math.round(res.probability*100) : 0;
+
+    // 자동 계산 결과 (solved_years / solved_seed / solved_monthly)
+    let solvedLabel = '', solvedValue = '';
+    if (res.solved_years   !== undefined) { solvedLabel='필요 투자 기간';  solvedValue = res.solved_years+'년'; }
+    if (res.solved_seed    !== undefined) { solvedLabel='필요 초기 투자금'; solvedValue = fmtKRW(res.solved_seed); }
+    if (res.solved_monthly !== undefined) { solvedLabel='필요 월 적립금';  solvedValue = fmtKRW(res.solved_monthly); }
+
+    document.getElementById('dtSolveTitle').textContent = solvedLabel || '달성 확률';
+    document.getElementById('dtSolveCards').innerHTML = solvedLabel ? `
       <div class="dist-card median">
-        <div class="dist-card-label">달성 확률</div>
-        <div class="dist-card-value">${p}%</div>
+        <div class="dist-card-label">${solvedLabel}</div>
+        <div class="dist-card-value">${solvedValue}</div>
       </div>
       <div class="dist-card pessimistic">
         <div class="dist-card-label">목표 월 배당금</div>
         <div class="dist-card-value">${fmtKRW(body.target_monthly_div)}</div>
       </div>
       <div class="dist-card optimistic">
-        <div class="dist-card-label">기준 확률</div>
-        <div class="dist-card-value">${Math.round(body.probability*100)}%</div>
-      </div>`;
-    document.getElementById('dtProbCurveCard').style.display = 'none';
+        <div class="dist-card-label">달성 확률</div>
+        <div class="dist-card-value">${p}%</div>
+      </div>` : `
+      <div class="dist-card median"><div class="dist-card-label">달성 확률</div><div class="dist-card-value">${p}%</div></div>
+      <div class="dist-card pessimistic"><div class="dist-card-label">목표 월 배당금</div><div class="dist-card-value">${fmtKRW(body.target_monthly_div)}</div></div>
+      <div class="dist-card optimistic"><div class="dist-card-label">기준 확률</div><div class="dist-card-value">${Math.round(body.probability*100)}%</div></div>`;
     return;
   }
 
-  document.getElementById('dtProbCurveCard').style.display = 'block';
-
-  const xKey  = data.x_key;
-  const lines = data.lines;
-  const allX  = [...new Set(lines.flatMap(l => l.points.map(p => p[xKey])))].sort((a,b)=>a-b);
-  const labels = allX.map(v => xKey === 'years' ? v+'년' : fmtKRW(v));
-
-  const allProbs = lines.flatMap(l => l.points.map(p => Math.round((p.probability||0)*100)));
-  const minP = Math.max(0,   Math.floor(Math.min(...allProbs)/10)*10 - 5);
-  const maxP = Math.min(100, Math.ceil(Math.max(...allProbs) /10)*10 + 15);
-
-  const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0',
-                   '#00BCD4','#FF5722','#607D8B','#795548','#F48FB1'];
-
-  const lineLabelOf = (key, v) => key === 'years' ? v+'년' : fmtKRW(v);
-
-  const buildDatasets = (curXKey, curLines, curAllX) => curLines.map((line, i) => ({
-    label: line.label || '달성 확률',
-    data: curAllX.map(xv => {
-      const pt = line.points.find(p => p[curXKey] === xv);
-      return pt ? Math.round((pt.probability||0) * 100) : null;
-    }),
-    borderColor: palette[i % palette.length],
-    backgroundColor: palette[i % palette.length] + '15',
-    fill: curLines.length === 1, tension: 0.35,
-    pointRadius: 5, pointHoverRadius: 7, borderWidth: 2.5, spanGaps: true,
-  }));
-
-  window._scenarioData    = data;
-  window._scenarioFlipped = false;
-
-  function drawChart(flipped) {
-    let curXKey, curLines, curAllX, curXLabel, curLineLabel;
-    if (!flipped || data.mode === 'scenario_1var') {
-      curXKey      = data.x_key;
-      curLines     = data.lines;
-      curAllX      = [...new Set(data.lines.flatMap(l => l.points.map(p => p[data.x_key])))].sort((a,b)=>a-b);
-      curXLabel    = data.x_key === 'seed' ? '초기 투자금' : data.x_key === 'monthly' ? '월 적립금' : '투자 기간';
-      curLineLabel = data.line_key ? (data.line_key === 'seed' ? '초기 투자금' : data.line_key === 'monthly' ? '월 적립금' : '투자 기간') : '';
-    } else {
-      curXKey      = data.line_key;
-      curLineLabel = data.x_key === 'seed' ? '초기 투자금' : data.x_key === 'monthly' ? '월 적립금' : '투자 기간';
-      curXLabel    = data.line_key === 'seed' ? '초기 투자금' : data.line_key === 'monthly' ? '월 적립금' : '투자 기간';
-      const origXVals   = [...new Set(data.lines[0].points.map(p => p[data.x_key]))].sort((a,b)=>a-b);
-      const newLineVals = [...new Set(data.lines.map(l => l[data.line_key]))].sort((a,b)=>a-b);
-      curAllX = newLineVals;
-      curLines = origXVals.map(xv => ({
-        label: `${curLineLabel}=${lineLabelOf(data.x_key, xv)}`,
-        [data.x_key]: xv,
-        points: newLineVals.map(lv => {
-          const srcLine = data.lines.find(l => l[data.line_key] === lv);
-          const pt = srcLine?.points.find(p => p[data.x_key] === xv);
-          return { [curXKey]: lv, probability: pt ? pt.probability : null };
-        })
-      }));
-    }
-
-    const curLabels = curAllX.map(v => curXKey === 'years' ? v+'년' : fmtKRW(v));
-    const titleText = curLineLabel ? `${curXLabel} × 달성 확률 (${curLineLabel}별)` : `${curXLabel} × 달성 확률`;
-    document.querySelector('#dtProbCurveCard .result-card-title').textContent = titleText;
-
-    if (dtCharts['prob']) dtCharts['prob'].destroy();
-    dtCharts['prob'] = new Chart(document.getElementById('dtProbCurveChart').getContext('2d'), {
-      type: 'line',
-      data: { labels: curLabels, datasets: buildDatasets(curXKey, curLines, curAllX) },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: curLines.length > 1, position: 'top', labels: { font:{size:11}, padding:12, boxWidth:20 } },
-          tooltip: { callbacks: {
-            title: items => curXLabel+': '+curLabels[items[0].dataIndex],
-            label: c => `${c.dataset.label}: ${c.raw}%`
-          }}
-        },
-        scales: {
-          x: { ticks:{font:{size:11,weight:'600'}, color:'#546E7A', maxRotation:0}, grid:{display:true, color:'rgba(0,0,0,0.06)'} },
-          y: { min:minP, max:maxP, ticks:{font:{size:11}, color:'#90A4AE', callback:v=>v+'%', stepSize:10}, grid:{color:'rgba(0,0,0,0.07)'} }
-        }
-      }
-    });
+  // 등위선 (자동 모드)
+  if (mode === 'isocurve') {
+    document.getElementById('dtIsocurveCard').style.display = 'block';
+    renderIsocurve(data);
+    return;
   }
 
-  drawChart(false);
+  // 시나리오 곡선
+  document.getElementById('dtProbCurveCard').style.display = 'block';
+  drawScenarioChart(data, false);
 
-  // X축/선 전환 버튼
-  const oldBtn = document.getElementById('dtSwapBtn');
-  if (oldBtn) oldBtn.remove();
-  if (data.mode === 'scenario_2var') {
+  // X↔선 전환 버튼 (2변수)
+  if (mode === 'scenario_2var') {
+    window._scenarioData = data;
+    window._scenarioFlipped = false;
     const btn = document.createElement('button');
     btn.id = 'dtSwapBtn';
     btn.textContent = '⇄ X축 / 선 전환';
-    btn.style.cssText = `margin-top:10px;padding:6px 14px;border:1.5px solid var(--blue-bright);
-      border-radius:8px;background:white;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;`;
-    btn.onclick = () => { window._scenarioFlipped = !window._scenarioFlipped; drawChart(window._scenarioFlipped); };
+    btn.style.cssText = 'margin-top:10px;padding:6px 14px;border:1.5px solid var(--blue-bright);border-radius:8px;background:white;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;';
+    btn.onclick = () => { window._scenarioFlipped=!window._scenarioFlipped; drawScenarioChart(window._scenarioData, window._scenarioFlipped); };
     document.getElementById('dtProbCurveCard').appendChild(btn);
-  }
-
-  const oldTbl = document.getElementById('dtAnchorTable');
-  if (oldTbl) oldTbl.remove();
-
-  // 등위곡선 (최적화 모드)
-  if (mode === 'isocurve' && data.points && data.points.length > 0) {
-    document.getElementById('dtIsocurveCard').style.display = 'block';
-    renderOptIsocurve(data);
   }
 }
 
-function renderOptIsocurve(data) {
-  if (dtCharts['iso']) dtCharts['iso'].destroy();
-  const ctx = document.getElementById('dtIsocurveChart').getContext('2d');
+function drawScenarioChart(data, flipped) {
+  let xKey, lines, xLabel, lineLabel;
+  const lineLabelOf = (key,v) => key==='years'?v+'년':fmtKRW(v);
 
-  const xKey    = data.x_key;
-  const optKey  = data.opt_key;
-  const xLabel  = data.x_label;
-  const optLabel = data.opt_label;
+  if (!flipped || data.mode==='scenario_1var') {
+    xKey=data.x_key; lines=data.lines;
+    xLabel   = xKey==='seed'?'초기 투자금':xKey==='monthly'?'월 적립금':'투자 기간';
+    lineLabel= data.line_key?(data.line_key==='seed'?'초기 투자금':data.line_key==='monthly'?'월 적립금':'투자 기간'):'';
+  } else {
+    xKey=data.line_key;
+    xLabel   = xKey==='seed'?'초기 투자금':xKey==='monthly'?'월 적립금':'투자 기간';
+    lineLabel= data.x_key==='seed'?'초기 투자금':data.x_key==='monthly'?'월 적립금':'투자 기간';
+    const origX = [...new Set(data.lines[0].points.map(p=>p[data.x_key]))].sort((a,b)=>a-b);
+    const newLV = [...new Set(data.lines.map(l=>l[data.line_key]))].sort((a,b)=>a-b);
+    lines = origX.map(xv=>({
+      label:`${lineLabel}=${lineLabelOf(data.x_key,xv)}`,
+      [data.x_key]:xv,
+      points: newLV.map(lv=>{
+        const sl=data.lines.find(l=>l[data.line_key]===lv);
+        const pt=sl?.points.find(p=>p[data.x_key]===xv);
+        return {[xKey]:lv, probability:pt?pt.probability:null};
+      })
+    }));
+  }
 
-  const xFmt   = v => xKey   === 'years' ? v+'년' : fmtKRW(v);
-  const optFmt = v => optKey === 'years' ? v+'년' : fmtKRW(v);
+  const allX    = [...new Set(lines.flatMap(l=>l.points.map(p=>p[xKey])))].sort((a,b)=>a-b);
+  const labels  = allX.map(v=>xKey==='years'?v+'년':fmtKRW(v));
+  const allProbs= lines.flatMap(l=>l.points.map(p=>Math.round((p.probability||0)*100)));
+  const minP    = Math.max(0, Math.floor(Math.min(...allProbs)/10)*10-5);
+  const maxP    = Math.min(100, Math.ceil(Math.max(...allProbs)/10)*10+15);
 
-  document.getElementById('dtIsocurveTitle').textContent =
-    `등위선 — ${xLabel} vs ${optLabel} (목표 달성 조합)`;
+  document.getElementById('dtChartTitle').textContent =
+    lineLabel ? `${xLabel} × 달성 확률 (${lineLabel}별)` : `${xLabel} × 달성 확률`;
 
-  dtCharts['iso'] = new Chart(ctx, {
-    type: 'line',
-    data: {
-      datasets: [{
-        label: `${optLabel} 필요량`,
-        data: data.points.map(p => ({ x: p[xKey], y: p[optKey] })),
-        borderColor: '#1976D2',
-        backgroundColor: 'rgba(25,118,210,0.08)',
-        fill: true, tension: 0.35,
-        pointRadius: 6, pointHoverRadius: 8,
-        pointBackgroundColor: '#1976D2',
-        borderWidth: 2.5,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: {
-          title: items => xLabel+': '+xFmt(items[0].parsed.x),
-          label: c => optLabel+': '+optFmt(c.parsed.y),
+  if (dtCharts['prob']) dtCharts['prob'].destroy();
+  dtCharts['prob'] = new Chart(document.getElementById('dtProbCurveChart').getContext('2d'), {
+    type:'line',
+    data:{ labels, datasets: lines.map((line,i)=>({
+      label: line.label||'달성 확률',
+      data: allX.map(xv=>{ const pt=line.points.find(p=>p[xKey]===xv); return pt?Math.round((pt.probability||0)*100):null; }),
+      borderColor:palette[i%palette.length], backgroundColor:palette[i%palette.length]+'15',
+      fill:lines.length===1, tension:0.35, pointRadius:5, pointHoverRadius:7, borderWidth:2.5, spanGaps:true,
+    }))},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:lines.length>1, position:'top', labels:{font:{size:11}, padding:12, boxWidth:20}},
+        tooltip:{callbacks:{
+          title:items=>xLabel+': '+labels[items[0].dataIndex],
+          label:c=>`${c.dataset.label}: ${c.raw}%`
         }}
       },
-      scales: {
-        x: {
-          type: 'linear',
-          title: { display:true, text:xLabel, font:{size:11}, color:'#90A4AE' },
-          ticks: { font:{size:11}, color:'#546E7A', callback: xFmt },
-          grid:  { color:'rgba(0,0,0,0.06)' }
-        },
-        y: {
-          title: { display:true, text:optLabel, font:{size:11}, color:'#90A4AE' },
-          ticks: { font:{size:11}, color:'#90A4AE', callback: optFmt },
-          grid:  { color:'rgba(0,0,0,0.07)' }
-        }
+      scales:{
+        x:{ticks:{font:{size:11,weight:'600'}, color:'#546E7A', maxRotation:0}, grid:{display:true, color:'rgba(0,0,0,0.06)'}},
+        y:{min:minP, max:maxP, ticks:{font:{size:11}, color:'#90A4AE', callback:v=>v+'%', stepSize:10}, grid:{color:'rgba(0,0,0,0.07)'}}
+      }
+    }
+  });
+}
+
+function renderIsocurve(data) {
+  if (dtCharts['iso']) dtCharts['iso'].destroy();
+  const xKey=data.x_key, optKey=data.opt_key;
+  const xFmt  = v => xKey==='years'?v+'년':fmtKRW(v);
+  const optFmt= v => optKey==='years'?v+'년':fmtKRW(v);
+
+  document.getElementById('dtIsocurveTitle').textContent =
+    `등위선 — ${data.x_label} vs ${data.opt_label}`;
+
+  dtCharts['iso'] = new Chart(document.getElementById('dtIsocurveChart').getContext('2d'), {
+    type:'line',
+    data:{ datasets:[{
+      label:`${data.opt_label} 필요량`,
+      data:data.points.map(p=>({x:p[xKey], y:p[optKey]})),
+      borderColor:'#1976D2', backgroundColor:'rgba(25,118,210,0.08)',
+      fill:true, tension:0.35, pointRadius:6, pointHoverRadius:8,
+      pointBackgroundColor:'#1976D2', borderWidth:2.5,
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          title:items=>data.x_label+': '+xFmt(items[0].parsed.x),
+          label:c=>data.opt_label+': '+optFmt(c.parsed.y),
+        }}
+      },
+      scales:{
+        x:{type:'linear', title:{display:true, text:data.x_label, font:{size:11}, color:'#90A4AE'},
+           ticks:{font:{size:11}, color:'#546E7A', callback:xFmt}, grid:{color:'rgba(0,0,0,0.06)'}},
+        y:{title:{display:true, text:data.opt_label, font:{size:11}, color:'#90A4AE'},
+           ticks:{font:{size:11}, color:'#90A4AE', callback:optFmt}, grid:{color:'rgba(0,0,0,0.07)'}}
       }
     }
   });

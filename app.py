@@ -507,12 +507,16 @@ def dividend_target_scenario():
             step_months = 3,
         )
 
+        seed_cfg    = body.get('seed',    {"center": 0,      "step": 0, "n": 0, "mode": "fixed"})
+        monthly_cfg = body.get('monthly', {"center": 500000, "step": 0, "n": 0, "mode": "fixed"})
+        years_cfg   = body.get('years',   {"center": 20,     "step": 0, "n": 0, "mode": "fixed"})
+
         result = sim.run_scenario(
             target_monthly_div = float(body['target_monthly_div']),
             probability        = float(body.get('probability', 0.90)),
-            seed_cfg           = body.get('seed',    {"center": 0,      "step": 0, "n": 0}),
-            monthly_cfg        = body.get('monthly', {"center": 500000, "step": 0, "n": 0}),
-            years_cfg          = body.get('years',   {"center": 20,     "step": 0, "n": 0}),
+            seed_cfg           = seed_cfg,
+            monthly_cfg        = monthly_cfg,
+            years_cfg          = years_cfg,
         )
         return jsonify(result)
     except Exception as e:

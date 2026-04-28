@@ -113,23 +113,152 @@ class DividendSimulator:
 
         return last_year_div
 
+    MIN_CASES = 30  # 롤링 케이스 최소 보장 개수
+
+    def _calc_div_stats(self) -> dict:
+        """
+        실제 배당 데이터에서 배당률/성장률 분포 계산
+        배당률 = 분기 DPS / 주가 (환율 중립)
+        """
+        stats = {}
+        for t in self.tickers:
+            df = self._load(t)
+            if df.empty:
+                continue
+            div_df = df[df["dividend"] > 0].copy()
+            if div_df.empty:
+                continue
+
+            # 분기별 배당률 계산
+            div_df["div_yield"] = div_df["dividend"] / df["close"].reindex(div_df.index)
+            div_df = div_df.dropna(subset=["div_yield"])
+            div_df = div_df[div_df["div_yield"] > 0]
+
+            # 연간 DPS 합계로 성장률 계산 (첫 해/현재 연도 제외)
+            div_df["year"] = div_df.index.year
+            annual = div_df.groupby("year")["dividend"].sum()
+            current_year = pd.Timestamp.today().year
+            # 첫 해(데이터 부족), 현재 연도(미완성) 제외
+            annual = annual.iloc[1:]
+            if annual.index[-1] == current_year:
+                annual = annual.iloc[:-1]
+            growth = annual.pct_change().dropna()
+            growth = growth[growth.abs() < 2.0]  # 극단값 제거 (200% 초과)
+
+            stats[t] = {
+                "div_yield_mean": float(div_df["div_yield"].mean()),
+                "div_yield_std":  float(div_df["div_yield"].std()),
+                "growth_mean":    float(growth.mean()) if len(growth) > 0 else 0.10,
+                "growth_std":     float(growth.std())  if len(growth) > 0 else 0.07,
+                "div_freq":       int(round(len(div_df) / max(1, (div_df.index[-1] - div_df.index[0]).days / 365))),
+            }
+        return stats
+
+    def _simulate_synthetic(self, seed, monthly, years, div_stats, rng) -> float:
+        """
+        가상 데이터 기반 시뮬 (자산가치 기반, 주가 불필요)
+        포트폴리오 전체 자산에 배당률 적용
+        """
+        # 포트폴리오 가중 평균 배당률/성장률
+        total_yield_mean = sum(div_stats[t]["div_yield_mean"] * self.weights[t] for t in self.tickers if t in div_stats)
+        total_yield_std  = sum(div_stats[t]["div_yield_std"]  * self.weights[t] for t in self.tickers if t in div_stats)
+        growth_mean      = sum(div_stats[t]["growth_mean"]    * self.weights[t] for t in self.tickers if t in div_stats)
+        growth_std       = sum(div_stats[t]["growth_std"]     * self.weights[t] for t in self.tickers if t in div_stats)
+        div_freq         = max(div_stats[t]["div_freq"] for t in self.tickers if t in div_stats) if div_stats else 4
+
+        # 연간 배당률 성장 적용한 분기별 배당률 시계열 생성
+        n_quarters = years * 4
+        quarterly_yields = []
+        current_yield = max(0.001, rng.normal(total_yield_mean, total_yield_std))
+        for q in range(n_quarters):
+            if q > 0 and q % 4 == 0:
+                # 매년 성장률 적용
+                annual_growth = rng.normal(growth_mean, growth_std)
+                annual_growth = max(-0.30, min(0.60, annual_growth))  # -30%~60% 클리핑
+                current_yield *= (1 + annual_growth)
+                current_yield  = max(0.001, current_yield)
+            y = max(0.0, rng.normal(current_yield, total_yield_std * 0.5))
+            quarterly_yields.append(y)
+
+        # 월별 시뮬
+        asset = float(seed)
+        last_year_start_q = max(0, n_quarters - 4)
+        last_year_div = 0.0
+        months_per_quarter = 3
+        div_months = set(range(0, n_quarters * months_per_quarter, months_per_quarter))  # 분기 첫 달
+
+        for m in range(years * 12):
+            asset += monthly
+            q = m // 3
+            # 분기 배당 (월배당 ETF면 매달, 분기면 3개월마다)
+            if div_freq >= 12:
+                # 월배당
+                div = asset * quarterly_yields[min(q, n_quarters-1)] / 3.0
+                if div > 0:
+                    if q >= last_year_start_q:
+                        last_year_div += div
+                    if self.div_mode == "reinvest":
+                        asset += div
+            else:
+                # 분기배당: 분기 마지막 달(2, 5, 8, 11월)에 지급
+                if m % 3 == 2:
+                    div = asset * quarterly_yields[min(q, n_quarters-1)]
+                    if div > 0:
+                        if q >= last_year_start_q:
+                            last_year_div += div
+                        if self.div_mode == "reinvest":
+                            asset += div
+
+        return last_year_div
+
+    def _run_synthetic_rolling(self, seed, monthly, years, n_needed) -> List[float]:
+        """
+        가상 데이터로 n_needed개 케이스 생성
+        충분히 긴 가상 시계열 1개 만들어서 롤링
+        """
+        div_stats = self._calc_div_stats()
+        if not div_stats:
+            return []
+
+        rng = np.random.default_rng(seed=42)  # 재현성을 위해 고정 시드
+        results = []
+
+        # 필요 케이스만큼 독립 시뮬 실행 (각각 다른 랜덤 시드)
+        for i in range(n_needed):
+            rng_i = np.random.default_rng(seed=i)
+            val = self._simulate_synthetic(seed, monthly, years, div_stats, rng_i)
+            if val > 0:
+                results.append(val)
+
+        return results
+
     def _run_rolling(self, seed, monthly, years) -> List[float]:
         cache_key = f"{round(seed,-4)}_{round(monthly,-4)}_{years}"
         if cache_key in self._sim_cache:
             return self._sim_cache[cache_key]
+
         actual_start = self._get_actual_start()
         if actual_start is None:
             return []
+
         actual_start_dt = pd.Timestamp(actual_start)
         sim_end_latest  = pd.Timestamp.today() - pd.DateOffset(years=years)
-        if actual_start_dt > sim_end_latest:
-            return []
-        roll_starts = pd.date_range(actual_start_dt, sim_end_latest, freq=f"{self.step_months}ME")
-        results = []
-        for start in roll_starts:
-            val = self._simulate_one(seed, monthly, years, start.strftime("%Y-%m-%d"))
-            if val > 0:
-                results.append(val)
+
+        # 실제 데이터 롤링
+        real_results = []
+        if actual_start_dt <= sim_end_latest:
+            roll_starts = pd.date_range(actual_start_dt, sim_end_latest, freq=f"{self.step_months}ME")
+            for start in roll_starts:
+                val = self._simulate_one(seed, monthly, years, start.strftime("%Y-%m-%d"))
+                if val > 0:
+                    real_results.append(val)
+
+        # 케이스 부족 시 가상 데이터로 보충
+        n_real    = len(real_results)
+        n_needed  = max(0, self.MIN_CASES - n_real)
+        synthetic = self._run_synthetic_rolling(seed, monthly, years, n_needed) if n_needed > 0 else []
+
+        results = real_results + synthetic
         self._sim_cache[cache_key] = results
         return results
 
@@ -403,6 +532,76 @@ class DividendSimulator:
     # 시나리오 기반 다중 계산
     # ──────────────────────────────────────────────────
 
+    def _run_optimize_scenario(
+        self, target_monthly_div, probability,
+        seeds, monthlys, yearss,
+        vary_seed, vary_monthly, vary_years,
+        opt_seed, opt_monthly, opt_years,
+        seed_cfg, monthly_cfg, years_cfg,
+    ) -> dict:
+        """최적화 모드: 탐색 변수 각 값에 대해 최적화 변수 역산 → 등위선"""
+
+        # 탐색 변수 결정 (x축)
+        if vary_seed:
+            x_vals, x_key = seeds, 'seed'
+            fixed_monthly = monthlys[0]
+            fixed_years   = yearss[0]
+        elif vary_monthly:
+            x_vals, x_key = monthlys, 'monthly'
+            fixed_seed    = seeds[0]
+            fixed_years   = yearss[0]
+        elif vary_years:
+            x_vals, x_key = yearss, 'years'
+            fixed_seed    = seeds[0]
+            fixed_monthly = monthlys[0]
+        else:
+            # 탐색 없이 최적화만 → 단일값 반환
+            if opt_seed:
+                v = self._find_anchor_seed(monthlys[0], yearss[0], target_monthly_div, probability)
+                return {"mode": "probability", "result": {"solved_seed": v, "probability": probability}}
+            elif opt_monthly:
+                v = self._find_anchor_monthly(seeds[0], yearss[0], target_monthly_div, probability)
+                return {"mode": "probability", "result": {"solved_monthly": v, "probability": probability}}
+            else:
+                v = self._find_anchor_years(seeds[0], monthlys[0], target_monthly_div, probability)
+                return {"mode": "probability", "result": {"solved_years": v, "probability": probability}}
+
+        # 탐색 변수 x_vals 각각에 대해 최적화 변수 역산
+        points = []
+        for xv in x_vals:
+            if x_key == 'seed':
+                s, m, y = xv, fixed_monthly, fixed_years
+            elif x_key == 'monthly':
+                s, m, y = fixed_seed, xv, fixed_years
+            else:
+                s, m, y = fixed_seed, fixed_monthly, xv
+
+            if opt_seed:
+                opt_val = self._find_anchor_seed(m, y, target_monthly_div, probability)
+                if opt_val is not None:
+                    points.append({x_key: xv, 'seed': opt_val})
+            elif opt_monthly:
+                opt_val = self._find_anchor_monthly(s, y, target_monthly_div, probability)
+                if opt_val is not None:
+                    points.append({x_key: xv, 'monthly': opt_val})
+            else:
+                opt_val = self._find_anchor_years(s, m, target_monthly_div, probability)
+                if opt_val is not None:
+                    points.append({x_key: xv, 'years': opt_val})
+
+        opt_key = 'seed' if opt_seed else 'monthly' if opt_monthly else 'years'
+        x_label   = '초기 투자금' if x_key   == 'seed' else '월 적립금' if x_key   == 'monthly' else '투자 기간'
+        opt_label = '초기 투자금' if opt_key  == 'seed' else '월 적립금' if opt_key  == 'monthly' else '투자 기간'
+
+        return {
+            "mode":      "isocurve",
+            "x_key":     x_key,
+            "opt_key":   opt_key,
+            "x_label":   x_label,
+            "opt_label": opt_label,
+            "points":    points,
+        }
+
     @staticmethod
     def _expand_var(center, step, n, min_val=0):
         """중심값 기준 ±n 스텝 확장, min_val 미만 제거"""
@@ -415,31 +614,46 @@ class DividendSimulator:
         self,
         target_monthly_div: float,
         probability:        float,
-        seed_cfg:           dict,   # {center, step, n}
+        seed_cfg:           dict,
         monthly_cfg:        dict,
         years_cfg:          dict,
     ) -> dict:
-        """
-        시나리오 기반 계산
+        seed_mode    = seed_cfg.get('mode', 'fixed')
+        monthly_mode = monthly_cfg.get('mode', 'fixed')
+        years_mode   = years_cfg.get('mode', 'fixed')
 
-        n=0인 변수: 고정값
-        n>0인 변수: 여러 값 생성
-        n>0인 변수가 1개: X축 → 달성확률 곡선 (선 1개)
-        n>0인 변수가 2개: X축 + 여러 선
-        n>0인 변수가 3개: 에러
-        """
         seeds    = self._expand_var(seed_cfg['center'],    seed_cfg['step'],    seed_cfg['n'],    min_val=0)
         monthlys = self._expand_var(monthly_cfg['center'], monthly_cfg['step'], monthly_cfg['n'], min_val=0)
         yearss   = self._expand_var(years_cfg['center'],   years_cfg['step'],   years_cfg['n'],   min_val=1)
 
-        vary_seed    = seed_cfg['n']    > 0 and seed_cfg['step']    > 0
-        vary_monthly = monthly_cfg['n'] > 0 and monthly_cfg['step'] > 0
-        vary_years   = years_cfg['n']   > 0 and years_cfg['step']   > 0
+        vary_seed    = seed_mode    == 'explore' and seed_cfg['n']    > 0 and seed_cfg['step']    > 0
+        vary_monthly = monthly_mode == 'explore' and monthly_cfg['n'] > 0 and monthly_cfg['step'] > 0
+        vary_years   = years_mode   == 'explore' and years_cfg['n']   > 0 and years_cfg['step']   > 0
+
+        opt_seed    = seed_mode    == 'optimize'
+        opt_monthly = monthly_mode == 'optimize'
+        opt_years   = years_mode   == 'optimize'
 
         vary_count = sum([vary_seed, vary_monthly, vary_years])
+        opt_count  = sum([opt_seed, opt_monthly, opt_years])
+
+        if vary_count > 2:
+            return {"error": "탐색 변수는 최대 2개입니다."}
+        if opt_count > 1:
+            return {"error": "최적화 변수는 최대 1개입니다."}
+
+        # 최적화 모드: 탐색 변수의 각 값에 대해 최적화 변수 역산
+        if opt_count == 1:
+            return self._run_optimize_scenario(
+                target_monthly_div, probability,
+                seeds, monthlys, yearss,
+                vary_seed, vary_monthly, vary_years,
+                opt_seed, opt_monthly, opt_years,
+                seed_cfg, monthly_cfg, years_cfg,
+            )
 
         if vary_count == 3:
-            return {"error": "스텝이 있는 변수는 최대 2개입니다."}
+            return {"error": "탐색이 있는 변수는 최대 2개입니다."}
 
         if vary_count == 0:
             # 모두 고정 → 달성 확률만 반환

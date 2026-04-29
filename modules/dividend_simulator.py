@@ -10,6 +10,12 @@ import pandas as pd
 from typing import Optional, List, Dict
 
 
+def fmtKRW_py(v):
+    if v >= 100000000: return f'{v/100000000:.1f}억'
+    if v >= 10000:     return f'{round(v/10000)}만'
+    return f'{round(v):,}'
+
+
 class DividendSimulator:
 
     def __init__(self, loader, tickers, weights, div_mode="reinvest", step_months=3):
@@ -301,22 +307,15 @@ class DividendSimulator:
     def _find_anchor_years(self, seed, monthly, target_monthly_div, probability):
         checkpoints = [1, 5, 10, 15, 20, 25, 30]
         xs, probs = [], []
-        lo_y = 1
         for y in checkpoints:
             p = self._calc_prob(self._run_rolling(seed, monthly, y), target_monthly_div)
             xs.append(y)
             probs.append(p)
             if p >= probability:
-                # 로지스틱 피팅으로 대략 추정
                 fitted = self._logistic_fit(xs, probs, probability)
-                rough = max(lo_y, min(30, round(fitted))) if fitted else y
-                # 추정값 근처 ±3년을 1년 단위로 정밀 탐색
-                for yy in range(max(lo_y, rough - 3), rough + 1):
-                    pp = self._calc_prob(self._run_rolling(seed, monthly, yy), target_monthly_div)
-                    if pp >= probability:
-                        return yy
-                return rough
-            lo_y = y
+                if fitted is not None:
+                    return max(1, min(30, round(fitted)))
+                return y
         return None
 
     def _find_anchor_seed(self, monthly, years, target_monthly_div, probability):
@@ -541,65 +540,103 @@ class DividendSimulator:
     ) -> dict:
         """최적화 모드: 탐색 변수 각 값에 대해 최적화 변수 역산 → 등위선"""
 
-        # 탐색 변수 결정 (x축)
-        if vary_seed:
-            x_vals, x_key = seeds, 'seed'
-            fixed_monthly = monthlys[0]
-            fixed_years   = yearss[0]
-        elif vary_monthly:
-            x_vals, x_key = monthlys, 'monthly'
-            fixed_seed    = seeds[0]
-            fixed_years   = yearss[0]
-        elif vary_years:
-            x_vals, x_key = yearss, 'years'
-            fixed_seed    = seeds[0]
-            fixed_monthly = monthlys[0]
-        else:
-            # 탐색 없이 최적화만 → 단일값 반환
+        vary_count = sum([vary_seed, vary_monthly, vary_years])
+
+        # 탐색 없이 최적화만 → 단일값 반환
+        if vary_count == 0:
             if opt_seed:
-                v = self._find_anchor_seed(monthlys[0], yearss[0], target_monthly_div, probability)
+                v = self._find_anchor_seed(monthly_cfg['center'], years_cfg['center'], target_monthly_div, probability)
                 return {"mode": "probability", "result": {"solved_seed": v, "probability": probability}}
             elif opt_monthly:
-                v = self._find_anchor_monthly(seeds[0], yearss[0], target_monthly_div, probability)
+                v = self._find_anchor_monthly(seed_cfg['center'], years_cfg['center'], target_monthly_div, probability)
                 return {"mode": "probability", "result": {"solved_monthly": v, "probability": probability}}
             else:
-                v = self._find_anchor_years(seeds[0], monthlys[0], target_monthly_div, probability)
+                v = self._find_anchor_years(seed_cfg['center'], monthly_cfg['center'], target_monthly_div, probability)
                 return {"mode": "probability", "result": {"solved_years": v, "probability": probability}}
 
-        # 탐색 변수 x_vals 각각에 대해 최적화 변수 역산
-        points = []
-        for xv in x_vals:
-            if x_key == 'seed':
-                s, m, y = xv, fixed_monthly, fixed_years
-            elif x_key == 'monthly':
-                s, m, y = fixed_seed, xv, fixed_years
-            else:
-                s, m, y = fixed_seed, fixed_monthly, xv
+        # 탐색 1개 → X축 = 탐색 변수, Y축 = 최적화 변수 (등위선 1개)
+        # 탐색 2개 → X축 = 더 많은 포인트 가진 변수, 나머지 탐색 변수는 여러 선
+        opt_key   = 'seed' if opt_seed else 'monthly' if opt_monthly else 'years'
+        opt_label = '초기 투자금' if opt_seed else '월 적립금' if opt_monthly else '투자 기간'
 
-            if opt_seed:
-                opt_val = self._find_anchor_seed(m, y, target_monthly_div, probability)
-                if opt_val is not None:
-                    points.append({x_key: xv, 'seed': opt_val})
-            elif opt_monthly:
-                opt_val = self._find_anchor_monthly(s, y, target_monthly_div, probability)
-                if opt_val is not None:
-                    points.append({x_key: xv, 'monthly': opt_val})
+        if vary_count == 1:
+            if vary_seed:
+                x_vals, x_key, line_vals, line_key = seeds, 'seed', [None], None
+                get_s = lambda xv, lv: xv
+                get_m = lambda xv, lv: monthly_cfg['center']
+                get_y = lambda xv, lv: years_cfg['center']
+            elif vary_monthly:
+                x_vals, x_key, line_vals, line_key = monthlys, 'monthly', [None], None
+                get_s = lambda xv, lv: seed_cfg['center']
+                get_m = lambda xv, lv: xv
+                get_y = lambda xv, lv: years_cfg['center']
             else:
-                opt_val = self._find_anchor_years(s, m, target_monthly_div, probability)
-                if opt_val is not None:
-                    points.append({x_key: xv, 'years': opt_val})
+                x_vals, x_key, line_vals, line_key = yearss, 'years', [None], None
+                get_s = lambda xv, lv: seed_cfg['center']
+                get_m = lambda xv, lv: monthly_cfg['center']
+                get_y = lambda xv, lv: xv
 
-        opt_key = 'seed' if opt_seed else 'monthly' if opt_monthly else 'years'
-        x_label   = '초기 투자금' if x_key   == 'seed' else '월 적립금' if x_key   == 'monthly' else '투자 기간'
-        opt_label = '초기 투자금' if opt_key  == 'seed' else '월 적립금' if opt_key  == 'monthly' else '투자 기간'
+        else:  # vary_count == 2
+            # 더 많은 포인트 → X축, 적은 포인트 → 여러 선
+            vary_pairs = []
+            if vary_seed:    vary_pairs.append(('seed',    seeds))
+            if vary_monthly: vary_pairs.append(('monthly', monthlys))
+            if vary_years:   vary_pairs.append(('years',   yearss))
+
+            # 포인트 많은 쪽이 X축
+            if len(vary_pairs[0][1]) >= len(vary_pairs[1][1]):
+                x_key, x_vals     = vary_pairs[0]
+                line_key, line_vals = vary_pairs[1]
+            else:
+                x_key, x_vals     = vary_pairs[1]
+                line_key, line_vals = vary_pairs[0]
+
+            def get_s(xv, lv):
+                if x_key == 'seed':    return xv
+                if line_key == 'seed': return lv
+                return seed_cfg['center']
+            def get_m(xv, lv):
+                if x_key == 'monthly':    return xv
+                if line_key == 'monthly': return lv
+                return monthly_cfg['center']
+            def get_y(xv, lv):
+                if x_key == 'years':    return xv
+                if line_key == 'years': return lv
+                return years_cfg['center']
+
+        x_label    = '초기 투자금' if x_key == 'seed' else '월 적립금' if x_key == 'monthly' else '투자 기간'
+        line_label = ('초기 투자금' if line_key == 'seed' else '월 적립금' if line_key == 'monthly' else '투자 기간') if line_key else None
+        line_label_of = lambda v: fmtKRW_py(v) if line_key != 'years' else f'{v}년'
+
+        lines = []
+        for lv in line_vals:
+            points = []
+            for xv in x_vals:
+                s, m, y = get_s(xv, lv), get_m(xv, lv), get_y(xv, lv)
+                if opt_seed:
+                    opt_val = self._find_anchor_seed(m, y, target_monthly_div, probability)
+                elif opt_monthly:
+                    opt_val = self._find_anchor_monthly(s, y, target_monthly_div, probability)
+                else:
+                    opt_val = self._find_anchor_years(s, m, target_monthly_div, probability)
+                if opt_val is not None:
+                    points.append({x_key: xv, opt_key: opt_val})
+
+            lbl = None if lv is None else (
+                f'{line_label}={lv//10000}만' if line_key in ("seed","monthly") else f'{line_label}={lv}년'
+            )
+            lines.append({"label": lbl, line_key: lv, "points": points} if lv is not None
+                         else {"label": None, "points": points})
 
         return {
-            "mode":      "isocurve",
-            "x_key":     x_key,
-            "opt_key":   opt_key,
-            "x_label":   x_label,
-            "opt_label": opt_label,
-            "points":    points,
+            "mode":       "isocurve",
+            "x_key":      x_key,
+            "opt_key":    opt_key,
+            "line_key":   line_key,
+            "x_label":    x_label,
+            "opt_label":  opt_label,
+            "line_label": line_label,
+            "lines":      lines,
         }
 
     @staticmethod

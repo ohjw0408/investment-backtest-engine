@@ -438,6 +438,8 @@ async function runDividendTarget() {
 const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0','#00BCD4','#FF5722','#607D8B'];
 
 function renderResult(data, body) {
+  console.log('API 응답:', JSON.stringify(data));
+  console.log('요청 body:', JSON.stringify(body));
   document.getElementById('dtResultEmpty').style.display   = 'none';
   document.getElementById('dtResultContent').style.display = 'block';
   document.getElementById('dtSolveSection').style.display  = 'none';
@@ -566,36 +568,58 @@ function drawScenarioChart(data, flipped) {
 
 function renderIsocurve(data) {
   if (dtCharts['iso']) dtCharts['iso'].destroy();
-  const xKey=data.x_key, optKey=data.opt_key;
-  const xFmt  = v => xKey==='years'?v+'년':fmtKRW(v);
-  const optFmt= v => optKey==='years'?v+'년':fmtKRW(v);
+  const xKey    = data.x_key;
+  const optKey  = data.opt_key;
+  const xLabel  = data.x_label;
+  const optLabel = data.opt_label;
+  const lines   = data.lines || [{ label: null, points: data.points || [] }];
+
+  const xFmt   = v => xKey   === 'years' ? v+'년' : fmtKRW(v);
+  const optFmt = v => optKey === 'years' ? v+'년' : fmtKRW(v);
 
   document.getElementById('dtIsocurveTitle').textContent =
-    `등위선 — ${data.x_label} vs ${data.opt_label}`;
+    data.line_label
+      ? `등위선 — ${xLabel} vs ${optLabel} (${data.line_label}별)`
+      : `등위선 — ${xLabel} vs ${optLabel}`;
+
+  const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0','#00BCD4','#FF5722','#607D8B'];
+
+  const datasets = lines.map((line, i) => ({
+    label: line.label || optLabel,
+    data: line.points.map(p => ({ x: p[xKey], y: p[optKey] })),
+    borderColor: palette[i % palette.length],
+    backgroundColor: palette[i % palette.length] + '15',
+    fill: lines.length === 1,
+    tension: 0.35,
+    pointRadius: 6, pointHoverRadius: 8,
+    pointBackgroundColor: palette[i % palette.length],
+    borderWidth: 2.5,
+  }));
 
   dtCharts['iso'] = new Chart(document.getElementById('dtIsocurveChart').getContext('2d'), {
-    type:'line',
-    data:{ datasets:[{
-      label:`${data.opt_label} 필요량`,
-      data:data.points.map(p=>({x:p[xKey], y:p[optKey]})),
-      borderColor:'#1976D2', backgroundColor:'rgba(25,118,210,0.08)',
-      fill:true, tension:0.35, pointRadius:6, pointHoverRadius:8,
-      pointBackgroundColor:'#1976D2', borderWidth:2.5,
-    }]},
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{callbacks:{
-          title:items=>data.x_label+': '+xFmt(items[0].parsed.x),
-          label:c=>data.opt_label+': '+optFmt(c.parsed.y),
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: lines.length > 1, position: 'top', labels: { font:{size:11}, padding:12, boxWidth:20 } },
+        tooltip: { callbacks: {
+          title: items => xLabel+': '+xFmt(items[0].parsed.x),
+          label: c => `${c.dataset.label}: ${optFmt(c.parsed.y)}`,
         }}
       },
-      scales:{
-        x:{type:'linear', title:{display:true, text:data.x_label, font:{size:11}, color:'#90A4AE'},
-           ticks:{font:{size:11}, color:'#546E7A', callback:xFmt}, grid:{color:'rgba(0,0,0,0.06)'}},
-        y:{title:{display:true, text:data.opt_label, font:{size:11}, color:'#90A4AE'},
-           ticks:{font:{size:11}, color:'#90A4AE', callback:optFmt}, grid:{color:'rgba(0,0,0,0.07)'}}
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display:true, text:xLabel, font:{size:11}, color:'#90A4AE' },
+          ticks: { font:{size:11}, color:'#546E7A', callback: xFmt },
+          grid:  { color:'rgba(0,0,0,0.06)' }
+        },
+        y: {
+          title: { display:true, text:optLabel, font:{size:11}, color:'#90A4AE' },
+          ticks: { font:{size:11}, color:'#90A4AE', callback: optFmt },
+          grid:  { color:'rgba(0,0,0,0.07)' }
+        }
       }
     }
   });

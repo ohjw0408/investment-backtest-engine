@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}세금 설정 — Domino Invest{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<style>
+.tax-card {
+  background: white;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: border-color 0.15s;
+}
+.tax-card.active {
+  border-color: var(--blue-bright);
+  box-shadow: 0 0 0 3px rgba(25,118,210,0.08);
+}
+.tax-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.tax-card-icon { font-size: 1.4rem; }
+.tax-card-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+.tax-card-sub { font-size: 0.78rem; color: var(--text-muted); margin-top:2px; }
+.tax-toggle {
+  margin-left: auto;
+  width: 44px; height: 24px;
+  background: var(--border);
+  border-radius: 12px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  border: none;
+  outline: none;
+}
+.tax-toggle.on { background: var(--blue); }
+.tax-toggle::after {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  background: white;
+  border-radius: 50%;
+  top: 3px; left: 3px;
+  transition: left 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.tax-toggle.on::after { left: 23px; }
+.tax-card-body { display: none; }
+.tax-card-body.show { display: block; }
+.save-btn {
+  width: 100%; padding: 14px;
+  background: var(--blue); color: white;
+  border: none; border-radius: 10px;
+  font-size: 1rem; font-weight: 700;
+  cursor: pointer; margin-top: 8px;
+}
+.save-btn:hover { background: var(--blue-dark, #1565C0); }
+.save-toast {
+  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+  background: #333; color: white;
+  padding: 10px 24px; border-radius: 8px;
+  font-size: 0.85rem; display: none; z-index: 9999;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:560px; margin:0 auto; padding:24px 16px;">
+
+  <div style="margin-bottom:24px;">
+    <h2 style="font-size:1.3rem;font-weight:800;margin-bottom:4px;">세금 설정</h2>
+    <p style="font-size:0.85rem;color:var(--text-muted);">
+      입력한 정보는 기기에만 저장되며 서버로 전송되지 않습니다.<br>
+      배당금 계산기와 포트폴리오 시뮬레이션에 적용됩니다.
+    </p>
+  </div>
+
+  <!-- 기본 소득 정보 -->
+  <div class="tax-card active" id="card-income">
+    <div class="tax-card-header">
+      <span class="tax-card-icon">💼</span>
+      <div>
+        <div class="tax-card-title">소득 정보</div>
+        <div class="tax-card-sub">종합과세 계산에 사용됩니다</div>
+      </div>
+    </div>
+    <div class="tax-card-body show">
+      <div class="input-row" style="margin-bottom:12px;">
+        <label>연간 근로/사업소득</label>
+        <div class="input-group">
+          <input type="number" id="earnedIncome" class="calc-input" value="50000000" min="0" step="1000000">
+          <span class="unit">원</span>
+        </div>
+        <div class="input-hint" id="earnedIncomeHint">₩5,000만</div>
+      </div>
+      <div class="input-row">
+        <label>나이 <span style="font-size:11px;color:var(--text-muted);">(연금 수령 세율 계산용)</span></label>
+        <div class="input-group" style="max-width:120px;">
+          <input type="number" id="userAge" class="calc-input" value="40" min="18" max="90" step="1">
+          <span class="unit">세</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 일반 계좌 -->
+  <div class="tax-card" id="card-general">
+    <div class="tax-card-header">
+      <span class="tax-card-icon">📈</span>
+      <div>
+        <div class="tax-card-title">일반 계좌</div>
+        <div class="tax-card-sub">배당소득세 15.4% (미국 ETF 15%), 금융소득 종합과세 적용</div>
+      </div>
+      <button class="tax-toggle" id="toggle-general" onclick="toggleAccount('general')"></button>
+    </div>
+  </div>
+
+  <!-- ISA -->
+  <div class="tax-card" id="card-isa">
+    <div class="tax-card-header">
+      <span class="tax-card-icon">🛡️</span>
+      <div>
+        <div class="tax-card-title">ISA 계좌</div>
+        <div class="tax-card-sub">운용 중 비과세, 만기 시 200~400만 비과세 후 9.9%</div>
+      </div>
+      <button class="tax-toggle" id="toggle-isa" onclick="toggleAccount('isa')"></button>
+    </div>
+    <div class="tax-card-body" id="body-isa">
+      <div class="input-row">
+        <label>ISA 유형</label>
+        <div class="rebal-options">
+          <label class="rebal-option">
+            <input type="radio" name="isaType" value="general" checked>
+            <span class="rebal-label">일반형 (200만 비과세)</span>
+          </label>
+          <label class="rebal-option">
+            <input type="radio" name="isaType" value="preferential">
+            <span class="rebal-label">서민형 (400만 비과세)</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 연금 계좌 -->
+  <div class="tax-card" id="card-pension">
+    <div class="tax-card-header">
+      <span class="tax-card-icon">🏦</span>
+      <div>
+        <div class="tax-card-title">연금 계좌 (IRP/연금저축)</div>
+        <div class="tax-card-sub">운용 중 과세 이연, 수령 시 3.3~5.5% 연금소득세</div>
+      </div>
+      <button class="tax-toggle" id="toggle-pension" onclick="toggleAccount('pension')"></button>
+    </div>
+    <div class="tax-card-body" id="body-pension">
+      <div class="input-row">
+        <label>연금 수령 예정 나이</label>
+        <div class="input-group" style="max-width:120px;">
+          <input type="number" id="pensionAge" class="calc-input" value="65" min="55" max="90" step="1">
+          <span class="unit">세</span>
+        </div>
+        <div class="input-hint" style="color:var(--text-muted);">
+          55~69세: 5.5% / 70~79세: 4.4% / 80세+: 3.3%
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 절세매매 -->
+  <div class="tax-card" id="card-harvest">
+    <div class="tax-card-header">
+      <span class="tax-card-icon">✂️</span>
+      <div>
+        <div class="tax-card-title">절세매매 (손익통산)</div>
+        <div class="tax-card-sub">연말 손실 실현으로 양도세 절감 (해외주식 연 250만 공제)</div>
+      </div>
+      <button class="tax-toggle" id="toggle-harvest" onclick="toggleAccount('harvest')"></button>
+    </div>
+  </div>
+
+  <button class="save-btn" onclick="saveSettings()">설정 저장</button>
+
+  <div style="margin-top:16px;padding:12px;background:#F5F5F5;border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.7;">
+    💡 <b>세금 계산 참고사항</b><br>
+    - 금현물, 비트코인 배당(이자)은 별도 세율 적용<br>
+    - 금융소득 종합과세: 연간 이자+배당 합계 2,000만원 초과 시<br>
+    - 본 계산은 참고용이며 실제 세금과 다를 수 있습니다
+  </div>
+
+</div>
+
+<div class="save-toast" id="saveToast">✅ 세금 설정이 저장되었습니다</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STORAGE_KEY = 'domino_tax_settings';
+const accounts = ['general', 'isa', 'pension', 'harvest'];
+
+function fmtKRW(v) {
+  if (v >= 100000000) return '₩'+(v/100000000).toFixed(1)+'억';
+  if (v >= 10000)     return '₩'+Math.round(v/10000)+'만';
+  return '₩'+Math.round(v).toLocaleString();
+}
+
+// 토글 상태
+const state = { general: false, isa: false, pension: false, harvest: false };
+
+function toggleAccount(name) {
+  state[name] = !state[name];
+  const btn  = document.getElementById('toggle-' + name);
+  const body = document.getElementById('body-' + name);
+  const card = document.getElementById('card-' + name);
+  btn.classList.toggle('on', state[name]);
+  card.classList.toggle('active', state[name]);
+  if (body) body.classList.toggle('show', state[name]);
+}
+
+function saveSettings() {
+  const settings = {
+    earned_income: parseFloat(document.getElementById('earnedIncome').value) || 0,
+    age:           parseInt(document.getElementById('userAge').value) || 40,
+    pension_age:   parseInt(document.getElementById('pensionAge').value) || 65,
+    isa_type:      document.querySelector('input[name="isaType"]:checked')?.value || 'general',
+    accounts:      { ...state },
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+
+  // 토스트
+  const toast = document.getElementById('saveToast');
+  toast.style.display = 'block';
+  setTimeout(() => toast.style.display = 'none', 2000);
+}
+
+function loadSettings() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+  try {
+    const s = JSON.parse(raw);
+    if (s.earned_income) document.getElementById('earnedIncome').value = s.earned_income;
+    if (s.age)           document.getElementById('userAge').value = s.age;
+    if (s.pension_age)   document.getElementById('pensionAge').value = s.pension_age;
+    if (s.isa_type) {
+      const radio = document.querySelector(`input[name="isaType"][value="${s.isa_type}"]`);
+      if (radio) radio.checked = true;
+    }
+    if (s.accounts) {
+      accounts.forEach(name => {
+        if (s.accounts[name] && !state[name]) toggleAccount(name);
+      });
+    }
+    document.getElementById('earnedIncomeHint').textContent = fmtKRW(s.earned_income || 0);
+  } catch(e) {}
+}
+
+document.getElementById('earnedIncome').addEventListener('input', function() {
+  document.getElementById('earnedIncomeHint').textContent = fmtKRW(parseFloat(this.value)||0);
+});
+
+loadSettings();
+</script>
+{% endblock %}

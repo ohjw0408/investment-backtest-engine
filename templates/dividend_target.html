@@ -189,6 +189,34 @@
       </div>
     </div>
 
+    <!-- 05. 세금 설정 -->
+    <div class="calc-section">
+      <div class="calc-section-title">
+        <span class="calc-section-num">05</span> 세금 설정
+        <a href="/tax-settings" style="font-size:11px;font-weight:600;color:var(--blue);margin-left:8px;text-decoration:none;">⚙ 세금 프로필 설정 →</a>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <span style="font-size:0.85rem;font-weight:600;color:var(--text);">세금 적용</span>
+        <button class="tax-toggle-btn" id="dtTaxToggle" onclick="toggleTax()" style="
+          width:44px;height:24px;background:var(--border);border-radius:12px;
+          position:relative;cursor:pointer;transition:background 0.2s;border:none;outline:none;">
+          <span style="position:absolute;width:18px;height:18px;background:white;border-radius:50%;
+            top:3px;left:3px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"
+            id="dtTaxToggleKnob"></span>
+        </button>
+        <span id="dtTaxToggleLabel" style="font-size:12px;color:var(--text-muted);">OFF</span>
+      </div>
+      <div id="dtTaxAccountWrap" style="display:none;">
+        <label style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;display:block;">투자 계좌</label>
+        <div class="rebal-options">
+          <label class="rebal-option"><input type="radio" name="dtAccount" value="general" checked><span class="rebal-label">일반</span></label>
+          <label class="rebal-option"><input type="radio" name="dtAccount" value="isa"><span class="rebal-label">ISA</span></label>
+          <label class="rebal-option"><input type="radio" name="dtAccount" value="pension"><span class="rebal-label">연금</span></label>
+        </div>
+        <div id="dtTaxProfileInfo" style="margin-top:8px;padding:8px 10px;background:#F5F5F5;border-radius:8px;font-size:11px;color:var(--text-muted);"></div>
+      </div>
+    </div>
+
     <button class="calc-run-btn" id="dtRunBtn" onclick="runDividendTarget()">
       <span id="dtRunBtnText">시뮬레이션 실행</span>
       <span id="dtRunBtnSpinner" class="btn-spinner" style="display:none">⏳</span>
@@ -312,6 +340,38 @@ document.getElementById('dtProbSlider').addEventListener('input', function() {
   document.getElementById('dtProbLabel').textContent = this.value+'%';
 });
 
+// ── 세금 토글 ──
+let dtTaxOn = false;
+function toggleTax() {
+  dtTaxOn = !dtTaxOn;
+  const btn   = document.getElementById('dtTaxToggle');
+  const knob  = document.getElementById('dtTaxToggleKnob');
+  const label = document.getElementById('dtTaxToggleLabel');
+  const wrap  = document.getElementById('dtTaxAccountWrap');
+  btn.style.background  = dtTaxOn ? 'var(--blue)' : 'var(--border)';
+  knob.style.left       = dtTaxOn ? '23px' : '3px';
+  label.textContent     = dtTaxOn ? 'ON' : 'OFF';
+  label.style.color     = dtTaxOn ? 'var(--blue)' : 'var(--text-muted)';
+  wrap.style.display    = dtTaxOn ? 'block' : 'none';
+  if (dtTaxOn) loadTaxProfile();
+}
+
+function loadTaxProfile() {
+  const raw = localStorage.getItem('domino_tax_settings');
+  const info = document.getElementById('dtTaxProfileInfo');
+  if (!raw) {
+    info.innerHTML = '⚠ 세금 프로필이 없습니다. <a href="/tax-settings" style="color:var(--blue);">세금 설정 →</a>';
+    return;
+  }
+  const s = JSON.parse(raw);
+  info.innerHTML = `연소득 ${fmtKRW(s.earned_income||0)} · 나이 ${s.age||40}세`;
+}
+
+// 계좌 변경 시 프로필 업데이트
+document.querySelectorAll('input[name="dtAccount"]').forEach(el => {
+  el.addEventListener('change', loadTaxProfile);
+});
+
 // ── 모드 변경 핸들러 ──
 function getMode(name) {
   return document.querySelector(`input[name="${name}Mode"]:checked`)?.value || 'fixed';
@@ -411,11 +471,21 @@ async function runDividendTarget() {
     };
   };
 
+  // 세금 프로필 로드
+  const taxRaw = localStorage.getItem('domino_tax_settings');
+  const taxProfile = taxRaw ? JSON.parse(taxRaw) : {};
+  const accountType = dtTaxOn
+    ? (document.querySelector('input[name="dtAccount"]:checked')?.value || 'general')
+    : 'none';
+
   const body = {
     tickers:            dtTickers.map(t=>({code:t.code, weight:t.weight/100})),
     target_monthly_div: parseFloat(document.getElementById('dtTargetDiv').value)||0,
     probability:        parseFloat(document.getElementById('dtProbSlider').value)/100,
     dividend_mode:      document.querySelector('input[name="dtDividend"]:checked').value,
+    account_type:       accountType,
+    earned_income:      taxProfile.earned_income || 50000000,
+    isa_type:           taxProfile.isa_type || 'general',
     seed:    mkCfg('seed'),
     monthly: mkCfg('monthly'),
     years:   mkCfg('years'),
@@ -567,15 +637,21 @@ function drawScenarioChart(data, flipped) {
 }
 
 function renderIsocurve(data) {
+  // 버튼/상태 세팅 후 차트 그리기
+  drawIsocurveChart(data);
+}
+
+function drawIsocurveChart(data) {
   if (dtCharts['iso']) dtCharts['iso'].destroy();
   const xKey    = data.x_key;
   const optKey  = data.opt_key;
   const xLabel  = data.x_label;
   const optLabel = data.opt_label;
   const lines   = data.lines || [{ label: null, points: data.points || [] }];
+  console.log('drawIsocurveChart lines:', lines.length, 'xKey:', xKey, 'optKey:', optKey);
 
-  const xFmt   = v => xKey   === 'years' ? v+'년' : fmtKRW(v);
-  const optFmt = v => optKey === 'years' ? v+'년' : fmtKRW(v);
+  const xFmt   = v => xKey   === 'years' ? (Number.isInteger(v) ? v+'년' : v.toFixed(1)+'년') : fmtKRW(v);
+  const optFmt = v => optKey === 'years' ? (Number.isInteger(v) ? v+'년' : v.toFixed(1)+'년') : fmtKRW(v);
 
   document.getElementById('dtIsocurveTitle').textContent =
     data.line_label
@@ -583,6 +659,14 @@ function renderIsocurve(data) {
       : `등위선 — ${xLabel} vs ${optLabel}`;
 
   const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0','#00BCD4','#FF5722','#607D8B'];
+
+  // Y축 여백 계산
+  const allOptVals = lines.flatMap(l => l.points.map(p => p[optKey])).filter(v => v != null);
+  const optMin = allOptVals.length ? Math.min(...allOptVals) : 0;
+  const optMax = allOptVals.length ? Math.max(...allOptVals) : 30;
+  const optRange = optMax - optMin || 1;
+  const optAxisMin = Math.max(0, optMin - optRange * 0.2);
+  const optAxisMax = optMax + optRange * 0.2;
 
   const datasets = lines.map((line, i) => ({
     label: line.label || optLabel,
@@ -595,6 +679,52 @@ function renderIsocurve(data) {
     pointBackgroundColor: palette[i % palette.length],
     borderWidth: 2.5,
   }));
+
+  // X축/선 전환 버튼 (선이 2개 이상일 때)
+  const oldIsoBtn = document.getElementById('dtIsoSwapBtn');
+  if (oldIsoBtn) oldIsoBtn.remove();
+  if (data.line_key && lines.length > 1) {
+    window._isoOrigData = data;
+    const swapBtn = document.createElement('button');
+    swapBtn.id = 'dtIsoSwapBtn';
+    swapBtn.textContent = '⇄ X축 / 선 전환';
+    swapBtn.style.cssText = 'margin-bottom:10px;padding:6px 14px;border:1.5px solid var(--blue-bright);border-radius:8px;background:white;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;display:block;';
+    swapBtn.onclick = () => {
+      const d = window._isoOrigData;
+      const isNormal = swapBtn.dataset.flipped !== '1';
+      if (isNormal) {
+        // X축과 선 swap
+        swapBtn.dataset.flipped = '1';
+        const origXVals = [...new Set(d.lines.flatMap(l => l.points.map(p => p[d.x_key])))].sort((a,b)=>a-b);
+        const origLineVals = [...new Set(d.lines.map(l => l[d.line_key]))].sort((a,b)=>a-b);
+        const fmtV = (key, v) => key==='years' ? v+'년' : fmtKRW(v);
+        const flippedLines = origXVals.map(xv => ({
+          label: `${d.x_label}=${fmtV(d.x_key, xv)}`,
+          [d.x_key]: xv,
+          points: origLineVals.map(lv => {
+            const srcLine = d.lines.find(l => l[d.line_key] === lv);
+            const pt = srcLine?.points.find(p => p[d.x_key] === xv);
+            return pt ? {[d.line_key]: lv, [d.opt_key]: pt[d.opt_key]} : null;
+          }).filter(Boolean)
+        }));
+        const flippedData = {
+          ...d,
+          x_key: d.line_key, line_key: d.x_key,
+          x_label: d.line_label || d.line_key,
+          line_label: d.x_label,
+          lines: flippedLines,
+        };
+        console.log('flippedLines:', flippedLines.length, '개');
+        console.log('flippedData.lines:', flippedData.lines.length, '개');
+        drawIsocurveChart(flippedData);
+      } else {
+        swapBtn.dataset.flipped = '0';
+        drawIsocurveChart(d);
+      }
+    };
+    document.getElementById('dtIsocurveCard').insertBefore(swapBtn,
+      document.getElementById('dtIsocurveChart').parentElement);
+  }
 
   dtCharts['iso'] = new Chart(document.getElementById('dtIsocurveChart').getContext('2d'), {
     type: 'line',
@@ -616,6 +746,7 @@ function renderIsocurve(data) {
           grid:  { color:'rgba(0,0,0,0.06)' }
         },
         y: {
+          min: optAxisMin, max: optAxisMax,
           title: { display:true, text:optLabel, font:{size:11}, color:'#90A4AE' },
           ticks: { font:{size:11}, color:'#90A4AE', callback: optFmt },
           grid:  { color:'rgba(0,0,0,0.07)' }

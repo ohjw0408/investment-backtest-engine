@@ -23,6 +23,7 @@
     <a class="nav-link {% if request.path.startswith('/retirement') %}active{% endif %}" href="/retirement">은퇴 설계</a>
     <a class="nav-link {% if request.path.startswith('/backtest') %}active{% endif %}" href="/backtest">포트폴리오 분석</a>
     <a class="nav-link {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">내 자산</a>
+    <a class="nav-link {% if request.path.startswith('/tax-settings') %}active{% endif %}" href="/tax-settings">세금 설정</a>
   </div>
   <div class="nav-search-wrap">
     <div class="nav-search-box">
@@ -62,6 +63,9 @@
     </a>
     <a class="sidebar-item {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">
       <span>💼</span> 내 자산
+    </a>
+    <a class="sidebar-item {% if request.path.startswith('/tax-settings') %}active{% endif %}" href="/tax-settings">
+      <span>🧾</span> 세금 설정
     </a>
   </aside>
 

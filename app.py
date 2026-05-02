@@ -46,6 +46,10 @@ def backtest():
 def myassets():
     return render_template('myassets.html')
 
+@app.route('/tax-settings')
+def tax_settings():
+    return render_template('tax_settings.html')
+
 @app.route('/settings')
 def settings():
     return render_template('settings.html')
@@ -498,6 +502,18 @@ def dividend_target_scenario():
         ticker_codes   = [t['code'] for t in tickers_input]
         target_weights = {t['code']: t['weight'] for t in tickers_input}
 
+        # 세금 엔진 생성
+        account_type = body.get('account_type', 'none')
+        tax_engine = None
+        if account_type != 'none':
+            from modules.sim.tax_engine import TaxEngine, UserProfile
+            profile = UserProfile(earned_income=float(body.get('earned_income', 50000000)))
+            tax_engine = TaxEngine(
+                account_type = account_type,
+                isa_type     = body.get('isa_type', 'general'),
+                profile      = profile,
+            )
+
         from modules.dividend_simulator import DividendSimulator
         sim = DividendSimulator(
             loader      = portfolio_engine.loader,
@@ -505,6 +521,7 @@ def dividend_target_scenario():
             weights     = target_weights,
             div_mode    = body.get('dividend_mode', 'reinvest'),
             step_months = 3,
+            tax_engine  = tax_engine,
         )
 
         seed_cfg    = body.get('seed',    {"center": 0,      "step": 0, "n": 0, "mode": "fixed"})

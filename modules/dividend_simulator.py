@@ -9,6 +9,9 @@ import numpy as np
 import pandas as pd
 from typing import Optional, List, Dict
 
+from modules.sim.tax_engine import TaxEngine
+from modules.sim.fee_engine import FeeEngine
+
 
 def fmtKRW_py(v):
     if v >= 100000000: return f'{v/100000000:.1f}억'
@@ -18,14 +21,39 @@ def fmtKRW_py(v):
 
 class DividendSimulator:
 
-    def __init__(self, loader, tickers, weights, div_mode="reinvest", step_months=3):
+    TICKER_REGION_MAP = {
+        "GOLD": "GOLD", "KRX_GOLD": "GOLD",
+        "BTC": "CRYPTO", "ETH": "CRYPTO",
+    }
+
+    def _get_region(self, ticker: str) -> str:
+        if ticker in self.TICKER_REGION_MAP:
+            return self.TICKER_REGION_MAP[ticker]
+        if ticker.isdigit() and len(ticker) == 6:
+            return "KR"
+        if any("\uAC00" <= c <= "\uD7A3" for c in ticker):
+            return "KR"
+        return "US"
+
+    def __init__(
+        self,
+        loader,
+        tickers,
+        weights,
+        div_mode:    str  = "reinvest",
+        step_months: int  = 3,
+        tax_engine:  Optional[TaxEngine] = None,
+        fee_engine:  Optional[FeeEngine] = None,
+    ):
         self.loader      = loader
         self.tickers     = tickers
         self.weights     = weights
         self.div_mode    = div_mode
         self.step_months = step_months
+        self.tax_engine  = tax_engine
+        self.fee_engine  = fee_engine
         self._price_cache: Dict[str, pd.DataFrame] = {}
-        self._sim_cache:   Dict[str, List[float]]   = {}  # (seed, monthly, years) 캐시
+        self._sim_cache:   Dict[str, List[float]]   = {}
 
     def _load(self, ticker: str) -> pd.DataFrame:
         if ticker in self._price_cache:
@@ -96,7 +124,10 @@ class DividendSimulator:
                     if idx >= 0:
                         price = float(close_series.iloc[idx])
                         if price > 0:
-                            quantities[t] += (monthly * self.weights[t]) / price
+                            amt = monthly * self.weights[t]
+                            if self.fee_engine:
+                                amt -= self.fee_engine.calc_buy_fee(amt)
+                            quantities[t] += amt / price
 
             # 배당 처리 (기존 로직 그대로, itertuples로 교체)
             for t in self.tickers:
@@ -107,15 +138,20 @@ class DividendSimulator:
                     if div_date in paid_div_dates[t]:
                         continue
                     paid_div_dates[t].add(div_date)
-                    div_total = quantities[t] * float(row.dividend)
-                    if div_total <= 0:
+                    gross_div = quantities[t] * float(row.dividend)
+                    if gross_div <= 0:
                         continue
+                    # 세금 차감
+                    if self.tax_engine:
+                        net_div = self.tax_engine.apply_dividend_tax(gross_div, self._get_region(t), month_end.year)
+                    else:
+                        net_div = gross_div
                     if div_date >= last_year_start:
-                        last_year_div += div_total
+                        last_year_div += net_div
                     if self.div_mode == "reinvest":
                         price = float(row.close)
                         if price > 0:
-                            quantities[t] += div_total / price
+                            quantities[t] += net_div / price
 
         return last_year_div
 
@@ -201,6 +237,8 @@ class DividendSimulator:
                 # 월배당
                 div = asset * quarterly_yields[min(q, n_quarters-1)] / 3.0
                 if div > 0:
+                    if self.tax_engine:
+                        div = self.tax_engine.apply_dividend_tax(div, 'US', q // 4)
                     if q >= last_year_start_q:
                         last_year_div += div
                     if self.div_mode == "reinvest":
@@ -210,6 +248,8 @@ class DividendSimulator:
                 if m % 3 == 2:
                     div = asset * quarterly_yields[min(q, n_quarters-1)]
                     if div > 0:
+                        if self.tax_engine:
+                            div = self.tax_engine.apply_dividend_tax(div, 'US', q // 4)
                         if q >= last_year_start_q:
                             last_year_div += div
                         if self.div_mode == "reinvest":
@@ -306,16 +346,18 @@ class DividendSimulator:
 
     def _find_anchor_years(self, seed, monthly, target_monthly_div, probability):
         checkpoints = [1, 5, 10, 15, 20, 25, 30]
-        xs, probs = [], []
+        lo_y, lo_p = 1, 0.0
         for y in checkpoints:
             p = self._calc_prob(self._run_rolling(seed, monthly, y), target_monthly_div)
-            xs.append(y)
-            probs.append(p)
             if p >= probability:
-                fitted = self._logistic_fit(xs, probs, probability)
-                if fitted is not None:
-                    return max(1, min(30, round(fitted)))
-                return y
+                hi_y = y
+                # lo~hi 사이를 1년 단위로 스윕 (early stop)
+                for yy in range(lo_y, hi_y + 1):
+                    pp = self._calc_prob(self._run_rolling(seed, monthly, yy), target_monthly_div)
+                    if pp >= probability:
+                        return float(yy)
+                return float(hi_y)
+            lo_y, lo_p = y, p
         return None
 
     def _find_anchor_seed(self, monthly, years, target_monthly_div, probability):
@@ -660,7 +702,7 @@ class DividendSimulator:
         years_mode   = years_cfg.get('mode', 'fixed')
 
         seeds    = self._expand_var(seed_cfg['center'],    seed_cfg['step'],    seed_cfg['n'],    min_val=0)
-        monthlys = self._expand_var(monthly_cfg['center'], monthly_cfg['step'], monthly_cfg['n'], min_val=0)
+        monthlys = self._expand_var(monthly_cfg['center'], monthly_cfg['step'], monthly_cfg['n'], min_val=1)
         yearss   = self._expand_var(years_cfg['center'],   years_cfg['step'],   years_cfg['n'],   min_val=1)
 
         vary_seed    = seed_mode    == 'explore' and seed_cfg['n']    > 0 and seed_cfg['step']    > 0

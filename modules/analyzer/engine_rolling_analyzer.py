@@ -100,15 +100,44 @@ class EngineRollingAnalyzer:
             wealth_distribution.append(wealth_multiple)
 
             # -------------------------------------------------
-            # CAGR
+            # CAGR (MWR/IRR 기반 - 월납 타이밍 정확히 반영)
             # -------------------------------------------------
 
-            years = self.horizon_years
+            mwr = 0.0
+            if "cash_flow" in result["history"].columns:
+                h = result["history"]
+                pv = h["portfolio_value"]
+                cf = h.loc[h["cash_flow"] != 0, ["date", "cash_flow"]].copy()
+                cf = pd.concat([
+                    cf,
+                    pd.DataFrame([{"date": h["date"].iloc[-1], "cash_flow": float(pv.iloc[-1])}])
+                ], ignore_index=True)
+                cf["date"] = pd.to_datetime(cf["date"])
+                cf = cf.sort_values("date").reset_index(drop=True)
+                cfs = [-c for c in cf["cash_flow"].iloc[:-1].tolist()] + [float(cf["cash_flow"].iloc[-1])]
+                if len(cfs) >= 2 and any(c < 0 for c in cfs) and any(c > 0 for c in cfs):
+                    try:
+                        rate = 0.01
+                        for _ in range(200):
+                            npv  = sum(c / (1 + rate) ** i for i, c in enumerate(cfs))
+                            dnpv = sum(-i * c / (1 + rate) ** (i + 1) for i, c in enumerate(cfs))
+                            if abs(dnpv) < 1e-12: break
+                            nr = rate - npv / dnpv
+                            if abs(nr - rate) < 1e-8:
+                                rate = nr; break
+                            rate = nr
+                        if -0.9 < rate < 10.0:
+                            mwr = (1 + rate) ** 12 - 1
+                    except Exception:
+                        mwr = 0.0
 
-            if wealth_multiple > 0:
+            # MWR 계산 성공 시 사용, 실패 시 단순 wealth_multiple 기반 CAGR 사용
+            if mwr != 0.0:
+                cagr = mwr
+            elif wealth_multiple > 0:
                 cagr = wealth_multiple ** (1 / years) - 1
             else:
-                cagr = 0
+                cagr = 0.0
 
             cagr_distribution.append(cagr)
 

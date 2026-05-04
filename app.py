@@ -46,10 +46,6 @@ def backtest():
 def myassets():
     return render_template('myassets.html')
 
-@app.route('/tax-settings')
-def tax_settings():
-    return render_template('tax_settings.html')
-
 @app.route('/settings')
 def settings():
     return render_template('settings.html')
@@ -502,18 +498,6 @@ def dividend_target_scenario():
         ticker_codes   = [t['code'] for t in tickers_input]
         target_weights = {t['code']: t['weight'] for t in tickers_input}
 
-        # 세금 엔진 생성
-        account_type = body.get('account_type', 'none')
-        tax_engine = None
-        if account_type != 'none':
-            from modules.sim.tax_engine import TaxEngine, UserProfile
-            profile = UserProfile(earned_income=float(body.get('earned_income', 50000000)))
-            tax_engine = TaxEngine(
-                account_type = account_type,
-                isa_type     = body.get('isa_type', 'general'),
-                profile      = profile,
-            )
-
         from modules.dividend_simulator import DividendSimulator
         sim = DividendSimulator(
             loader      = portfolio_engine.loader,
@@ -521,7 +505,6 @@ def dividend_target_scenario():
             weights     = target_weights,
             div_mode    = body.get('dividend_mode', 'reinvest'),
             step_months = 3,
-            tax_engine  = tax_engine,
         )
 
         seed_cfg    = body.get('seed',    {"center": 0,      "step": 0, "n": 0, "mode": "fixed"})
@@ -540,6 +523,171 @@ def dividend_target_scenario():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+# -----------------------------------------------
+# API - 은퇴 설계
+# -----------------------------------------------
+
+@app.route('/api/retirement/run', methods=['POST'])
+def retirement_run():
+    try:
+        body = request.get_json()
+
+        tickers_input  = body['tickers']
+        ticker_codes   = [t['code'] for t in tickers_input]
+        target_weights = {t['code']: t['weight'] for t in tickers_input}
+
+        initial_capital      = float(body['initial_capital'])
+        monthly_contribution = float(body['monthly_contribution'])
+        accumulation_years   = int(body['accumulation_years'])
+        dividend_mode        = body.get('dividend_mode', 'reinvest')
+        rebal_mode           = body.get('rebal_mode', 'none')
+        monthly_withdrawal   = float(body['monthly_withdrawal'])
+        withdrawal_years     = int(body['withdrawal_years'])
+        inflation            = float(body.get('inflation', 0.02))
+        target_percentile    = float(body.get('target_percentile', 0.90))
+
+        strategy_factory = _make_strategy_factory(target_weights, rebal_mode)
+
+        usdkrw_start = portfolio_engine.loader.USD_KRW_START
+        price_starts = [get_price_start(t) for t in ticker_codes]
+        price_starts = [d for d in price_starts if d]
+        data_start   = max([usdkrw_start] + price_starts) if price_starts else usdkrw_start
+        data_end     = datetime.date.today().strftime('%Y-%m-%d')
+
+        div_starts = [get_dividend_start(t) for t in ticker_codes]
+        div_starts = [d for d in div_starts if d]
+        div_start  = max(div_starts) if div_starts else None
+
+        # 1. 축적기
+        from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
+        acc_analyzer = AccumulationAnalyzer(
+            portfolio_engine     = portfolio_engine,
+            tickers              = ticker_codes,
+            strategy_factory     = strategy_factory,
+            data_start           = data_start,
+            data_end             = data_end,
+            accumulation_years   = accumulation_years,
+            monthly_contribution = monthly_contribution,
+            initial_capital      = initial_capital,
+            dividend_mode        = dividend_mode,
+            step_months          = 3,
+            verbose              = False,
+            div_start            = div_start,
+        )
+        acc_result = acc_analyzer.run()
+
+        # 2. 은퇴 플래너 (축적 → 인출)
+        from modules.retirement.retirement_planner import RetirementPlanner
+        planner = RetirementPlanner(
+            acc_result         = acc_result,
+            wd_config          = {
+                "portfolio_engine": portfolio_engine,
+                "tickers":          ticker_codes,
+                "strategy_factory": strategy_factory,
+                "data_start":       data_start,
+                "data_end":         data_end,
+                "withdrawal_years": withdrawal_years,
+                "dividend_mode":    dividend_mode,
+                "step_months":      6,
+            },
+            monthly_withdrawal = monthly_withdrawal,
+            withdrawal_years   = withdrawal_years,
+            inflation          = inflation,
+            verbose            = False,
+        )
+        report = planner.run(target_percentile=target_percentile)
+
+        # 3. 응답 구성
+        dist = acc_result['distribution']
+        return jsonify({
+            "accumulation_summary": report["accumulation_summary"],
+            "sample_results": [
+                {
+                    "percentile":      s["percentile"],
+                    "initial_capital": round(s["initial_capital"]),
+                    "success_rate":    round(s["success_rate"], 4),
+                    "end_value_p50":   round(s["end_value_p50"]),
+                }
+                for s in report["sample_results"]
+            ],
+            "combined_summary":  report["combined_summary"],
+            "message":           report["message"],
+            "acc_cases_count":   len(acc_result["cases"]),
+            "acc_values":        [round(c["end_value"]) for c in acc_result["cases"]],
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/retirement/withdrawal', methods=['POST'])
+def retirement_withdrawal():
+    try:
+        body = request.get_json()
+
+        tickers_input  = body['tickers']
+        ticker_codes   = [t['code'] for t in tickers_input]
+        target_weights = {t['code']: t['weight'] for t in tickers_input}
+
+        initial_capital    = float(body['initial_capital'])
+        monthly_withdrawal = float(body['monthly_withdrawal'])
+        withdrawal_years   = int(body['withdrawal_years'])
+        inflation          = float(body.get('inflation', 0.02))
+        dividend_mode      = body.get('dividend_mode', 'reinvest')
+        rebal_mode         = body.get('rebal_mode', 'none')
+        target_percentile  = float(body.get('target_percentile', 0.90))
+
+        strategy_factory = _make_strategy_factory(target_weights, rebal_mode)
+
+        usdkrw_start = portfolio_engine.loader.USD_KRW_START
+        price_starts = [get_price_start(t) for t in ticker_codes]
+        price_starts = [d for d in price_starts if d]
+        data_start   = max([usdkrw_start] + price_starts) if price_starts else usdkrw_start
+        data_end     = datetime.date.today().strftime('%Y-%m-%d')
+
+        from modules.retirement.withdrawal_analyzer import WithdrawalAnalyzer
+        wd_analyzer = WithdrawalAnalyzer(
+            portfolio_engine   = portfolio_engine,
+            tickers            = ticker_codes,
+            strategy_factory   = strategy_factory,
+            data_start         = data_start,
+            data_end           = data_end,
+            withdrawal_years   = withdrawal_years,
+            monthly_withdrawal = monthly_withdrawal,
+            initial_capital    = initial_capital,
+            inflation          = inflation,
+            dividend_mode      = dividend_mode,
+            step_months        = 3,
+            verbose            = False,
+        )
+        result = wd_analyzer.run()
+
+        dist = result['distribution']
+        end_vals = [round(c['end_value']) for c in result['cases']]
+
+        return jsonify({
+            "survival_rate": round(result['success_rate'], 4),
+            "combined_summary": {
+                "survival_rate": round(result['success_rate'], 4),
+                "combined_end_value": {
+                    "p10":  round(dist['end_value_ratio']['p10'] * initial_capital),
+                    "p25":  round(dist['end_value_ratio']['p25'] * initial_capital),
+                    "p50":  round(dist['end_value_ratio']['p50'] * initial_capital),
+                    "p75":  round(dist['end_value_ratio']['p75'] * initial_capital),
+                    "p90":  round(dist['end_value_ratio']['p90'] * initial_capital),
+                },
+            },
+            "wd_values": end_vals,
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 # -----------------------------------------------
 # API - 자산군별 비교 (임시 더미)

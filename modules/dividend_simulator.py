@@ -159,8 +159,7 @@ class DividendSimulator:
 
     def _calc_div_stats(self) -> dict:
         """
-        실제 배당 데이터에서 배당률/성장률 분포 계산
-        배당률 = 분기 DPS / 주가 (환율 중립)
+        실제 배당 데이터에서 배당률/성장률/연평균수익률 분포 계산
         """
         stats = {}
         for t in self.tickers:
@@ -180,76 +179,77 @@ class DividendSimulator:
             div_df["year"] = div_df.index.year
             annual = div_df.groupby("year")["dividend"].sum()
             current_year = pd.Timestamp.today().year
-            # 첫 해(데이터 부족), 현재 연도(미완성) 제외
             annual = annual.iloc[1:]
-            if annual.index[-1] == current_year:
+            if len(annual) > 0 and annual.index[-1] == current_year:
                 annual = annual.iloc[:-1]
             growth = annual.pct_change().dropna()
-            growth = growth[growth.abs() < 2.0]  # 극단값 제거 (200% 초과)
+            growth = growth[growth.abs() < 2.0]
+
+            # 연평균 주가 수익률 계산 (배당 제외, 순수 가격 상승)
+            annual_prices = df["close"].resample("YE").last().dropna()
+            if len(annual_prices) > 2:
+                price_returns = annual_prices.pct_change().dropna()
+                # 극단값 제거
+                price_returns = price_returns[price_returns.abs() < 1.0]
+                # 배당수익률 제외한 순수 가격 상승률
+                mean_price_return = float(price_returns.mean())
+            else:
+                mean_price_return = 0.07  # fallback: 연 7%
 
             stats[t] = {
-                "div_yield_mean": float(div_df["div_yield"].mean()),
-                "div_yield_std":  float(div_df["div_yield"].std()),
-                "growth_mean":    float(growth.mean()) if len(growth) > 0 else 0.10,
-                "growth_std":     float(growth.std())  if len(growth) > 0 else 0.07,
-                "div_freq":       int(round(len(div_df) / max(1, (div_df.index[-1] - div_df.index[0]).days / 365))),
+                "div_yield_mean":    float(div_df["div_yield"].mean()),
+                "div_yield_std":     float(div_df["div_yield"].std()),
+                "growth_mean":       float(growth.mean()) if len(growth) > 0 else 0.10,
+                "growth_std":        float(growth.std())  if len(growth) > 0 else 0.07,
+                "div_freq":          int(round(len(div_df) / max(1, (div_df.index[-1] - div_df.index[0]).days / 365))),
+                "price_return_mean": mean_price_return,
             }
         return stats
 
     def _simulate_synthetic(self, seed, monthly, years, div_stats, rng) -> float:
         """
-        가상 데이터 기반 시뮬 (자산가치 기반, 주가 불필요)
-        포트폴리오 전체 자산에 배당률 적용
+        가상 데이터 기반 시뮬 (자산가치 기반)
+        배당률 고정 + 연평균 주가 상승률 반영
         """
-        # 포트폴리오 가중 평균 배당률/성장률
-        total_yield_mean = sum(div_stats[t]["div_yield_mean"] * self.weights[t] for t in self.tickers if t in div_stats)
-        total_yield_std  = sum(div_stats[t]["div_yield_std"]  * self.weights[t] for t in self.tickers if t in div_stats)
-        growth_mean      = sum(div_stats[t]["growth_mean"]    * self.weights[t] for t in self.tickers if t in div_stats)
-        growth_std       = sum(div_stats[t]["growth_std"]     * self.weights[t] for t in self.tickers if t in div_stats)
-        div_freq         = max(div_stats[t]["div_freq"] for t in self.tickers if t in div_stats) if div_stats else 4
+        total_yield_mean   = sum(div_stats[t]["div_yield_mean"]    * self.weights[t] for t in self.tickers if t in div_stats)
+        total_yield_std    = sum(div_stats[t]["div_yield_std"]      * self.weights[t] for t in self.tickers if t in div_stats)
+        price_return_mean  = sum(div_stats[t]["price_return_mean"]  * self.weights[t] for t in self.tickers if t in div_stats)
+        div_freq           = max(div_stats[t]["div_freq"] for t in self.tickers if t in div_stats) if div_stats else 4
 
-        # 연간 배당률 성장 적용한 분기별 배당률 시계열 생성
         n_quarters = years * 4
-        quarterly_yields = []
-        current_yield = max(0.001, rng.normal(total_yield_mean, total_yield_std))
-        for q in range(n_quarters):
-            if q > 0 and q % 4 == 0:
-                # 매년 성장률 적용
-                annual_growth = rng.normal(growth_mean, growth_std)
-                annual_growth = max(-0.30, min(0.60, annual_growth))  # -30%~60% 클리핑
-                current_yield *= (1 + annual_growth)
-                current_yield  = max(0.001, current_yield)
-            y = max(0.0, rng.normal(current_yield, total_yield_std * 0.5))
-            quarterly_yields.append(y)
 
-        # 월별 시뮬
+        # 배당률 고정 샘플링
+        div_yield = max(0.001, rng.normal(total_yield_mean, total_yield_std * 0.3))
+
+        # 월간 주가 상승률
+        monthly_price_return = (1 + price_return_mean) ** (1 / 12) - 1
+
         asset = float(seed)
         last_year_start_q = max(0, n_quarters - 4)
         last_year_div = 0.0
-        months_per_quarter = 3
-        div_months = set(range(0, n_quarters * months_per_quarter, months_per_quarter))  # 분기 첫 달
 
         for m in range(years * 12):
+            # 주가 상승 반영 (자산가치 증가)
+            asset *= (1 + monthly_price_return)
             asset += monthly
             q = m // 3
-            # 분기 배당 (월배당 ETF면 매달, 분기면 3개월마다)
+            yr = q // 4
+
             if div_freq >= 12:
-                # 월배당
-                div = asset * quarterly_yields[min(q, n_quarters-1)] / 3.0
+                div = asset * div_yield / 3.0
                 if div > 0:
                     if self.tax_engine:
-                        div = self.tax_engine.apply_dividend_tax(div, 'US', q // 4)
+                        div = self.tax_engine.apply_dividend_tax(div, 'US', yr)
                     if q >= last_year_start_q:
                         last_year_div += div
                     if self.div_mode == "reinvest":
                         asset += div
             else:
-                # 분기배당: 분기 마지막 달(2, 5, 8, 11월)에 지급
                 if m % 3 == 2:
-                    div = asset * quarterly_yields[min(q, n_quarters-1)]
+                    div = asset * div_yield
                     if div > 0:
                         if self.tax_engine:
-                            div = self.tax_engine.apply_dividend_tax(div, 'US', q // 4)
+                            div = self.tax_engine.apply_dividend_tax(div, 'US', yr)
                         if q >= last_year_start_q:
                             last_year_div += div
                         if self.div_mode == "reinvest":
@@ -735,8 +735,7 @@ class DividendSimulator:
             return {"error": "탐색이 있는 변수는 최대 2개입니다."}
 
         if vary_count == 0:
-            # 모두 고정 → 달성 확률만 반환
-            result = self.get_probability(seeds[0], monthlys[0], yearss[0], target_monthly_div)
+            result = self.get_probability(seed_cfg['center'], monthly_cfg['center'], years_cfg['center'], target_monthly_div)
             return {"mode": "probability", "result": result}
 
         if vary_count == 1:

@@ -87,15 +87,8 @@ class AccumulationAnalyzer:
         # 원금 (총 납입액)
         total_contribution = self.monthly_contribution * years * 12 + self.initial_capital
 
-        # CAGR
         end_value   = pv.iloc[-1]
         start_value = pv.iloc[0]
-        if total_contribution > 0 and end_value > 0:
-            cagr = (end_value / total_contribution) ** (1 / years) - 1
-        elif start_value > 0 and end_value > 0:
-            cagr = (end_value / start_value) ** (1 / years) - 1
-        else:
-            cagr = 0.0
 
         # MDD
         mdd = float(((pv - pv.cummax()) / pv.cummax()).min())
@@ -109,14 +102,13 @@ class AccumulationAnalyzer:
             date_idx = pd.to_datetime(history.loc[daily_returns.index, "date"]).dt.normalize()
             daily_returns = daily_returns[(~date_idx.isin(contrib_dates)).values]
 
-        # Sharpe / Sortino / Calmar
+        # Sharpe / Sortino
         std = daily_returns.std()
         sharpe  = (daily_returns.mean() / std * np.sqrt(252)) if std > 0 else 0.0
         dstd    = daily_returns[daily_returns < 0].std()
         sortino = (daily_returns.mean() / dstd * np.sqrt(252)) if (dstd and dstd > 0) else 0.0
-        calmar  = cagr / abs(mdd) if mdd != 0 else 0.0
 
-        # MWR (IRR)
+        # MWR (IRR) - 월납 타이밍을 정확히 반영한 수익률
         mwr = 0.0
         if "cash_flow" in history.columns:
             cf = history.loc[history["cash_flow"] != 0, ["date", "cash_flow"]].copy()
@@ -140,6 +132,19 @@ class AccumulationAnalyzer:
                         mwr = (1 + rate) ** 12 - 1
                 except Exception:
                     mwr = 0.0
+
+        # CAGR = MWR (IRR) 사용 - 월납 타이밍 정확히 반영
+        # 단, cash_flow 없거나 MWR 계산 실패 시 단순 CAGR 사용
+        if mwr != 0.0:
+            cagr = mwr
+        elif total_contribution > 0 and end_value > 0:
+            cagr = (end_value / total_contribution) ** (1 / years) - 1
+        elif start_value > 0 and end_value > 0:
+            cagr = (end_value / start_value) ** (1 / years) - 1
+        else:
+            cagr = 0.0
+
+        calmar = cagr / abs(mdd) if mdd != 0 else 0.0
 
         # 배당 계산 (div_start 이후 구간만)
         div_col             = "dividend_income"

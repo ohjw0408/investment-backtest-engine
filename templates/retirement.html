@@ -402,7 +402,7 @@
 
       <!-- 인출기 종료자산 분포 -->
       <div class="acc-dist-card">
-        <div class="acc-dist-title">💰 인출기 종료 자산 분포</div>
+        <div class="acc-dist-title">💰 인출기 종료 자산 분포 <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">(중앙값 축적 시나리오 기준)</span></div>
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
           <div class="dist-card pessimistic" style="flex:1;min-width:80px;">
             <div class="dist-card-label">하위 10%</div>
@@ -662,28 +662,63 @@ function renderRetirement(data, body) {
     }).join('');
   }
 
-  // 인출기 종료자산
-  const wdDist = combined.combined_end_value || combined.end_value_dist;
-  if (wdDist) {
-    document.getElementById('retWdP10').textContent = fmtKRW(wdDist.p10);
-    document.getElementById('retWdP50').textContent = fmtKRW(wdDist.p50);
-    document.getElementById('retWdP90').textContent = fmtKRW(wdDist.p90);
-    renderHistogram('retWdChart', data.wd_values || (data.sample_results || []).map(s => s.end_value_p50), '#66BB6A');
+  // 인출기 종료자산 — p50 축적 시나리오 기준
+  const p50Sample = (data.sample_results || []).find(s => s.percentile === 50)
+                 || (data.sample_results || [])[Math.floor((data.sample_results||[]).length/2)];
+  const p50WdValues = p50Sample ? (p50Sample.wd_end_values || []) : [];
+
+  if (p50WdValues.length) {
+    // p10/p50/p90 계산
+    const sorted = [...p50WdValues].sort((a,b) => a-b);
+    const pIdx = (pct) => sorted[Math.min(Math.floor(sorted.length * pct / 100), sorted.length-1)];
+    document.getElementById('retWdP10').textContent = fmtKRW(pIdx(10));
+    document.getElementById('retWdP50').textContent = fmtKRW(pIdx(50));
+    document.getElementById('retWdP90').textContent = fmtKRW(pIdx(90));
+    renderHistogram('retWdChart', p50WdValues, '#66BB6A');
+  } else {
+    const wdDist = combined.combined_end_value || combined.end_value_dist;
+    if (wdDist) {
+      document.getElementById('retWdP10').textContent = fmtKRW(wdDist.p10);
+      document.getElementById('retWdP50').textContent = fmtKRW(wdDist.p50);
+      document.getElementById('retWdP90').textContent = fmtKRW(wdDist.p90);
+    }
   }
 }
 
 function renderHistogram(canvasId, values, color) {
   if (retCharts[canvasId]) retCharts[canvasId].destroy();
   if (!values || !values.length) return;
-  const min = Math.min(...values), max = Math.max(...values);
-  const nBins = Math.min(10, values.length);
-  const binSize = (max - min) / nBins || 1;
-  const bins = Array(nBins).fill(0);
-  values.forEach(v => { const i = Math.min(Math.floor((v-min)/binSize), nBins-1); bins[i]++; });
-  const labels = bins.map((_, i) => fmtKRW(min + binSize*(i+0.5)));
+
+  // 0원(실패) 케이스 분리
+  const zeroCount   = values.filter(v => v <= 0).length;
+  const nonZero     = values.filter(v => v > 0);
+
+  const allLabels = [], allData = [], allColors = [];
+
+  // 0원 케이스 별도 표시
+  if (zeroCount > 0) {
+    allLabels.push('₩0 (고갈)');
+    allData.push(zeroCount);
+    allColors.push('#EF9A9A');
+  }
+
+  // 나머지 구간 히스토그램
+  if (nonZero.length) {
+    const min     = Math.min(...nonZero), max = Math.max(...nonZero);
+    const nBins   = Math.min(9, nonZero.length);
+    const binSize = (max - min) / nBins || 1;
+    const bins    = Array(nBins).fill(0);
+    nonZero.forEach(v => { const i = Math.min(Math.floor((v - min) / binSize), nBins - 1); bins[i]++; });
+    bins.forEach((cnt, i) => {
+      allLabels.push(fmtKRW(min + binSize * (i + 0.5)));
+      allData.push(cnt);
+      allColors.push(color + '99');
+    });
+  }
+
   retCharts[canvasId] = new Chart(document.getElementById(canvasId).getContext('2d'), {
     type: 'bar',
-    data: { labels, datasets: [{ data: bins, backgroundColor: color+'99', borderColor: color, borderWidth: 1.5, borderRadius: 4 }] },
+    data: { labels: allLabels, datasets: [{ data: allData, backgroundColor: allColors, borderColor: allColors.map(c => c.replace('99','')), borderWidth: 1.5, borderRadius: 4 }] },
     options: {
       responsive: true, plugins: { legend: { display: false } },
       scales: {

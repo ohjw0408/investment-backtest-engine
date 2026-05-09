@@ -1,0 +1,194 @@
+"""
+auth_manager.py
+────────────────────────────────────────────────────────────────────────────────
+사용자 DB 관리 (data/private/users.db)
+"""
+
+import sqlite3
+import json
+from datetime import datetime
+from pathlib import Path
+
+DB_PATH = Path(__file__).resolve().parent.parent / "data" / "private" / "users.db"
+
+DDL = """
+CREATE TABLE IF NOT EXISTS users (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    google_id   TEXT UNIQUE NOT NULL,
+    email       TEXT,
+    name        TEXT,
+    picture     TEXT,
+    created_at  TEXT NOT NULL,
+    last_login  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id     INTEGER PRIMARY KEY,
+    tax         TEXT,
+    updated_at  TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+"""
+
+_conn = None
+
+
+def init_db():
+    """앱 시작 시 DB 초기화."""
+    global _conn
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    _conn.row_factory = sqlite3.Row
+    _conn.executescript(DDL)
+    _conn.commit()
+
+
+def _get_conn():
+    global _conn
+    if _conn is None:
+        init_db()
+    return _conn
+
+
+def get_or_create_user(google_id, email, name, picture):
+    """구글 로그인 시 사용자 조회/생성."""
+    now = datetime.now().isoformat()
+    c   = _get_conn()
+    row = c.execute("SELECT * FROM users WHERE google_id=?", (google_id,)).fetchone()
+    if row:
+        c.execute(
+            "UPDATE users SET last_login=?, name=?, picture=? WHERE google_id=?",
+            (now, name, picture, google_id)
+        )
+    else:
+        c.execute(
+            "INSERT INTO users (google_id, email, name, picture, created_at, last_login) "
+            "VALUES (?,?,?,?,?,?)",
+            (google_id, email, name, picture, now, now)
+        )
+    c.commit()
+    return dict(c.execute("SELECT * FROM users WHERE google_id=?", (google_id,)).fetchone())
+
+
+def get_user_by_id(user_id):
+    if user_id is None:
+        return None
+    row = _get_conn().execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def get_settings(user_id):
+    row = _get_conn().execute(
+        "SELECT tax FROM user_settings WHERE user_id=?", (user_id,)
+    ).fetchone()
+    if row and row["tax"]:
+        return json.loads(row["tax"])
+    return {}
+
+
+def save_settings(user_id, tax):
+    now = datetime.now().isoformat()
+    c   = _get_conn()
+    c.execute(
+        "INSERT INTO user_settings (user_id, tax, updated_at) VALUES (?,?,?) "
+        "ON CONFLICT(user_id) DO UPDATE SET tax=excluded.tax, updated_at=excluded.updated_at",
+        (user_id, json.dumps(tax, ensure_ascii=False), now)
+    )
+    c.commit()
+
+
+# ── 자산 그룹 + 보유 종목 테이블 ──────────────────────────
+HOLDINGS_DDL = """
+CREATE TABLE IF NOT EXISTS asset_groups (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    name       TEXT NOT NULL,
+    color      TEXT DEFAULT '#1976D2',
+    target_pct REAL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS holdings (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    code         TEXT NOT NULL,
+    quantity     REAL NOT NULL DEFAULT 0,
+    avg_price    REAL DEFAULT 0,
+    account_type TEXT DEFAULT '일반',
+    group_id     INTEGER,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    FOREIGN KEY (user_id)  REFERENCES users(id),
+    FOREIGN KEY (group_id) REFERENCES asset_groups(id)
+);
+"""
+
+def init_holdings_db():
+    """보유 종목 테이블 초기화."""
+    c = _get_conn()
+    c.executescript(HOLDINGS_DDL)
+    c.commit()
+
+
+# ── 자산 그룹 CRUD ─────────────────────────────────────
+
+def get_groups(user_id):
+    return [dict(r) for r in _get_conn().execute(
+        "SELECT * FROM asset_groups WHERE user_id=? ORDER BY id", (user_id,)
+    ).fetchall()]
+
+
+def upsert_group(user_id, name, color='#1976D2', target_pct=0, group_id=None):
+    now = datetime.now().isoformat()
+    c   = _get_conn()
+    if group_id:
+        c.execute("UPDATE asset_groups SET name=?, color=?, target_pct=? WHERE id=? AND user_id=?",
+                  (name, color, target_pct, group_id, user_id))
+    else:
+        c.execute("INSERT INTO asset_groups (user_id, name, color, target_pct, created_at) VALUES (?,?,?,?,?)",
+                  (user_id, name, color, target_pct, now))
+    c.commit()
+
+
+def delete_group(user_id, group_id):
+    c = _get_conn()
+    c.execute("UPDATE holdings SET group_id=NULL WHERE group_id=? AND user_id=?", (group_id, user_id))
+    c.execute("DELETE FROM asset_groups WHERE id=? AND user_id=?", (group_id, user_id))
+    c.commit()
+
+
+# ── 보유 종목 CRUD ─────────────────────────────────────
+
+def get_holdings(user_id):
+    return [dict(r) for r in _get_conn().execute(
+        "SELECT h.*, g.name as group_name, g.color as group_color, g.target_pct as group_target "
+        "FROM holdings h "
+        "LEFT JOIN asset_groups g ON h.group_id = g.id "
+        "WHERE h.user_id=? ORDER BY h.group_id, h.code",
+        (user_id,)
+    ).fetchall()]
+
+
+def upsert_holding(user_id, code, quantity, avg_price, account_type='일반', group_id=None, holding_id=None):
+    now = datetime.now().isoformat()
+    c   = _get_conn()
+    if holding_id:
+        c.execute(
+            "UPDATE holdings SET code=?, quantity=?, avg_price=?, account_type=?, group_id=?, updated_at=? "
+            "WHERE id=? AND user_id=?",
+            (code, quantity, avg_price, account_type, group_id, now, holding_id, user_id)
+        )
+    else:
+        c.execute(
+            "INSERT INTO holdings (user_id, code, quantity, avg_price, account_type, group_id, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (user_id, code, quantity, avg_price, account_type, group_id, now, now)
+        )
+    c.commit()
+
+
+def delete_holding(user_id, holding_id):
+    c = _get_conn()
+    c.execute("DELETE FROM holdings WHERE id=? AND user_id=?", (holding_id, user_id))
+    c.commit()

@@ -1,11 +1,641 @@
 {% extends "base.html" %}
 {% block title %}내 자산 — Domino Invest{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<style>
+.ma-wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+/* 탭 */
+.ma-tabs { display: flex; gap: 0; margin-bottom: 20px; border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; width: fit-content; }
+.ma-tab  { padding: 9px 20px; background: white; cursor: pointer; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); border: none; }
+.ma-tab.active { background: var(--blue); color: white; }
+
+/* 카드 */
+.ma-card { background: white; border-radius: 14px; border: 1.5px solid var(--border); padding: 20px; margin-bottom: 16px; }
+.ma-card-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+
+/* 종목 테이블 */
+.holdings-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.holdings-table th { background: var(--bg); padding: 8px 10px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1.5px solid var(--border); }
+.holdings-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.holdings-table tr:last-child td { border-bottom: none; }
+.holdings-table tr:hover td { background: var(--bg); }
+
+/* 비중 바 */
+.weight-progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 3px; }
+.weight-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+/* 그룹 배지 */
+.group-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+
+/* 액션 버튼 */
+.icon-btn { width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--border); background: white; cursor: pointer; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn:hover { border-color: var(--blue); color: var(--blue); }
+.icon-btn.danger:hover { border-color: #C62828; color: #C62828; }
+
+/* 모달 */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: none; align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.modal-box { background: white; border-radius: 16px; padding: 24px; width: 440px; max-width: 90vw; box-shadow: 0 8px 40px rgba(0,0,0,0.18); }
+.modal-title { font-size: 1rem; font-weight: 800; margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.btn-primary { padding: 9px 20px; background: var(--blue); color: white; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+.btn-secondary { padding: 9px 20px; background: var(--bg); color: var(--text); border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+
+/* 리밸런싱 */
+.rebal-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+.rebal-row:last-child { border-bottom: none; }
+.rebal-action { font-weight: 700; padding: 3px 10px; border-radius: 6px; font-size: 0.78rem; }
+.rebal-buy  { background: #E8F5E9; color: #2E7D32; }
+.rebal-sell { background: #FFEBEE; color: #C62828; }
+.rebal-ok   { background: #F5F5F5; color: #9E9E9E; }
+
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.summary-item { padding: 12px 14px; background: var(--bg); border-radius: 10px; }
+.summary-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+.summary-value { font-size: 1.05rem; font-weight: 800; }
+
+.login-required { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">내 자산</h1>
-  <p class="page-sub">보유 자산 현황을 확인하세요.</p>
+<div class="ma-wrap">
+
+  {% if not user %}
+  <div class="login-required">
+    <div style="font-size:2rem;margin-bottom:12px;">🔒</div>
+    <div style="font-weight:700;font-size:1rem;margin-bottom:8px;">로그인이 필요합니다</div>
+    <a href="/auth/google" style="display:inline-block;margin-top:12px;padding:10px 24px;background:var(--blue);color:white;border-radius:8px;text-decoration:none;font-weight:700;">Google로 로그인</a>
+  </div>
+  {% else %}
+
+  <div class="ma-tabs">
+    <button class="ma-tab active" onclick="showTab('overview')">📊 자산 현황</button>
+    <button class="ma-tab" onclick="showTab('rebalance')">⚖️ 리밸런싱</button>
+    <button class="ma-tab" onclick="showTab('purchase')">➕ 추가매수</button>
+    <button class="ma-tab" onclick="showTab('groups')">🗂 그룹 관리</button>
+  </div>
+
+  <!-- 자산 현황 탭 -->
+  <div id="tab-overview">
+    <div class="ma-card">
+      <div class="ma-card-title">
+        💼 보유 종목
+        <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="openAddHolding()">+ 종목 추가</button>
+      </div>
+      <div id="holdingsTableWrap">
+        <div style="text-align:center;padding:30px;color:var(--text-muted);">⏳ 로딩 중...</div>
+      </div>
+    </div>
+
+    <div class="ma-card">
+      <div class="ma-card-title">📈 자산 구성</div>
+      <div id="summaryGrid" class="summary-grid"></div>
+      <canvas id="weightChart" height="80"></canvas>
+    </div>
+  </div>
+
+  <!-- 리밸런싱 탭 -->
+  <div id="tab-rebalance" style="display:none;">
+    <div class="ma-card">
+      <div class="ma-card-title">
+        ⚖️ 리밸런싱 계산
+        <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">그룹별 목표 비중 기준</span>
+      </div>
+      <div id="rebalResult">
+        <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;">
+          그룹 탭에서 목표 비중을 설정하면 리밸런싱 계산이 표시됩니다
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 추가매수 탭 -->
+  <div id="tab-purchase" style="display:none;">
+    <div class="ma-card">
+      <div class="ma-card-title">➕ 추가매수 계산</div>
+      <div class="input-row" style="max-width:300px;">
+        <label>추가 투자금액</label>
+        <div class="input-group">
+          <input type="number" id="purchaseAmount" class="calc-input" value="1000000" min="0" step="100000">
+          <span class="unit">원</span>
+        </div>
+      </div>
+      <button class="btn-primary" style="margin-top:8px;" onclick="calcPurchase()">계산하기</button>
+      <div id="purchaseResult" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- 그룹 관리 탭 -->
+  <div id="tab-groups" style="display:none;">
+    <div class="ma-card">
+      <div class="ma-card-title">
+        🗂 자산 그룹
+        <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="openAddGroup()">+ 그룹 추가</button>
+      </div>
+      <div id="groupsWrap"></div>
+    </div>
+  </div>
+
+  <!-- 종목 추가 모달 -->
+  <div class="modal-overlay" id="modalHolding">
+    <div class="modal-box">
+      <div class="modal-title" id="modalHoldingTitle" style="display:flex;justify-content:space-between;align-items:center;">종목 추가 <button onclick="closeModal('modalHolding')" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted);">✕</button></div>
+      <input type="hidden" id="holdingId">
+
+      <div class="input-row">
+        <label>종목</label>
+        <div style="position:relative;">
+          <input type="text" id="holdingCodeInput" class="calc-input" placeholder="종목 검색 (예: SPY, 삼성전자)" autocomplete="off">
+          <input type="hidden" id="holdingCode">
+          <div id="holdingSearchDrop" class="ticker-search-dropdown"></div>
+        </div>
+        <div id="holdingCodeSelected" style="font-size:0.8rem;color:var(--blue);margin-top:4px;"></div>
+      </div>
+
+      <div class="input-row">
+        <label>수량</label>
+        <div class="input-group">
+          <input type="number" id="holdingQty" class="calc-input" value="1" min="0" step="0.001">
+          <span class="unit">주</span>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <label>평균 단가</label>
+        <div class="input-group">
+          <input type="number" id="holdingAvgPrice" class="calc-input" value="0" min="0">
+          <span class="unit">원</span>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <label>계좌 유형</label>
+        <div class="rebal-options">
+          <label class="rebal-option"><input type="radio" name="holdingAccount" value="일반" checked><span class="rebal-label">일반</span></label>
+          <label class="rebal-option"><input type="radio" name="holdingAccount" value="ISA"><span class="rebal-label">ISA</span></label>
+          <label class="rebal-option"><input type="radio" name="holdingAccount" value="연금저축"><span class="rebal-label">연금저축</span></label>
+          <label class="rebal-option"><input type="radio" name="holdingAccount" value="IRP"><span class="rebal-label">IRP</span></label>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <label>그룹 (선택)</label>
+        <select id="holdingGroup" class="calc-input">
+          <option value="">그룹 없음</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('modalHolding')">취소</button>
+        <button class="btn-primary" onclick="saveHolding()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 그룹 추가 모달 -->
+  <div class="modal-overlay" id="modalGroup">
+    <div class="modal-box">
+      <div class="modal-title" id="modalGroupTitle" style="display:flex;justify-content:space-between;align-items:center;">그룹 추가 <button onclick="closeModal('modalGroup')" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted);">✕</button></div>
+      <input type="hidden" id="groupId">
+      <div class="input-row">
+        <label>그룹명</label>
+        <input type="text" id="groupName" class="calc-input" placeholder="예: 미국주식, 금, 채권">
+      </div>
+      <div class="input-row">
+        <label>색상</label>
+        <input type="color" id="groupColor" value="#1976D2" style="width:48px;height:36px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;">
+      </div>
+      <div class="input-row">
+        <label>목표 비중 <span style="font-size:0.75rem;color:var(--text-muted);">(리밸런싱 기준)</span></label>
+        <div class="input-group" style="max-width:120px;">
+          <input type="number" id="groupTargetPct" class="calc-input" value="0" min="0" max="100" step="1">
+          <span class="unit">%</span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('modalGroup')">취소</button>
+        <button class="btn-primary" onclick="saveGroup()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  {% endif %}
 </div>
-<div class="card" style="padding: 40px; text-align:center; color: var(--text-muted);">
-  🚧 내 자산 페이지 준비 중
-</div>
+{% endblock %}
+
+{% block scripts %}
+{% if user %}
+<script>
+let holdings = [];
+let groups   = [];
+let prices   = {};
+let weightChart = null;
+
+function fmtKRW(v) {
+  if (!v && v !== 0) return '—';
+  return (v < 0 ? '-' : '') + '₩' + Math.abs(Math.round(v)).toLocaleString();
+}
+function fmtPct(v) { return (v*100).toFixed(1)+'%'; }
+
+// ── 탭 ──
+function showTab(name) {
+  ['overview','rebalance','purchase','groups'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===name ? 'block' : 'none';
+  });
+  document.querySelectorAll('.ma-tab').forEach((b,i) => {
+    b.classList.toggle('active', ['overview','rebalance','purchase','groups'][i]===name);
+  });
+  if (name === 'rebalance') renderRebalance();
+  if (name === 'groups')    renderGroups();
+}
+
+// ── 데이터 로드 ──
+async function loadAll() {
+  const res  = await fetch('/api/myassets/data');
+  const data = await res.json();
+  holdings   = data.holdings || [];
+  groups     = data.groups   || [];
+  prices     = data.prices   || {};
+  renderHoldings();
+  renderSummary();
+  renderGroupOptions();
+}
+
+// ── 보유 종목 테이블 ──
+function renderHoldings() {
+  const wrap = document.getElementById('holdingsTableWrap');
+  if (!holdings.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">보유 종목이 없습니다. + 종목 추가를 눌러 시작하세요</div>';
+    return;
+  }
+
+  const totalValue = holdings.reduce((s, h) => s + (prices[h.code] || 0) * h.quantity, 0);
+
+  wrap.innerHTML = `
+    <table class="holdings-table">
+      <thead><tr>
+        <th>종목</th><th>그룹</th><th>계좌</th><th>수량</th>
+        <th>현재가</th><th>평가금액</th><th>비중</th><th>수익률</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${holdings.map(h => {
+          const cur  = prices[h.code] || 0;
+          const val  = cur * h.quantity;
+          const wt   = totalValue > 0 ? val / totalValue : 0;
+          const ret  = h.avg_price > 0 ? (cur - h.avg_price) / h.avg_price : null;
+          const gc   = h.group_color || '#90A4AE';
+          return `<tr>
+            <td><b>${h.code}</b></td>
+            <td>
+              <select onchange="quickSetGroup(${h.id}, this.value)"
+                style="border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.75rem;background:white;cursor:pointer;max-width:100px;color:var(--text);">
+                <option value="">그룹 없음</option>
+                ${groups.map(g => `<option value="${g.id}" ${h.group_id===g.id?'selected':''}>${g.name}</option>`).join('' )}
+              </select>
+            </td>
+            <td style="color:var(--text-muted);font-size:0.78rem;">${h.account_type}</td>
+            <td>${h.quantity.toLocaleString()}</td>
+            <td>${fmtKRW(cur)}</td>
+            <td><b>${fmtKRW(val)}</b></td>
+            <td>
+              <div style="min-width:60px;">
+                <span style="font-size:0.8rem;">${fmtPct(wt)}</span>
+                <div class="weight-progress"><div class="weight-fill" style="width:${(wt*100).toFixed(1)}%;background:${gc}"></div></div>
+              </div>
+            </td>
+            <td style="font-weight:700;color:${ret===null?'var(--text-muted)':ret>=0?'#2E7D32':'#C62828'}">
+              ${ret===null?'—':(ret>=0?'+':'')+fmtPct(ret)}
+            </td>
+            <td>
+              <button class="icon-btn" onclick="openEditHolding(${h.id})" title="수정">✏️</button>
+              <button class="icon-btn danger" onclick="deleteHolding(${h.id})" title="삭제">🗑</button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ── 요약 + 차트 ──
+function renderSummary() {
+  const totalValue  = holdings.reduce((s, h) => s + (prices[h.code]||0)*h.quantity, 0);
+  const totalCost   = holdings.reduce((s, h) => s + h.avg_price*h.quantity, 0);
+  const totalReturn = totalCost > 0 ? (totalValue - totalCost) / totalCost : 0;
+
+  document.getElementById('summaryGrid').innerHTML = [
+    { label: '총 평가금액', value: fmtKRW(totalValue), cls: '' },
+    { label: '총 매입금액', value: fmtKRW(totalCost), cls: '' },
+    { label: '총 수익률',   value: (totalReturn>=0?'+':'')+fmtPct(totalReturn), cls: totalReturn>=0?'#2E7D32':'#C62828' },
+    { label: '보유 종목 수', value: holdings.length+'개', cls: '' },
+  ].map(i=>`<div class="summary-item"><div class="summary-label">${i.label}</div><div class="summary-value" style="color:${i.cls||'var(--text)'}">${i.value}</div></div>`).join('');
+
+  renderWeightChart(totalValue);
+}
+
+function renderWeightChart(totalValue) {
+  if (weightChart) weightChart.destroy();
+  if (!holdings.length || !totalValue) return;
+
+  // 그룹별 합산
+  const grouped = {};
+  const ungrouped = [];
+  holdings.forEach(h => {
+    const val = (prices[h.code]||0) * h.quantity;
+    if (h.group_name) {
+      if (!grouped[h.group_name]) grouped[h.group_name] = { val: 0, color: h.group_color||'#90A4AE' };
+      grouped[h.group_name].val += val;
+    } else {
+      ungrouped.push({ label: h.code, val, color: '#90A4AE' });
+    }
+  });
+
+  const items = [
+    ...Object.entries(grouped).map(([k,v]) => ({ label: k, val: v.val, color: v.color })),
+    ...ungrouped,
+  ].filter(i => i.val > 0);
+
+  weightChart = new Chart(document.getElementById('weightChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: items.map(i => i.label),
+      datasets: [{
+        data: items.map(i => parseFloat((i.val/totalValue*100).toFixed(1))),
+        backgroundColor: items.map(i => i.color+'cc'),
+        borderColor:     items.map(i => i.color),
+        borderWidth: 1.5, borderRadius: 6,
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ctx.parsed.x.toFixed(1)+'%' }
+      }},
+      scales: {
+        x: { ticks: { callback: v=>v+'%', font:{size:10}, color:'#90A4AE' }, grid:{color:'rgba(0,0,0,0.04)'} },
+        y: { ticks: { font:{size:11}, color:'var(--text)' }, grid:{display:false} }
+      }
+    }
+  });
+}
+
+// ── 리밸런싱 ──
+function renderRebalance() {
+  const totalValue = holdings.reduce((s, h) => s + (prices[h.code]||0)*h.quantity, 0);
+  if (!totalValue || !groups.length) {
+    document.getElementById('rebalResult').innerHTML =
+      '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;">그룹을 만들고 목표 비중을 설정해주세요</div>';
+    return;
+  }
+
+  // 그룹별 현재 가치
+  const groupValues = {};
+  holdings.forEach(h => {
+    const val = (prices[h.code]||0)*h.quantity;
+    if (h.group_id) {
+      groupValues[h.group_id] = (groupValues[h.group_id]||0) + val;
+    }
+  });
+
+  const rows = groups.filter(g => g.target_pct > 0).map(g => {
+    const cur     = groupValues[g.id] || 0;
+    const curPct  = totalValue > 0 ? cur/totalValue : 0;
+    const tgtPct  = g.target_pct/100;
+    const diff    = tgtPct - curPct;
+    const diffVal = diff * totalValue;
+    const action  = Math.abs(diffVal) < 10000 ? 'ok' : diffVal > 0 ? 'buy' : 'sell';
+    return { g, cur, curPct, tgtPct, diff, diffVal, action };
+  });
+
+  if (!rows.length) {
+    document.getElementById('rebalResult').innerHTML =
+      '<div style="padding:20px;color:var(--text-muted);font-size:0.85rem;">그룹 탭에서 목표 비중을 설정해주세요</div>';
+    return;
+  }
+
+  document.getElementById('rebalResult').innerHTML = rows.map(r => `
+    <div class="rebal-row">
+      <span class="group-badge" style="background:${r.g.color}22;color:${r.g.color};min-width:70px;">${r.g.name}</span>
+      <span style="flex:1;color:var(--text-muted);">현재 ${fmtPct(r.curPct)} → 목표 ${fmtPct(r.tgtPct)}</span>
+      <span style="min-width:80px;">${fmtKRW(r.cur)}</span>
+      <span class="rebal-action ${r.action==='buy'?'rebal-buy':r.action==='sell'?'rebal-sell':'rebal-ok'}">
+        ${r.action==='ok'?'✅ 적정':r.action==='buy'?'▲ 매수 '+fmtKRW(r.diffVal):'▼ 매도 '+fmtKRW(Math.abs(r.diffVal))}
+      </span>
+    </div>
+  `).join('');
+}
+
+// ── 추가매수 ──
+function calcPurchase() {
+  const amount     = parseFloat(document.getElementById('purchaseAmount').value)||0;
+  const totalValue = holdings.reduce((s,h)=>(prices[h.code]||0)*h.quantity+s, 0);
+  const newTotal   = totalValue + amount;
+
+  if (!groups.length || !amount) return;
+
+  const groupValues = {};
+  holdings.forEach(h => {
+    if (h.group_id) groupValues[h.group_id] = (groupValues[h.group_id]||0) + (prices[h.code]||0)*h.quantity;
+  });
+
+  const rows = groups.filter(g=>g.target_pct>0).map(g => {
+    const tgtVal = newTotal * g.target_pct/100;
+    const curVal = groupValues[g.id]||0;
+    const buy    = Math.max(0, tgtVal - curVal);
+    return { g, buy };
+  }).filter(r=>r.buy>0);
+
+  if (!rows.length) {
+    document.getElementById('purchaseResult').innerHTML = '<div style="color:var(--text-muted);">그룹 목표 비중을 설정해주세요</div>';
+    return;
+  }
+
+  document.getElementById('purchaseResult').innerHTML = `
+    <div style="font-size:0.85rem;font-weight:700;margin-bottom:10px;">추가매수 배분 제안</div>
+    ${rows.map(r=>`
+    <div class="rebal-row">
+      <span class="group-badge" style="background:${r.g.color}22;color:${r.g.color};min-width:70px;">${r.g.name}</span>
+      <span style="flex:1;color:var(--text-muted);">목표 비중 ${r.g.target_pct}%</span>
+      <span class="rebal-action rebal-buy">▲ ${fmtKRW(r.buy)}</span>
+    </div>`).join('')}
+    <div style="margin-top:10px;font-size:0.78rem;color:var(--text-muted);">* 그룹 내 어떤 종목을 살지는 계좌별 세금을 고려해 직접 결정하세요</div>
+  `;
+}
+
+// ── 그룹 관리 ──
+function renderGroups() {
+  const wrap = document.getElementById('groupsWrap');
+  if (!groups.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">그룹이 없습니다</div>';
+    return;
+  }
+  wrap.innerHTML = groups.map(g=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div style="width:14px;height:14px;border-radius:50%;background:${g.color};flex-shrink:0;"></div>
+      <span style="flex:1;font-weight:600;">${g.name}</span>
+      <span style="color:var(--text-muted);font-size:0.82rem;">목표 ${g.target_pct}%</span>
+      <button class="icon-btn" onclick="openEditGroup(${g.id})">✏️</button>
+      <button class="icon-btn danger" onclick="deleteGroup(${g.id})">🗑</button>
+    </div>
+  `).join('');
+}
+
+// ── 모달 ──
+function openModal(id)  { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+function renderGroupOptions() {
+  const sel = document.getElementById('holdingGroup');
+  sel.innerHTML = '<option value="">그룹 없음</option>' +
+    groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+}
+
+function openAddHolding() {
+  document.getElementById('holdingId').value       = '';
+  document.getElementById('holdingCodeInput').value = '';
+  document.getElementById('holdingCode').value      = '';
+  document.getElementById('holdingCodeSelected').textContent = '';
+  document.getElementById('holdingQty').value       = '1';
+  document.getElementById('holdingAvgPrice').value  = '0';
+  document.getElementById('holdingGroup').value     = '';
+  document.querySelector('input[name="holdingAccount"][value="일반"]').checked = true;
+  document.getElementById('modalHoldingTitle').textContent = '종목 추가';
+  openModal('modalHolding');
+}
+
+function openEditHolding(id) {
+  const h = holdings.find(h=>h.id===id);
+  if (!h) return;
+  document.getElementById('holdingId').value       = h.id;
+  document.getElementById('holdingCodeInput').value = h.code;
+  document.getElementById('holdingCode').value      = h.code;
+  document.getElementById('holdingCodeSelected').textContent = h.code;
+  document.getElementById('holdingQty').value       = h.quantity;
+  document.getElementById('holdingAvgPrice').value  = h.avg_price;
+  document.getElementById('holdingGroup').value     = h.group_id || '';
+  const acc = document.querySelector(`input[name="holdingAccount"][value="${h.account_type}"]`);
+  if (acc) acc.checked = true;
+  document.getElementById('modalHoldingTitle').textContent = '종목 수정';
+  openModal('modalHolding');
+}
+
+async function saveHolding() {
+  const code = document.getElementById('holdingCode').value;
+  if (!code) { alert('종목을 선택해주세요.'); return; }
+  await fetch('/api/myassets/holding', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      id:           document.getElementById('holdingId').value || null,
+      code,
+      quantity:     parseFloat(document.getElementById('holdingQty').value)||0,
+      avg_price:    parseFloat(document.getElementById('holdingAvgPrice').value)||0,
+      account_type: document.querySelector('input[name="holdingAccount"]:checked').value,
+      group_id:     document.getElementById('holdingGroup').value || null,
+    })
+  });
+  closeModal('modalHolding');
+  await loadAll();
+}
+
+async function quickSetGroup(holdingId, groupId) {
+  const h = holdings.find(h => h.id === holdingId);
+  if (!h) return;
+  await fetch('/api/myassets/holding', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      id: holdingId, code: h.code,
+      quantity: h.quantity, avg_price: h.avg_price,
+      account_type: h.account_type,
+      group_id: groupId || null,
+    })
+  });
+  await loadAll();
+}
+
+async function deleteHolding(id) {
+  if (!confirm('이 종목을 삭제할까요?')) return;
+  await fetch('/api/myassets/holding/'+id, { method: 'DELETE' });
+  await loadAll();
+}
+
+function openAddGroup() {
+  document.getElementById('groupId').value         = '';
+  document.getElementById('groupName').value       = '';
+  document.getElementById('groupColor').value      = '#1976D2';
+  document.getElementById('groupTargetPct').value  = '0';
+  document.getElementById('modalGroupTitle').textContent = '그룹 추가';
+  openModal('modalGroup');
+}
+
+function openEditGroup(id) {
+  const g = groups.find(g=>g.id===id);
+  if (!g) return;
+  document.getElementById('groupId').value        = g.id;
+  document.getElementById('groupName').value      = g.name;
+  document.getElementById('groupColor').value     = g.color;
+  document.getElementById('groupTargetPct').value = g.target_pct;
+  document.getElementById('modalGroupTitle').textContent = '그룹 수정';
+  openModal('modalGroup');
+}
+
+async function saveGroup() {
+  const name = document.getElementById('groupName').value.trim();
+  if (!name) { alert('그룹명을 입력해주세요.'); return; }
+  await fetch('/api/myassets/group', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      id:         document.getElementById('groupId').value || null,
+      name,
+      color:      document.getElementById('groupColor').value,
+      target_pct: parseFloat(document.getElementById('groupTargetPct').value)||0,
+    })
+  });
+  closeModal('modalGroup');
+  await loadAll();
+  renderGroups();
+}
+
+async function deleteGroup(id) {
+  if (!confirm('이 그룹을 삭제할까요? (종목은 유지됩니다)')) return;
+  await fetch('/api/myassets/group/'+id, { method: 'DELETE' });
+  await loadAll();
+  renderGroups();
+}
+
+// ── 종목 검색 (모달) ──
+let holdingSearchTimer = null;
+document.getElementById('holdingCodeInput').addEventListener('input', e => {
+  const q = e.target.value.trim();
+  if (!q) { document.getElementById('holdingSearchDrop').style.display='none'; return; }
+  clearTimeout(holdingSearchTimer);
+  holdingSearchTimer = setTimeout(async () => {
+    const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    const drop = document.getElementById('holdingSearchDrop');
+    if (!data.length) { drop.style.display='none'; return; }
+    drop.innerHTML = data.slice(0,8).map(item=>`
+      <div class="nav-search-result" onclick="selectHoldingCode('${item.code}','${item.name.replace(/'/g,"\\'")}')">
+        <div class="nav-search-info">
+          <div class="nav-search-code">${item.code}</div>
+          <div class="nav-search-name">${item.name}</div>
+        </div>
+      </div>`).join('');
+    drop.style.display = 'block';
+  }, 250);
+});
+
+function selectHoldingCode(code, name) {
+  document.getElementById('holdingCode').value          = code;
+  document.getElementById('holdingCodeInput').value     = code;
+  document.getElementById('holdingCodeSelected').textContent = name;
+  document.getElementById('holdingSearchDrop').style.display = 'none';
+}
+
+// 외부 클릭으로 닫기 비활성화
+
+loadAll();
+</script>
+{% endif %}
 {% endblock %}

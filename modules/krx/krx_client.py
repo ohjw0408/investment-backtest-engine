@@ -98,3 +98,39 @@ class KRXClient:
 
         print("🚨 금 데이터 완전 실패")
         return pd.DataFrame()
+    def get_current_prices_kr(self, codes: list, bas_dd: str = None) -> dict:
+        """
+        KR 종목 현재가 (종가) 일괄 조회
+        codes: 단축코드 리스트 ['133690', '458730', ...]
+        반환: {code: price} dict (KRW)
+        """
+        from datetime import datetime, timedelta
+        if bas_dd is None:
+            d = datetime.today()
+            while d.weekday() >= 5:
+                d -= timedelta(days=1)
+            bas_dd = d.strftime("%Y%m%d")
+
+        code_set = set(codes)
+        prices   = {}
+
+        for market_url in [
+            "https://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd",   # KOSPI
+            "https://data-dbg.krx.co.kr/svc/apis/sto/ksq_bydd_trd",   # KOSDAQ
+        ]:
+            try:
+                data = self._get(market_url, {"basDd": bas_dd})
+                rows = self._extract_rows(data)
+                for r in rows:
+                    # ISU_CD: KR7133690004 → short code: [3:9]
+                    isu_cd  = r.get("ISU_CD", "")
+                    short   = isu_cd[3:9] if len(isu_cd) >= 9 else ""
+                    if short in code_set:
+                        price = self._to_float(r.get("TDD_CLSPRC", 0))
+                        if price > 0:
+                            prices[short] = price
+            except Exception as e:
+                if self.debug:
+                    print(f"KRX 현재가 조회 실패 ({market_url}): {e}")
+
+        return prices

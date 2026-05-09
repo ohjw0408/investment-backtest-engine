@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} — Domino Invest{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<style>
+.symbol-wrap { max-width: 960px; margin: 0 auto; padding: 24px; }
+
+/* 헤더 */
+.symbol-header {
+  display: flex; align-items: flex-start; gap: 16px;
+  margin-bottom: 24px;
+}
+.symbol-badge {
+  padding: 3px 10px; border-radius: 6px;
+  font-size: 0.75rem; font-weight: 700;
+  background: #E3F2FD; color: #1565C0;
+}
+.symbol-badge.kr { background: #E8F5E9; color: #2E7D32; }
+.symbol-code { font-size: 1.6rem; font-weight: 900; color: var(--text); }
+.symbol-name { font-size: 0.9rem; color: var(--text-muted); margin-top: 2px; }
+.symbol-price-wrap { margin-left: auto; text-align: right; }
+.symbol-price { font-size: 2rem; font-weight: 800; color: var(--text); }
+.symbol-change { font-size: 0.9rem; font-weight: 700; margin-top: 2px; }
+.symbol-change.up   { color: #2E7D32; }
+.symbol-change.down { color: #C62828; }
+
+/* 차트 카드 */
+.symbol-card {
+  background: white; border-radius: 14px;
+  border: 1.5px solid var(--border); padding: 20px;
+  margin-bottom: 16px;
+}
+.symbol-card-title {
+  font-size: 0.9rem; font-weight: 700; color: var(--text);
+  margin-bottom: 14px;
+}
+
+/* 기간 탭 */
+.period-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+.period-tab {
+  padding: 5px 12px; border-radius: 7px;
+  font-size: 0.8rem; font-weight: 600;
+  border: 1.5px solid var(--border);
+  background: white; color: var(--text-muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.period-tab.active { background: var(--blue); color: white; border-color: var(--blue); }
+
+/* 지표 그리드 */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.stat-item { padding: 12px; background: var(--bg); border-radius: 10px; }
+.stat-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+.stat-value { font-size: 1rem; font-weight: 700; color: var(--text); }
+
+/* 배당 테이블 */
+.div-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.div-table th {
+  background: var(--bg); padding: 8px 12px;
+  color: var(--text-muted); font-weight: 600;
+  text-align: left; border-bottom: 1.5px solid var(--border);
+}
+.div-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.div-table tr:last-child td { border-bottom: none; }
+
+/* 빈 상태 */
+.symbol-empty {
+  display: flex; align-items: center; justify-content: center;
+  height: 200px; color: var(--text-muted); font-size: 0.9rem;
+  border: 2px dashed var(--border); border-radius: 12px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="symbol-wrap">
+  <div id="symbolContent">
+    <div class="symbol-empty">⏳ 데이터 로드 중...</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CODE = "{{ code }}";
+
+function fmtPrice(v, currency) {
+  if (v === null || v === undefined) return '—';
+  if (currency === 'KRW') return '₩' + Math.round(v).toLocaleString();
+  return '$' + v.toFixed(2);
+}
+
+function fmtDiv(v, currency) {
+  if (!v) return '—';
+  if (currency === 'KRW') return '₩' + Math.round(v).toLocaleString();
+  return '$' + parseFloat(v).toFixed(4);
+}
+
+let chartInst = null;
+let allData   = null;
+
+async function loadSymbol() {
+  const res  = await fetch(`/api/symbol/${CODE}`);
+  const data = await res.json();
+  if (data.error) {
+    document.getElementById('symbolContent').innerHTML =
+      `<div class="symbol-empty">종목을 찾을 수 없습니다: ${CODE}</div>`;
+    return;
+  }
+  allData = data;
+  renderPage(data);
+}
+
+function renderPage(data) {
+  const cur    = data.current_price;
+  const prev   = data.prev_price;
+  const chg    = prev ? cur - prev : 0;
+  const chgPct = prev ? (chg / prev * 100) : 0;
+  const isUp   = chg >= 0;
+  const curr   = data.currency;
+  const isKR   = data.country === 'KR';
+
+  document.getElementById('symbolContent').innerHTML = `
+    <!-- 헤더 -->
+    <div class="symbol-header">
+      <div>
+        <span class="symbol-badge ${isKR ? 'kr' : ''}">${isKR ? 'KR ETF' : 'US ETF'}</span>
+        <div class="symbol-code" style="margin-top:6px;">${data.code}</div>
+        <div class="symbol-name">${data.name}</div>
+      </div>
+      <div class="symbol-price-wrap">
+        <div class="symbol-price">${fmtPrice(cur, curr)}</div>
+        <div class="symbol-change ${isUp ? 'up' : 'down'}">
+          ${isUp ? '▲' : '▼'} ${fmtPrice(Math.abs(chg), curr)} (${Math.abs(chgPct).toFixed(2)}%)
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${data.last_date} 기준</div>
+      </div>
+    </div>
+
+    <!-- 차트 -->
+    <div class="symbol-card">
+      <div class="symbol-card-title">📈 가격 차트</div>
+      <div class="period-tabs">
+        <button class="period-tab active" onclick="setPeriod('1M',this)">1개월</button>
+        <button class="period-tab" onclick="setperiod('3M',this)">3개월</button>
+        <button class="period-tab" onclick="setperiod('1Y',this)">1년</button>
+        <button class="period-tab" onclick="setperiod('ALL',this)">전체</button>
+      </div>
+      <canvas id="priceChart" height="120"></canvas>
+    </div>
+
+    <!-- 핵심 지표 -->
+    <div class="symbol-card">
+      <div class="symbol-card-title">📊 핵심 지표</div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-label">52주 최고</div>
+          <div class="stat-value">${fmtPrice(data.high_52w, curr)}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">52주 최저</div>
+          <div class="stat-value">${fmtPrice(data.low_52w, curr)}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">배당수익률</div>
+          <div class="stat-value">${data.div_yield ? data.div_yield.toFixed(2) + '%' : '—'}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">운용사</div>
+          <div class="stat-value">${data.issuer || '—'}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">카테고리</div>
+          <div class="stat-value" style="font-size:0.82rem;">${data.category || '—'}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">보수율</div>
+          <div class="stat-value">${data.expense_ratio ? (data.expense_ratio * 100).toFixed(2) + '%' : '—'}</div>
+        </div>
+        ${data.aum ? `
+        <div class="stat-item">
+          <div class="stat-label">AUM</div>
+          <div class="stat-value">$${(data.aum / 1e9).toFixed(1)}B</div>
+        </div>` : ''}
+      </div>
+    </div>
+
+    <!-- 배당 내역 -->
+    <div class="symbol-card">
+      <div class="symbol-card-title">💰 배당 내역</div>
+      ${data.dividends && data.dividends.length ? `
+      <table class="div-table">
+        <thead><tr><th>배당일</th><th>주당 배당금</th></tr></thead>
+        <tbody>
+          ${data.dividends.map(d => `
+            <tr>
+              <td>${d.date}</td>
+              <td>${fmtDiv(d.dividend, curr)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>` : '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">배당 데이터 없음</div>'}
+    </div>
+  `;
+
+  renderChart(data.prices, '1M');
+}
+
+function setperiod(period, btn) { setperiodInner(period, btn); }
+function setperiod(period, btn) { setperiodInner(period, btn); }
+function setPeriod(period, btn) { setperiodInner(period, btn); }
+
+function setperiodInner(period, btn) {
+  document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderChart(allData.prices, period);
+}
+
+// 버튼 핸들러 통일
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('period-tab')) {
+    const period = e.target.textContent === '1개월' ? '1M'
+                 : e.target.textContent === '3개월' ? '3M'
+                 : e.target.textContent === '1년'   ? '1Y' : 'ALL';
+    document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    if (allData) renderChart(allData.prices, period);
+  }
+});
+
+function renderChart(prices, period) {
+  if (!prices || !prices.length) return;
+  const now   = new Date(prices[prices.length - 1].date);
+  const cutoff = new Date(now);
+  if      (period === '1M')  cutoff.setMonth(cutoff.getMonth() - 1);
+  else if (period === '3M')  cutoff.setMonth(cutoff.getMonth() - 3);
+  else if (period === '1Y')  cutoff.setFullYear(cutoff.getFullYear() - 1);
+  else                        cutoff.setFullYear(1900);
+
+  const filtered = prices.filter(p => new Date(p.date) >= cutoff);
+  const labels   = filtered.map(p => p.date);
+  const vals     = filtered.map(p => p.close);
+
+  const isUp = vals.length > 1 && vals[vals.length - 1] >= vals[0];
+  const color = isUp ? '#2E7D32' : '#C62828';
+  const fill  = isUp ? 'rgba(46,125,50,0.08)' : 'rgba(198,40,40,0.08)';
+
+  if (chartInst) chartInst.destroy();
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  chartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        borderColor: color, borderWidth: 2,
+        backgroundColor: fill,
+        fill: true, pointRadius: 0, tension: 0.3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => allData.currency === 'KRW'
+          ? '₩' + Math.round(ctx.parsed.y).toLocaleString()
+          : '$' + ctx.parsed.y.toFixed(2) }
+      }},
+      scales: {
+        x: { ticks: { maxTicksLimit: 6, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { color: 'rgba(0,0,0,0.04)' } }
+      }
+    }
+  });
+}
+
+loadSymbol();
+</script>
+{% endblock %}

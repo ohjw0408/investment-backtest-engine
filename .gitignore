@@ -35,6 +35,8 @@ Thumbs.db
 # ----------------------------
 data/price_cache/
 
+data/private/
+
 !data/meta/symbol_master.db
 # ----------------------------
 # Old CSV price cache
@@ -50,3 +52,5 @@ data/*.csv
 data/meta/*.txt
 
 *.db
+
+.env

@@ -1,22 +1,108 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 import random
 import datetime
 import sqlite3
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+from authlib.integrations.flask_client import OAuth
+from modules.auth_manager import (
+    init_db, get_or_create_user, get_user_by_id,
+    get_groups, upsert_group, delete_group,
+    get_holdings, upsert_holding, delete_holding,
+    init_holdings_db,
+)
+
+load_dotenv()
 
 from modules.data_engine import DataEngine
 from modules.info_engine import InfoEngine
 from modules.portfolio_engine import PortfolioEngine
 from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
+from modules.retirement.data_preparer import DataPreparer
 from modules.dividend_simulator import DividendSimulator
 from modules.rebalance.periodic import PeriodicRebalance
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key')
+import datetime as _dt_mod
+app.config['PERMANENT_SESSION_LIFETIME'] = _dt_mod.timedelta(days=30)
+
+init_holdings_db()
 data_engine      = DataEngine()
 info_engine      = InfoEngine()
 portfolio_engine = PortfolioEngine()
 
+# Google OAuth
+oauth  = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id     = os.environ.get('GOOGLE_CLIENT_ID'),
+    client_secret = os.environ.get('GOOGLE_CLIENT_SECRET'),
+    server_metadata_url = 'https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs = {'scope': 'openid email profile'},
+)
+
+# DB 초기화
+init_db()
+
+# 모든 템플릿에 user 자동 주입
+@app.context_processor
+def inject_user():
+    return {'user': current_user()}
+
+def current_user():
+    uid = session.get('user_id')
+    return get_user_by_id(uid) if uid else None
+
 INDEX_DB_PATH = Path(__file__).parent / "data" / "meta" / "index_master.db"
+PRICE_DB_PATH = Path(__file__).parent / "data" / "price_cache" / "price_daily.db"
+
+# -----------------------------------------------
+# Google OAuth 라우트
+# -----------------------------------------------
+
+@app.route('/auth/google')
+def google_login():
+    redirect_uri = url_for('google_callback', _external=True)
+    return google.authorize_redirect(redirect_uri)
+
+
+@app.route('/auth/google/callback')
+def google_callback():
+    token     = google.authorize_access_token()
+    userinfo  = token.get('userinfo')
+    if not userinfo:
+        return redirect('/')
+    user = get_or_create_user(
+        google_id = userinfo['sub'],
+        email     = userinfo.get('email', ''),
+        name      = userinfo.get('name', ''),
+        picture   = userinfo.get('picture', ''),
+    )
+    session.permanent = True
+    session['user_id'] = user['id']
+    return redirect('/')
+
+
+@app.route('/auth/logout')
+def logout():
+    session.clear()
+    return redirect('/')
+
+
+@app.route('/api/me')
+def me():
+    user = current_user()
+    if not user:
+        return jsonify({'logged_in': False})
+    return jsonify({
+        'logged_in': True,
+        'name':      user['name'],
+        'email':     user['email'],
+        'picture':   user['picture'],
+    })
+
 
 # -----------------------------------------------
 # 페이지 라우트
@@ -24,7 +110,11 @@ INDEX_DB_PATH = Path(__file__).parent / "data" / "meta" / "index_master.db"
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', user=current_user())
+
+@app.route('/search')
+def search_page():
+    return render_template('search.html')
 
 @app.route('/calculator')
 def calculator():
@@ -47,8 +137,9 @@ def myassets():
     return render_template('myassets.html')
 
 @app.route('/settings')
+@app.route('/tax-settings')
 def settings():
-    return render_template('settings.html')
+    return render_template('tax_settings.html')
 
 # -----------------------------------------------
 # API - 검색
@@ -60,29 +151,37 @@ def search():
     if not q:
         return jsonify([])
     try:
-        df = info_engine.search_fuzzy(q, limit=20)
-        if df.empty:
-            return jsonify([])
         results = []
-        for _, row in df.iterrows():
-            if row.get('is_etf'):
-                badge = 'KR ETF' if row.get('country') == 'KR' else 'US ETF'
-            else:
-                badge = row.get('market') or row.get('country') or ''
-            subtitle = (
-                row.get('index_name') or
-                row.get('category') or
-                row.get('issuer') or ''
-            )
+
+        # KRX 금현물 특별 처리
+        if any(k in q.upper() for k in ['금', 'GOLD', 'KRX', '현물']):
             results.append({
-                'code':     row['code'],
-                'name':     row['name'],
-                'badge':    badge,
-                'subtitle': '' if str(subtitle) == 'nan' else str(subtitle),
-                'country':  row.get('country', ''),
-                'is_etf':   bool(row.get('is_etf', 0)),
+                'code': 'KRX_GOLD', 'name': '금 현물 (KRX, 1g)',
+                'badge': 'KRX', 'subtitle': 'KRX 금시장 현물',
+                'country': 'KR', 'is_etf': False,
             })
-        return jsonify(results)
+
+        df = info_engine.search_fuzzy(q, limit=20)
+        if not df.empty:
+            for _, row in df.iterrows():
+                if row.get('is_etf'):
+                    badge = 'KR ETF' if row.get('country') == 'KR' else 'US ETF'
+                else:
+                    badge = row.get('market') or row.get('country') or ''
+                subtitle = (
+                    row.get('index_name') or
+                    row.get('category') or
+                    row.get('issuer') or ''
+                )
+                results.append({
+                    'code':     row['code'],
+                    'name':     row['name'],
+                    'badge':    badge,
+                    'subtitle': '' if str(subtitle) == 'nan' else str(subtitle),
+                    'country':  row.get('country', ''),
+                    'is_etf':   bool(row.get('is_etf', 0)),
+                })
+        return jsonify(results[:20])
     except Exception as e:
         print(f"[search] 오류: {e}")
         return jsonify([])
@@ -358,7 +457,6 @@ def _get_krx_gold():
             prev_price = float(rows[1][1])
             cur_date   = rows[0][0]
             change     = round((cur_price - prev_price) / prev_price * 100, 2)
-            # 스파크라인용 최근 20일
             conn2 = sqlite3.connect(str(INDEX_DB_PATH))
             spark_rows = conn2.execute(
                 "SELECT close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date DESC LIMIT 20"
@@ -376,7 +474,6 @@ def _get_krx_gold():
                 "note":   cur_date,
             }
         elif len(rows) == 1:
-            # 1개만 있으면 KRX API로 최신 받아오기
             try:
                 from modules.krx.krx_client import KRXClient
                 client = KRXClient()
@@ -397,7 +494,6 @@ def _get_krx_gold():
             except Exception as e:
                 print(f"[market] KRX 금 최신 조회 실패: {e}")
         else:
-            # DB에 없으면 KRX API로 받아오기
             try:
                 from modules.krx.krx_client import KRXClient
                 client = KRXClient()
@@ -421,7 +517,6 @@ def _get_krx_gold():
 
 @app.route('/api/market')
 def market():
-    # 순서: sp500, nasdaq, kospi / 국제금, KRX금현물, 환율
     yf_tickers = [
         {"id": "sp500",  "name": "S&P 500",      "tag": "S&P",    "ticker": "^GSPC", "prefix": "",  "fmt": "int"},
         {"id": "nasdaq", "name": "NASDAQ",         "tag": "NASDAQ", "ticker": "^IXIC", "prefix": "",  "fmt": "int"},
@@ -455,7 +550,6 @@ def market():
         except Exception as e:
             print(f"[market] {info['id']} 오류: {e}")
 
-    # 순서 고정: sp500, nasdaq, kospi, gold(국제), krx_gold(한국), usdkrw
     result = []
     for id_ in ["sp500", "nasdaq", "kospi"]:
         if id_ in yf_result:
@@ -474,24 +568,12 @@ def market():
     return jsonify(result)
 
 
-
+# -----------------------------------------------
+# API - 배당 목표 시나리오
+# -----------------------------------------------
 
 @app.route('/api/dividend-target/scenario', methods=['POST'])
 def dividend_target_scenario():
-    """
-    시나리오 기반 다중 계산
-
-    요청:
-    {
-        "tickers": [...],
-        "target_monthly_div": 1000000,
-        "probability": 0.90,
-        "dividend_mode": "reinvest",
-        "seed":    {"center": 10000000, "step": 5000000, "n": 2},
-        "monthly": {"center": 500000,   "step": 0,       "n": 0},
-        "years":   {"center": 20,       "step": 5,       "n": 1}
-    }
-    """
     try:
         body = request.get_json()
         tickers_input  = body['tickers']
@@ -524,6 +606,7 @@ def dividend_target_scenario():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+
 # -----------------------------------------------
 # API - 은퇴 설계
 # -----------------------------------------------
@@ -549,11 +632,21 @@ def retirement_run():
 
         strategy_factory = _make_strategy_factory(target_weights, rebal_mode)
 
-        usdkrw_start = portfolio_engine.loader.USD_KRW_START
-        price_starts = [get_price_start(t) for t in ticker_codes]
-        price_starts = [d for d in price_starts if d]
-        data_start   = max([usdkrw_start] + price_starts) if price_starts else usdkrw_start
-        data_end     = datetime.date.today().strftime('%Y-%m-%d')
+        data_end = datetime.date.today().strftime('%Y-%m-%d')
+
+        # ── 데이터 준비 (백필 + 가상 데이터 생성) ──────────
+        preparer = DataPreparer(price_db_path=PRICE_DB_PATH, verbose=False)
+        prep     = preparer.prepare(
+            tickers     = ticker_codes,
+            sim_years   = accumulation_years,
+            data_end    = data_end,
+            step_months = 3,
+        )
+        preparer.close()
+
+        data_start     = prep["data_start"]
+        synthetic_info = prep["synthetic_info"]
+        backfilled     = prep["backfilled"]
 
         div_starts = [get_dividend_start(t) for t in ticker_codes]
         div_starts = [d for d in div_starts if d]
@@ -599,7 +692,6 @@ def retirement_run():
         report = planner.run(target_percentile=target_percentile)
 
         # 3. 응답 구성
-        dist = acc_result['distribution']
         return jsonify({
             "accumulation_summary": report["accumulation_summary"],
             "sample_results": [
@@ -608,13 +700,24 @@ def retirement_run():
                     "initial_capital": round(s["initial_capital"]),
                     "success_rate":    round(s["success_rate"], 4),
                     "end_value_p50":   round(s["end_value_p50"]),
+                    "wd_end_values":   s.get("wd_end_values", []),
                 }
                 for s in report["sample_results"]
             ],
             "combined_summary":  report["combined_summary"],
             "message":           report["message"],
             "acc_cases_count":   len(acc_result["cases"]),
+            "acc_n_real":        acc_result.get("n_real"),
+            "acc_n_synthetic":   acc_result.get("n_synthetic"),
             "acc_values":        [round(c["end_value"]) for c in acc_result["cases"]],
+            "wd_values":         [
+                v
+                for s in report["sample_results"]
+                for v in s.get("wd_end_values", [])
+            ],
+            "data_start":        data_start,
+            "synthetic_info":    synthetic_info,
+            "backfilled":        backfilled,
         })
 
     except Exception as e:
@@ -642,11 +745,19 @@ def retirement_withdrawal():
 
         strategy_factory = _make_strategy_factory(target_weights, rebal_mode)
 
-        usdkrw_start = portfolio_engine.loader.USD_KRW_START
-        price_starts = [get_price_start(t) for t in ticker_codes]
-        price_starts = [d for d in price_starts if d]
-        data_start   = max([usdkrw_start] + price_starts) if price_starts else usdkrw_start
-        data_end     = datetime.date.today().strftime('%Y-%m-%d')
+        data_end = datetime.date.today().strftime('%Y-%m-%d')
+
+        # ── 데이터 준비 (백필 + 가상 데이터 생성) ──────────
+        preparer = DataPreparer(price_db_path=PRICE_DB_PATH, verbose=False)
+        prep     = preparer.prepare(
+            tickers     = ticker_codes,
+            sim_years   = withdrawal_years,
+            data_end    = data_end,
+            step_months = 3,
+        )
+        preparer.close()
+
+        data_start = prep["data_start"]
 
         from modules.retirement.withdrawal_analyzer import WithdrawalAnalyzer
         wd_analyzer = WithdrawalAnalyzer(
@@ -665,7 +776,7 @@ def retirement_withdrawal():
         )
         result = wd_analyzer.run()
 
-        dist = result['distribution']
+        dist     = result['distribution']
         end_vals = [round(c['end_value']) for c in result['cases']]
 
         return jsonify({
@@ -680,7 +791,10 @@ def retirement_withdrawal():
                     "p90":  round(dist['end_value_ratio']['p90'] * initial_capital),
                 },
             },
-            "wd_values": end_vals,
+            "wd_values":     end_vals,
+            "data_start":    data_start,
+            "n_real":        result.get("n_real"),
+            "n_synthetic":   result.get("n_synthetic"),
         })
 
     except Exception as e:
@@ -689,9 +803,292 @@ def retirement_withdrawal():
         return jsonify({'error': str(e)}), 500
 
 
+
+
+
 # -----------------------------------------------
-# API - 자산군별 비교 (임시 더미)
+# 내 자산 API
 # -----------------------------------------------
+
+@app.route('/api/myassets/data')
+def myassets_data():
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    uid      = session['user_id']
+    holdings = get_holdings(uid)
+    groups   = get_groups(uid)
+
+    # 현재가 조회
+    from pathlib import Path as _P
+    import sqlite3 as _sq
+
+    codes  = list({h['code'] for h in holdings})
+    prices = {}
+
+    # USD/KRW 최신 환율 한 번만 조회
+    try:
+        idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
+        ic  = _sq.connect(str(idx_db))
+        row = ic.execute("SELECT close FROM index_daily WHERE code='USD/KRW' ORDER BY date DESC LIMIT 1").fetchone()
+        ic.close()
+        usdkrw = float(row[0]) if row else 1300.0
+    except Exception:
+        usdkrw = 1300.0
+
+    price_db = _P(__file__).parent / 'data' / 'price_cache' / 'price_daily.db'
+    pc = _sq.connect(str(price_db))
+
+    import yfinance as _yf
+    from modules.krx.krx_client import KRXClient as _KRXC
+
+    pc.close()
+
+    # KR / US 종목 분리
+    kr_codes = [c for c in codes if c != 'KRX_GOLD' and portfolio_engine.loader.is_kr_etf(c)]
+    us_codes = [c for c in codes if c != 'KRX_GOLD' and not portfolio_engine.loader.is_kr_etf(c)]
+
+    # KR 종목 → KRX API (공식 종가, 이미 KRW → 환율 변환 없음)
+    if kr_codes:
+        try:
+            krx   = _KRXC(debug=False)
+            kr_px = krx.get_current_prices_kr(kr_codes)
+            prices.update(kr_px)
+        except Exception:
+            pass
+        # KRX API 실패한 종목은 yfinance .KS 폴백 (이미 KRW)
+        for code in kr_codes:
+            if prices.get(code, 0) == 0:
+                try:
+                    hist = _yf.Ticker(f"{code}.KS").history(period="2d")
+                    if not hist.empty:
+                        prices[code] = float(hist["Close"].iloc[-1])  # .KS는 이미 KRW
+                except Exception:
+                    pass
+
+    # US 종목 → yfinance (USD) → KRW 변환
+    for code in us_codes:
+        try:
+            hist = _yf.Ticker(code).history(period="2d")
+            if not hist.empty:
+                prices[code] = float(hist["Close"].iloc[-1]) * usdkrw  # USD → KRW
+        except Exception:
+            prices[code] = 0
+
+    # KRX_GOLD 별도 처리
+    if 'KRX_GOLD' in codes:
+        try:
+            ic  = _sq.connect(str(idx_db))
+            row = ic.execute("SELECT close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date DESC LIMIT 1").fetchone()
+            ic.close()
+            prices['KRX_GOLD'] = round(float(row[0])) if row else 0
+        except Exception:
+            prices['KRX_GOLD'] = 0
+
+    return jsonify({'holdings': holdings, 'groups': groups, 'prices': prices})
+
+
+@app.route('/api/myassets/holding', methods=['POST'])
+def myassets_save_holding():
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    uid  = session['user_id']
+    body = request.json
+    upsert_holding(
+        user_id      = uid,
+        code         = body['code'],
+        quantity     = float(body['quantity']),
+        avg_price    = float(body.get('avg_price', 0)),
+        account_type = body.get('account_type', '일반'),
+        group_id     = body.get('group_id') or None,
+        holding_id   = body.get('id') or None,
+    )
+    return jsonify({'ok': True})
+
+
+@app.route('/api/myassets/holding/<int:holding_id>', methods=['DELETE'])
+def myassets_delete_holding(holding_id):
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    delete_holding(session['user_id'], holding_id)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/myassets/group', methods=['POST'])
+def myassets_save_group():
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    body = request.json
+    upsert_group(
+        user_id    = session['user_id'],
+        name       = body['name'],
+        color      = body.get('color', '#1976D2'),
+        target_pct = float(body.get('target_pct', 0)),
+        group_id   = body.get('id') or None,
+    )
+    return jsonify({'ok': True})
+
+
+@app.route('/api/myassets/group/<int:group_id>', methods=['DELETE'])
+def myassets_delete_group(group_id):
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    delete_group(session['user_id'], group_id)
+    return jsonify({'ok': True})
+
+# -----------------------------------------------
+# 백테스트 API
+# -----------------------------------------------
+
+@app.route('/api/backtest/run', methods=['POST'])
+def backtest_run():
+    import numpy as np
+    from modules.core.portfolio                 import Portfolio
+    from modules.config.simulation_config       import SimulationConfig
+    from modules.execution.order_executor       import OrderExecutor
+    from modules.execution.cash_allocator       import CashAllocator
+    from modules.simulation.dividend_engine     import DividendEngine
+    from modules.simulation.contribution_engine import ContributionEngine
+    from modules.simulation.withdrawal_engine   import WithdrawalEngine
+    from modules.simulation.history_recorder    import HistoryRecorder
+    from modules.simulation.simulation_loop     import SimulationLoop
+    from modules.rebalance.periodic             import PeriodicRebalance
+
+    body = request.json
+    try:
+        tickers    = [t['code']   for t in body['tickers']]
+        weights    = {t['code']:  t['weight'] for t in body['tickers']}
+        start_date = body['start_date']
+        end_date   = body['end_date']
+        initial    = float(body.get('initial_capital', 10_000_000))
+        monthly    = float(body.get('monthly_contribution', 0))
+        div_mode   = body.get('dividend_mode', 'reinvest')
+        rebal_mode = body.get('rebal_mode', 'none')
+
+        rebal_freq = None if rebal_mode == 'none' else rebal_mode
+        drift      = 0.05 if rebal_mode == 'band' else None
+
+        strategy = PeriodicRebalance(
+            target_weights      = weights,
+            rebalance_frequency = rebal_freq,
+            drift_threshold     = drift,
+        )
+        config = SimulationConfig(
+            start_date           = start_date,
+            end_date             = end_date,
+            tickers              = tickers,
+            target_weights       = weights,
+            initial_capital      = initial,
+            monthly_contribution = monthly,
+            withdrawal_amount    = 0,
+            dividend_mode        = div_mode,
+            rebalance_frequency  = rebal_freq,
+            inflation            = 0.0,
+        )
+
+        price_data, dates = portfolio_engine.price_loader.load(tickers, start_date, end_date)
+
+        portfolio = Portfolio(initial)
+        loop      = SimulationLoop(
+            DividendEngine(), ContributionEngine(), WithdrawalEngine(),
+            OrderExecutor(), CashAllocator()
+        )
+        recorder = HistoryRecorder()
+        loop.run(portfolio, strategy, config, price_data, dates, recorder)
+        history_df = recorder.to_dataframe()
+
+        if history_df.empty:
+            return jsonify({'error': '시뮬레이션 결과가 없습니다. 날짜 범위나 종목을 확인해주세요.'}), 400
+
+        pv     = history_df['portfolio_value']
+        years  = (len(history_df) / 252)
+
+        # 총 납입금
+        total_invested = initial + monthly * years * 12
+        end_value      = float(pv.iloc[-1])
+        total_return   = (end_value / total_invested - 1) if total_invested > 0 else 0
+
+        # CAGR
+        cagr = (end_value / total_invested) ** (1 / years) - 1 if years > 0 and total_invested > 0 else 0
+
+        # MDD
+        cummax = pv.cummax()
+        dd     = (pv - cummax) / cummax
+        mdd    = float(dd.min())
+
+        # Sharpe
+        daily_ret = pv.pct_change().dropna()
+        sharpe    = float(daily_ret.mean() / daily_ret.std() * np.sqrt(252)) if daily_ret.std() > 0 else 0
+
+        # 총 배당금
+        total_dividend = float(history_df['dividend_income'].sum()) if 'dividend_income' in history_df.columns else 0
+
+        # history 직렬화 (매 거래일 → 주 1회 샘플링으로 경량화)
+        h = history_df.copy()
+        h['drawdown'] = (pv - cummax) / cummax
+        h['total_invested'] = initial + monthly * np.arange(len(h)) / 21  # 월 근사
+
+        step    = max(1, len(h) // 500)
+        h_sampled = h.iloc[::step]
+
+        history_out = [
+            {
+                'date':            str(row['date'])[:10],
+                'portfolio_value': round(float(row['portfolio_value'])),
+                'total_invested':  round(float(row['total_invested'])),
+                'drawdown':        round(float(row['drawdown']), 4),
+            }
+            for _, row in h_sampled.iterrows()
+        ]
+
+        # 연간 수익률
+        h2 = history_df.copy()
+        import pandas as _pd; h2['year'] = _pd.to_datetime(h2['date']).dt.year
+        annual_returns = []
+        for yr, grp in h2.groupby('year'):
+            s = float(grp['portfolio_value'].iloc[0])
+            e = float(grp['portfolio_value'].iloc[-1])
+            if s > 0:
+                annual_returns.append({'year': int(yr), 'return': round((e / s - 1), 4)})
+
+        return jsonify({
+            'metrics': {
+                'end_value':       round(end_value),
+                'total_invested':  round(total_invested),
+                'total_return':    round(total_return, 4),
+                'cagr':            round(cagr, 4),
+                'mdd':             round(mdd, 4),
+                'sharpe':          round(sharpe, 2),
+                'total_dividend':  round(total_dividend),
+                'years':           round(years, 1),
+            },
+            'history':        history_out,
+            'annual_returns': annual_returns,
+        })
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# -----------------------------------------------
+# 종목 상세 페이지
+# -----------------------------------------------
+
+@app.route('/symbol/<code>')
+def symbol_page(code):
+    return render_template('symbol.html', code=code.upper())
+
+
+@app.route('/api/symbol/<code>')
+def symbol_api(code):
+    try:
+        data = portfolio_engine.loader.get_symbol_data(code.upper())
+        return jsonify(data)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/assets')
 def assets():
@@ -706,4 +1103,6 @@ def assets():
 # -----------------------------------------------
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    import multiprocessing
+    multiprocessing.freeze_support()   # Windows 필수
+    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)

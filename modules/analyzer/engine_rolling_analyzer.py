@@ -132,6 +132,7 @@ class EngineRollingAnalyzer:
                         mwr = 0.0
 
             # MWR 계산 성공 시 사용, 실패 시 단순 wealth_multiple 기반 CAGR 사용
+            years = self.horizon_years
             if mwr != 0.0:
                 cagr = mwr
             elif wealth_multiple > 0:

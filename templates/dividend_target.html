@@ -328,6 +328,7 @@ function renderDtTickers() {
 }
 
 function fmtKRW(v) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
   if (v>=100000000) return '₩'+(v/100000000).toFixed(1)+'억';
   if (v>=10000)     return '₩'+Math.round(v/10000)+'만';
   return '₩'+Math.round(v).toLocaleString();
@@ -508,8 +509,6 @@ async function runDividendTarget() {
 const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0','#00BCD4','#FF5722','#607D8B'];
 
 function renderResult(data, body) {
-  console.log('API 응답:', JSON.stringify(data));
-  console.log('요청 body:', JSON.stringify(body));
   document.getElementById('dtResultEmpty').style.display   = 'none';
   document.getElementById('dtResultContent').style.display = 'block';
   document.getElementById('dtSolveSection').style.display  = 'none';
@@ -528,9 +527,9 @@ function renderResult(data, body) {
 
     // 자동 계산 결과 (solved_years / solved_seed / solved_monthly)
     let solvedLabel = '', solvedValue = '';
-    if (res.solved_years   !== undefined) { solvedLabel='필요 투자 기간';  solvedValue = res.solved_years+'년'; }
-    if (res.solved_seed    !== undefined) { solvedLabel='필요 초기 투자금'; solvedValue = fmtKRW(res.solved_seed); }
-    if (res.solved_monthly !== undefined) { solvedLabel='필요 월 적립금';  solvedValue = fmtKRW(res.solved_monthly); }
+    if (res.solved_years   !== undefined) { solvedLabel='필요 투자 기간';  solvedValue = res.solved_years ? res.solved_years+'년' : '—'; }
+    if (res.solved_seed    !== undefined) { solvedLabel='필요 초기 투자금'; solvedValue = res.solved_seed > 0 ? fmtKRW(res.solved_seed) : '투자금 불필요'; }
+    if (res.solved_monthly !== undefined) { solvedLabel='필요 월 적립금';  solvedValue = res.solved_monthly > 0 ? fmtKRW(res.solved_monthly) : '적립금 불필요'; }
 
     document.getElementById('dtSolveTitle').textContent = solvedLabel || '달성 확률';
     document.getElementById('dtSolveCards').innerHTML = solvedLabel ? `
@@ -648,7 +647,6 @@ function drawIsocurveChart(data) {
   const xLabel  = data.x_label;
   const optLabel = data.opt_label;
   const lines   = data.lines || [{ label: null, points: data.points || [] }];
-  console.log('drawIsocurveChart lines:', lines.length, 'xKey:', xKey, 'optKey:', optKey);
 
   const xFmt   = v => xKey   === 'years' ? (Number.isInteger(v) ? v+'년' : v.toFixed(1)+'년') : fmtKRW(v);
   const optFmt = v => optKey === 'years' ? (Number.isInteger(v) ? v+'년' : v.toFixed(1)+'년') : fmtKRW(v);
@@ -714,9 +712,7 @@ function drawIsocurveChart(data) {
           line_label: d.x_label,
           lines: flippedLines,
         };
-        console.log('flippedLines:', flippedLines.length, '개');
-        console.log('flippedData.lines:', flippedData.lines.length, '개');
-        drawIsocurveChart(flippedData);
+                    drawIsocurveChart(flippedData);
       } else {
         swapBtn.dataset.flipped = '0';
         drawIsocurveChart(d);

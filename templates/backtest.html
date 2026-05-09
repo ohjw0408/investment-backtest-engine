@@ -1,11 +1,481 @@
 {% extends "base.html" %}
 {% block title %}포트폴리오 분석 — Domino Invest{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<style>
+.bt-layout {
+  display: flex; gap: 24px; align-items: flex-start; padding: 24px;
+}
+.bt-left {
+  width: 380px; min-width: 340px; flex-shrink: 0;
+  background: white; border-radius: 16px;
+  border: 1.5px solid var(--border);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 20px;
+}
+.bt-right { flex: 1; min-width: 0; }
+
+@media (max-width: 860px) {
+  .bt-layout { flex-direction: column; padding: 16px; }
+  .bt-left { width: 100%; min-width: 0; }
+}
+
+.bt-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 2px; }
+.bt-sub   { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px; }
+
+.bt-left .calc-section {
+  border: none; border-bottom: 1px solid var(--border);
+  border-radius: 0; padding: 16px 0; margin-bottom: 0;
+}
+.bt-left .calc-section:last-of-type { border-bottom: none; }
+
+.date-row { display: flex; gap: 10px; align-items: center; }
+.date-row input[type=date] {
+  flex: 1; padding: 9px 12px;
+  border: 1.5px solid var(--border); border-radius: 10px;
+  font-size: 0.875rem; color: var(--text); background: var(--bg);
+  outline: none;
+}
+.date-row input[type=date]:focus { border-color: var(--blue); background: white; }
+.date-sep { color: var(--text-muted); font-size: 0.85rem; flex-shrink: 0; }
+
+/* 결과 카드 */
+.bt-card {
+  background: white; border-radius: 14px;
+  border: 1.5px solid var(--border); padding: 20px;
+  margin-bottom: 16px;
+}
+.bt-card-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 14px; }
+
+/* 지표 그리드 */
+.metrics-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px; margin-bottom: 4px;
+}
+.metric-item { padding: 12px 14px; background: var(--bg); border-radius: 10px; }
+.metric-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+.metric-value { font-size: 1.05rem; font-weight: 800; color: var(--text); }
+.metric-value.up   { color: #2E7D32; }
+.metric-value.down { color: #C62828; }
+
+.bt-empty {
+  display: flex; align-items: center; justify-content: center;
+  height: 240px; color: var(--text-muted); font-size: 0.9rem;
+  border: 2px dashed var(--border); border-radius: 12px;
+}
+
+/* 연도 비교 테이블 */
+.year-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.year-table th {
+  background: var(--bg); padding: 7px 10px;
+  color: var(--text-muted); font-weight: 600;
+  text-align: left; border-bottom: 1.5px solid var(--border);
+}
+.year-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.year-table tr:last-child td { border-bottom: none; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">포트폴리오 분석</h1>
-  <p class="page-sub">내 포트폴리오가 과거에 어땠는지 분석해드려요.</p>
+<div class="bt-layout">
+
+  <!-- 왼쪽 입력 -->
+  <div class="bt-left">
+    <div class="bt-title">📊 포트폴리오 분석</div>
+    <div class="bt-sub">과거 특정 기간의 포트폴리오 성과를 시뮬레이션합니다</div>
+
+    <!-- 포트폴리오 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">01</span> 포트폴리오</div>
+      <div id="btTickerList"></div>
+      <div id="btTickerPlaceholder" class="ticker-placeholder">종목을 검색해서 추가해보세요</div>
+      <div class="ticker-search-wrap" style="margin-top:8px;">
+        <div class="ret-search-box" style="display:flex;align-items:center;gap:8px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;">
+          <span style="font-size:1rem;color:var(--text-muted);">🔍</span>
+          <input type="text" id="btTickerSearch" placeholder="종목 또는 ETF 검색" style="border:none;outline:none;background:transparent;font-size:0.875rem;width:100%;">
+        </div>
+        <div class="ticker-search-dropdown" id="btTickerDropdown"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+        <span style="font-size:0.85rem;color:var(--text-muted);">비중 합계</span>
+        <span id="btWeightTotal" style="font-weight:700;">0%</span>
+      </div>
+      <div class="weight-bar-bg" style="margin-top:4px;"><div class="weight-bar-fill" id="btWeightBar" style="width:0%"></div></div>
+    </div>
+
+    <!-- 기간 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">02</span> 분석 기간</div>
+      <div class="date-row">
+        <input type="date" id="btStartDate" value="2010-01-01">
+        <span class="date-sep">~</span>
+        <input type="date" id="btEndDate">
+      </div>
+    </div>
+
+    <!-- 투자 설정 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">03</span> 투자 설정</div>
+
+      <div class="input-row">
+        <label>초기 투자금</label>
+        <div class="input-group">
+          <input type="number" id="btSeed" class="calc-input" value="10000000" min="0" step="1000000">
+          <span class="unit">원</span>
+        </div>
+        <div class="input-hint" id="btSeedHint">₩10,000,000</div>
+      </div>
+
+      <div class="input-row">
+        <label>월 적립금</label>
+        <div class="input-group">
+          <input type="number" id="btMonthly" class="calc-input" value="0" min="0" step="100000">
+          <span class="unit">원</span>
+        </div>
+        <div class="input-hint" id="btMonthlyHint">₩0</div>
+      </div>
+
+      <div class="input-row">
+        <label>배당 처리</label>
+        <div class="rebal-options">
+          <label class="rebal-option"><input type="radio" name="btDividend" value="reinvest" checked><span class="rebal-label">재투자</span></label>
+          <label class="rebal-option"><input type="radio" name="btDividend" value="hold"><span class="rebal-label">현금 보유</span></label>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <label>리밸런싱</label>
+        <div class="rebal-options">
+          <label class="rebal-option"><input type="radio" name="btRebal" value="none" checked><span class="rebal-label">없음</span></label>
+          <label class="rebal-option"><input type="radio" name="btRebal" value="monthly"><span class="rebal-label">월</span></label>
+          <label class="rebal-option"><input type="radio" name="btRebal" value="yearly"><span class="rebal-label">연</span></label>
+          <label class="rebal-option"><input type="radio" name="btRebal" value="band"><span class="rebal-label">밴드</span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="calc-warning">⚠ 과거 데이터 기반 시뮬레이션입니다. 미래 수익을 보장하지 않습니다.</div>
+
+    <button class="calc-run-btn" id="btRunBtn" onclick="runBacktest()">📊 분석 실행</button>
+    <div id="btLoading" style="display:none;text-align:center;padding:12px;color:var(--blue);font-size:0.85rem;font-weight:600;">
+      ⏳ 분석 중...
+    </div>
+  </div>
+
+  <!-- 오른쪽 결과 -->
+  <div class="bt-right">
+    <div id="btResultEmpty" class="bt-empty">포트폴리오를 구성하고 분석을 실행하세요</div>
+
+    <div id="btResultContent" style="display:none;">
+
+      <!-- 핵심 지표 -->
+      <div class="bt-card">
+        <div class="bt-card-title">📈 분석 결과</div>
+        <div class="metrics-grid" id="btMetrics"></div>
+      </div>
+
+      <!-- 포트폴리오 가치 차트 -->
+      <div class="bt-card">
+        <div class="bt-card-title">💹 포트폴리오 가치 추이</div>
+        <canvas id="btValueChart" height="130"></canvas>
+      </div>
+
+      <!-- 연간 수익률 -->
+      <div class="bt-card">
+        <div class="bt-card-title">📅 연간 수익률</div>
+        <canvas id="btAnnualChart" height="100"></canvas>
+      </div>
+
+      <!-- 낙폭 차트 -->
+      <div class="bt-card">
+        <div class="bt-card-title">📉 낙폭 (Drawdown)</div>
+        <canvas id="btDrawdownChart" height="80"></canvas>
+      </div>
+
+    </div>
+  </div>
 </div>
-<div class="card" style="padding: 40px; text-align:center; color: var(--text-muted);">
-  🚧 포트폴리오 분석 준비 중
-</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 오늘 날짜 기본값
+document.getElementById('btEndDate').value = new Date().toISOString().split('T')[0];
+
+let btTickers = [];
+let btCharts  = {};
+
+function fmtKRW(v) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  if (Math.abs(v) >= 100000000) return (v >= 0 ? '' : '-') + '₩' + Math.abs(v/100000000).toFixed(1) + '억';
+  if (Math.abs(v) >= 10000)     return (v >= 0 ? '' : '-') + '₩' + Math.round(Math.abs(v)/10000) + '만';
+  return '₩' + Math.round(v).toLocaleString();
+}
+function fmtPct(v) {
+  if (v === null || v === undefined) return '—';
+  return (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+}
+function fmtPctClass(v) { return v >= 0 ? 'up' : 'down'; }
+
+// ── 종목 관리 ──
+function updateBtWeightUI() {
+  const total = btTickers.reduce((s, t) => s + t.weight, 0);
+  const pct   = Math.round(total * 100);
+  document.getElementById('btWeightTotal').textContent = pct + '%';
+  document.getElementById('btWeightTotal').style.color = pct === 100 ? '#2E7D32' : '#C62828';
+  document.getElementById('btWeightBar').style.width      = Math.min(pct, 100) + '%';
+  document.getElementById('btWeightBar').style.background = pct === 100 ? '#4CAF50' : '#F44336';
+
+  const ph = document.getElementById('btTickerPlaceholder');
+  if (ph) ph.style.display = btTickers.length ? 'none' : 'block';
+
+  document.getElementById('btTickerList').innerHTML = btTickers.map((t, i) => `
+    <div class="ticker-item">
+      <span class="ticker-badge">${t.code}</span>
+      <span class="ticker-name">${(t.name || '').substring(0, 10)}</span>
+      <input type="number" class="ticker-weight-input" value="${Math.round(t.weight*100)}" min="1" max="100"
+        onchange="btUpdateWeight(${i}, this.value)"> %
+      <input type="range" class="ticker-weight-slider" value="${Math.round(t.weight*100)}" min="1" max="100"
+        oninput="btUpdateWeight(${i}, this.value)">
+      <button class="ticker-remove-btn" onclick="btRemoveTicker(${i})">×</button>
+    </div>
+  `).join('');
+}
+
+function btUpdateWeight(i, val) { btTickers[i].weight = parseFloat(val) / 100; updateBtWeightUI(); }
+function btRemoveTicker(i)       { btTickers.splice(i, 1); updateBtWeightUI(); }
+
+let btSearchTimer = null;
+const btInput    = document.getElementById('btTickerSearch');
+const btDropdown = document.getElementById('btTickerDropdown');
+
+function badgeColor(badge) {
+  if (badge === 'KR ETF' || badge === 'KOSPI' || badge === 'KOSDAQ') return '#1976D2';
+  if (badge === 'US ETF' || badge === 'NASDAQ' || badge === 'NYSE')   return '#2E7D32';
+  return '#78909C';
+}
+
+btInput.addEventListener('input', e => {
+  const q = e.target.value.trim();
+  if (!q) { btDropdown.style.display = 'none'; return; }
+  clearTimeout(btSearchTimer);
+  btDropdown.innerHTML = '<div class="nav-search-hint">검색 중...</div>';
+  btDropdown.style.display = 'block';
+  btSearchTimer = setTimeout(async () => {
+    const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (!data.length) { btDropdown.innerHTML = '<div class="nav-search-hint">결과 없음</div>'; return; }
+    btDropdown.innerHTML = data.map(item => `
+      <div class="nav-search-result" onclick="btAddTicker('${item.code}','${item.name.replace(/'/g,"\\'")}')">
+        <span class="nav-search-badge" style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
+        <div class="nav-search-info">
+          <div class="nav-search-code">${item.code}</div>
+          <div class="nav-search-name">${item.name}</div>
+        </div>
+      </div>`).join('');
+  }, 250);
+});
+
+document.addEventListener('click', e => {
+  if (!btInput.closest('.ticker-search-wrap').contains(e.target))
+    btDropdown.style.display = 'none';
+});
+
+function btAddTicker(code, name) {
+  if (btTickers.find(t => t.code === code)) { btDropdown.style.display='none'; return; }
+  const n = btTickers.length + 1;
+  const w = Math.round(100 / n) / 100;
+  btTickers.forEach(t => t.weight = w);
+  btTickers.push({ code, name, weight: parseFloat((1 - w*(n-1)).toFixed(2)) });
+  btInput.value = '';
+  btDropdown.style.display = 'none';
+  updateBtWeightUI();
+}
+
+// 힌트
+document.getElementById('btSeed').addEventListener('input', function() {
+  document.getElementById('btSeedHint').textContent = '₩' + (parseFloat(this.value)||0).toLocaleString();
+});
+document.getElementById('btMonthly').addEventListener('input', function() {
+  document.getElementById('btMonthlyHint').textContent = '₩' + (parseFloat(this.value)||0).toLocaleString();
+});
+
+// ── 실행 ──
+async function runBacktest() {
+  const total = Math.round(btTickers.reduce((s,t) => s+t.weight, 0) * 100);
+  if (!btTickers.length) { alert('종목을 추가해주세요.'); return; }
+  if (total !== 100)     { alert(`비중 합계가 ${total}%입니다.`); return; }
+
+  const startDate = document.getElementById('btStartDate').value;
+  const endDate   = document.getElementById('btEndDate').value;
+  if (!startDate || !endDate || startDate >= endDate) { alert('기간을 올바르게 설정해주세요.'); return; }
+
+  document.getElementById('btRunBtn').disabled       = true;
+  document.getElementById('btLoading').style.display = 'block';
+  document.getElementById('btResultEmpty').style.display   = 'none';
+  document.getElementById('btResultContent').style.display = 'none';
+
+  try {
+    const res  = await fetch('/api/backtest/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tickers:              btTickers.map(t => ({ code: t.code, weight: t.weight })),
+        start_date:           startDate,
+        end_date:             endDate,
+        initial_capital:      parseFloat(document.getElementById('btSeed').value) || 0,
+        monthly_contribution: parseFloat(document.getElementById('btMonthly').value) || 0,
+        dividend_mode:        document.querySelector('input[name="btDividend"]:checked').value,
+        rebal_mode:           document.querySelector('input[name="btRebal"]:checked').value,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    renderBacktest(data);
+  } catch(e) {
+    alert('오류: ' + e.message);
+  } finally {
+    document.getElementById('btRunBtn').disabled       = false;
+    document.getElementById('btLoading').style.display = 'none';
+  }
+}
+
+// ── 렌더링 ──
+function renderBacktest(data) {
+  document.getElementById('btResultEmpty').style.display   = 'none';
+  document.getElementById('btResultContent').style.display = 'block';
+
+  const m = data.metrics;
+
+  // 핵심 지표
+  document.getElementById('btMetrics').innerHTML = [
+    { label: '최종 자산',    value: fmtKRW(m.end_value),       cls: '' },
+    { label: '총 납입금',    value: fmtKRW(m.total_invested),  cls: '' },
+    { label: '총 수익률',    value: fmtPct(m.total_return),    cls: fmtPctClass(m.total_return) },
+    { label: 'CAGR',        value: fmtPct(m.cagr),            cls: fmtPctClass(m.cagr) },
+    { label: 'MDD',         value: fmtPct(m.mdd),             cls: 'down' },
+    { label: 'Sharpe',      value: m.sharpe ? m.sharpe.toFixed(2) : '—', cls: '' },
+    { label: '총 배당금',   value: fmtKRW(m.total_dividend),  cls: '' },
+    { label: '분석 기간',   value: m.years ? m.years.toFixed(1) + '년' : '—', cls: '' },
+  ].map(item => `
+    <div class="metric-item">
+      <div class="metric-label">${item.label}</div>
+      <div class="metric-value ${item.cls}">${item.value}</div>
+    </div>
+  `).join('');
+
+  // 가치 추이 차트
+  renderValueChart(data.history);
+
+  // 연간 수익률
+  renderAnnualChart(data.annual_returns);
+
+  // 낙폭 차트
+  renderDrawdownChart(data.history);
+}
+
+function renderValueChart(history) {
+  if (btCharts.value) btCharts.value.destroy();
+  const labels = history.map(h => h.date);
+  const values = history.map(h => h.portfolio_value);
+  const invested = history.map(h => h.total_invested);
+
+  btCharts.value = new Chart(document.getElementById('btValueChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '포트폴리오',
+          data: values,
+          borderColor: '#1976D2', borderWidth: 2,
+          backgroundColor: 'rgba(25,118,210,0.08)',
+          fill: true, pointRadius: 0, tension: 0.2,
+        },
+        {
+          label: '납입금',
+          data: invested,
+          borderColor: '#90A4AE', borderWidth: 1.5,
+          borderDash: [5, 4],
+          fill: false, pointRadius: 0, tension: 0,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { font: { size: 11 } } },
+        tooltip: { callbacks: {
+          label: ctx => ctx.dataset.label + ': ' + fmtKRW(ctx.parsed.y)
+        }}
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => fmtKRW(v) }, grid: { color: 'rgba(0,0,0,0.04)' } }
+      }
+    }
+  });
+}
+
+function renderAnnualChart(annualReturns) {
+  if (btCharts.annual) btCharts.annual.destroy();
+  if (!annualReturns || !annualReturns.length) return;
+  const labels = annualReturns.map(a => a.year + '년');
+  const values = annualReturns.map(a => a.return * 100);
+  const colors = values.map(v => v >= 0 ? 'rgba(46,125,50,0.8)' : 'rgba(198,40,40,0.8)');
+
+  btCharts.annual = new Chart(document.getElementById('btAnnualChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y.toFixed(2) + '%' }
+      }},
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.04)' } }
+      }
+    }
+  });
+}
+
+function renderDrawdownChart(history) {
+  if (btCharts.drawdown) btCharts.drawdown.destroy();
+  const labels = history.map(h => h.date);
+  const values = history.map(h => (h.drawdown || 0) * 100);
+
+  btCharts.drawdown = new Chart(document.getElementById('btDrawdownChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: '#C62828', borderWidth: 1.5,
+        backgroundColor: 'rgba(198,40,40,0.1)',
+        fill: true, pointRadius: 0, tension: 0.2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ctx.parsed.y.toFixed(2) + '%' }
+      }},
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.04)' } }
+      }
+    }
+  });
+}
+</script>
 {% endblock %}

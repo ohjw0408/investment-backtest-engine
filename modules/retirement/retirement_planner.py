@@ -165,6 +165,10 @@ class RetirementPlanner:
                 "end_value_ratio": wd_result["distribution"]["end_value_ratio"]["p50"],
                 "end_value_p50":   initial_capital * wd_result["distribution"]["end_value_ratio"]["p50"],
                 "wd_result":       wd_result,
+                "wd_end_values":   [
+                    round(c["end_value_ratio"] * initial_capital)
+                    for c in wd_result["cases"]
+                ],
             })
 
             if self.verbose:

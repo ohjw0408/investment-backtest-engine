@@ -376,3 +376,161 @@ class PriceLoader:
         # ── 캐시 저장 후 반환 ─────────────────────────────────
         self._price_cache[cache_key] = df
         return df
+    # -------------------------------------------------
+    # 종목 상세 데이터 (symbol detail page용)
+    # -------------------------------------------------
+
+    def get_symbol_data(self, code: str) -> dict:
+        """
+        종목 상세 페이지용 데이터 반환
+        - KR 주식/ETF (6자리): yfinance .KS
+        - US ETF/주식/지수/선물: yfinance
+        - KRX 금현물: index_master.db
+        - 기타 (BTC-USD 등): yfinance 직접
+        """
+        import sqlite3 as _sq
+        from datetime import datetime as _dt, timedelta as _td
+
+        today    = _dt.today().strftime("%Y-%m-%d")
+        start_dl = "2000-01-01"
+
+        # ── KRX 금현물 특별 처리 ────────────────────────
+        if code == "KRX_GOLD":
+            if self.index_conn is None:
+                raise ValueError("KRX_GOLD 데이터 없음")
+            rows = self.index_conn.execute(
+                "SELECT date, close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date"
+            ).fetchall()
+            if not rows:
+                raise ValueError("KRX_GOLD 데이터 없음")
+            prices    = [{"date": r[0], "close": round(float(r[1]), 2)} for r in rows]
+            cur_price = prices[-1]["close"]
+            prev_price = prices[-2]["close"] if len(prices) > 1 else None
+            cutoff_1y  = (_dt.now() - _td(days=365)).strftime("%Y-%m-%d")
+            prices_1y  = [p["close"] for p in prices if p["date"] >= cutoff_1y]
+            return {
+                "code": "KRX_GOLD", "name": "금 (KRX 현물)",
+                "country": "KR", "currency": "KRW",
+                "current_price": cur_price, "prev_price": prev_price,
+                "last_date": prices[-1]["date"],
+                "high_52w": max(prices_1y) if prices_1y else None,
+                "low_52w":  min(prices_1y) if prices_1y else None,
+                "div_yield": None, "issuer": "KRX", "category": "금현물",
+                "expense_ratio": None, "aum": None,
+                "dividends": [], "prices": prices,
+            }
+
+        # ── 가격 로드 ─────────────────────────────────
+        is_kr = self.is_kr_etf(code)
+        currency = "KRW" if is_kr else "USD"
+        country  = "KR"  if is_kr else "US"
+
+        df = self.get_price(code, start_dl, today, apply_fx=False)
+
+        # get_price 실패 시 yfinance 직접 (BTC-USD 등)
+        if df is None or df.empty:
+            yf_code = self._kr_yf_ticker(code) if is_kr else code
+            raw = yf.download(
+                yf_code, period="5y", progress=False,
+                auto_adjust=False, actions=True, threads=False
+            )
+            if raw.empty:
+                raise ValueError(f"{code} 데이터를 찾을 수 없습니다.")
+            if isinstance(raw.columns, pd.MultiIndex):
+                raw.columns = raw.columns.get_level_values(0)
+            raw = raw.reset_index()
+            raw["Date"] = raw["Date"].dt.strftime("%Y-%m-%d")
+            raw = raw.rename(columns={"Date": "date", "Close": "close", "Dividends": "dividend"})
+            df = raw[["date", "close"]].copy()
+            df["dividend"] = raw.get("dividend", 0)
+
+        prices    = [{"date": row["date"], "close": round(float(row["close"]), 4)}
+                     for _, row in df.iterrows()]
+        cur_price = prices[-1]["close"]
+        prev_price = prices[-2]["close"] if len(prices) > 1 else None
+        last_date  = prices[-1]["date"]
+
+        # 52주 고저
+        cutoff_1y = (_dt.now() - _td(days=365)).strftime("%Y-%m-%d")
+        prices_1y = [p["close"] for p in prices if p["date"] >= cutoff_1y]
+        high_52w  = max(prices_1y) if prices_1y else None
+        low_52w   = min(prices_1y) if prices_1y else None
+
+        # 배당 내역
+        divs_raw = self.conn.execute(
+            "SELECT date, dividend FROM corporate_actions "
+            "WHERE code=? AND dividend > 0 ORDER BY date DESC LIMIT 12",
+            (code,)
+        ).fetchall()
+        dividends   = [{"date": r[0], "dividend": round(float(r[1]), 6)} for r in divs_raw]
+        recent_divs = [d["dividend"] for d in dividends if d["date"] >= cutoff_1y]
+        div_yield   = (sum(recent_divs) / cur_price * 100) if cur_price and recent_divs else None
+
+        # 메타 정보 (symbol_master.db)
+        sym_db = META_DIR / "symbol_master.db"
+        name = issuer = category = ""
+        if sym_db.exists():
+            sc  = _sq.connect(str(sym_db))
+            row = sc.execute("SELECT * FROM symbols WHERE code=?", (code,)).fetchone()
+            sc.close()
+            if row:
+                cols = [d[0] for d in sc.description] if False else \
+                       ["id","code","name","market","country","is_etf",
+                        "underlying_symbol","category","index_name","issuer","leverage","hedge"]
+                d    = dict(zip(cols, row))
+                name     = d.get("name", "")
+                issuer   = d.get("issuer", "") or ""
+                category = d.get("category", "") or ""
+
+        # KR ETF → kr_etf_list.csv 보완
+        if is_kr and not issuer:
+            try:
+                kr_csv = META_DIR / "kr_etf_list.csv"
+                if kr_csv.exists():
+                    kr_df = pd.read_csv(str(kr_csv))
+                    r = kr_df[kr_df["code"].astype(str) == code]
+                    if not r.empty:
+                        issuer   = str(r.iloc[0].get("issuer", ""))
+                        category = category or str(r.iloc[0].get("index", ""))
+            except Exception:
+                pass
+
+        # US ETF → us_etf_list.csv 보완
+        if not is_kr and not category:
+            try:
+                us_csv = META_DIR / "us_etf_list.csv"
+                if us_csv.exists():
+                    us_df = pd.read_csv(str(us_csv))
+                    r = us_df[us_df["code"] == code]
+                    if not r.empty:
+                        category = str(r.iloc[0].get("category", ""))
+            except Exception:
+                pass
+
+        # yfinance 메타 (AUM, 보수율, 이름 보완)
+        aum = expense_ratio = None
+        try:
+            yf_code = self._kr_yf_ticker(code) if is_kr else code
+            info    = yf.Ticker(yf_code).info
+            if not name: name = info.get("longName", code)
+            if not issuer:
+                issuer = info.get("fundFamily", "") or info.get("company", "")
+            if not category:
+                category = info.get("category", "") or info.get("sector", "")
+            aum           = info.get("totalAssets")
+            expense_ratio = info.get("expenseRatio") or info.get("annualReportExpenseRatio")
+        except Exception:
+            pass
+
+        if not name:
+            name = code
+
+        return {
+            "code": code, "name": name,
+            "country": country, "currency": currency,
+            "current_price": cur_price, "prev_price": prev_price,
+            "last_date": last_date, "high_52w": high_52w, "low_52w": low_52w,
+            "div_yield": div_yield, "issuer": issuer, "category": category,
+            "expense_ratio": expense_ratio, "aum": aum,
+            "dividends": dividends, "prices": prices,
+        }

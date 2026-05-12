@@ -806,6 +806,170 @@ def retirement_withdrawal():
 
 
 
+
+# -----------------------------------------------
+# 세금 적용 시뮬레이션 API
+# -----------------------------------------------
+
+@app.route('/api/tax/run', methods=['POST'])
+def tax_run():
+    """
+    세금 적용/미적용 AccumulationAnalyzer 병렬 실행.
+    롤링 윈도우 기반 분포 결과 반환.
+    """
+    import concurrent.futures
+    from modules.tax.base_tax       import TaxEngine
+    from modules.rebalance.periodic import PeriodicRebalance
+
+    body          = request.get_json()
+    tickers_input = body['tickers']
+    tickers       = [t['code']   for t in tickers_input]
+    weights       = {t['code']:  t['weight'] for t in tickers_input}
+    accounts      = body['accounts']
+    user_settings = body.get('user_settings', {})
+    dividend_mode = body.get('dividend_mode', 'reinvest')
+    rebal_mode    = body.get('rebal_mode', 'none')
+    years         = int(body.get('years', 20))
+
+    rebal_freq = None if rebal_mode == 'none' else rebal_mode
+    drift      = 0.05 if rebal_mode == 'band' else None
+
+    def make_strategy():
+        return PeriodicRebalance(
+            target_weights=weights,
+            rebalance_frequency=rebal_freq,
+            drift_threshold=drift,
+        )
+
+    try:
+        # 데이터 범위
+        usdkrw_start = portfolio_engine.loader.USD_KRW_START
+        data_end     = datetime.date.today().strftime('%Y-%m-%d')
+        price_starts = [get_price_start(t) for t in tickers]
+        price_starts = [d for d in price_starts if d]
+        data_start   = max([usdkrw_start] + price_starts) if price_starts else usdkrw_start
+
+        from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
+        from modules.tax.base_tax                     import TaxEngine
+        from modules.tax.account_tax                  import check_contribution_limits
+
+        warnings = check_contribution_limits(accounts)
+
+        def run_one(apply_tax, account_type="위탁", initial=None, monthly=None):
+            """단일 계좌 AccumulationAnalyzer 실행."""
+            total_init = sum(a.get('initial_capital', 0) for a in accounts)
+            total_mon  = sum(a.get('monthly_contribution', 0) for a in accounts)
+            ic  = initial if initial is not None else total_init
+            mc  = monthly if monthly is not None else total_mon
+
+            tax_eng = TaxEngine(user_settings) if apply_tax else None
+
+            analyzer = AccumulationAnalyzer(
+                portfolio_engine     = portfolio_engine,
+                tickers              = tickers,
+                strategy_factory     = make_strategy,
+                data_start           = data_start,
+                data_end             = data_end,
+                accumulation_years   = years,
+                monthly_contribution = mc,
+                initial_capital      = ic,
+                dividend_mode        = dividend_mode,
+                step_months          = 3,
+                verbose              = False,
+                tax_engine           = tax_eng,
+                account_type         = account_type,
+            )
+            return analyzer.run()
+
+        # ── 단일 계좌 ────────────────────────────────────
+        if len(accounts) == 1:
+            acc_type = accounts[0].get('type', '위탁')
+            total_init = accounts[0].get('initial_capital', 0)
+            total_mon  = accounts[0].get('monthly_contribution', 0)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+                f_before = ex.submit(run_one, False, acc_type, total_init, total_mon)
+                f_after  = ex.submit(run_one, True,  acc_type, total_init, total_mon)
+                result_before = f_before.result()
+                result_after  = f_after.result()
+
+        # ── 복수 계좌: 각 계좌별 실행 후 케이스 합산 ─────
+        else:
+            def run_account(acc, apply_tax):
+                return run_one(
+                    apply_tax,
+                    acc.get('type', '위탁'),
+                    acc.get('initial_capital', 0),
+                    acc.get('monthly_contribution', 0),
+                )
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(accounts)*2) as ex:
+                futures_before = [ex.submit(run_account, a, False) for a in accounts]
+                futures_after  = [ex.submit(run_account, a, True)  for a in accounts]
+                results_before = [f.result() for f in futures_before]
+                results_after  = [f.result() for f in futures_after]
+
+            result_before = _merge_acc_results(results_before)
+            result_after  = _merge_acc_results(results_after)
+
+        def fmt_result(r):
+            # distribution 그대로 전달 (renderResult와 동일한 형식)
+            return {
+                'distribution': r['distribution'],
+                'cases':        [{'start': c['start'], 'end_value': round(c['end_value'])}
+                                  for c in r['cases']],
+                'cases_count':  len(r['cases']),
+            }
+
+        return jsonify({
+            'before':   fmt_result(result_before),
+            'after':    fmt_result(result_after),
+            'warnings': warnings,
+            'accounts': accounts,
+        })
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+def _merge_acc_results(results: list) -> dict:
+    """복수 계좌 AccumulationAnalyzer 결과 합산."""
+    import numpy as np
+    if not results:
+        return {'cases': [], 'distribution': {}}
+
+    # 공통 날짜 기준 케이스 합산
+    by_start = {}
+    for r in results:
+        for c in r['cases']:
+            key = c['start']
+            if key not in by_start:
+                by_start[key] = dict(c)
+            else:
+                by_start[key]['end_value'] = by_start[key]['end_value'] + c['end_value']
+
+    merged_cases = list(by_start.values())
+
+    # 분포 재계산
+    ev = np.array([c['end_value'] for c in merged_cases])
+    distribution = {
+        'end_value': {
+            'p10': float(np.percentile(ev,10)), 'p25': float(np.percentile(ev,25)),
+            'p50': float(np.percentile(ev,50)), 'p75': float(np.percentile(ev,75)),
+            'p90': float(np.percentile(ev,90)), 'mean': float(np.mean(ev)),
+            'std': float(np.std(ev)), 'values': ev.tolist(),
+        }
+    }
+
+    # 나머지 지표는 첫 번째 결과에서 가져옴
+    for k, v in results[0]['distribution'].items():
+        if k != 'end_value':
+            distribution[k] = v
+
+    return {'cases': merged_cases, 'distribution': distribution}
+
+
 # -----------------------------------------------
 # 내 자산 API
 # -----------------------------------------------

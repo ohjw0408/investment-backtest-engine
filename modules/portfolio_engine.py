@@ -66,9 +66,10 @@ class PortfolioEngine:
     # 핵심 실행
     # -------------------------------------------------
 
-    def run(self, config: SimulationConfig, strategy):
+    def run(self, config: SimulationConfig, strategy, portfolio_class=None):
 
-        portfolio = Portfolio(config.initial_capital)
+        pf_cls    = portfolio_class if portfolio_class is not None else Portfolio
+        portfolio = pf_cls(config.initial_capital)
 
         # 🔥 전체 범위 캐시 key (tickers + 전체 범위)
         # preload()가 먼저 호출됐으면 캐시 히트
@@ -103,10 +104,20 @@ class PortfolioEngine:
 
         history_df = recorder.to_dataframe()
 
+        # 마지막 가격 저장 (최종 청산세 계산용)
+        last_prices = {}
+        if sliced_dates:
+            last_date = sliced_dates[-1]
+            for ticker in config.tickers:
+                df = sliced_data.get(ticker)
+                if df is not None and not df.empty:
+                    last_prices[ticker] = float(df["close"].iloc[-1])
+
         return {
             "history":     history_df,
             "final_value": history_df["portfolio_value"].iloc[-1],
-            "portfolio":   portfolio
+            "portfolio":   portfolio,
+            "last_prices": last_prices,
         }
 
     def _find_cached_or_load(self, config):
@@ -151,6 +162,7 @@ class PortfolioEngine:
         withdrawal_amount    = 0,
         dividend_mode        = "reinvest",
         inflation            = 0.0,
+        **kwargs,
     ):
 
         config = SimulationConfig(
@@ -166,4 +178,5 @@ class PortfolioEngine:
             inflation            = inflation,
         )
 
-        return self.run(config, strategy)
+        return self.run(config, strategy,
+                       portfolio_class=kwargs.get("portfolio_class"))

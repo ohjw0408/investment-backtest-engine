@@ -295,6 +295,17 @@ def calculator_run():
         div_starts = [d for d in div_starts if d]
         div_start  = max(div_starts) if div_starts else None
 
+        # 세금 엔진 (선택)
+        tax_enabled      = body.get('tax_enabled', False)
+        account_type     = body.get('account_type', '위탁')
+        user_settings    = body.get('user_settings', {})
+        isa_renewal      = body.get('isa_renewal', False)
+        gain_harvesting  = body.get('gain_harvesting', False)
+        tax_engine       = None
+        if tax_enabled:
+            from modules.tax.base_tax import TaxEngine
+            tax_engine = TaxEngine(user_settings)
+
         analyzer = AccumulationAnalyzer(
             portfolio_engine     = portfolio_engine,
             tickers              = ticker_codes,
@@ -308,6 +319,10 @@ def calculator_run():
             step_months          = 3,
             verbose              = False,
             div_start            = div_start,
+            tax_engine           = tax_engine,
+            account_type         = account_type,
+            isa_renewal          = isa_renewal,
+            gain_harvesting      = gain_harvesting,
         )
 
         result = analyzer.run()
@@ -654,6 +669,17 @@ def retirement_run():
 
         # 1. 축적기
         from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
+        # 세금 파라미터
+        tax_enabled     = body.get('tax_enabled', False)
+        account_type    = body.get('account_type', '위탁')
+        user_settings   = body.get('user_settings', {})
+        isa_renewal     = body.get('isa_renewal', False)
+        gain_harvesting = body.get('gain_harvesting', False)
+        ret_tax_engine  = None
+        if tax_enabled:
+            from modules.tax.base_tax import TaxEngine
+            ret_tax_engine = TaxEngine(user_settings)
+
         acc_analyzer = AccumulationAnalyzer(
             portfolio_engine     = portfolio_engine,
             tickers              = ticker_codes,
@@ -667,6 +693,10 @@ def retirement_run():
             step_months          = 3,
             verbose              = False,
             div_start            = div_start,
+            tax_engine           = ret_tax_engine,
+            account_type         = account_type,
+            isa_renewal          = isa_renewal,
+            gain_harvesting      = gain_harvesting,
         )
         acc_result = acc_analyzer.run()
 
@@ -718,6 +748,8 @@ def retirement_run():
             "data_start":        data_start,
             "synthetic_info":    synthetic_info,
             "backfilled":        backfilled,
+            "tax_enabled":       tax_enabled,
+            "account_type":      account_type if tax_enabled else None,
         })
 
     except Exception as e:
@@ -759,6 +791,16 @@ def retirement_withdrawal():
 
         data_start = prep["data_start"]
 
+        # 세금 파라미터
+        tax_enabled   = body.get('tax_enabled', False)
+        account_type  = body.get('account_type', '위탁')
+        user_settings = body.get('user_settings', {})
+        acc_years     = int(body.get('accumulation_years', 0))
+        ret_tax_engine = None
+        if tax_enabled:
+            from modules.tax.base_tax import TaxEngine
+            ret_tax_engine = TaxEngine(user_settings)
+
         from modules.retirement.withdrawal_analyzer import WithdrawalAnalyzer
         wd_analyzer = WithdrawalAnalyzer(
             portfolio_engine   = portfolio_engine,
@@ -773,6 +815,10 @@ def retirement_withdrawal():
             dividend_mode      = dividend_mode,
             step_months        = 3,
             verbose            = False,
+            tax_engine         = ret_tax_engine,
+            account_type       = account_type if tax_enabled else "위탁",
+            current_age        = user_settings.get("age", 40) if tax_enabled else 40,
+            accumulation_years = acc_years,
         )
         result = wd_analyzer.run()
 
@@ -791,10 +837,13 @@ def retirement_withdrawal():
                     "p90":  round(dist['end_value_ratio']['p90'] * initial_capital),
                 },
             },
-            "wd_values":     end_vals,
-            "data_start":    data_start,
-            "n_real":        result.get("n_real"),
-            "n_synthetic":   result.get("n_synthetic"),
+            "wd_values":        end_vals,
+            "data_start":       data_start,
+            "n_real":           result.get("n_real"),
+            "n_synthetic":      result.get("n_synthetic"),
+            "pension_tax_info": result.get("pension_tax_info"),
+            "tax_enabled":      tax_enabled,
+            "account_type":     account_type if tax_enabled else None,
         })
 
     except Exception as e:
@@ -806,168 +855,6 @@ def retirement_withdrawal():
 
 
 
-
-# -----------------------------------------------
-# 세금 적용 시뮬레이션 API
-# -----------------------------------------------
-
-@app.route('/api/tax/run', methods=['POST'])
-def tax_run():
-    """
-    세금 적용/미적용 AccumulationAnalyzer 병렬 실행.
-    롤링 윈도우 기반 분포 결과 반환.
-    """
-    import concurrent.futures
-    from modules.tax.base_tax       import TaxEngine
-    from modules.rebalance.periodic import PeriodicRebalance
-
-    body          = request.get_json()
-    tickers_input = body['tickers']
-    tickers       = [t['code']   for t in tickers_input]
-    weights       = {t['code']:  t['weight'] for t in tickers_input}
-    accounts      = body['accounts']
-    user_settings = body.get('user_settings', {})
-    dividend_mode = body.get('dividend_mode', 'reinvest')
-    rebal_mode    = body.get('rebal_mode', 'none')
-    years         = int(body.get('years', 20))
-
-    rebal_freq = None if rebal_mode == 'none' else rebal_mode
-    drift      = 0.05 if rebal_mode == 'band' else None
-
-    def make_strategy():
-        return PeriodicRebalance(
-            target_weights=weights,
-            rebalance_frequency=rebal_freq,
-            drift_threshold=drift,
-        )
-
-    try:
-        # 데이터 범위
-        usdkrw_start = portfolio_engine.loader.USD_KRW_START
-        data_end     = datetime.date.today().strftime('%Y-%m-%d')
-        price_starts = [get_price_start(t) for t in tickers]
-        price_starts = [d for d in price_starts if d]
-        data_start   = max([usdkrw_start] + price_starts) if price_starts else usdkrw_start
-
-        from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
-        from modules.tax.base_tax                     import TaxEngine
-        from modules.tax.account_tax                  import check_contribution_limits
-
-        warnings = check_contribution_limits(accounts)
-
-        def run_one(apply_tax, account_type="위탁", initial=None, monthly=None):
-            """단일 계좌 AccumulationAnalyzer 실행."""
-            total_init = sum(a.get('initial_capital', 0) for a in accounts)
-            total_mon  = sum(a.get('monthly_contribution', 0) for a in accounts)
-            ic  = initial if initial is not None else total_init
-            mc  = monthly if monthly is not None else total_mon
-
-            tax_eng = TaxEngine(user_settings) if apply_tax else None
-
-            analyzer = AccumulationAnalyzer(
-                portfolio_engine     = portfolio_engine,
-                tickers              = tickers,
-                strategy_factory     = make_strategy,
-                data_start           = data_start,
-                data_end             = data_end,
-                accumulation_years   = years,
-                monthly_contribution = mc,
-                initial_capital      = ic,
-                dividend_mode        = dividend_mode,
-                step_months          = 3,
-                verbose              = False,
-                tax_engine           = tax_eng,
-                account_type         = account_type,
-            )
-            return analyzer.run()
-
-        # ── 단일 계좌 ────────────────────────────────────
-        if len(accounts) == 1:
-            acc_type = accounts[0].get('type', '위탁')
-            total_init = accounts[0].get('initial_capital', 0)
-            total_mon  = accounts[0].get('monthly_contribution', 0)
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-                f_before = ex.submit(run_one, False, acc_type, total_init, total_mon)
-                f_after  = ex.submit(run_one, True,  acc_type, total_init, total_mon)
-                result_before = f_before.result()
-                result_after  = f_after.result()
-
-        # ── 복수 계좌: 각 계좌별 실행 후 케이스 합산 ─────
-        else:
-            def run_account(acc, apply_tax):
-                return run_one(
-                    apply_tax,
-                    acc.get('type', '위탁'),
-                    acc.get('initial_capital', 0),
-                    acc.get('monthly_contribution', 0),
-                )
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(accounts)*2) as ex:
-                futures_before = [ex.submit(run_account, a, False) for a in accounts]
-                futures_after  = [ex.submit(run_account, a, True)  for a in accounts]
-                results_before = [f.result() for f in futures_before]
-                results_after  = [f.result() for f in futures_after]
-
-            result_before = _merge_acc_results(results_before)
-            result_after  = _merge_acc_results(results_after)
-
-        def fmt_result(r):
-            # distribution 그대로 전달 (renderResult와 동일한 형식)
-            return {
-                'distribution': r['distribution'],
-                'cases':        [{'start': c['start'], 'end_value': round(c['end_value'])}
-                                  for c in r['cases']],
-                'cases_count':  len(r['cases']),
-            }
-
-        return jsonify({
-            'before':   fmt_result(result_before),
-            'after':    fmt_result(result_after),
-            'warnings': warnings,
-            'accounts': accounts,
-        })
-
-    except Exception as e:
-        import traceback; traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
-def _merge_acc_results(results: list) -> dict:
-    """복수 계좌 AccumulationAnalyzer 결과 합산."""
-    import numpy as np
-    if not results:
-        return {'cases': [], 'distribution': {}}
-
-    # 공통 날짜 기준 케이스 합산
-    by_start = {}
-    for r in results:
-        for c in r['cases']:
-            key = c['start']
-            if key not in by_start:
-                by_start[key] = dict(c)
-            else:
-                by_start[key]['end_value'] = by_start[key]['end_value'] + c['end_value']
-
-    merged_cases = list(by_start.values())
-
-    # 분포 재계산
-    ev = np.array([c['end_value'] for c in merged_cases])
-    distribution = {
-        'end_value': {
-            'p10': float(np.percentile(ev,10)), 'p25': float(np.percentile(ev,25)),
-            'p50': float(np.percentile(ev,50)), 'p75': float(np.percentile(ev,75)),
-            'p90': float(np.percentile(ev,90)), 'mean': float(np.mean(ev)),
-            'std': float(np.std(ev)), 'values': ev.tolist(),
-        }
-    }
-
-    # 나머지 지표는 첫 번째 결과에서 가져옴
-    for k, v in results[0]['distribution'].items():
-        if k != 'end_value':
-            distribution[k] = v
-
-    return {'cases': merged_cases, 'distribution': distribution}
 
 
 # -----------------------------------------------
@@ -1151,10 +1038,45 @@ def backtest_run():
 
         price_data, dates = portfolio_engine.price_loader.load(tickers, start_date, end_date)
 
-        portfolio = Portfolio(initial)
-        loop      = SimulationLoop(
-            DividendEngine(), ContributionEngine(), WithdrawalEngine(),
-            OrderExecutor(), CashAllocator()
+        # 세금 주입
+        tax_enabled     = body.get('tax_enabled', False)
+        account_type    = body.get('account_type', '위탁')
+        user_settings   = body.get('user_settings', {})
+        gain_harvesting = body.get('gain_harvesting', False)
+
+        # 계좌별 투자 제약 검증
+        if tax_enabled and account_type != '위탁':
+            from modules.tax.base_tax    import TaxEngine as _TaxEngine
+            from modules.tax.account_tax import validate_account_portfolio
+            _check = validate_account_portfolio(
+                account_type, tickers, weights, _TaxEngine(user_settings)
+            )
+            if not _check['valid']:
+                return jsonify({
+                    'error':      'account_restrictions',
+                    'violations': _check['violations'],
+                    'disclaimer': _check.get('disclaimer'),
+                }), 400
+
+        bt_tax_engine   = None
+        if tax_enabled:
+            from modules.tax.base_tax    import TaxEngine
+            from modules.tax.account_tax import TaxedDividendEngine
+            from modules.execution.order_executor import TaxedOrderExecutor
+            from modules.core.portfolio  import TaxTrackedPortfolio
+            bt_tax_engine = TaxEngine(user_settings)
+            div_engine    = TaxedDividendEngine(DividendEngine(), bt_tax_engine, account_type)
+            exec_engine   = TaxedOrderExecutor(bt_tax_engine, account_type,
+                                               gain_harvesting=gain_harvesting)
+            portfolio     = TaxTrackedPortfolio(initial)
+        else:
+            div_engine    = DividendEngine()
+            exec_engine   = OrderExecutor()
+            portfolio     = Portfolio(initial)
+
+        loop = SimulationLoop(
+            div_engine, ContributionEngine(), WithdrawalEngine(),
+            exec_engine, CashAllocator()
         )
         recorder = HistoryRecorder()
         loop.run(portfolio, strategy, config, price_data, dates, recorder)
@@ -1169,6 +1091,36 @@ def backtest_run():
         # 총 납입금
         total_invested = initial + monthly * years * 12
         end_value      = float(pv.iloc[-1])
+
+        # 세금 적용: 최종 청산세
+        if tax_enabled and bt_tax_engine:
+            from modules.tax.base_tax import TaxEngine as _TE
+            if account_type == 'ISA':
+                end_value = bt_tax_engine.after_tax_withdrawal(
+                    end_value, 'ISA', total_invested)
+            elif account_type in ('연금저축', 'IRP'):
+                end_value = bt_tax_engine.after_tax_withdrawal(
+                    end_value, account_type, total_invested,
+                    age=user_settings.get('age', 40))
+            else:
+                # 위탁: 미실현 차익 최종 청산세 (손익통산 적용)
+                gain = end_value - total_invested
+                if gain > 0:
+                    kr_foreign_gains = 0.0
+                    us_direct_gains  = 0.0
+                    for t, w in weights.items():
+                        t_gain = gain * w  # 비중별 미실현 차익 근사
+                        asset_type = bt_tax_engine.classify_asset(t)
+                        if asset_type == 'KR_FOREIGN':
+                            kr_foreign_gains += t_gain
+                        elif asset_type == 'US_DIRECT':
+                            us_direct_gains += t_gain
+                    total_tax = 0.0
+                    if kr_foreign_gains > 0:
+                        total_tax += kr_foreign_gains * 0.154
+                    if us_direct_gains > 0:
+                        total_tax += max(0.0, us_direct_gains - 2_500_000) * 0.22
+                    end_value -= total_tax
         total_return   = (end_value / total_invested - 1) if total_invested > 0 else 0
 
         # CAGR
@@ -1215,6 +1167,8 @@ def backtest_run():
                 annual_returns.append({'year': int(yr), 'return': round((e / s - 1), 4)})
 
         return jsonify({
+            'tax_enabled':  tax_enabled,
+            'account_type': account_type if tax_enabled else None,
             'metrics': {
                 'end_value':       round(end_value),
                 'total_invested':  round(total_invested),

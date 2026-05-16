@@ -193,14 +193,41 @@ async function runCalculator() {
   const dividendMode = document.querySelector('input[name="dividend"]:checked').value;
   const bandWidth    = Number(document.getElementById('bandSlider').value) / 100;
 
+  // 세금 파라미터
+  const taxEnabled  = window.taxEnabled || false;
+  const taxAccounts = window.taxAccounts || [];
+  const isSingle    = taxAccounts.length <= 1;
+  const totalInit   = Number(document.getElementById('initialCapital').value);
+  const totalMon    = Number(document.getElementById('monthlyContrib').value);
+
+  // 복수 계좌일 때 대표 계좌 타입 (첫 번째 계좌 기준)
+  const accountType = taxAccounts.length > 0 ? taxAccounts[0].type : '위탁';
+
+  // 복수 계좌면 합산해서 단일 시뮬로 (단순화)
+  const effectiveInit = taxAccounts.length > 0
+    ? taxAccounts.reduce((s,a) => s + (isSingle ? totalInit : Math.round(totalInit * a.pct/100)), 0)
+    : totalInit;
+  const effectiveMon = taxAccounts.length > 0
+    ? taxAccounts.reduce((s,a) => s + (isSingle ? totalMon : Math.round(totalMon * a.pct/100)), 0)
+    : totalMon;
+
   const payload = {
     tickers:              tickers.map(t => ({ code: t.code, weight: t.weight / 100 })),
-    initial_capital:      Number(document.getElementById('initialCapital').value),
-    monthly_contribution: Number(document.getElementById('monthlyContrib').value),
+    initial_capital:      isSingle ? totalInit : effectiveInit,
+    monthly_contribution: isSingle ? totalMon  : effectiveMon,
     years:                Number(document.getElementById('yearsSlider').value),
     rebal_mode:           rebalMode,
     band_width:           bandWidth,
     dividend_mode:        dividendMode,
+    tax_enabled:          taxEnabled,
+    account_type:         accountType,
+    isa_renewal:          taxEnabled && (document.getElementById('isaRenewalCheck')?.checked ?? false),
+    gain_harvesting:      taxEnabled && (window.taxAccounts||[]).some(a => a.type === '위탁') && (document.getElementById('gainHarvestingCheck')?.checked ?? false),
+    user_settings: taxEnabled ? {
+      earned_income: Number(document.getElementById('taxEarnedIncome')?.value || 50000000),
+      age:           Number(document.getElementById('taxAge')?.value || 40),
+      isa_type:      'general',
+    } : {},
   };
 
   try {
@@ -416,393 +443,169 @@ function fmtPct(v) {
   return (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
 }
 // ═══════════════════════════════════════════════════════════
-// 세금 엔진
+// 세금 토글 + 계좌 설정
 // ═══════════════════════════════════════════════════════════
 
-let taxEnabled     = false;
-let taxAccounts    = [];
-let taxResultCache = null;
-let taxCurrentView = 'before';
+window.taxEnabled  = false;
+window.taxAccounts = [];
 const ACCOUNT_TYPES = ['위탁', 'ISA', '연금저축', 'IRP'];
 
-// ── 토글 ──
 function toggleTax() {
-  taxEnabled = !taxEnabled;
+  window.taxEnabled = !window.taxEnabled;
   const wrap  = document.getElementById('taxToggleWrap');
   const thumb = document.getElementById('taxToggleThumb');
   const label = document.getElementById('taxToggleLabel');
   const panel = document.getElementById('taxPanel');
-  wrap.style.background = taxEnabled ? 'var(--blue)' : 'var(--border)';
-  thumb.style.left      = taxEnabled ? '23px' : '3px';
-  label.textContent     = taxEnabled ? 'ON'  : 'OFF';
-  label.style.color     = taxEnabled ? 'var(--blue)' : 'var(--text-muted)';
-  panel.style.display   = taxEnabled ? 'block' : 'none';
-  if (taxEnabled && taxAccounts.length === 0) addTaxAccount();
-  taxResultCache = null;
-  document.getElementById('taxCompareSection').style.display = 'none';
+  wrap.style.background = window.taxEnabled ? 'var(--blue)' : 'var(--border)';
+  thumb.style.left      = window.taxEnabled ? '23px' : '3px';
+  label.textContent     = window.taxEnabled ? 'ON'  : 'OFF';
+  label.style.color     = window.taxEnabled ? 'var(--blue)' : 'var(--text-muted)';
+  panel.style.display   = window.taxEnabled ? 'block' : 'none';
+  if (window.taxEnabled && window.taxAccounts.length === 0) addTaxAccount();
 }
 
-// ── 계좌 추가/삭제 ──
 function addTaxAccount() {
-  taxAccounts.push({ type: '위탁', pct: 100 });
+  window.taxAccounts.push({ type: '위탁', pct: 100 });
   rebalancePcts();
   renderTaxAccounts();
 }
 
 function removeTaxAccount(idx) {
-  taxAccounts.splice(idx, 1);
-  if (taxAccounts.length > 0) rebalancePcts();
+  window.taxAccounts.splice(idx, 1);
+  if (window.taxAccounts.length > 0) rebalancePcts();
   renderTaxAccounts();
 }
 
 function updateTaxAccountType(idx, type) {
-  taxAccounts[idx].type = type;
+  window.taxAccounts[idx].type = type;
   renderTaxAccounts();
 }
 
 function updateTaxAccountPct(idx, val) {
-  // 마지막 계좌는 나머지로 자동 조정
-  taxAccounts[idx].pct = Math.max(0, Math.min(100, Number(val) || 0));
-  if (idx < taxAccounts.length - 1) {
-    const remaining = 100 - taxAccounts.slice(0, -1).reduce((s, a) => s + a.pct, 0);
-    taxAccounts[taxAccounts.length - 1].pct = Math.max(0, remaining);
+  window.taxAccounts[idx].pct = Math.max(0, Math.min(100, Number(val) || 0));
+  if (idx < window.taxAccounts.length - 1) {
+    const used = window.taxAccounts.slice(0, -1).reduce((s, a) => s + a.pct, 0);
+    window.taxAccounts[window.taxAccounts.length - 1].pct = Math.max(0, 100 - used);
   }
   renderTaxAccounts();
 }
 
 function rebalancePcts() {
-  const n = taxAccounts.length;
-  if (n === 0) return;
+  const n = window.taxAccounts.length;
+  if (!n) return;
   const base = Math.floor(100 / n);
-  let   rem  = 100 - base * n;
-  taxAccounts.forEach((a, i) => { a.pct = base + (i === 0 ? rem : 0); });
-}
-
-function getAccountAmounts(acc) {
-  const totalInitial = Number(document.getElementById('initialCapital').value) || 0;
-  const totalMonthly = Number(document.getElementById('monthlyContrib').value)  || 0;
-  return {
-    initial_capital:      Math.round(totalInitial * acc.pct / 100),
-    monthly_contribution: Math.round(totalMonthly * acc.pct / 100),
-  };
-}
-
-function hasPensionAccount() {
-  return taxAccounts.some(a => a.type === '연금저축' || a.type === 'IRP');
-}
-
-// ── 계좌 UI 렌더링 ──
-function renderTaxAccounts() {
-  const n           = taxAccounts.length;
-  const totalInit   = Number(document.getElementById('initialCapital').value) || 0;
-  const totalMonthly= Number(document.getElementById('monthlyContrib').value) || 0;
-  const list        = document.getElementById('taxAccountList');
-  const isSingle    = n <= 1;
-
-  if (n === 0) {
-    list.innerHTML = '<div style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:8px;">계좌를 추가해주세요</div>';
-    return;
-  }
-
-  // 할당 시각화 바 (2개 이상일 때)
-  let allocBar = '';
-  if (!isSingle) {
-    const segments = taxAccounts.map(a => {
-      const colors = { '위탁':'#1976D2','ISA':'#2E7D32','연금저축':'#7B1FA2','IRP':'#E65100' };
-      return `<div style="flex:${a.pct};background:${colors[a.type]||'#90A4AE'};height:100%;
-                           display:flex;align-items:center;justify-content:center;
-                           font-size:10px;color:white;font-weight:700;min-width:0;overflow:hidden;">
-                ${a.pct > 8 ? a.pct+'%' : ''}
-              </div>`;
-    }).join('');
-
-    const totalPct = taxAccounts.reduce((s,a)=>s+a.pct, 0);
-    const pctColor = Math.abs(totalPct-100)<1 ? '#2E7D32' : '#C62828';
-    allocBar = `
-      <div style="margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">
-          <span>초기 ${fmtTaxKRW(totalInit)} 배분</span>
-          <span style="color:${pctColor};font-weight:700;">합계 ${totalPct}%</span>
-        </div>
-        <div style="height:20px;border-radius:8px;overflow:hidden;display:flex;background:var(--border);">
-          ${segments}
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-top:3px;">
-          <span>월 납입 ${fmtTaxKRW(totalMonthly)} 배분</span>
-        </div>
-      </div>`;
-  }
-
-  // 계좌 행 렌더링
-  const colors = { '위탁':'#1976D2','ISA':'#2E7D32','연금저축':'#7B1FA2','IRP':'#E65100' };
-  const rows = taxAccounts.map((acc, i) => {
-    const amounts = getAccountAmounts(acc);
-    if (isSingle) {
-      // 단일 계좌: 유형만 선택, 금액은 상단 설정 그대로
-      return `
-        <div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;
-                    display:flex;align-items:center;gap:8px;">
-          <select onchange="updateTaxAccountType(${i},this.value)"
-            style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.85rem;background:white;">
-            ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-          <span style="font-size:0.75rem;color:var(--text-muted);">상단 설정값 사용</span>
-          <button onclick="removeTaxAccount(${i})"
-            style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:0;">✕</button>
-        </div>`;
-    } else {
-      // 복수 계좌: 비율 입력, 금액 자동 계산
-      return `
-        <div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-            <div style="width:10px;height:10px;border-radius:50%;background:${colors[acc.type]||'#90A4AE'};flex-shrink:0;"></div>
-            <select onchange="updateTaxAccountType(${i},this.value)"
-              style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;background:white;">
-              ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
-            </select>
-            <div style="display:flex;align-items:center;gap:4px;width:80px;">
-              <input type="number" value="${acc.pct}" min="0" max="100" step="1"
-                onchange="updateTaxAccountPct(${i},this.value)"
-                style="width:50px;border:1.5px solid var(--border);border-radius:6px;padding:4px 6px;font-size:0.82rem;text-align:center;">
-              <span style="font-size:0.8rem;color:var(--text-muted);">%</span>
-            </div>
-            <button onclick="removeTaxAccount(${i})"
-              style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:0;">✕</button>
-          </div>
-          <div style="display:flex;gap:12px;font-size:0.75rem;color:var(--text-muted);">
-            <span>초기 <b style="color:var(--text);">${fmtTaxKRW(amounts.initial_capital)}</b></span>
-            <span>월 <b style="color:var(--text);">${fmtTaxKRW(amounts.monthly_contribution)}</b></span>
-          </div>
-        </div>`;
-    }
-  }).join('');
-
-  list.innerHTML = allocBar + rows;
-
-  // 세액공제 재투자 메뉴 표시/숨김
-  const deductWrap = document.getElementById('taxDeductionSection');
-  if (deductWrap) deductWrap.style.display = hasPensionAccount() ? 'block' : 'none';
-
-  // 납입한도 경고
-  checkTaxLimits();
+  const rem  = 100 - base * n;
+  window.taxAccounts.forEach((a, i) => { a.pct = base + (i === 0 ? rem : 0); });
 }
 
 function fmtTaxKRW(v) {
   if (!v) return '₩0';
-  if (Math.abs(v) >= 1e8) return '₩'+(v/1e8).toFixed(1)+'억';
-  if (Math.abs(v) >= 1e4) return '₩'+(v/1e4).toFixed(0)+'만';
-  return '₩'+Math.round(v).toLocaleString();
+  if (Math.abs(v) >= 1e8) return '₩' + (v/1e8).toFixed(1) + '억';
+  if (Math.abs(v) >= 1e4) return '₩' + Math.round(v/1e4) + '만';
+  return '₩' + Math.round(v).toLocaleString();
 }
 
-function checkTaxLimits() {
-  const warnings = [];
-  const totalMonthly = Number(document.getElementById('monthlyContrib').value) || 0;
-  let pensionAnnual = 0, irpAnnual = 0;
+function renderTaxAccounts() {
+  const accs     = window.taxAccounts;
+  const isSingle = accs.length <= 1;
+  const totalI   = Number(document.getElementById('initialCapital').value) || 0;
+  const totalM   = Number(document.getElementById('monthlyContrib').value)  || 0;
+  const list     = document.getElementById('taxAccountList');
+  if (!list) return;
 
-  taxAccounts.forEach(a => {
-    const monthly = Math.round(totalMonthly * a.pct / 100);
-    if (a.type === '연금저축') pensionAnnual += monthly * 12;
-    if (a.type === 'IRP')     irpAnnual     += monthly * 12;
-  });
+  const colors = { '위탁':'#1976D2','ISA':'#2E7D32','연금저축':'#7B1FA2','IRP':'#E65100' };
 
-  const combined = pensionAnnual + irpAnnual;
-  if (combined > 18_000_000)
-    warnings.push(`⚠ 연금저축+IRP 연간 납입 합계 ${fmtTaxKRW(combined)}이 한도(1,800만)를 초과합니다.`);
-  if (Math.min(pensionAnnual, 6_000_000) + irpAnnual > 9_000_000)
-    warnings.push(`⚠ 세액공제 한도(900만) 초과분은 공제 불가합니다.`);
-
-  const totalInitial = Number(document.getElementById('initialCapital').value) || 0;
-  taxAccounts.forEach(a => {
-    if (a.type === 'ISA') {
-      const monthly = Math.round(totalMonthly * a.pct / 100);
-      if (monthly * 12 > 20_000_000)
-        warnings.push(`⚠ ISA 연간 납입 ${fmtTaxKRW(monthly*12)}이 한도(2,000만)를 초과합니다.`);
-    }
-  });
-
-  const warnEl = document.getElementById('taxWarnings');
-  if (warnEl) warnEl.innerHTML = warnings
-    .map(w=>`<div style="font-size:0.75rem;color:#C62828;background:#FFEBEE;padding:6px 10px;border-radius:6px;margin-bottom:4px;">${w}</div>`)
-    .join('');
-}
-
-// ── 실행 ──
-const _origRunCalc = window.runCalculator;
-window.runCalculator = async function() {
-  if (!taxEnabled) return _origRunCalc();
-
-  if (tickers.length === 0) { alert('종목을 최소 1개 이상 추가해주세요.'); return; }
-  if (taxAccounts.length === 0) { alert('계좌를 추가해주세요.'); return; }
-  const totalWeight = tickers.reduce((s, t) => s + t.weight, 0);
-  if (totalWeight > 100) { alert('비중 합계가 100%를 초과했어요.'); return; }
-
-  const btn = document.getElementById('runBtn');
-  btn.disabled = true;
-  document.getElementById('runBtnText').style.display    = 'none';
-  document.getElementById('runBtnSpinner').style.display = 'inline';
-
-  const totalInitial = Number(document.getElementById('initialCapital').value) || 0;
-  const totalMonthly = Number(document.getElementById('monthlyContrib').value) || 0;
-  const isSingle     = taxAccounts.length === 1;
-
-  const accountsPayload = taxAccounts.map(a => ({
-    type:                 a.type,
-    initial_capital:      isSingle ? totalInitial : Math.round(totalInitial * a.pct / 100),
-    monthly_contribution: isSingle ? totalMonthly : Math.round(totalMonthly * a.pct / 100),
-  }));
-
-  const payload = {
-    tickers:            tickers.map(t => ({ code: t.code, weight: t.weight / 100 })),
-    years:              Number(document.getElementById('yearsSlider').value),
-    rebal_mode:         document.querySelector('input[name="rebal"]:checked').value,
-    dividend_mode:      document.querySelector('input[name="dividend"]:checked').value,
-    accounts:           accountsPayload,
-    user_settings: {
-      earned_income: Number(document.getElementById('taxEarnedIncome').value) || 0,
-      age:           Number(document.getElementById('taxAge').value) || 40,
-      isa_type:      'general',
-    },
-    deduction_reinvest: document.getElementById('taxDeductionReinvest')?.checked ?? true,
-    deduction_account:  document.getElementById('taxDeductionAccount')?.value ?? '위탁',
-  };
-
-  try {
-    const res  = await fetch('/api/tax/run', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (data.error) { alert('오류: ' + data.error); return; }
-    taxResultCache  = data;
-    taxCurrentView  = 'before';
-    // 기존 renderResult로 히스토그램까지 전부 렌더링
-    renderResult(data['before'], { years: payload.years });
-    renderTaxCompareBanner(data);
-  } catch(err) {
-    alert('서버 오류: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    document.getElementById('runBtnText').style.display    = 'inline';
-    document.getElementById('runBtnSpinner').style.display = 'none';
-  }
-};
-
-// ── 세전/세후 전환 ──
-function switchTaxView(view) {
-  taxCurrentView = view;
-  document.getElementById('taxViewBefore').classList.toggle('active', view === 'before');
-  document.getElementById('taxViewAfter').classList.toggle('active',  view === 'after');
-  if (taxResultCache) {
-    renderResult(taxResultCache[view], { years: document.getElementById('yearsSlider').value });
-    renderTaxCompareBanner(taxResultCache);
-  }
-}
-
-function renderTaxCompareBanner(data) {
-  const tabs = document.getElementById('taxViewTabs');
-  if (tabs) tabs.style.display = 'block';
-
-  const before = data['before'];
-  const after  = data['after'];
-  const bEl    = document.getElementById('taxAccountBreakdown');
-  if (!bEl) return;
-
-  const bp50 = before.distribution?.end_value?.p50;
-  const ap50 = after.distribution?.end_value?.p50;
-  const diff = ap50 && bp50 ? ap50 - bp50 : 0;
-  const pct  = bp50 && bp50 > 0 ? (diff / bp50 * 100).toFixed(1) : '0';
-
-  bEl.innerHTML = `
-    <div style="background:var(--bg);border-radius:10px;padding:12px;font-size:0.82rem;">
-      <div style="font-weight:700;margin-bottom:8px;">세금 영향 요약 (중앙값 기준)</div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <div><span style="color:var(--text-muted);">세금 미적용</span>
-             <span style="font-weight:700;margin-left:6px;">${fmtTaxKRW(bp50)}</span></div>
-        <div>→</div>
-        <div><span style="color:var(--text-muted);">세금 적용</span>
-             <span style="font-weight:700;margin-left:6px;">${fmtTaxKRW(ap50)}</span></div>
-        <div><span style="color:${diff>=0?'#2E7D32':'#C62828'};font-weight:700;">
-          ${diff>=0?'+':''}${fmtTaxKRW(diff)} (${pct}%)
-        </span></div>
-      </div>
-      ${data.warnings?.length ? data.warnings.map(w=>`<div style="margin-top:6px;font-size:0.75rem;color:#C62828;">${w}</div>`).join('') : ''}
-    </div>`;
-}
-
-// ── 세금 결과 렌더링 ──
-function renderTaxResult(data, view) {
-  const result = data[view];
-  document.getElementById('resultEmpty').style.display   = 'none';
-  document.getElementById('resultContent').style.display = 'block';
-  const taxTabs = document.getElementById('taxViewTabs');
-  if (taxTabs) taxTabs.style.display = 'block';
-
-  // 계좌별 breakdown
-  const breakdown = result.breakdown || [];
-  const bdEl = document.getElementById('taxAccountBreakdown');
-  if (bdEl && breakdown.length) {
-    bdEl.innerHTML = `
-      <div style="background:var(--bg);border-radius:10px;padding:12px;">
-        <div style="font-size:0.8rem;font-weight:700;margin-bottom:8px;">계좌별 결과 (${view==='after'?'세금 적용':'세금 미적용'})</div>
-        ${breakdown.map(b => `
-          <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.82rem;">
-            <span style="min-width:70px;font-weight:600;">${b.account_type}</span>
-            <span style="flex:1;color:var(--text-muted);font-size:0.75rem;">납입 ${fmtTaxKRW(b.total_contrib)}</span>
-            <span style="font-weight:700;">${fmtTaxKRW(b.after_tax_end)}</span>
-            ${b.total_deduction>0 ? `<span style="color:var(--blue);font-size:0.72rem;">+${fmtTaxKRW(b.total_deduction)} 환급</span>` : ''}
-          </div>`).join('')}
-        <div style="display:flex;align-items:center;gap:8px;padding:8px 0;font-weight:700;font-size:0.85rem;">
-          <span style="min-width:70px;">합계</span>
-          <span style="flex:1;"></span>
-          <span>${fmtTaxKRW(result.grand_total || result.total_end_value)}</span>
-          ${view==='after'&&result.total_deduction>0 ? `<span style="color:var(--blue);font-size:0.72rem;">환급 ${fmtTaxKRW(result.total_deduction)} 포함</span>` : ''}
+  // 할당 바 (2개 이상)
+  let allocBar = '';
+  if (!isSingle) {
+    const segs = accs.map(a =>
+      `<div style="flex:${a.pct};background:${colors[a.type]||'#90A4AE'};height:100%;
+        display:flex;align-items:center;justify-content:center;
+        font-size:10px;color:white;font-weight:700;overflow:hidden;min-width:0;">
+        ${a.pct > 8 ? a.pct+'%' : ''}</div>`).join('');
+    const tot   = accs.reduce((s,a) => s+a.pct, 0);
+    const color = Math.abs(tot-100)<1 ? '#2E7D32' : '#C62828';
+    allocBar = `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">
+          <span>초기 ${fmtTaxKRW(totalI)} / 월 ${fmtTaxKRW(totalM)} 배분</span>
+          <span style="color:${color};font-weight:700;">합계 ${tot}%</span>
         </div>
+        <div style="height:20px;border-radius:8px;overflow:hidden;display:flex;background:var(--border);">${segs}</div>
       </div>`;
   }
 
-  // 분포 카드
-  const ev = result.total_end_value || 0;
-  const iv = result.total_invested  || 0;
-  document.getElementById('distP50').textContent = fmtTaxKRW(ev);
-  document.getElementById('distP10').textContent = fmtTaxKRW(iv);
-  document.getElementById('distP90').textContent = fmtTaxKRW(result.grand_total || ev);
+  list.innerHTML = allocBar + accs.map((acc, i) => {
+    if (isSingle) return `
+      <div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+        <select onchange="updateTaxAccountType(${i},this.value)"
+          style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.85rem;background:white;">
+          ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+        <span style="font-size:0.75rem;color:var(--text-muted);">상단 설정값 사용</span>
+        <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
+      </div>`;
 
-  document.getElementById('resultPeriodLabel').textContent =
-    `${breakdown.length}개 계좌 합산 | ${view==='after'?'세금 적용':'세금 미적용'}`;
+    const initAmt = Math.round(totalI * acc.pct / 100);
+    const monAmt  = Math.round(totalM  * acc.pct / 100);
+    return `
+      <div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:${colors[acc.type]||'#90A4AE'};flex-shrink:0;"></div>
+          <select onchange="updateTaxAccountType(${i},this.value)"
+            style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;background:white;">
+            ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+          <input type="number" value="${acc.pct}" min="0" max="100" step="1"
+            onchange="updateTaxAccountPct(${i},this.value)"
+            style="width:50px;border:1.5px solid var(--border);border-radius:6px;padding:4px;font-size:0.82rem;text-align:center;">
+          <span style="font-size:0.78rem;color:var(--text-muted);">%</span>
+          <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);">
+          초기 <b style="color:var(--text);">${fmtTaxKRW(initAmt)}</b> &nbsp;
+          월 <b style="color:var(--text);">${fmtTaxKRW(monAmt)}</b>
+        </div>
+      </div>`;
+  }).join('');
 
-  // 가치 추이 차트
-  if (result.history && result.history.length) {
-    renderTaxHistoryChart(result.history);
-  }
+  // 세액공제 메뉴 표시 조건
+  const hasPension = accs.some(a => a.type === '연금저축' || a.type === 'IRP');
+  const dedSec     = document.getElementById('taxDeductionSection');
+  if (dedSec) dedSec.style.display = hasPension ? 'block' : 'none';
+
+  // ISA 풍차돌리기 섹션
+  const hasISA     = accs.some(a => a.type === 'ISA');
+  const isaRenSec  = document.getElementById('isaRenewalSection');
+  if (isaRenSec) isaRenSec.style.display = hasISA ? 'block' : 'none';
+
+  // 절세 매도 섹션 (위탁 계좌)
+  const hasWitaku  = accs.some(a => a.type === '위탁');
+  const ghSec      = document.getElementById('gainHarvestingSection');
+  if (ghSec) ghSec.style.display = hasWitaku ? 'block' : 'none';
+
+  checkTaxLimits();
 }
 
-function renderTaxHistoryChart(history) {
-  // ── 기존 차트 모두 제거 ──
-  Object.keys(chartInstances).forEach(k => {
-    if (chartInstances[k]) { chartInstances[k].destroy(); chartInstances[k] = null; }
-  });
+function checkTaxLimits() {
+  const totalM  = Number(document.getElementById('monthlyContrib').value) || 0;
+  const accs    = window.taxAccounts;
+  const isSingle = accs.length <= 1;
+  const warnings = [];
 
-  const ctx = document.getElementById('rollingChart').getContext('2d');
-  chartInstances['rollingChart'] = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: history.map(h => h.date),
-      datasets: [{
-        data: history.map(h => h.portfolio_value),
-        borderColor: '#1976D2', borderWidth: 2,
-        backgroundColor: 'rgba(25,118,210,0.08)',
-        fill: true, pointRadius: 0, tension: 0.3,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend:{display:false}, tooltip:{
-        callbacks:{ label: c => fmtTaxKRW(c.parsed.y) }
-      }},
-      scales: {
-        x: { ticks:{maxTicksLimit:8,font:{size:10},color:'#90A4AE'},grid:{display:false}},
-        y: { ticks:{font:{size:10},color:'#90A4AE',callback:v=>fmtTaxKRW(v)},grid:{color:'rgba(0,0,0,0.04)'}}
-      }
-    }
+  let pensionAnn = 0, irpAnn = 0;
+  accs.forEach(a => {
+    const m = isSingle ? totalM : Math.round(totalM * a.pct / 100);
+    if (a.type === '연금저축') pensionAnn += m * 12;
+    if (a.type === 'IRP')     irpAnn     += m * 12;
   });
+  if (pensionAnn + irpAnn > 18_000_000)
+    warnings.push(`⚠ 연금저축+IRP 연간 합계 ${fmtTaxKRW(pensionAnn+irpAnn)}이 한도(1,800만)를 초과합니다.`);
+  if (Math.min(pensionAnn, 6_000_000) + irpAnn > 9_000_000)
+    warnings.push(`⚠ 세액공제 한도(900만) 초과분은 공제 불가합니다.`);
+
+  const warnEl = document.getElementById('taxWarnings');
+  if (warnEl) warnEl.innerHTML = warnings.map(w =>
+    `<div style="font-size:0.75rem;color:#C62828;background:#FFEBEE;padding:6px 10px;border-radius:6px;margin-bottom:4px;">${w}</div>`
+  ).join('');
 }

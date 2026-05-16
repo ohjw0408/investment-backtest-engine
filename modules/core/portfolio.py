@@ -109,3 +109,33 @@ class Portfolio:
                 price_dict, include_cash=False
             ),
         }
+
+
+class TaxTrackedPortfolio(Portfolio):
+    """
+    Portfolio 확장 - 평균 취득단가(avg_cost) 추적.
+    세금 계산 시 실현 차익 계산에 사용.
+    """
+
+    def __init__(self, initial_cash: float):
+        super().__init__(initial_cash)
+        self._avg_costs: Dict[str, float] = {}
+
+    def buy(self, ticker: str, quantity: float, price: float):
+        old_pos  = self.positions.get(ticker)
+        old_qty  = old_pos.quantity if old_pos else 0.0
+        old_cost = self._avg_costs.get(ticker, price)
+        super().buy(ticker, quantity, price)
+        new_qty = old_qty + quantity
+        if new_qty > 0:
+            self._avg_costs[ticker] = (old_qty * old_cost + quantity * price) / new_qty
+
+    def get_avg_cost(self, ticker: str) -> float | None:
+        return self._avg_costs.get(ticker)
+
+    def unrealized_gain(self, ticker: str, current_price: float) -> float:
+        pos = self.positions.get(ticker)
+        if pos is None or pos.quantity <= 0:
+            return 0.0
+        avg_cost = self._avg_costs.get(ticker, current_price)
+        return (current_price - avg_cost) * pos.quantity

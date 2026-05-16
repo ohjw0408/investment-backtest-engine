@@ -15,6 +15,7 @@ class OrderExecutor:
         portfolio: Portfolio,
         orders: Dict[str, float],
         price_dict: Dict[str, float],
+        date=None,
     ) -> None:
 
         if not orders:
@@ -85,3 +86,186 @@ class OrderExecutor:
 
             except ValueError:
                 continue
+
+class TaxedOrderExecutor(OrderExecutor):
+    """
+    OrderExecutor 확장 - 리밸런싱 매도 시 양도차익세 차감.
+
+    위탁 계좌:
+      KR_FOREIGN (국내상장 해외ETF) → 차익 × 15.4%
+      US_DIRECT  (해외 직접투자)   → 연 250만 공제 후 × 22%
+      KR_DOMESTIC / KR_STOCK       → 비과세
+
+    ISA / 연금저축 / IRP → 과세이연, CG세 없음
+    """
+
+    OVERSEAS_EXEMPT = 2_500_000
+    OVERSEAS_RATE   = 0.22
+    KR_FOREIGN_RATE = 0.154
+
+    def __init__(
+        self,
+        tax_engine,
+        account_type: str = "위탁",
+        gain_harvesting: bool = False,
+    ):
+        self.tax_engine        = tax_engine
+        self.account_type      = account_type
+        self.gain_harvesting   = gain_harvesting  # 연간 250만 공제 소진 절세 매도
+        self._ytd_us_gains     = 0.0
+        self._current_year     = None
+        self.total_cg_tax_paid = 0.0
+        self._harvested_year   = None  # 올해 이미 harvest 했으면 스킵
+
+    def _update_year(self, date) -> None:
+        if date and (self._current_year is None or date.year != self._current_year):
+            self._current_year = date.year
+            self._ytd_us_gains = 0.0
+
+    def execute_orders(
+        self,
+        portfolio,
+        orders: Dict[str, float],
+        price_dict: Dict[str, float],
+        date=None,
+    ) -> None:
+        self._update_year(date)
+
+        # ISA / 연금저축 / IRP: CG세 없음
+        if self.account_type in ("ISA", "연금저축", "IRP"):
+            super().execute_orders(portfolio, orders, price_dict)
+            return
+
+        # 위탁: 매도 먼저 (CG세 계산)
+        for ticker, value in orders.items():
+            if ticker == "CASH" or value >= 0:
+                continue
+            if ticker not in price_dict:
+                continue
+            price = price_dict[ticker]
+            if not price or price != price or price <= 0:
+                continue
+            quantity = int(abs(value) / price)
+            if quantity <= 0:
+                continue
+            position = portfolio.positions.get(ticker)
+            if position is None:
+                continue
+            quantity = min(quantity, int(position.quantity))
+            if quantity <= 0:
+                continue
+
+            avg_cost = (
+                portfolio.get_avg_cost(ticker)
+                if hasattr(portfolio, "get_avg_cost")
+                else None
+            )
+            if avg_cost is None:
+                avg_cost = price  # 취득단가 불명 → 차익 0 (보수적 처리)
+            realized_gain = (price - avg_cost) * quantity
+
+            portfolio.sell(ticker, quantity, price)
+
+            if realized_gain > 0:
+                cg_tax = self._calc_cg_tax(ticker, realized_gain)
+                if cg_tax > 0:
+                    portfolio.cash = max(0.0, portfolio.cash - cg_tax)
+                    self.total_cg_tax_paid += cg_tax
+
+        # 매수
+        for ticker, value in orders.items():
+            if ticker == "CASH" or value <= 0:
+                continue
+            if ticker not in price_dict:
+                continue
+            price = price_dict[ticker]
+            if not price or price != price or price <= 0:
+                continue
+            quantity = int(value / price)
+            if quantity <= 0:
+                continue
+            try:
+                portfolio.buy(ticker, quantity, price)
+            except ValueError:
+                continue
+
+        # 연간 250만 공제 소진 절세 매도 (12월 마지막 거래일 근처)
+        if (
+            self.gain_harvesting
+            and self.account_type == "위탁"
+            and date is not None
+            and date.month == 12
+            and self._harvested_year != date.year
+        ):
+            self._do_gain_harvest(portfolio, price_dict, date)
+
+    def _do_gain_harvest(self, portfolio, price_dict: Dict[str, float], date) -> None:
+        """
+        연간 250만원 공제 소진 절세 매도.
+
+        US_DIRECT 종목의 미실현 차익 중 (250만 - 올해 이미 실현한 차익)만큼
+        추가로 매도 후 즉시 재매수 → 취득단가 리셋, 세금 0원.
+
+        남은 공제 여유가 없거나 미실현 차익이 없으면 아무 것도 안 함.
+        """
+        self._harvested_year = date.year
+        remaining_exempt = max(0.0, self.OVERSEAS_EXEMPT - self._ytd_us_gains)
+        if remaining_exempt <= 0:
+            return
+
+        for ticker, position in list(portfolio.positions.items()):
+            if position.quantity <= 0:
+                continue
+            if ticker not in price_dict:
+                continue
+            asset_type = self.tax_engine.classify_asset(ticker)
+            if asset_type != "US_DIRECT":
+                continue
+
+            price    = price_dict[ticker]
+            avg_cost = portfolio.get_avg_cost(ticker) if hasattr(portfolio, "get_avg_cost") else None
+            if avg_cost is None or avg_cost >= price:
+                continue  # 취득단가 불명 또는 손실 포지션은 스킵
+
+            gain_per_share    = price - avg_cost
+            harvest_shares    = int(remaining_exempt / gain_per_share)
+            harvest_shares    = min(harvest_shares, int(position.quantity))
+            if harvest_shares <= 0:
+                continue
+
+            harvest_gain = gain_per_share * harvest_shares
+            self._ytd_us_gains += harvest_gain
+            remaining_exempt   -= harvest_gain
+
+            # 매도 후 즉시 재매수 (취득단가 현재가로 리셋)
+            portfolio.sell(ticker, harvest_shares, price)
+            try:
+                portfolio.buy(ticker, harvest_shares, price)
+            except ValueError:
+                pass  # 현금 부족 시 재매수 포기 (매도는 이미 완료)
+
+            if remaining_exempt <= 0:
+                break
+
+    def _calc_cg_tax(self, ticker: str, realized_gain: float) -> float:
+        # ISA / 연금저축 / IRP: 비과세
+        if self.account_type in ("ISA", "연금저축", "IRP"):
+            return 0.0
+
+        asset_type = self.tax_engine.classify_asset(ticker)
+
+        if asset_type == "KR_FOREIGN":
+            return realized_gain * self.KR_FOREIGN_RATE
+
+        elif asset_type == "US_DIRECT":
+            self._ytd_us_gains += realized_gain
+            if self._ytd_us_gains <= self.OVERSEAS_EXEMPT:
+                return 0.0
+            prev = self._ytd_us_gains - realized_gain
+            if prev >= self.OVERSEAS_EXEMPT:
+                taxable = realized_gain
+            else:
+                taxable = self._ytd_us_gains - self.OVERSEAS_EXEMPT
+            return max(0.0, taxable) * self.OVERSEAS_RATE
+
+        return 0.0  # KR_DOMESTIC: 비과세

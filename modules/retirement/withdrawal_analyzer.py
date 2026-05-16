@@ -107,14 +107,22 @@ class WithdrawalAnalyzer:
         dividend_mode:      str   = "reinvest",
         step_months:        int   = 1,
         verbose:            bool  = False,
+        # 세금 파라미터 (선택)
+        tax_engine                    = None,
+        account_type:       str       = "위탁",
+        current_age:        int       = 40,
+        accumulation_years: int       = 0,
     ):
         self.portfolio_engine   = portfolio_engine
         self.tickers            = tickers
         self.strategy_factory   = strategy_factory
         self.data_start         = pd.Timestamp(data_start)
         self.data_end           = pd.Timestamp(data_end)
-        self.withdrawal_years   = withdrawal_years
-        self.monthly_withdrawal = monthly_withdrawal
+        self.withdrawal_years      = withdrawal_years
+        self.monthly_withdrawal    = monthly_withdrawal
+        self.tax_engine            = tax_engine
+        self.account_type          = account_type
+        self.withdrawal_start_age  = current_age + accumulation_years
         self.initial_capital    = initial_capital
         self.inflation          = inflation
         self.dividend_mode      = dividend_mode
@@ -133,13 +141,17 @@ class WithdrawalAnalyzer:
         if self.verbose:
             print(f"[WithdrawalAnalyzer] 실제 {n_real}개 + 합성 {n_synthetic}개 = 총 {len(cases)}개")
             print(f"  성공률: {success_rate:.1%}")
-        return {
+        result = {
             "cases":        cases,
             "distribution": distribution,
             "success_rate": success_rate,
             "n_real":       n_real,
             "n_synthetic":  n_synthetic,
         }
+        # 연금 세금 정보 (연금저축/IRP)
+        if self.tax_engine and self.account_type in ("연금저축", "IRP"):
+            result["pension_tax_info"] = self._calc_pension_tax_by_age()
+        return result
 
     # ════════════════════════════════════════════════════════
     # 병렬 롤링
@@ -175,10 +187,11 @@ class WithdrawalAnalyzer:
             "rebalance_frequency": getattr(strategy_instance, "rebalance_frequency", None),
             "drift_threshold":     getattr(strategy_instance, "drift_threshold", None),
         }
+        gross_withdrawal = self._calc_gross_withdrawal()
         config_dict = {
             "tickers":           self.tickers,
             "initial_capital":   self.initial_capital,
-            "withdrawal_amount": self.monthly_withdrawal,
+            "withdrawal_amount": gross_withdrawal,
             "dividend_mode":     self.dividend_mode,
             "inflation":         self.inflation,
         }
@@ -264,7 +277,7 @@ class WithdrawalAnalyzer:
         t_scale    = np.sqrt(SYNTHETIC_DF / (SYNTHETIC_DF - 2))
         rets       = (rng.standard_t(df=SYNTHETIC_DF, size=n_months) / t_scale) * sigma + mu
         asset      = float(self.initial_capital)
-        withdrawal = float(self.monthly_withdrawal)
+        withdrawal = float(self._calc_gross_withdrawal())
         pv_arr     = np.zeros(n_months + 1)
         pv_arr[0]  = asset
         depleted   = False
@@ -397,3 +410,72 @@ class WithdrawalAnalyzer:
             "p90": float(np.percentile(sv, 90)), "values": sv.tolist(),
         }
         return result
+    def _calc_gross_withdrawal(self) -> float:
+        """
+        워커에게 넘길 총 인출액(gross)을 계산한다.
+
+        연금저축/IRP의 경우 포트폴리오에서 나가는 금액은
+        사용자가 실제로 수령하는 net 금액보다 크다 (세금 납부분 포함).
+        나이가 올라갈수록 세율이 낮아지므로 연도별 gross를 가중 평균한다.
+
+        위탁/ISA: 인출 중 CG세가 없으므로 net = gross.
+        """
+        if (
+            self.tax_engine is None
+            or self.account_type not in ("연금저축", "IRP")
+        ):
+            return self.monthly_withdrawal
+
+        net     = self.monthly_withdrawal
+        n_total = self.withdrawal_years * 12
+        gross_sum = 0.0
+        for month in range(n_total):
+            age          = self.withdrawal_start_age + month // 12
+            annual_gross = self.monthly_withdrawal * 12  # 초기 추정치로 연간 수령액 계산
+            # 1,500만 초과 여부 판단 후 실효세율 적용
+            rate = self.tax_engine.pension_effective_rate(annual_gross, age)
+            gross_sum += net / (1.0 - rate) if rate < 1.0 else net
+        return gross_sum / n_total
+
+    def _calc_pension_tax_by_age(self) -> dict:
+        """
+        연금 수령 기간 중 나이별 세후 실수령액 계산.
+        시뮬은 그대로 두고, 실제 수령액만 별도 계산.
+        수령 나이가 바뀔 때 세율이 자동으로 3단계 전환.
+        """
+        gross   = self.monthly_withdrawal
+        start   = self.withdrawal_start_age
+        end_age = start + self.withdrawal_years
+
+        BRACKETS = [
+            (55, 70, 0.055),
+            (70, 80, 0.044),
+            (80, 200, 0.033),
+        ]
+
+        brackets = []
+        for b_start, b_end, rate in BRACKETS:
+            age_from = max(start, b_start)
+            age_to   = min(end_age, b_end)
+            if age_from >= age_to:
+                continue
+            net = gross * (1.0 - rate)
+            brackets.append({
+                "age_from":     age_from,
+                "age_to":       age_to,
+                "rate":         rate,
+                "gross_monthly": round(gross),
+                "net_monthly":   round(net),
+                "tax_monthly":   round(gross - net),
+            })
+
+        # 연간 1,500만 초과 체크
+        annual = gross * 12
+        threshold = 15_000_000
+        over_threshold = annual > threshold
+
+        return {
+            "brackets":      brackets,
+            "over_threshold": over_threshold,
+            "annual_gross":   round(annual),
+        }

@@ -54,6 +54,19 @@ def _run_single_account(args: tuple):
         initial      = float(account.get("initial_capital", 0))
         monthly      = float(account.get("monthly_contribution", 0))
 
+        # 계좌별 투자 제약 검증 (세금 적용 시)
+        if apply_tax:
+            from modules.tax.account_tax import validate_account_portfolio
+            _te = TaxEngine(user_settings)
+            _check = validate_account_portfolio(account_type, tickers, weights, _te)
+            if not _check["valid"]:
+                return {
+                    "account_type": account_type,
+                    "error":        True,
+                    "violations":   _check["violations"],
+                    "disclaimer":   _check.get("disclaimer"),
+                }
+
         strategy = PeriodicRebalance(
             target_weights      = weights,
             rebalance_frequency = rebal_freq,
@@ -104,7 +117,9 @@ def _run_single_account(args: tuple):
             return None
 
         end_value       = float(history_df["portfolio_value"].iloc[-1])
-        total_contrib   = initial + monthly * len(history_df) / 21  # 근사
+        # 월 기준 납입원금: 영업일 수 ÷ 21 → 월 수로 변환 후 계산
+        n_months        = round(len(history_df) / 21)
+        total_contrib   = initial + monthly * n_months
 
         # 수령 시 세금 (세금 ON인 경우)
         after_tax_end = end_value

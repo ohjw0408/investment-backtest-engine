@@ -3,10 +3,6 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
-<style>
-.tax-view-btn { flex:1;padding:7px;background:transparent;border:none;border-radius:7px;font-size:0.82rem;font-weight:600;color:var(--text-muted);cursor:pointer;transition:all 0.15s; }
-.tax-view-btn.active { background:white;color:var(--blue);box-shadow:0 1px 4px rgba(0,0,0,0.1); }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -106,7 +102,7 @@
       <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
         <span><span class="calc-section-num">05</span> 세금 적용</span>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
-          <span style="font-size:0.8rem;color:var(--text-muted);" id="taxToggleLabel">OFF</span>
+          <span id="taxToggleLabel" style="font-size:0.8rem;color:var(--text-muted);">OFF</span>
           <div id="taxToggleWrap" onclick="toggleTax()" style="width:44px;height:24px;background:var(--border);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
             <div id="taxToggleThumb" style="position:absolute;width:18px;height:18px;background:white;border-radius:50%;top:3px;left:3px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
           </div>
@@ -114,10 +110,8 @@
       </div>
 
       <div id="taxPanel" style="display:none;margin-top:12px;">
-
-        <!-- 소득 정보 -->
         <div style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;">
-          <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;">소득 정보</div>
+          <div style="font-size:0.8rem;font-weight:700;margin-bottom:8px;">소득 정보</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <div>
               <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">연간 근로소득</div>
@@ -138,39 +132,47 @@
           </div>
         </div>
 
-        <!-- 계좌 설정 -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <span style="font-size:0.82rem;font-weight:700;color:var(--text);">계좌 설정</span>
+          <span style="font-size:0.82rem;font-weight:700;">계좌 설정</span>
           <button onclick="addTaxAccount()" style="font-size:0.75rem;padding:4px 10px;background:var(--blue);color:white;border:none;border-radius:6px;cursor:pointer;">+ 계좌 추가</button>
         </div>
         <div id="taxAccountList"></div>
         <div id="taxWarnings" style="margin-top:4px;"></div>
 
-        <!-- 세액공제 환급 재투자 (연금저축/IRP 있을 때만) -->
+        <!-- ISA 풍차돌리기 옵션 (ISA 선택 시만 표시) -->
+        <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:#E8F5E9;border-radius:8px;font-size:0.8rem;border:1px solid #A5D6A7;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="isaRenewalCheck" style="width:14px;height:14px;">
+            <div>
+              <span style="font-weight:700;color:#1B5E20;">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
+              <div style="color:#2E7D32;font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 200만원 갱신</div>
+            </div>
+          </label>
+        </div>
+
         <div id="taxDeductionSection" style="display:none;margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;font-size:0.8rem;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="taxDeductionReinvest" checked style="width:14px;height:14px;">
             <span>세액공제 환급금 재투자</span>
           </label>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span style="color:var(--text-muted);">재투자 계좌:</span>
-            <select id="taxDeductionAccount" style="font-size:0.8rem;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;">
-              <option value="위탁">위탁</option>
-              <option value="연금저축">연금저축</option>
-              <option value="IRP">IRP</option>
-            </select>
-          </div>
         </div>
 
-        <!-- ISA 종합과세 경고 -->
+        <!-- 절세 매도 (위탁 계좌 선택 시 표시) -->
+        <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:#E3F2FD;border-radius:8px;font-size:0.8rem;border:1px solid #90CAF9;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="gainHarvestingCheck" style="width:14px;height:14px;">
+            <div>
+              <span style="font-weight:700;color:#1565C0;">📉 절세 매도 (연 250만 공제 소진)</span>
+              <div style="color:#1976D2;font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
+            </div>
+          </label>
+        </div>
+
         <div style="margin-top:8px;font-size:0.75rem;color:#E65100;background:#FFF3E0;padding:8px 10px;border-radius:6px;border:1px solid #FFCC02;">
-          ⚠ 직전 연도 금융소득 종합과세 대상자는 ISA 계좌 개설이 불가합니다.
+          ⚠ 직전 연도 금융소득 종합과세 대상자는 ISA 개설이 불가합니다.
         </div>
       </div>
     </div>
-
-    <!-- 세금 비교 결과 (결과 패널용 데이터, HTML 숨김) -->
-    <div id="taxCompareSection" style="display:none;"></div>
 
     <button class="calc-run-btn" id="runBtn" onclick="runCalculator()">
       <span id="runBtnText">시뮬레이션 실행</span>
@@ -196,15 +198,6 @@
           <h3 class="result-title">시뮬레이션 결과</h3>
           <span class="result-period" id="resultPeriodLabel"></span>
         </div>
-      </div>
-
-      <!-- 세전/세후 전환 탭 (세금 ON 시) -->
-      <div id="taxViewTabs" style="display:none;margin-bottom:12px;">
-        <div style="display:flex;gap:4px;background:var(--bg);border-radius:10px;padding:4px;">
-          <button class="tax-view-btn active" id="taxViewBefore" onclick="switchTaxView('before')">세금 미적용</button>
-          <button class="tax-view-btn" id="taxViewAfter" onclick="switchTaxView('after')">세금 적용</button>
-        </div>
-        <div id="taxAccountBreakdown" style="margin-top:10px;"></div>
       </div>
 
       <!-- 자산 분포 카드 -->

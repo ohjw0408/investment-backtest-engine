@@ -155,6 +155,61 @@
       </div>
     </div>
 
+    <!-- 세금 적용 섹션 -->
+    <div class="calc-section">
+      <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span><span class="calc-section-num">04</span> 세금 적용</span>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+          <span id="btTaxLabel" style="font-size:0.8rem;color:var(--text-muted);">OFF</span>
+          <div id="btTaxWrap" onclick="toggleBtTax()" style="width:44px;height:24px;background:var(--border);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+            <div id="btTaxThumb" style="position:absolute;width:18px;height:18px;background:white;border-radius:50%;top:3px;left:3px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+          </div>
+        </label>
+      </div>
+      <div id="btTaxPanel" style="display:none;margin-top:10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">나이</div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <input type="number" id="btTaxAge" value="40" min="18" max="90"
+                style="width:60px;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;">
+              <span style="font-size:0.75rem;color:var(--text-muted);">세</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">계좌 유형</div>
+            <select id="btTaxAccount" onchange="updateBtTaxAccount()"
+              style="width:100%;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;background:white;">
+              <option value="위탁">위탁</option>
+              <option value="ISA">ISA</option>
+              <option value="연금저축">연금저축</option>
+              <option value="IRP">IRP</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:8px;">
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">연간 근로소득</div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <input type="number" id="btTaxEarnedIncome" value="50000000" min="0" step="1000000"
+              style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;min-width:0;">
+            <span style="font-size:0.75rem;color:var(--text-muted);">원</span>
+          </div>
+        </div>
+        <div id="btGainHarvesting" style="display:block;padding:8px 10px;background:#E3F2FD;border-radius:8px;margin-bottom:8px;font-size:0.8rem;border:1px solid #90CAF9;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="btGainHarvestingCheck" style="width:14px;height:14px;">
+            <div>
+              <span style="font-weight:700;color:#1565C0;">📉 절세 매도 (연 250만 공제 소진)</span>
+              <div style="color:#1976D2;font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
+            </div>
+          </label>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);background:var(--bg);padding:7px 10px;border-radius:6px;">
+          세금 적용 시 최종 자산에 청산세 반영 (배당세·리밸런싱 CG세 포함)
+        </div>
+      </div>
+    </div>
+
     <div class="calc-warning">⚠ 과거 데이터 기반 시뮬레이션입니다. 미래 수익을 보장하지 않습니다.</div>
 
     <button class="calc-run-btn" id="btRunBtn" onclick="runBacktest()">📊 분석 실행</button>
@@ -301,6 +356,25 @@ document.getElementById('btMonthly').addEventListener('input', function() {
   document.getElementById('btMonthlyHint').textContent = '₩' + (parseFloat(this.value)||0).toLocaleString();
 });
 
+// ── 세금 토글 ──
+window.btTaxEnabled = false;
+function toggleBtTax() {
+  window.btTaxEnabled = !window.btTaxEnabled;
+  const on = window.btTaxEnabled;
+  document.getElementById('btTaxWrap').style.background = on ? 'var(--blue)' : 'var(--border)';
+  document.getElementById('btTaxThumb').style.left      = on ? '23px' : '3px';
+  document.getElementById('btTaxLabel').textContent     = on ? 'ON' : 'OFF';
+  document.getElementById('btTaxLabel').style.color     = on ? 'var(--blue)' : 'var(--text-muted)';
+  document.getElementById('btTaxPanel').style.display   = on ? 'block' : 'none';
+  if (on) updateBtTaxAccount();
+}
+
+function updateBtTaxAccount() {
+  const acc   = document.getElementById('btTaxAccount')?.value;
+  const ghSec = document.getElementById('btGainHarvesting');
+  if (ghSec) ghSec.style.display = acc === '위탁' ? 'block' : 'none';
+}
+
 // ── 실행 ──
 async function runBacktest() {
   const total = Math.round(btTickers.reduce((s,t) => s+t.weight, 0) * 100);
@@ -328,6 +402,13 @@ async function runBacktest() {
         monthly_contribution: parseFloat(document.getElementById('btMonthly').value) || 0,
         dividend_mode:        document.querySelector('input[name="btDividend"]:checked').value,
         rebal_mode:           document.querySelector('input[name="btRebal"]:checked').value,
+        tax_enabled:          window.btTaxEnabled || false,
+        account_type:         document.getElementById('btTaxAccount')?.value || '위탁',
+        gain_harvesting: window.btTaxEnabled && document.getElementById('btTaxAccount')?.value === '위탁' && (document.getElementById('btGainHarvestingCheck')?.checked ?? false),
+        user_settings: (window.btTaxEnabled) ? {
+          age:           parseInt(document.getElementById('btTaxAge')?.value || 40),
+          earned_income: parseInt(document.getElementById('btTaxEarnedIncome')?.value || 50000000),
+        } : {},
       }),
     });
     const data = await res.json();

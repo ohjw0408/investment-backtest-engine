@@ -27,9 +27,10 @@ class AccumulationAnalyzer:
         step_months:          int   = 1,
         verbose:              bool  = False,
         div_start:            Optional[str] = None,
-        # 세금 엔진 (선택)
-        tax_engine          = None,
-        account_type:         str   = "위탁",
+        tax_engine                          = None,
+        account_type:         str           = "위탁",
+        isa_renewal:          bool          = False,
+        gain_harvesting:      bool          = False,
     ):
         self.portfolio_engine      = portfolio_engine
         self.tickers               = tickers
@@ -45,6 +46,8 @@ class AccumulationAnalyzer:
         self.div_start             = pd.Timestamp(div_start) if div_start else None
         self.tax_engine            = tax_engine
         self.account_type          = account_type
+        self.isa_renewal           = isa_renewal and account_type == "ISA"
+        self.gain_harvesting       = gain_harvesting and account_type == "위탁"
 
     def run(self) -> dict:
         cases = self._run_rolling()
@@ -58,11 +61,13 @@ class AccumulationAnalyzer:
         return {"cases": cases, "distribution": distribution}
 
     def _run_rolling(self) -> List[dict]:
-        from modules.tax.account_tax import TaxedDividendEngine
+        from modules.tax.account_tax         import TaxedDividendEngine
+        from modules.execution.order_executor import TaxedOrderExecutor
+        from modules.core.portfolio           import TaxTrackedPortfolio
 
-        # 원본 dividend_engine 백업
         sim_loop        = self.portfolio_engine.simulation_loop
         orig_div_engine = sim_loop.dividend_engine
+        orig_executor   = sim_loop.executor
 
         cases, cur, run_id = [], self.data_start, 1
         while True:
@@ -71,39 +76,72 @@ class AccumulationAnalyzer:
                 break
             strategy = self.strategy_factory()
 
-            # 세금 엔진 주입
+            # ── 세금 컴포넌트 주입 ─────────────────────────
             if self.tax_engine:
                 sim_loop.dividend_engine = TaxedDividendEngine(
                     orig_div_engine, self.tax_engine, self.account_type
                 )
-
-            result = self.portfolio_engine.run_simulation(
-                tickers              = self.tickers,
-                start_date           = cur.strftime("%Y-%m-%d"),
-                end_date             = end.strftime("%Y-%m-%d"),
-                initial_capital      = self.initial_capital,
-                monthly_contribution = self.monthly_contribution,
-                strategy             = strategy,
-                dividend_mode        = self.dividend_mode,
-            )
-
-            # 원본 복원
-            sim_loop.dividend_engine = orig_div_engine
-
-            # 수령세 적용 (ISA/연금저축/IRP)
-            final_value = result["final_value"]
-            if self.tax_engine and self.account_type != "위탁":
-                total_contrib = (self.initial_capital +
-                                 self.monthly_contribution * self.accumulation_years * 12)
-                final_value = self.tax_engine.after_tax_withdrawal(
-                    final_value, self.account_type, total_contrib
+                sim_loop.executor = TaxedOrderExecutor(
+                    self.tax_engine, self.account_type,
+                    gain_harvesting=self.gain_harvesting,
                 )
+                portfolio_class = TaxTrackedPortfolio
+            else:
+                portfolio_class = None
+
+            # ── ISA 풍차돌리기 ────────────────────────────
+            if self.isa_renewal and self.tax_engine:
+                sim_loop.dividend_engine = orig_div_engine
+                sim_loop.executor        = orig_executor
+                final_value = self._run_isa_renewal_cycle(cur, self.accumulation_years)
+                # metrics 계산을 위한 단순 1회 시뮬
+                result = self.portfolio_engine.run_simulation(
+                    tickers              = self.tickers,
+                    start_date           = cur.strftime("%Y-%m-%d"),
+                    end_date             = end.strftime("%Y-%m-%d"),
+                    initial_capital      = self.initial_capital,
+                    monthly_contribution = self.monthly_contribution,
+                    strategy             = strategy,
+                    dividend_mode        = self.dividend_mode,
+                )
+            else:
+                result = self.portfolio_engine.run_simulation(
+                    tickers              = self.tickers,
+                    start_date           = cur.strftime("%Y-%m-%d"),
+                    end_date             = end.strftime("%Y-%m-%d"),
+                    initial_capital      = self.initial_capital,
+                    monthly_contribution = self.monthly_contribution,
+                    strategy             = strategy,
+                    dividend_mode        = self.dividend_mode,
+                    portfolio_class      = portfolio_class,
+                )
+
+                # ── 원본 복원 ──────────────────────────────────
+                sim_loop.dividend_engine = orig_div_engine
+                sim_loop.executor        = orig_executor
+
+                final_value = result["final_value"]
+
+                # ── 최종 청산세 적용 ────────────────────────────
+                if self.tax_engine:
+                    final_value = self._apply_liquidation_tax(result, final_value)
 
             metrics              = self._calc_metrics(result["history"], self.accumulation_years)
             metrics["run_id"]    = run_id
             metrics["start"]     = cur.strftime("%Y-%m-%d")
             metrics["end"]       = end.strftime("%Y-%m-%d")
             metrics["end_value"] = final_value
+            # ISA 풍차돌리기나 세금 적용 시 end_value가 세전 history와 달라짐
+            # → CAGR을 세후 최종값 기준으로 재계산
+            if final_value != result["final_value"]:
+                total_contrib = (
+                    self.initial_capital
+                    + self.monthly_contribution * self.accumulation_years * 12
+                )
+                if total_contrib > 0 and final_value > 0 and self.accumulation_years > 0:
+                    metrics["cagr"] = (
+                        (final_value / total_contrib) ** (1.0 / self.accumulation_years) - 1
+                    )
             cases.append(metrics)
             if self.verbose:
                 print(f"  [{run_id:03d}] {cur.strftime('%Y-%m')} ~ {end.strftime('%Y-%m')}"
@@ -111,6 +149,145 @@ class AccumulationAnalyzer:
             cur    += relativedelta(months=self.step_months)
             run_id += 1
         return cases
+
+
+    def _run_isa_renewal_cycle(
+        self,
+        start: "pd.Timestamp",
+        total_years: int,
+    ) -> float:
+        """
+        ISA 3년마다 해지·재가입 시뮬레이션.
+        각 3년 주기마다 ISA 세금 적용 후 재투자.
+        """
+        current_capital = self.initial_capital
+        current_start   = start
+
+        n_full    = total_years // 3
+        remainder = total_years % 3
+
+        for cycle in range(n_full):
+            cycle_end = current_start + relativedelta(years=3)
+            # 데이터 범위 체크
+            if cycle_end > self.data_end:
+                cycle_end = self.data_end
+            if current_start >= cycle_end:
+                break
+
+            strategy = self.strategy_factory()
+            try:
+                result = self.portfolio_engine.run_simulation(
+                    tickers              = self.tickers,
+                    start_date           = current_start.strftime("%Y-%m-%d"),
+                    end_date             = cycle_end.strftime("%Y-%m-%d"),
+                    initial_capital      = current_capital,
+                    monthly_contribution = self.monthly_contribution,
+                    strategy             = strategy,
+                    dividend_mode        = self.dividend_mode,
+                )
+                history = result.get("history")
+                if history is None or len(history) == 0:
+                    break
+                cycle_final = result["final_value"]
+            except Exception:
+                break
+
+            cycle_contrib   = current_capital + self.monthly_contribution * 36
+            cycle_after_tax = self.tax_engine.after_tax_withdrawal(
+                cycle_final, "ISA", cycle_contrib
+            )
+            current_capital = cycle_after_tax
+            current_start   = cycle_end
+
+        # 나머지 기간 처리
+        if remainder > 0 and current_start < self.data_end:
+            rem_end  = current_start + relativedelta(years=remainder)
+            if rem_end > self.data_end:
+                rem_end = self.data_end
+            if current_start < rem_end:
+                strategy = self.strategy_factory()
+                try:
+                    result = self.portfolio_engine.run_simulation(
+                        tickers              = self.tickers,
+                        start_date           = current_start.strftime("%Y-%m-%d"),
+                        end_date             = rem_end.strftime("%Y-%m-%d"),
+                        initial_capital      = current_capital,
+                        monthly_contribution = self.monthly_contribution,
+                        strategy             = strategy,
+                        dividend_mode        = self.dividend_mode,
+                    )
+                    history = result.get("history")
+                    if history is not None and len(history) > 0:
+                        rem_final   = result["final_value"]
+                        rem_contrib = current_capital + self.monthly_contribution * remainder * 12
+                        current_capital = self.tax_engine.after_tax_withdrawal(
+                            rem_final, "ISA", rem_contrib,
+                            isa_years_held=remainder,  # 3년 미만이면 중도해지세(16.5%) 적용
+                        )
+                except Exception:
+                    pass
+
+        return current_capital
+
+    def _apply_liquidation_tax(self, result: dict, final_value: float) -> float:
+        """최종 청산 시 세금 계산 및 차감."""
+        portfolio   = result.get("portfolio")
+        last_prices = result.get("last_prices", {})
+
+        # ISA / 연금저축 / IRP: after_tax_withdrawal로 처리
+        if self.account_type in ("ISA", "연금저축", "IRP"):
+            total_contrib = (
+                self.initial_capital +
+                self.monthly_contribution * self.accumulation_years * 12
+            )
+            # 수령 나이 = 현재 나이 + 적립 기간
+            withdrawal_age = self.tax_engine.age + self.accumulation_years
+            return self.tax_engine.after_tax_withdrawal(
+                final_value, self.account_type, total_contrib,
+                age=withdrawal_age,
+                pension_years=self.accumulation_years,
+            )
+
+        # 위탁: 미실현 차익에 대한 최종 청산세 (손익통산 적용)
+        if portfolio is None or not last_prices:
+            return final_value
+
+        liquidation_tax = 0.0
+
+        # 자산 타입별로 손익 분리해서 통산
+        kr_foreign_gains  = 0.0  # KR_FOREIGN: 손익통산 후 15.4%
+        us_direct_gains   = 0.0  # US_DIRECT: 손익통산 후 250만 공제, 22%
+
+        for ticker, position in portfolio.positions.items():
+            if ticker not in last_prices or position.quantity <= 0:
+                continue
+            price = last_prices[ticker]
+            unrealized = (
+                portfolio.unrealized_gain(ticker, price)
+                if hasattr(portfolio, "unrealized_gain")
+                else 0.0
+            )
+            if unrealized == 0.0:
+                continue
+
+            asset_type = self.tax_engine.classify_asset(ticker)
+
+            if asset_type == "KR_FOREIGN":
+                kr_foreign_gains += unrealized  # 음수(손실)도 포함해서 통산
+            elif asset_type == "US_DIRECT":
+                us_direct_gains += unrealized   # 음수(손실)도 포함해서 통산
+            # KR_DOMESTIC: 비과세
+
+        # KR_FOREIGN 손익통산 후 과세
+        if kr_foreign_gains > 0:
+            liquidation_tax += kr_foreign_gains * 0.154
+
+        # US_DIRECT 손익통산 후 250만 공제
+        if us_direct_gains > 0:
+            taxable = max(0.0, us_direct_gains - 2_500_000)
+            liquidation_tax += taxable * 0.22
+
+        return max(0.0, final_value - liquidation_tax)
 
     def _calc_metrics(self, history: pd.DataFrame, years: int) -> dict:
         pv = history["portfolio_value"]

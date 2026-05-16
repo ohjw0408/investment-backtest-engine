@@ -129,7 +129,7 @@ class SimulationLoop:
             # ── rebalance ────────────────────────────
             if strategy.should_rebalance(date, portfolio, price_dict):
                 orders = strategy.generate_orders(portfolio, price_dict)
-                self.executor.execute_orders(portfolio, orders, price_dict)
+                self.executor.execute_orders(portfolio, orders, price_dict, date=date)
 
             # ── dividend sweep ───────────────────────
             if config.dividend_mode in ("reinvest", "withdraw") and config.withdrawal_amount == 0:

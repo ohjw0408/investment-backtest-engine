@@ -81,6 +81,78 @@ def check_contribution_limits(accounts: list[dict]) -> list[str]:
     return warnings
 
 
+# ── 계좌별 투자 제약 검증 ────────────────────────────────────
+
+def validate_account_portfolio(
+    account_type: str,
+    tickers: list[str],
+    weights: dict[str, float],
+    tax_engine,
+) -> dict:
+    """
+    계좌 유형별 투자 가능 종목 제약 검증.
+
+    규칙:
+      위탁   : 제한 없음
+      ISA    : 해외 직접 상장(US_DIRECT) 금지
+      연금저축 : US_DIRECT·개별주식·레버리지/인버스 ETF 금지
+      IRP    : US_DIRECT·개별주식·레버리지/인버스 ETF 금지 + 위험자산 ≤ 70%
+
+    Returns
+    -------
+    {"valid": bool, "violations": list[str], "disclaimer": str | None}
+    """
+    if account_type == "위탁":
+        return {"valid": True, "violations": [], "disclaimer": None}
+
+    violations: list[str] = []
+    disclaimer: str | None = None
+
+    for ticker in tickers:
+        market = tax_engine.classify_asset(ticker)          # KR_DOMESTIC | KR_FOREIGN | US_DIRECT | KRX_GOLD
+        inst   = tax_engine.classify_instrument_type(ticker) # ETF | STOCK | LEVERAGED_ETF | INVERSE_ETF | UNKNOWN
+
+        if account_type == "ISA":
+            if market == "US_DIRECT":
+                violations.append(
+                    f"ISA 계좌는 해외 직접 상장 종목({ticker})을 보유할 수 없습니다. "
+                    f"국내 상장 ETF(예: TIGER 미국S&P500)를 이용하세요."
+                )
+
+        elif account_type in ("연금저축", "IRP"):
+            if market == "US_DIRECT":
+                violations.append(
+                    f"{account_type} 계좌는 해외 직접 상장 종목({ticker})을 보유할 수 없습니다. "
+                    f"국내 상장 ETF를 이용하세요."
+                )
+            elif inst == "STOCK":
+                violations.append(
+                    f"{account_type} 계좌는 개별주식({ticker})을 보유할 수 없습니다. "
+                    f"ETF만 투자 가능합니다."
+                )
+            elif inst == "LEVERAGED_ETF":
+                violations.append(
+                    f"{account_type} 계좌는 레버리지 ETF({ticker})를 보유할 수 없습니다."
+                )
+            elif inst == "INVERSE_ETF":
+                violations.append(
+                    f"{account_type} 계좌는 인버스 ETF({ticker})를 보유할 수 없습니다."
+                )
+
+    # IRP 위험자산 70% 한도 추가 검증
+    if account_type == "IRP" and not violations:
+        irp_result = tax_engine.validate_irp_weights(weights)
+        disclaimer = irp_result.get("disclaimer")
+        if not irp_result["valid"]:
+            violations.append(irp_result["warning"])
+
+    return {
+        "valid":      len(violations) == 0,
+        "violations": violations,
+        "disclaimer": disclaimer,
+    }
+
+
 # ── TaxedDividendEngine ──────────────────────────────────────
 
 class TaxedDividendEngine:

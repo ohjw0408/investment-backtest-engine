@@ -31,6 +31,7 @@ class AccumulationAnalyzer:
         account_type:         str           = "위탁",
         isa_renewal:          bool          = False,
         gain_harvesting:      bool          = False,
+        progress_callback                   = None,
     ):
         self.portfolio_engine      = portfolio_engine
         self.tickers               = tickers
@@ -48,6 +49,18 @@ class AccumulationAnalyzer:
         self.account_type          = account_type
         self.isa_renewal           = isa_renewal and account_type == "ISA"
         self.gain_harvesting       = gain_harvesting and account_type == "위탁"
+        self.progress_callback     = progress_callback
+
+    def _estimate_total_cases(self) -> int:
+        cur = self.data_start
+        count = 0
+        while True:
+            end = cur + relativedelta(years=self.accumulation_years)
+            if end > self.data_end:
+                break
+            count += 1
+            cur += relativedelta(months=self.step_months)
+        return max(count, 1)
 
     def run(self) -> dict:
         cases = self._run_rolling()
@@ -61,6 +74,7 @@ class AccumulationAnalyzer:
         return {"cases": cases, "distribution": distribution}
 
     def _run_rolling(self) -> List[dict]:
+        import time
         from modules.tax.account_tax         import TaxedDividendEngine
         from modules.execution.order_executor import TaxedOrderExecutor
         from modules.core.portfolio           import TaxTrackedPortfolio
@@ -69,6 +83,8 @@ class AccumulationAnalyzer:
         orig_div_engine = sim_loop.dividend_engine
         orig_executor   = sim_loop.executor
 
+        total_cases = self._estimate_total_cases() if self.progress_callback else 0
+        start_time  = time.time()
         cases, cur, run_id = [], self.data_start, 1
         while True:
             end = cur + relativedelta(years=self.accumulation_years)
@@ -143,6 +159,12 @@ class AccumulationAnalyzer:
                         (final_value / total_contrib) ** (1.0 / self.accumulation_years) - 1
                     )
             cases.append(metrics)
+            if self.progress_callback:
+                self.progress_callback(
+                    current=run_id,
+                    total=total_cases,
+                    elapsed=time.time() - start_time,
+                )
             if self.verbose:
                 print(f"  [{run_id:03d}] {cur.strftime('%Y-%m')} ~ {end.strftime('%Y-%m')}"
                       f"  종료자산(세후): {final_value:,.0f}")

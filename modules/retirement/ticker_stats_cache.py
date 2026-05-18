@@ -24,14 +24,16 @@ TRADING_DAYS_PER_MONTH = 21
 # 테이블 DDL
 _DDL = """
 CREATE TABLE IF NOT EXISTS ticker_return_stats (
-    code          TEXT PRIMARY KEY,
-    mu_monthly    REAL NOT NULL,
-    sigma_monthly REAL NOT NULL,
-    data_start    TEXT NOT NULL,
-    data_end      TEXT NOT NULL,
-    n_months      INTEGER NOT NULL,
-    is_synthetic  INTEGER NOT NULL DEFAULT 0,
-    computed_at   TEXT NOT NULL
+    code             TEXT PRIMARY KEY,
+    mu_monthly       REAL NOT NULL,
+    sigma_monthly    REAL NOT NULL,
+    data_start       TEXT NOT NULL,
+    data_end         TEXT NOT NULL,
+    n_months         INTEGER NOT NULL,
+    is_synthetic     INTEGER NOT NULL DEFAULT 0,
+    computed_at      TEXT NOT NULL,
+    div_yield_mu     REAL,
+    div_yield_sigma  REAL
 )
 """
 
@@ -47,7 +49,8 @@ class TickerStatsCache:
     def get(self, code: str) -> dict | None:
         """캐시에서 읽기. TTL 초과 시 None 반환."""
         row = self._conn.execute(
-            "SELECT mu_monthly, sigma_monthly, data_start, data_end, n_months, computed_at "
+            "SELECT mu_monthly, sigma_monthly, data_start, data_end, n_months, computed_at, "
+            "div_yield_mu, div_yield_sigma "
             "FROM ticker_return_stats WHERE code=?",
             (code,)
         ).fetchone()
@@ -60,11 +63,13 @@ class TickerStatsCache:
             return None  # 만료
 
         return {
-            "mu_monthly":    row[0],
-            "sigma_monthly": row[1],
-            "data_start":    row[2],
-            "data_end":      row[3],
-            "n_months":      row[4],
+            "mu_monthly":      row[0],
+            "sigma_monthly":   row[1],
+            "data_start":      row[2],
+            "data_end":        row[3],
+            "n_months":        row[4],
+            "div_yield_mu":    row[6],
+            "div_yield_sigma": row[7],
         }
 
     def compute_and_save(self, code: str) -> dict | None:
@@ -108,16 +113,50 @@ class TickerStatsCache:
         n_months    = len(monthly_ret)
         computed_at = datetime.now().isoformat()
 
+        # 배당수익률 통계: corporate_actions JOIN price_daily
+        div_yield_mu    = None
+        div_yield_sigma = None
+        try:
+            div_data = self._conn.execute("""
+                SELECT strftime('%Y', ca.date) yr,
+                       SUM(ca.dividend)       total_div,
+                       AVG(pd.close)          avg_price
+                FROM corporate_actions ca
+                JOIN price_daily pd ON ca.code = pd.code AND ca.date = pd.date
+                WHERE ca.code = ? AND ca.dividend > 0
+                GROUP BY yr
+            """, (code,)).fetchall()
+        except Exception:
+            div_data = []
+        if div_data:
+            yields = [r[1] / r[2] for r in div_data if r[2] and r[2] > 0]
+            if yields:
+                div_yield_mu = float(np.mean(yields))
+                n_div        = len(yields)
+                div_yield_sigma = max(
+                    float(np.std(yields)) if n_div >= 2 else div_yield_mu * 0.20,
+                    div_yield_mu * 0.10,
+                )
+
         self._conn.execute(
             """INSERT OR REPLACE INTO ticker_return_stats
-               (code, mu_monthly, sigma_monthly, data_start, data_end, n_months, is_synthetic, computed_at)
-               VALUES (?,?,?,?,?,?,0,?)""",
-            (code, mu, sigma, data_start, data_end, n_months, computed_at)
+               (code, mu_monthly, sigma_monthly, data_start, data_end, n_months,
+                is_synthetic, computed_at, div_yield_mu, div_yield_sigma)
+               VALUES (?,?,?,?,?,?,0,?,?,?)""",
+            (code, mu, sigma, data_start, data_end, n_months,
+             computed_at, div_yield_mu, div_yield_sigma)
         )
         self._conn.commit()
 
-        return {"mu_monthly": mu, "sigma_monthly": sigma,
-                "data_start": data_start, "data_end": data_end, "n_months": n_months}
+        return {
+            "mu_monthly":      mu,
+            "sigma_monthly":   sigma,
+            "data_start":      data_start,
+            "data_end":        data_end,
+            "n_months":        n_months,
+            "div_yield_mu":    div_yield_mu,
+            "div_yield_sigma": div_yield_sigma,
+        }
 
     def get_or_compute(self, code: str) -> dict | None:
         """캐시 hit → 반환, miss → 계산 후 저장 후 반환."""

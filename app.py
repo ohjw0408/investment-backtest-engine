@@ -240,121 +240,200 @@ def _make_strategy_factory(target_weights, rebal_mode, band_width=0.05):
 # API - 투자 계산기
 # -----------------------------------------------
 
+def _run_calculator_logic(body: dict, progress_callback=None) -> dict:
+    """calculator_run 핵심 로직. 동기(직접 호출) / 비동기(Celery) 양쪽에서 사용."""
+    tickers_input    = body['tickers']
+    initial_capital  = float(body['initial_capital'])
+    monthly_contrib  = float(body['monthly_contribution'])
+    years            = int(body['years'])
+    rebal_mode       = body['rebal_mode']
+    band_width       = float(body.get('band_width', 0.05))
+    dividend_mode    = body['dividend_mode']
+
+    ticker_codes   = [t['code'] for t in tickers_input]
+    target_weights = {t['code']: t['weight'] for t in tickers_input}
+
+    strategy_factory = _make_strategy_factory(target_weights, rebal_mode, band_width)
+
+    usdkrw_start = portfolio_engine.loader.USD_KRW_START
+
+    for ticker in ticker_codes:
+        try:
+            portfolio_engine.loader.get_price(
+                ticker,
+                usdkrw_start,
+                datetime.date.today().strftime('%Y-%m-%d')
+            )
+        except Exception as e:
+            print(f"[calculator] {ticker} 데이터 로드 오류: {e}")
+
+    price_starts = [get_price_start(t) for t in ticker_codes]
+    price_starts = [d for d in price_starts if d]
+
+    data_start = max([usdkrw_start] + price_starts) if price_starts else usdkrw_start
+    data_end   = datetime.date.today().strftime('%Y-%m-%d')
+
+    from dateutil.relativedelta import relativedelta
+    start_dt  = datetime.datetime.strptime(data_start, '%Y-%m-%d').date()
+    max_years = (datetime.date.today() - start_dt).days // 365
+
+    if years > max_years:
+        raise ValueError(
+            f"데이터 부족: {ticker_codes}의 데이터는 {data_start}부터 있어서 "
+            f"최대 {max_years}년 시뮬레이션이 가능합니다."
+        )
+
+    div_starts = [get_dividend_start(t) for t in ticker_codes]
+    div_starts = [d for d in div_starts if d]
+    div_start  = max(div_starts) if div_starts else None
+
+    tax_enabled     = body.get('tax_enabled', False)
+    account_type    = body.get('account_type', '위탁')
+    user_settings   = body.get('user_settings', {})
+    isa_renewal     = body.get('isa_renewal', False)
+    gain_harvesting = body.get('gain_harvesting', False)
+    tax_engine      = None
+    if tax_enabled:
+        from modules.tax.base_tax import TaxEngine
+        tax_engine = TaxEngine(user_settings)
+
+    analyzer = AccumulationAnalyzer(
+        portfolio_engine     = portfolio_engine,
+        tickers              = ticker_codes,
+        strategy_factory     = strategy_factory,
+        data_start           = data_start,
+        data_end             = data_end,
+        accumulation_years   = years,
+        monthly_contribution = monthly_contrib,
+        initial_capital      = initial_capital,
+        dividend_mode        = dividend_mode,
+        step_months          = 3,
+        verbose              = False,
+        div_start            = div_start,
+        tax_engine           = tax_engine,
+        account_type         = account_type,
+        isa_renewal          = isa_renewal,
+        gain_harvesting      = gain_harvesting,
+        progress_callback    = progress_callback,
+    )
+
+    result = analyzer.run()
+
+    if div_start:
+        result['distribution']['div_data_start']  = div_start
+        result['distribution']['div_cases_count'] = len(result['cases'])
+    else:
+        result['distribution']['no_dividend'] = True
+
+    cases_summary = [
+        {
+            'run_id':    c['run_id'],
+            'start':     c['start'],
+            'end':       c['end'],
+            'end_value': round(c['end_value']),
+            'cagr':      round(c['cagr'], 4),
+            'mdd':       round(c['mdd'], 4),
+        }
+        for c in result['cases']
+    ]
+
+    return {
+        'cases':        cases_summary,
+        'cases_count':  len(cases_summary),
+        'distribution': result['distribution'],
+    }
+
+
 @app.route('/api/calculator/run', methods=['POST'])
 def calculator_run():
     try:
-        body = request.get_json()
-
-        tickers_input    = body['tickers']
-        initial_capital  = float(body['initial_capital'])
-        monthly_contrib  = float(body['monthly_contribution'])
-        years            = int(body['years'])
-        rebal_mode       = body['rebal_mode']
-        band_width       = float(body.get('band_width', 0.05))
-        dividend_mode    = body['dividend_mode']
-
-        ticker_codes   = [t['code'] for t in tickers_input]
-        target_weights = {t['code']: t['weight'] for t in tickers_input}
-
-        strategy_factory = _make_strategy_factory(target_weights, rebal_mode, band_width)
-
-        usdkrw_start = portfolio_engine.loader.USD_KRW_START
-
-        for ticker in ticker_codes:
-            try:
-                portfolio_engine.loader.get_price(
-                    ticker,
-                    usdkrw_start,
-                    datetime.date.today().strftime('%Y-%m-%d')
-                )
-            except Exception as e:
-                print(f"[calculator] {ticker} 데이터 로드 오류: {e}")
-
-        price_starts = [get_price_start(t) for t in ticker_codes]
-        price_starts = [d for d in price_starts if d]
-
-        if price_starts:
-            data_start = max([usdkrw_start] + price_starts)
-        else:
-            data_start = usdkrw_start
-
-        data_end = datetime.date.today().strftime('%Y-%m-%d')
-
-        from dateutil.relativedelta import relativedelta
-        start_dt  = datetime.datetime.strptime(data_start, '%Y-%m-%d').date()
-        end_dt    = datetime.date.today()
-        max_years = (end_dt - start_dt).days // 365
-
-        if years > max_years:
-            return jsonify({
-                'error': f"데이터 부족: {ticker_codes}의 데이터는 {data_start}부터 있어서 "
-                         f"최대 {max_years}년 시뮬레이션이 가능합니다."
-            }), 400
-
-        div_starts = [get_dividend_start(t) for t in ticker_codes]
-        div_starts = [d for d in div_starts if d]
-        div_start  = max(div_starts) if div_starts else None
-
-        # 세금 엔진 (선택)
-        tax_enabled      = body.get('tax_enabled', False)
-        account_type     = body.get('account_type', '위탁')
-        user_settings    = body.get('user_settings', {})
-        isa_renewal      = body.get('isa_renewal', False)
-        gain_harvesting  = body.get('gain_harvesting', False)
-        tax_engine       = None
-        if tax_enabled:
-            from modules.tax.base_tax import TaxEngine
-            tax_engine = TaxEngine(user_settings)
-
-        analyzer = AccumulationAnalyzer(
-            portfolio_engine     = portfolio_engine,
-            tickers              = ticker_codes,
-            strategy_factory     = strategy_factory,
-            data_start           = data_start,
-            data_end             = data_end,
-            accumulation_years   = years,
-            monthly_contribution = monthly_contrib,
-            initial_capital      = initial_capital,
-            dividend_mode        = dividend_mode,
-            step_months          = 3,
-            verbose              = False,
-            div_start            = div_start,
-            tax_engine           = tax_engine,
-            account_type         = account_type,
-            isa_renewal          = isa_renewal,
-            gain_harvesting      = gain_harvesting,
-        )
-
-        result = analyzer.run()
-
-        if div_start:
-            result['distribution']['div_data_start']  = div_start
-            result['distribution']['div_cases_count'] = len(result['cases'])
-        else:
-            result['distribution']['no_dividend'] = True
-
-        cases_summary = [
-            {
-                'run_id':    c['run_id'],
-                'start':     c['start'],
-                'end':       c['end'],
-                'end_value': round(c['end_value']),
-                'cagr':      round(c['cagr'], 4),
-                'mdd':       round(c['mdd'], 4),
-            }
-            for c in result['cases']
-        ]
-
-        return jsonify({
-            'cases':        cases_summary,
-            'cases_count':  len(cases_summary),
-            'distribution': result['distribution'],
-        })
-
+        body   = request.get_json()
+        result = _run_calculator_logic(body)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/calculator/submit', methods=['POST'])
+def calculator_submit():
+    from tasks import run_simulation_task
+    payload = request.get_json()
+    task    = run_simulation_task.delay(payload)
+    return jsonify({'task_id': task.id, 'status': 'PENDING'})
+
+
+@app.route('/api/task/<task_id>', methods=['GET'])
+def task_status(task_id: str):
+    from celery_app import celery as celery_app
+    from tasks import get_queue_position
+
+    task = celery_app.AsyncResult(task_id)
+
+    if task.state == 'PENDING':
+        queue_pos = get_queue_position(task_id)
+        return jsonify({
+            'status':    'PENDING',
+            'queue_pos': queue_pos,
+            'percent':   0,
+        })
+
+    elif task.state == 'PROGRESS':
+        meta = task.info or {}
+        return jsonify({
+            'status':  'PROGRESS',
+            'percent': meta.get('percent', 0),
+            'current': meta.get('current', 0),
+            'total':   meta.get('total', 0),
+            'elapsed': meta.get('elapsed', 0),
+            'eta':     meta.get('eta'),
+        })
+
+    elif task.state == 'SUCCESS':
+        result = task.result or {}
+        if result.get('status') == 'FAILURE':
+            return jsonify({'status': 'FAILURE', 'error': result.get('error', '알 수 없는 오류')})
+        return jsonify({
+            'status': 'SUCCESS',
+            'result': result.get('result'),
+        })
+
+    else:
+        return jsonify({
+            'status': 'FAILURE',
+            'error':  str(task.info),
+        })
+
+
+# -----------------------------------------------
+# API - 투자 계산기 비동기 제출 (이미 위에 정의됨)
+# API - 은퇴 설계 / 백테스트 / 배당 — 비동기 submit
+# -----------------------------------------------
+
+@app.route('/api/retirement/submit', methods=['POST'])
+def retirement_submit():
+    from tasks import run_retirement_task
+    payload = request.get_json()
+    payload['_mode'] = 'withdrawal' if payload.get('_withdrawal_only') else 'full'
+    task = run_retirement_task.delay(payload)
+    return jsonify({'task_id': task.id, 'status': 'PENDING'})
+
+
+@app.route('/api/backtest/submit', methods=['POST'])
+def backtest_submit():
+    from tasks import run_backtest_task
+    task = run_backtest_task.delay(request.get_json())
+    return jsonify({'task_id': task.id, 'status': 'PENDING'})
+
+
+@app.route('/api/dividend-target/submit', methods=['POST'])
+def dividend_target_submit():
+    from tasks import run_dividend_task
+    task = run_dividend_task.delay(request.get_json())
+    return jsonify({'task_id': task.id, 'status': 'PENDING'})
 
 
 # -----------------------------------------------

@@ -112,6 +112,7 @@ class WithdrawalAnalyzer:
         account_type:       str       = "위탁",
         current_age:        int       = 40,
         accumulation_years: int       = 0,
+        progress_callback             = None,
     ):
         self.portfolio_engine   = portfolio_engine
         self.tickers            = tickers
@@ -128,7 +129,19 @@ class WithdrawalAnalyzer:
         self.dividend_mode      = dividend_mode
         self.step_months        = step_months
         self.verbose            = verbose
+        self.progress_callback  = progress_callback
         self._return_stats_cache: Optional[tuple] = None
+
+    def _estimate_total_cases(self) -> int:
+        cur = self.data_start
+        count = 0
+        while True:
+            end = cur + relativedelta(years=self.withdrawal_years)
+            if end > self.data_end:
+                break
+            count += 1
+            cur += relativedelta(months=self.step_months)
+        return max(count, 1)
 
     def run(self) -> dict:
         cases = self._run_rolling()
@@ -200,8 +213,34 @@ class WithdrawalAnalyzer:
             for s, e, rid in windows
         ]
 
-        # 4. 병렬 실행
-        raw_results = self._run_parallel(task_args, full_price_data, all_dates)
+        # 4. 병렬 실행 (progress_callback 있으면 imap_unordered로 케이스 단위 보고)
+        import time as _t
+        _start = _t.time()
+        total  = len(task_args)
+
+        if self.progress_callback:
+            from multiprocessing import Pool as _Pool
+            try:
+                raw_results = []
+                with _Pool(N_WORKERS, initializer=_init_wd_worker,
+                           initargs=(full_price_data, all_dates)) as pool:
+                    for completed, result in enumerate(
+                            pool.imap_unordered(_run_wd_case, task_args), 1):
+                        raw_results.append(result)
+                        elapsed = _t.time() - _start
+                        eta = elapsed / completed * (total - completed) if completed > 0 else None
+                        self.progress_callback(current=completed, total=total, elapsed=elapsed)
+            except Exception as e:
+                if self.verbose:
+                    print(f"  [병렬화 실패 → 순차 실행] {e}")
+                _init_wd_worker(full_price_data, all_dates)
+                raw_results = []
+                for completed, a in enumerate(task_args, 1):
+                    raw_results.append(_run_wd_case(a))
+                    elapsed = _t.time() - _start
+                    self.progress_callback(current=completed, total=total, elapsed=elapsed)
+        else:
+            raw_results = self._run_parallel(task_args, full_price_data, all_dates)
 
         # 5. metrics 변환
         cases = []

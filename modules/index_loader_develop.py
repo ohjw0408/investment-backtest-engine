@@ -102,6 +102,15 @@ class IndexLoader:
                 last_update TEXT
             )
         """)
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS index_div_yield (
+                index_code   TEXT,
+                year         INTEGER,
+                annual_yield REAL,
+                source       TEXT,
+                PRIMARY KEY (index_code, year)
+            )
+        """)
         self.conn.commit()
 
     # ── DB 날짜 범위 조회 ──────────────────────────────────

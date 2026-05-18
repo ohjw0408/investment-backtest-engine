@@ -231,6 +231,16 @@
 
   <!-- 결과 패널 -->
   <div class="calc-result-panel" id="dtResultPanel">
+    <div id="dtLoading" style="display:none;padding:20px 16px;">
+      <div id="dtProgressPhase" style="font-size:0.85rem;font-weight:700;color:var(--blue);margin-bottom:8px;">준비 중...</div>
+      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;">
+        <div id="dtProgressBar" style="height:100%;background:var(--blue);border-radius:8px;width:0%;transition:width 0.4s ease;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
+        <span id="dtProgressDetail">계산 준비 중</span>
+        <span id="dtProgressEta"></span>
+      </div>
+    </div>
     <div class="result-empty" id="dtResultEmpty">
       <div class="result-empty-icon">💰</div>
       <div class="result-empty-title">시뮬레이션 결과가 여기에 표시됩니다</div>
@@ -458,8 +468,12 @@ async function runDividendTarget() {
   const btnText=document.getElementById('dtRunBtnText');
   const spinner=document.getElementById('dtRunBtnSpinner');
   btn.disabled=true;
-  btnText.textContent = modes.includes('optimize') ? '자동 계산 중... (1~2분 소요)' : '계산 중...';
+  btnText.textContent = modes.includes('optimize') ? '자동 계산 중...' : '계산 중...';
   spinner.style.display='inline';
+
+  document.getElementById('dtResultEmpty').style.display   = 'none';
+  document.getElementById('dtResultContent').style.display = 'none';
+  dtShowProgressUI();
 
   const mkCfg = (v) => {
     const cap  = v.charAt(0).toUpperCase()+v.slice(1);
@@ -472,7 +486,6 @@ async function runDividendTarget() {
     };
   };
 
-  // 세금 프로필 로드
   const taxRaw = localStorage.getItem('domino_tax_settings');
   const taxProfile = taxRaw ? JSON.parse(taxRaw) : {};
   const accountType = dtTaxOn
@@ -493,16 +506,84 @@ async function runDividendTarget() {
   };
 
   try {
-    const data = await fetch('/api/dividend-target/scenario', {
+    const res = await fetch('/api/dividend-target/submit', {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
-    }).then(r=>r.json());
-    if (data.error) { alert('오류: '+data.error); return; }
-    renderResult(data, body);
+    });
+    const { task_id } = await res.json();
+    window._dtLastBody = body;
+    await dtPollTask(task_id);
   } catch(e) {
     alert('오류: '+e.message);
+    dtHideProgressUI();
+    document.getElementById('dtResultEmpty').style.display = 'block';
   } finally {
     btn.disabled=false; btnText.textContent='시뮬레이션 실행'; spinner.style.display='none';
   }
+}
+
+async function dtPollTask(taskId, maxWait = 600000) {
+  const deadline = Date.now() + maxWait;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const res  = await fetch(`/api/task/${taskId}`);
+      const data = await res.json();
+
+      if (data.state === 'PROGRESS') {
+        const m = data.meta || {};
+        dtUpdateProgressUI({
+          phase:    '시뮬레이션 중...',
+          queuePos: m.queue_pos || 0,
+          percent:  m.percent   || 0,
+          current:  m.current   || 0,
+          total:    m.total     || 0,
+          eta:      m.eta,
+        });
+        continue;
+      }
+      if (data.state === 'SUCCESS') {
+        dtHideProgressUI();
+        const result = data.result?.result ?? data.result;
+        if (result.error) { alert('오류: '+result.error); document.getElementById('dtResultEmpty').style.display='block'; return; }
+        renderResult(result, window._dtLastBody || {});
+        return;
+      }
+      if (data.state === 'FAILURE') {
+        dtHideProgressUI();
+        document.getElementById('dtResultEmpty').style.display = 'block';
+        alert('오류: ' + (data.result?.error || '알 수 없는 오류'));
+        return;
+      }
+    } catch(e) {
+      dtHideProgressUI();
+      document.getElementById('dtResultEmpty').style.display = 'block';
+      alert('폴링 오류: ' + e.message);
+      return;
+    }
+  }
+  dtHideProgressUI();
+  document.getElementById('dtResultEmpty').style.display = 'block';
+  alert('시간 초과: 시뮬레이션이 너무 오래 걸립니다.');
+}
+
+function dtShowProgressUI() {
+  document.getElementById('dtLoading').style.display = 'block';
+  dtUpdateProgressUI({ phase: '대기 중...', queuePos: 0, percent: 0, current: 0, total: 0, eta: null });
+}
+
+function dtUpdateProgressUI({ phase, queuePos, percent, current, total, eta }) {
+  const phaseEl  = document.getElementById('dtProgressPhase');
+  const barEl    = document.getElementById('dtProgressBar');
+  const detailEl = document.getElementById('dtProgressDetail');
+  const etaEl    = document.getElementById('dtProgressEta');
+  if (phaseEl)  phaseEl.textContent  = queuePos > 0 ? `대기 중 (${queuePos}번째)` : phase;
+  if (barEl)    barEl.style.width    = percent + '%';
+  if (detailEl) detailEl.textContent = total > 0 ? `${percent}% (${current}/${total})` : '계산 준비 중';
+  if (etaEl)    etaEl.textContent    = eta != null ? `남은 시간: 약 ${eta}초` : '';
+}
+
+function dtHideProgressUI() {
+  document.getElementById('dtLoading').style.display = 'none';
 }
 
 // ── 결과 렌더링 ──

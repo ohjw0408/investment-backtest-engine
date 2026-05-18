@@ -45,6 +45,7 @@ class PriceLoader:
         self._usdkrw_cache    = None
         self._backfill_engine = None   # 싱글톤
         self._price_cache     = {}     # 가격 데이터 캐시
+        self._backfilled_codes: set = set()  # backfill은 ticker당 1회만
 
         self.create_tables()
         self._auto_update_usdkrw()
@@ -321,13 +322,14 @@ class PriceLoader:
             self._insert_ignore(price_df, "price_daily")
             self._insert_ignore(action_df, "corporate_actions")
 
-        # ── 백필링 자동 실행 (싱글톤) ────────────────────────
-        if self.is_kr_etf(code) or code in self._us_tickers:
+        # ── 백필링 자동 실행 (ticker당 1회) ─────────────────
+        if (self.is_kr_etf(code) or code in self._us_tickers) and code not in self._backfilled_codes:
             try:
                 bf     = self._get_backfill_engine()
                 result = bf.backfill(code)
                 if result.get("status") == "ok":
                     print(f"[PriceLoader] 백필링 완료: {code} ({result['rows_added']:,}행 추가)")
+                self._backfilled_codes.add(code)
             except Exception:
                 pass
 

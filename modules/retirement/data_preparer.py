@@ -183,17 +183,44 @@ class DataPreparer:
             if gen_result["status"] == "ok":
                 new_start    = _get_ticker_data_start(self.price_conn, code)
                 starts[code] = new_start
+
+                # 합성 구간 배당 주입 (실측 mu/sigma 기반)
+                div_yield_mu    = stats.get("div_yield_mu")
+                div_yield_sigma = stats.get("div_yield_sigma")
+                div_rows = 0
+
+                if div_yield_mu and div_yield_mu > 0:
+                    synth_px = pd.read_sql(
+                        "SELECT date, close FROM price_daily "
+                        "WHERE code=? AND date BETWEEN ? AND ? ORDER BY date",
+                        self.price_conn,
+                        params=(code, gen_result["date_from"], gen_result["date_to"]),
+                    )
+                    if not synth_px.empty:
+                        synth_px["date"] = pd.to_datetime(synth_px["date"])
+                        price_series = synth_px.set_index("date")["close"]
+                        from modules.backfill_engine import inject_quarterly_dividends
+                        div_rows = inject_quarterly_dividends(
+                            price_conn=self.price_conn,
+                            code=code,
+                            price_series=price_series,
+                            annual_yield_src=("musigma", div_yield_mu, div_yield_sigma),
+                            seed=abs(hash(code)) % 2**31,
+                        )
+
                 synthetic_info[code] = {
                     "mu_monthly":    stats["mu_monthly"],
                     "sigma_monthly": stats["sigma_monthly"],
                     "rows_added":    gen_result["rows"],
+                    "div_rows":      div_rows,
                     "date_from":     gen_result["date_from"],
                     "date_to":       gen_result["date_to"],
                     "stats_basis":   f"{stats['data_start']} ~ {stats['data_end']}",
                 }
                 if self.verbose:
+                    div_str = f" | 배당 {div_rows}건" if div_rows > 0 else ""
                     print(f"  [{code}] 가상 데이터 생성: {gen_result['date_from']} ~ "
-                          f"{gen_result['date_to']} ({gen_result['rows']:,}행)")
+                          f"{gen_result['date_to']} ({gen_result['rows']:,}행){div_str}")
             else:
                 if self.verbose:
                     print(f"  [{code}] 가상 데이터 생성 실패: {gen_result['status']}")

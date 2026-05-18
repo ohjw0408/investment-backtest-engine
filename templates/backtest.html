@@ -213,8 +213,15 @@
     <div class="calc-warning">⚠ 과거 데이터 기반 시뮬레이션입니다. 미래 수익을 보장하지 않습니다.</div>
 
     <button class="calc-run-btn" id="btRunBtn" onclick="runBacktest()">📊 분석 실행</button>
-    <div id="btLoading" style="display:none;text-align:center;padding:12px;color:var(--blue);font-size:0.85rem;font-weight:600;">
-      ⏳ 분석 중...
+    <div id="btLoading" style="display:none;padding:16px 12px;">
+      <div id="btProgressPhase" style="font-size:0.85rem;font-weight:700;color:var(--blue);margin-bottom:8px;">준비 중...</div>
+      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;">
+        <div id="btProgressBar" style="height:100%;background:var(--blue);border-radius:8px;width:0%;transition:width 0.4s ease;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
+        <span id="btProgressDetail">계산 준비 중</span>
+        <span id="btProgressEta"></span>
+      </div>
     </div>
   </div>
 
@@ -385,13 +392,13 @@ async function runBacktest() {
   const endDate   = document.getElementById('btEndDate').value;
   if (!startDate || !endDate || startDate >= endDate) { alert('기간을 올바르게 설정해주세요.'); return; }
 
-  document.getElementById('btRunBtn').disabled       = true;
-  document.getElementById('btLoading').style.display = 'block';
+  document.getElementById('btRunBtn').disabled             = true;
   document.getElementById('btResultEmpty').style.display   = 'none';
   document.getElementById('btResultContent').style.display = 'none';
+  btShowProgressUI();
 
   try {
-    const res  = await fetch('/api/backtest/run', {
+    const res = await fetch('/api/backtest/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -411,15 +418,78 @@ async function runBacktest() {
         } : {},
       }),
     });
-    const data = await res.json();
-    if (data.error) { alert(data.error); return; }
-    renderBacktest(data);
+    const { task_id } = await res.json();
+    await btPollTask(task_id);
   } catch(e) {
     alert('오류: ' + e.message);
+    btHideProgressUI();
+    document.getElementById('btResultEmpty').style.display = 'flex';
   } finally {
-    document.getElementById('btRunBtn').disabled       = false;
-    document.getElementById('btLoading').style.display = 'none';
+    document.getElementById('btRunBtn').disabled = false;
   }
+}
+
+async function btPollTask(taskId, maxWait = 600000) {
+  const deadline = Date.now() + maxWait;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const res  = await fetch(`/api/task/${taskId}`);
+      const data = await res.json();
+
+      if (data.state === 'PROGRESS') {
+        const m = data.meta || {};
+        btUpdateProgressUI({
+          phase:    '분석 중...',
+          queuePos: m.queue_pos || 0,
+          percent:  m.percent   || 0,
+          current:  m.current   || 0,
+          total:    m.total     || 0,
+          eta:      m.eta,
+        });
+        continue;
+      }
+      if (data.state === 'SUCCESS') {
+        btHideProgressUI();
+        renderBacktest(data.result?.result ?? data.result);
+        return;
+      }
+      if (data.state === 'FAILURE') {
+        btHideProgressUI();
+        document.getElementById('btResultEmpty').style.display = 'flex';
+        alert('오류: ' + (data.result?.error || '알 수 없는 오류'));
+        return;
+      }
+    } catch(e) {
+      btHideProgressUI();
+      document.getElementById('btResultEmpty').style.display = 'flex';
+      alert('폴링 오류: ' + e.message);
+      return;
+    }
+  }
+  btHideProgressUI();
+  document.getElementById('btResultEmpty').style.display = 'flex';
+  alert('시간 초과: 분석이 너무 오래 걸립니다.');
+}
+
+function btShowProgressUI() {
+  document.getElementById('btLoading').style.display = 'block';
+  btUpdateProgressUI({ phase: '대기 중...', queuePos: 0, percent: 0, current: 0, total: 0, eta: null });
+}
+
+function btUpdateProgressUI({ phase, queuePos, percent, current, total, eta }) {
+  const phaseEl  = document.getElementById('btProgressPhase');
+  const barEl    = document.getElementById('btProgressBar');
+  const detailEl = document.getElementById('btProgressDetail');
+  const etaEl    = document.getElementById('btProgressEta');
+  if (phaseEl)  phaseEl.textContent  = queuePos > 0 ? `대기 중 (${queuePos}번째)` : phase;
+  if (barEl)    barEl.style.width    = percent + '%';
+  if (detailEl) detailEl.textContent = total > 0 ? `${percent}% (${current}/${total})` : '계산 준비 중';
+  if (etaEl)    etaEl.textContent    = eta != null ? `남은 시간: 약 ${eta}초` : '';
+}
+
+function btHideProgressUI() {
+  document.getElementById('btLoading').style.display = 'none';
 }
 
 // ── 렌더링 ──

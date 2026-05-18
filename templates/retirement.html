@@ -411,8 +411,15 @@
       🏖 시뮬레이션 실행
     </button>
 
-    <div id="retLoading" style="display:none;text-align:center;padding:12px;color:var(--blue);font-size:0.85rem;font-weight:600;">
-      ⏳ 시뮬레이션 중... (수십 초 소요될 수 있습니다)
+    <div id="retLoading" style="display:none;padding:16px 12px;">
+      <div id="retProgressPhase" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:6px;">준비 중...</div>
+      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;">
+        <div id="retProgressBar" style="background:var(--blue);height:100%;width:0%;transition:width 0.5s;border-radius:8px;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
+        <span id="retProgressDetail">계산 준비 중</span>
+        <span id="retProgressEta"></span>
+      </div>
     </div>
   </div>
 
@@ -628,16 +635,16 @@ async function runRetirement() {
   if (!retTickers.length) { alert('종목을 추가해주세요.'); return; }
   if (total !== 100) { alert(`비중 합계가 ${total}%입니다. 100%로 맞춰주세요.`); return; }
 
-  document.getElementById('retRunBtn').disabled        = true;
-  document.getElementById('retLoading').style.display  = 'block';
+  document.getElementById('retRunBtn').disabled       = true;
+  document.getElementById('retLoading').style.display = 'block';
   document.getElementById('retResultEmpty').style.display   = 'none';
   document.getElementById('retResultContent').style.display = 'none';
+  retShowProgressUI();
 
   const targetProb = parseFloat(document.getElementById('retTargetProb').value) / 100;
-  let body, endpoint;
+  let body;
 
   if (retMode === 'sim') {
-    endpoint = '/api/retirement/run';
     const retTaxOn  = window.retTaxEnabled || false;
     const retAge    = parseInt(document.getElementById('retTaxAge')?.value || 40);
     const retAccYrs = parseInt(document.getElementById('simAccYears').value) || 20;
@@ -663,7 +670,6 @@ async function runRetirement() {
       } : {},
     };
   } else {
-    endpoint = '/api/retirement/withdrawal';
     body = {
       tickers:            retTickers.map(t => ({ code: t.code, weight: t.weight })),
       initial_capital:    parseFloat(document.getElementById('wdSeed').value) || 0,
@@ -673,23 +679,77 @@ async function runRetirement() {
       dividend_mode:      document.querySelector('input[name="wdDividend"]:checked').value,
       rebal_mode:         document.querySelector('input[name="wdRebal"]:checked').value,
       target_percentile:  targetProb,
+      _withdrawal_only:   true,
     };
   }
 
   try {
-    const res  = await fetch(endpoint, {
+    const submitRes = await fetch('/api/retirement/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+    const { task_id } = await submitRes.json();
+    const data = await retPollTask(task_id);
     renderRetirement(data, body);
   } catch(e) {
     alert('오류가 발생했습니다: ' + e.message);
   } finally {
     document.getElementById('retRunBtn').disabled       = false;
     document.getElementById('retLoading').style.display = 'none';
+  }
+}
+
+async function retPollTask(taskId, maxWait = 600000) {
+  const start = Date.now();
+  while (Date.now() - start < maxWait) {
+    await new Promise(r => setTimeout(r, 1500));
+    const res  = await fetch(`/api/task/${taskId}`);
+    const data = await res.json();
+
+    if (data.status === 'PENDING') {
+      retUpdateProgressUI({ phase: '대기 중', queuePos: data.queue_pos, percent: 0, eta: null });
+    } else if (data.status === 'PROGRESS') {
+      retUpdateProgressUI({ phase: '계산 중', percent: data.percent, current: data.current, total: data.total, elapsed: data.elapsed, eta: data.eta });
+    } else if (data.status === 'SUCCESS') {
+      return data.result;
+    } else if (data.status === 'FAILURE') {
+      throw new Error(data.error || '시뮬레이션 실패');
+    }
+  }
+  throw new Error('시간 초과 (10분)');
+}
+
+function retShowProgressUI() {
+  const phaseEl = document.getElementById('retProgressPhase');
+  if (phaseEl) phaseEl.textContent = '준비 중...';
+  const barEl = document.getElementById('retProgressBar');
+  if (barEl) barEl.style.width = '0%';
+  const detailEl = document.getElementById('retProgressDetail');
+  if (detailEl) detailEl.textContent = '계산 준비 중';
+  const etaEl = document.getElementById('retProgressEta');
+  if (etaEl) etaEl.textContent = '';
+}
+
+function retUpdateProgressUI({ phase, queuePos, percent, current, total, elapsed, eta }) {
+  const phaseEl  = document.getElementById('retProgressPhase');
+  const barEl    = document.getElementById('retProgressBar');
+  const detailEl = document.getElementById('retProgressDetail');
+  const etaEl    = document.getElementById('retProgressEta');
+  if (!phaseEl) return;
+  if (queuePos > 0) {
+    phaseEl.textContent  = `⏳ 대기 중 — 내 앞에 ${queuePos}개`;
+    barEl.style.width    = '0%';
+    detailEl.textContent = '이전 요청 처리 중...';
+    etaEl.textContent    = '';
+  } else {
+    phaseEl.textContent = `🔄 ${phase || '계산 중'} (${percent || 0}%)`;
+    barEl.style.width   = `${percent || 0}%`;
+    if (current && total) detailEl.textContent = `${current} / ${total} 케이스`;
+    if (eta) {
+      const m = Math.floor(eta / 60), s = eta % 60;
+      etaEl.textContent = m > 0 ? `약 ${m}분 ${s}초 남음` : `약 ${s}초 남음`;
+    }
   }
 }
 

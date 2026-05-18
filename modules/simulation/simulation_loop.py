@@ -23,8 +23,10 @@ class SimulationLoop:
         price_data,
         dates,
         recorder,
-        record_history=True   # 🔥 추가
+        record_history=True,
+        progress_callback=None,
     ):
+        import time as _time
 
         last_month             = None
         last_withdrawal_month  = (dates[0].year, dates[0].month) if dates else None
@@ -42,6 +44,10 @@ class SimulationLoop:
             df = price_data[ticker]
             price_array[ticker] = df["close"].values
             valid_index[ticker] = df.index
+
+        total_dates = len(dates)
+        update_step = max(1, total_dates // 20)
+        _start_time = _time.time() if progress_callback else None
 
         # 🔥 메인 루프
         for i, date in enumerate(dates):
@@ -166,3 +172,7 @@ class SimulationLoop:
                     dividend_by_ticker,
                     cash_flow=cash_flow,
                 )
+
+            if progress_callback and i % update_step == 0:
+                elapsed = _time.time() - _start_time
+                progress_callback(current=i + 1, total=total_dates, elapsed=elapsed)

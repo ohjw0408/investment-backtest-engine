@@ -722,7 +722,10 @@ class DividendSimulator:
         seed_cfg:           dict,
         monthly_cfg:        dict,
         years_cfg:          dict,
+        progress_callback=None,
     ) -> dict:
+        import time as _t
+        _scenario_start = _t.time()
         seed_mode    = seed_cfg.get('mode', 'fixed')
         monthly_mode = monthly_cfg.get('mode', 'fixed')
         years_mode   = years_cfg.get('mode', 'fixed')
@@ -761,6 +764,8 @@ class DividendSimulator:
             return {"error": "탐색이 있는 변수는 최대 2개입니다."}
 
         if vary_count == 0:
+            if progress_callback:
+                progress_callback(current=1, total=1, elapsed=_t.time() - _scenario_start)
             result = self.get_probability(seed_cfg['center'], monthly_cfg['center'], years_cfg['center'], target_monthly_div)
             return {"mode": "probability", "result": result}
 
@@ -779,14 +784,18 @@ class DividendSimulator:
                 x_key  = "years"
                 fixed  = {"seed": seeds[0], "monthly": monthlys[0]}
 
+            total_pts = len(x_vals)
             points = []
-            for v in x_vals:
+            for idx, v in enumerate(x_vals, 1):
                 s = v if x_key == "seed"    else fixed["seed"]
                 m = v if x_key == "monthly" else fixed["monthly"]
                 y = v if x_key == "years"   else fixed["years"]
                 divs = self._run_rolling(s, m, y)
                 prob = self._calc_prob(divs, target_monthly_div)
                 points.append({x_key: v, "probability": round(prob, 4)})
+                if progress_callback:
+                    elapsed = _t.time() - _scenario_start
+                    progress_callback(current=idx, total=total_pts, elapsed=elapsed)
 
             return {"mode": "scenario_1var", "x_key": x_key, "lines": [
                 {"label": None, "points": points}
@@ -822,6 +831,8 @@ class DividendSimulator:
                 line_vals, line_key = monthlys, "monthly"
                 fixed_val, fixed_key = seeds[0], "seed"
 
+        total_combos = len(line_vals) * len(x_vals)
+        combo_done   = 0
         lines = []
         for lv in line_vals:
             points = []
@@ -836,6 +847,10 @@ class DividendSimulator:
                 divs = self._run_rolling(s, m, y)
                 prob = self._calc_prob(divs, target_monthly_div)
                 points.append({x_key: xv, "probability": round(prob, 4)})
+                combo_done += 1
+                if progress_callback:
+                    elapsed = _t.time() - _scenario_start
+                    progress_callback(current=combo_done, total=total_combos, elapsed=elapsed)
 
             label = f"{line_key}={lv // 10000}만" if line_key in ("seed", "monthly") else f"{line_key}={lv}년"
             lines.append({"label": label, line_key: lv, "points": points})

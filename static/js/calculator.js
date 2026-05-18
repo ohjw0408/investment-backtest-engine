@@ -186,24 +186,18 @@ async function runCalculator() {
 
   const btn = document.getElementById('runBtn');
   btn.disabled = true;
-  document.getElementById('runBtnText').style.display    = 'none';
-  document.getElementById('runBtnSpinner').style.display = 'inline';
 
   const rebalMode    = document.querySelector('input[name="rebal"]:checked').value;
   const dividendMode = document.querySelector('input[name="dividend"]:checked').value;
   const bandWidth    = Number(document.getElementById('bandSlider').value) / 100;
 
-  // 세금 파라미터
   const taxEnabled  = window.taxEnabled || false;
   const taxAccounts = window.taxAccounts || [];
   const isSingle    = taxAccounts.length <= 1;
   const totalInit   = Number(document.getElementById('initialCapital').value);
   const totalMon    = Number(document.getElementById('monthlyContrib').value);
 
-  // 복수 계좌일 때 대표 계좌 타입 (첫 번째 계좌 기준)
-  const accountType = taxAccounts.length > 0 ? taxAccounts[0].type : '위탁';
-
-  // 복수 계좌면 합산해서 단일 시뮬로 (단순화)
+  const accountType   = taxAccounts.length > 0 ? taxAccounts[0].type : '위탁';
   const effectiveInit = taxAccounts.length > 0
     ? taxAccounts.reduce((s,a) => s + (isSingle ? totalInit : Math.round(totalInit * a.pct/100)), 0)
     : totalInit;
@@ -230,22 +224,126 @@ async function runCalculator() {
     } : {},
   };
 
+  showProgressUI();
+
   try {
-    const res  = await fetch('/api/calculator/run', {
+    const submitRes = await fetch('/api/calculator/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
-    if (data.error) { alert('오류: ' + data.error); return; }
-    renderResult(data, payload);
+    const { task_id } = await submitRes.json();
+
+    const result = await pollTask(task_id);
+
+    hideProgressUI();
+    renderResult(result, payload);
   } catch (err) {
-    alert('서버 오류: ' + err.message);
+    hideProgressUI();
+    alert('오류: ' + err.message);
   } finally {
     btn.disabled = false;
     document.getElementById('runBtnText').style.display    = 'inline';
     document.getElementById('runBtnSpinner').style.display = 'none';
   }
+}
+
+
+async function pollTask(taskId, maxWait = 600000) {
+  const start = Date.now();
+
+  while (Date.now() - start < maxWait) {
+    await new Promise(r => setTimeout(r, 1500));
+
+    const res  = await fetch(`/api/task/${taskId}`);
+    const data = await res.json();
+
+    if (data.status === 'PENDING') {
+      updateProgressUI({
+        phase:    '대기 중',
+        queuePos: data.queue_pos,
+        percent:  0,
+        eta:      null,
+      });
+
+    } else if (data.status === 'PROGRESS') {
+      updateProgressUI({
+        phase:   '계산 중',
+        percent: data.percent,
+        current: data.current,
+        total:   data.total,
+        elapsed: data.elapsed,
+        eta:     data.eta,
+      });
+
+    } else if (data.status === 'SUCCESS') {
+      return data.result;
+
+    } else if (data.status === 'FAILURE') {
+      throw new Error(data.error || '시뮬레이션 실패');
+    }
+  }
+  throw new Error('시간 초과 (10분)');
+}
+
+
+// ── 진행 상황 UI ────────────────────────────────────────────
+function showProgressUI() {
+  document.getElementById('runBtnText').style.display    = 'none';
+  document.getElementById('runBtnSpinner').style.display = 'inline';
+
+  const empty = document.getElementById('resultEmpty');
+  empty.style.display = 'flex';
+  empty.innerHTML = `
+    <div style="width:100%;padding:24px;">
+      <div id="progressPhase"
+           style="font-size:0.9rem;color:var(--text-muted);margin-bottom:8px;">
+        준비 중...
+      </div>
+      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:8px;">
+        <div id="progressBar"
+             style="background:var(--blue);height:100%;width:0%;transition:width 0.5s;border-radius:8px;">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
+        <span id="progressDetail">계산 준비 중</span>
+        <span id="progressEta"></span>
+      </div>
+    </div>`;
+  document.getElementById('resultContent').style.display = 'none';
+}
+
+function updateProgressUI({ phase, queuePos, percent, current, total, elapsed, eta }) {
+  const phaseEl  = document.getElementById('progressPhase');
+  const barEl    = document.getElementById('progressBar');
+  const detailEl = document.getElementById('progressDetail');
+  const etaEl    = document.getElementById('progressEta');
+  if (!phaseEl) return;
+
+  if (queuePos > 0) {
+    phaseEl.textContent  = `⏳ 대기 중 — 내 앞에 ${queuePos}개`;
+    barEl.style.width    = '0%';
+    detailEl.textContent = '이전 요청 처리 중...';
+    etaEl.textContent    = '';
+  } else {
+    phaseEl.textContent  = `🔄 ${phase || '계산 중'} (${percent || 0}%)`;
+    barEl.style.width    = `${percent || 0}%`;
+    if (current && total) {
+      detailEl.textContent = `${current} / ${total} 케이스`;
+    }
+    if (eta) {
+      const m = Math.floor(eta / 60);
+      const s = eta % 60;
+      etaEl.textContent = m > 0
+        ? `약 ${m}분 ${s}초 남음`
+        : `약 ${s}초 남음`;
+    }
+  }
+}
+
+function hideProgressUI() {
+  const empty = document.getElementById('resultEmpty');
+  if (empty) empty.style.display = 'none';
 }
 
 // ── 결과 렌더링 ──

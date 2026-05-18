@@ -27,6 +27,13 @@ import numpy as np
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
+# 배당 없는 지수 — 배당 주입 제외
+_NO_DIVIDEND_INDICES: set[str] = {
+    "DGS30", "DGS10", "DGS3MO",
+    "GC=F", "SI=F", "CL=F", "HG=F",
+    "USD/KRW", "USD/JPY",
+}
+
 BASE_DIR      = Path(__file__).resolve().parent.parent
 DATA_DIR      = BASE_DIR / "data"
 META_DIR      = DATA_DIR / "meta"
@@ -118,6 +125,58 @@ INDEX_MAP = {
 }
 
 
+def inject_quarterly_dividends(
+    price_conn: sqlite3.Connection,
+    code: str,
+    price_series: pd.Series,
+    annual_yield_src: tuple,
+    seed: int = 0,
+) -> int:
+    """
+    분기말(3,6,9,12월 마지막 거래일)에 배당 레코드를 corporate_actions에 삽입.
+
+    annual_yield_src 형식:
+      ("table",   yield_table: dict[int, float], resolve_fn)  → Tier 1+2
+      ("musigma", mu: float, sigma: float)                    → Tier 3
+    """
+    QUARTER_END_MONTHS = {3, 6, 9, 12}
+    rng     = np.random.default_rng(seed=seed)
+    records = []
+
+    for year in sorted(price_series.index.year.unique()):
+        mode = annual_yield_src[0]
+
+        if mode == "table":
+            _, yield_table, resolve_fn = annual_yield_src
+            annual_yield = resolve_fn(yield_table, year)
+        else:  # "musigma"
+            _, mu, sigma = annual_yield_src
+            annual_yield = max(0.0, float(rng.normal(mu, sigma)))
+
+        if annual_yield <= 0:
+            continue
+
+        for month in QUARTER_END_MONTHS:
+            mask  = (price_series.index.year == year) & (price_series.index.month == month)
+            dates = price_series.index[mask]
+            if dates.empty:
+                continue
+            ex_date = dates[-1]
+            div     = float(price_series[ex_date]) * (annual_yield / 4.0)
+            records.append((code, ex_date.strftime("%Y-%m-%d"), round(div, 6), 1.0))
+
+    if not records:
+        return 0
+
+    price_conn.executemany(
+        "INSERT OR IGNORE INTO corporate_actions (code, date, dividend, split) "
+        "VALUES (?,?,?,?)",
+        records,
+    )
+    price_conn.commit()
+    return len(records)
+
+
 class BackfillEngine:
 
     def __init__(self, verbose: bool = True):
@@ -127,6 +186,7 @@ class BackfillEngine:
         self._index_cache: dict = {}
         self._usdkrw_cache      = None
         self._etf_meta          = self._load_etf_meta()
+        self._ensure_corporate_actions_table()
 
     def __del__(self):
         try: self.index_conn.close()
@@ -163,6 +223,74 @@ class BackfillEngine:
 
         df = pd.concat(frames, ignore_index=True)
         return df.set_index("code")
+
+    # ── corporate_actions 테이블 보장 ─────────────────────
+
+    def _ensure_corporate_actions_table(self):
+        self.price_conn.execute("""
+            CREATE TABLE IF NOT EXISTS corporate_actions (
+                code     TEXT,
+                date     TEXT,
+                dividend REAL,
+                split    REAL,
+                PRIMARY KEY (code, date)
+            )
+        """)
+        self.price_conn.commit()
+
+    # ── 배당수익률 DB 조회 (Tier 1+2) ────────────────────
+
+    def _load_div_yield_table(self, index_code: str) -> dict[int, float] | None:
+        """index_master.db의 index_div_yield에서 연도별 수익률 조회."""
+        rows = self.index_conn.execute(
+            "SELECT year, annual_yield FROM index_div_yield "
+            "WHERE index_code=? ORDER BY year",
+            (index_code,),
+        ).fetchall()
+        return {int(yr): float(val) for yr, val in rows} if rows else None
+
+    def _resolve_yield(self, yield_table: dict[int, float], year: int) -> float:
+        """
+        테이블 내 연도가 있으면 반환.
+        없으면(프록시 이전 구간) 테이블 전체 mu/sigma로 가상 생성.
+        seed=year로 재현성 보장.
+        """
+        if year in yield_table:
+            return yield_table[year]
+
+        values = list(yield_table.values())
+        mu     = float(np.mean(values))
+        sigma  = max(float(np.std(values)), mu * 0.10)
+        rng    = np.random.default_rng(seed=year)
+        return max(0.0, float(rng.normal(mu, sigma)))
+
+    # ── ETF 실측 배당 mu/sigma (Tier 3) ──────────────────
+
+    def _load_etf_actual_div_yield(self, code: str) -> tuple[float, float] | None:
+        """ETF 자신의 corporate_actions 실측 데이터에서 연간 배당수익률 mu/sigma 계산."""
+        rows = self.price_conn.execute("""
+            SELECT strftime('%Y', ca.date) yr,
+                   SUM(ca.dividend)        total_div,
+                   AVG(pd.close)           avg_price
+            FROM corporate_actions ca
+            JOIN price_daily pd ON ca.code = pd.code AND ca.date = pd.date
+            WHERE ca.code = ? AND ca.dividend > 0
+            GROUP BY yr
+        """, (code,)).fetchall()
+
+        if not rows:
+            return None
+
+        yields = [float(r[1]) / float(r[2]) for r in rows if r[2] and float(r[2]) > 0]
+        if not yields:
+            return None
+
+        mu    = float(np.mean(yields))
+        sigma = max(
+            float(np.std(yields)) if len(yields) >= 2 else mu * 0.20,
+            mu * 0.10,
+        )
+        return mu, sigma
 
     # ── 지수 데이터 로드 (캐시) ───────────────────────────
 
@@ -203,10 +331,19 @@ class BackfillEngine:
     # ── ETF 기존 데이터 범위 조회 ─────────────────────────
 
     def _get_etf_range(self, code: str):
-        row = self.price_conn.execute(
-            "SELECT MIN(date), MAX(date) FROM price_daily WHERE code=?", (code,)
-        ).fetchone()
-        return row[0], row[1]
+        # 실제 상장일: volume>0인 첫 날 (백필 데이터는 volume=0으로 저장)
+        listing = self.price_conn.execute(
+            "SELECT MIN(date) FROM price_daily WHERE code=? AND volume > 0", (code,)
+        ).fetchone()[0]
+        if listing is None:
+            # 백필 이전 (첫 다운로드 직후): volume 무관 MIN
+            listing = self.price_conn.execute(
+                "SELECT MIN(date) FROM price_daily WHERE code=?", (code,)
+            ).fetchone()[0]
+        max_date = self.price_conn.execute(
+            "SELECT MAX(date) FROM price_daily WHERE code=?", (code,)
+        ).fetchone()[0]
+        return listing, max_date
 
     # ── 저장 ──────────────────────────────────────────────
 
@@ -278,7 +415,9 @@ class BackfillEngine:
         if code not in self._etf_meta.index:
             return {"code": code, "status": "no_meta"}
 
-        meta      = self._etf_meta.loc[code]
+        meta = self._etf_meta.loc[code]
+        if isinstance(meta, pd.DataFrame):
+            meta = meta.iloc[0]
         index_nm  = str(meta["index"])
         market    = str(meta["market"])
         leverage  = float(meta["leverage"])
@@ -365,10 +504,38 @@ class BackfillEngine:
 
         self._save(code, df)
 
+        # ── 배당 주입 ─────────────────────────────────────
+        div_rows = 0
+        if leverage == 1.0 and index_code not in _NO_DIVIDEND_INDICES:
+            yield_table = self._load_div_yield_table(index_code)
+
+            if yield_table:
+                # Tier 1+2: DB에 연도별 배당수익률 존재
+                div_rows = inject_quarterly_dividends(
+                    price_conn=self.price_conn,
+                    code=code,
+                    price_series=scaled,
+                    annual_yield_src=("table", yield_table, self._resolve_yield),
+                    seed=abs(hash(code)) % 2**31,
+                )
+            else:
+                # Tier 3: ETF 자신의 실측 corporate_actions에서 mu/sigma 계산
+                actual = self._load_etf_actual_div_yield(code)
+                if actual:
+                    div_rows = inject_quarterly_dividends(
+                        price_conn=self.price_conn,
+                        code=code,
+                        price_series=scaled,
+                        annual_yield_src=("musigma", actual[0], actual[1]),
+                        seed=abs(hash(code)) % 2**31,
+                    )
+                # actual이 None이면 배당 없음 (비배당 ETF) → div_rows = 0
+
         result = {
             "code":       code,
             "status":     "ok",
             "rows_added": len(df),
+            "div_rows":   div_rows,
             "date_from":  df["date"].min(),
             "date_to":    df["date"].max(),
             "index_code": index_code,
@@ -379,8 +546,9 @@ class BackfillEngine:
         if self.verbose:
             fx_str  = " ×환율" if fx_applied else ""
             lev_str = f" ×{leverage}" if leverage != 1.0 else ""
+            div_str = f" 배당{div_rows}건" if div_rows > 0 else ""
             print(f"  ✅ {code:8s} {name[:22]:22s} "
-                  f"← {index_code:12s}{lev_str}{fx_str} "
+                  f"← {index_code:12s}{lev_str}{fx_str}{div_str} "
                   f"| {result['date_from']} ~ {result['date_to']} ({len(df):,}행)")
 
         return result

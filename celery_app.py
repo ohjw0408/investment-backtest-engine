@@ -16,3 +16,4 @@ celery.conf.update(
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=10,
 )
+import tasks  # noqa

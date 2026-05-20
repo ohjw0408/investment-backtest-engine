@@ -88,8 +88,8 @@ async function loadPortfolio(period = '1m') {
   const canvas = document.getElementById('portfolioChart');
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, 200);
-  grad.addColorStop(0, 'rgba(249,115,22,0.25)');
-  grad.addColorStop(1, 'rgba(249,115,22,0)');
+  grad.addColorStop(0, 'rgba(33,150,243,0.3)');
+  grad.addColorStop(1, 'rgba(33,150,243,0)');
 
   if (portfolioChart) portfolioChart.destroy();
   portfolioChart = new Chart(ctx, {
@@ -98,13 +98,13 @@ async function loadPortfolio(period = '1m') {
       labels: slicedLabels,
       datasets: [{
         data: slicedValues,
-        borderColor: '#F97316',
+        borderColor: '#1976D2',
         borderWidth: 2.5,
         fill: true,
         backgroundColor: grad,
         pointRadius: 0,
         pointHoverRadius: 5,
-        pointHoverBackgroundColor: '#F97316',
+        pointHoverBackgroundColor: '#1976D2',
         tension: 0.4
       }]
     },

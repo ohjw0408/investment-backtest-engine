@@ -3,11 +3,11 @@
    ============================================= */
 
 :root {
-  --blue:        #F97316;
-  --blue-dark:   #EA580C;
-  --blue-mid:    #F97316;
-  --blue-bright: #FB923C;
-  --blue-pale:   #FFF7ED;
+  --blue:        #1565C0;
+  --blue-dark:   #1565C0;
+  --blue-mid:    #1976D2;
+  --blue-bright: #2196F3;
+  --blue-pale:   #E3F2FD;
   --green:       #2E7D32;
   --green-light: #43A047;
   --red:         #C62828;
@@ -18,8 +18,8 @@
   --text:        #1A1A2E;
   --text-muted:  #78909C;
   --border:      #E0E8F0;
-  --shadow:      0 2px 12px rgba(249,115,22,0.08);
-  --shadow-lg:   0 8px 32px rgba(249,115,22,0.14);
+  --shadow:      0 2px 12px rgba(21,101,192,0.08);
+  --shadow-lg:   0 8px 32px rgba(21,101,192,0.14);
   --radius:      14px;
 }
 
@@ -47,7 +47,7 @@ a { text-decoration: none; color: inherit; }
   align-items: center;
   padding: 0 24px;
   gap: 0;
-  box-shadow: 0 2px 16px rgba(249,115,22,0.3);
+  box-shadow: 0 2px 16px rgba(21,101,192,0.3);
 }
 
 .logo {
@@ -62,7 +62,7 @@ a { text-decoration: none; color: inherit; }
   white-space: nowrap;
 }
 
-.logo span { color: #FED7AA; }
+.logo span { color: #90CAF9; }
 
 .logo-icon {
   width: 34px; height: 34px;

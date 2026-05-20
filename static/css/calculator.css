@@ -381,7 +381,7 @@
   gap: 8px;
 }
 
-.calc-run-btn:hover { background: var(--blue-mid); box-shadow: 0 4px 20px rgba(249,115,22,0.3); }
+.calc-run-btn:hover { background: var(--blue-mid); box-shadow: 0 4px 20px rgba(21,101,192,0.3); }
 .calc-run-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-spinner { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

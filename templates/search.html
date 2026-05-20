@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}종목 검색 — Money Milestone{% endblock %}
+
+{% block head %}
+<style>
+.search-page { max-width: 700px; margin: 0 auto; padding: 24px 16px; }
+.search-bar {
+  display: flex; align-items: center; gap: 10px;
+  background: white; border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 10px 16px; margin-bottom: 20px;
+  box-shadow: var(--shadow); transition: border-color 0.2s;
+}
+.search-bar:focus-within { border-color: var(--blue-bright); }
+.search-bar input {
+  border: none; outline: none; flex: 1;
+  font-size: 1rem; font-family: inherit; color: var(--text);
+  background: transparent;
+}
+.search-icon { font-size: 1.2rem; color: var(--text-muted); }
+.result-item {
+  background: white; border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 8px;
+  cursor: pointer; display: flex; align-items: center; gap: 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  text-decoration: none; color: var(--text);
+}
+.result-item:hover { border-color: var(--blue-bright); box-shadow: var(--shadow); }
+.result-badge {
+  font-size: 0.7rem; font-weight: 700;
+  padding: 2px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;
+}
+.result-code { font-weight: 700; font-size: 0.95rem; }
+.result-name { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
+.search-hint { text-align: center; color: var(--text-muted); padding: 48px 0; font-size: 0.9rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="search-page">
+  <h2 style="font-size:1.3rem;font-weight:800;margin-bottom:16px;">종목 검색</h2>
+  <div class="search-bar">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="searchInput" placeholder="종목명, ETF, 티커 입력..." autocomplete="off" autofocus>
+  </div>
+  <div id="searchResults">
+    <div class="search-hint">종목명 또는 티커를 입력하세요</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function badgeColor(badge) {
+  if (badge === 'KR ETF' || badge === 'KOSPI' || badge === 'KOSDAQ') return '#1976D2';
+  if (badge === 'US ETF' || badge === 'NASDAQ' || badge === 'NYSE')   return '#2E7D32';
+  return '#78909C';
+}
+
+const input      = document.getElementById('searchInput');
+const resultsDiv = document.getElementById('searchResults');
+let timer = null;
+
+input.addEventListener('input', () => {
+  const q = input.value.trim();
+  if (!q) {
+    resultsDiv.innerHTML = '<div class="search-hint">종목명 또는 티커를 입력하세요</div>';
+    return;
+  }
+  clearTimeout(timer);
+  resultsDiv.innerHTML = '<div class="search-hint">검색 중...</div>';
+  timer = setTimeout(async () => {
+    try {
+      const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!data.length) {
+        resultsDiv.innerHTML = '<div class="search-hint">검색 결과가 없습니다</div>';
+        return;
+      }
+      resultsDiv.innerHTML = data.map(item => `
+        <a class="result-item" href="/symbol/${item.code}">
+          <span class="result-badge" style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
+          <div>
+            <div class="result-code">${item.code}</div>
+            <div class="result-name">${item.name}${item.subtitle ? ' · ' + item.subtitle : ''}</div>
+          </div>
+        </a>
+      `).join('');
+    } catch(e) {
+      resultsDiv.innerHTML = '<div class="search-hint">오류가 발생했습니다</div>';
+    }
+  }, 250);
+});
+</script>
+{% endblock %}

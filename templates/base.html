@@ -26,7 +26,7 @@
     <a class="nav-link {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">내 자산</a>
     <a class="nav-link {% if request.path.startswith('/tax-settings') %}active{% endif %}" href="/tax-settings">세금 설정</a>
   </div>
-  <div class="nav-search-wrap" style="display:none">
+  <div class="nav-search-wrap">
     <div class="nav-search-box">
       <span class="nav-search-icon">🔍</span>
       <input type="text" placeholder="종목, ETF 검색..." id="navSearchInput" autocomplete="off">

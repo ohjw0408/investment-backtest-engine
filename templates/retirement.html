@@ -411,10 +411,16 @@
       🏖 시뮬레이션 실행
     </button>
 
+    <style>
+      @keyframes mm-indeterminate {
+        0%   { left: -40%; width: 40%; }
+        100% { left: 110%; width: 30%; }
+      }
+    </style>
     <div id="retLoading" style="display:none;padding:16px 12px;">
       <div id="retProgressPhase" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:6px;">준비 중...</div>
-      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;">
-        <div id="retProgressBar" style="background:var(--blue);height:100%;width:0%;transition:width 0.5s;border-radius:8px;"></div>
+      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;position:relative;">
+        <div id="retProgressBar" style="background:var(--blue);height:100%;width:40%;border-radius:8px;position:absolute;top:0;left:0;animation:mm-indeterminate 1.4s ease-in-out infinite;"></div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
         <span id="retProgressDetail">계산 준비 중</span>
@@ -740,15 +746,27 @@ function retUpdateProgressUI({ phase, queuePos, avgDuration, percent, current, t
   const etaEl    = document.getElementById('retProgressEta');
   if (!phaseEl) return;
   if (queuePos > 0) {
-    phaseEl.textContent  = `⏳ 대기 중 (${queuePos}번째)`;
-    barEl.style.width    = '0%';
-    detailEl.textContent = '이전 요청 처리 중...';
+    phaseEl.textContent   = `⏳ ${queuePos}번째 대기 중`;
+    barEl.style.animation = '';
+    barEl.style.width     = '0%';
+    barEl.style.left      = '0%';
+    detailEl.textContent  = '앞 사람 처리 완료 후 자동으로 시작됩니다';
     const waitSecs = queuePos * (avgDuration || 30);
-    const m = Math.floor(waitSecs / 60), s = waitSecs % 60;
-    etaEl.textContent = m > 0 ? `약 ${m}분 ${s}초 대기 예상` : `약 ${s}초 대기 예상`;
+    const wm = Math.floor(waitSecs / 60), ws = waitSecs % 60;
+    etaEl.textContent = wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`;
+  } else if (!percent) {
+    phaseEl.textContent   = `🔄 ${phase || '준비 중...'}`;
+    barEl.style.transition = 'none';
+    barEl.style.animation = 'mm-indeterminate 1.4s ease-in-out infinite';
+    barEl.style.width     = '40%';
+    detailEl.textContent  = '가격 데이터 로딩 중...';
+    etaEl.textContent     = '';
   } else {
-    phaseEl.textContent = `🔄 ${phase || '계산 중'} (${percent || 0}%)`;
-    barEl.style.width   = `${percent || 0}%`;
+    phaseEl.textContent   = `🔄 ${phase || '계산 중'} (${percent}%)`;
+    barEl.style.animation = '';
+    barEl.style.transition = 'width 0.5s';
+    barEl.style.left      = '0%';
+    barEl.style.width     = `${percent}%`;
     if (current && total) detailEl.textContent = `${current} / ${total} 케이스`;
     if (eta) {
       const m = Math.floor(eta / 60), s = eta % 60;

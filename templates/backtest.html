@@ -213,10 +213,16 @@
     <div class="calc-warning">⚠ 과거 데이터 기반 시뮬레이션입니다. 미래 수익을 보장하지 않습니다.</div>
 
     <button class="calc-run-btn" id="btRunBtn" onclick="runBacktest()">📊 분석 실행</button>
+    <style>
+      @keyframes mm-indeterminate {
+        0%   { left: -40%; width: 40%; }
+        100% { left: 110%; width: 30%; }
+      }
+    </style>
     <div id="btLoading" style="display:none;padding:16px 12px;">
       <div id="btProgressPhase" style="font-size:0.85rem;font-weight:700;color:var(--blue);margin-bottom:8px;">준비 중...</div>
-      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;">
-        <div id="btProgressBar" style="height:100%;background:var(--blue);border-radius:8px;width:0%;transition:width 0.4s ease;"></div>
+      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;position:relative;">
+        <div id="btProgressBar" style="height:100%;background:var(--blue);border-radius:8px;width:40%;position:absolute;top:0;left:0;animation:mm-indeterminate 1.4s ease-in-out infinite;"></div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
         <span id="btProgressDetail">계산 준비 중</span>
@@ -488,17 +494,22 @@ function btUpdateProgressUI({ phase, queuePos, avgDuration, percent, current, to
   const detailEl = document.getElementById('btProgressDetail');
   const etaEl    = document.getElementById('btProgressEta');
   if (queuePos > 0) {
-    if (phaseEl)  phaseEl.textContent  = `⏳ 대기 중 (${queuePos}번째)`;
-    if (barEl)    barEl.style.width    = '0%';
-    if (detailEl) detailEl.textContent = '이전 요청 처리 중...';
+    if (phaseEl)  phaseEl.textContent  = `⏳ ${queuePos}번째 대기 중`;
+    if (barEl) { barEl.style.animation = ''; barEl.style.width = '0%'; barEl.style.left = '0%'; }
+    if (detailEl) detailEl.textContent = '앞 사람 처리 완료 후 자동으로 시작됩니다';
     const waitSecs = queuePos * (avgDuration || 30);
-    const m = Math.floor(waitSecs / 60), s = waitSecs % 60;
-    if (etaEl) etaEl.textContent = m > 0 ? `약 ${m}분 ${s}초 대기 예상` : `약 ${s}초 대기 예상`;
+    const wm = Math.floor(waitSecs / 60), ws = waitSecs % 60;
+    if (etaEl) etaEl.textContent = wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`;
+  } else if (!percent) {
+    if (phaseEl)  phaseEl.textContent  = phase || '준비 중...';
+    if (barEl) { barEl.style.transition = 'none'; barEl.style.animation = 'mm-indeterminate 1.4s ease-in-out infinite'; barEl.style.width = '40%'; }
+    if (detailEl) detailEl.textContent = '가격 데이터 로딩 중...';
+    if (etaEl)    etaEl.textContent    = '';
   } else {
-    if (phaseEl)  phaseEl.textContent  = phase || '계산 중...';
-    if (barEl)    barEl.style.width    = percent + '%';
-    if (detailEl) detailEl.textContent = total > 0 ? `${percent}% (${current}/${total})` : '계산 준비 중';
-    if (etaEl)    etaEl.textContent    = eta != null ? `약 ${eta}초 남음` : '';
+    if (phaseEl)  phaseEl.textContent  = `${phase || '계산 중'} (${percent}%)`;
+    if (barEl) { barEl.style.animation = ''; barEl.style.transition = 'width 0.4s ease'; barEl.style.left = '0%'; barEl.style.width = percent + '%'; }
+    if (detailEl) detailEl.textContent = total > 0 ? `${current} / ${total} 케이스` : '계산 중...';
+    if (eta != null) { const m = Math.floor(eta/60), s = eta%60; if (etaEl) etaEl.textContent = m > 0 ? `약 ${m}분 ${s}초 남음` : `약 ${s}초 남음`; }
   }
 }
 

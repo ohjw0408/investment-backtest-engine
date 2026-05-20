@@ -40,9 +40,20 @@ def get_avg_duration() -> int:
         return 30
 
 
+def get_active_tasks() -> int:
+    try:
+        return max(0, int(r.get('mm_active_tasks') or 0))
+    except Exception:
+        return 0
+
+
 @celery.task(bind=True)
 def run_simulation_task(self, payload: dict) -> dict:
     start_time = time.time()
+    try:
+        r.incr('mm_active_tasks')
+    except Exception:
+        pass
 
     def progress_callback(current: int, total: int, elapsed: float):
         eta = (elapsed / current * (total - current)) if current > 0 else None
@@ -70,6 +81,11 @@ def run_simulation_task(self, payload: dict) -> dict:
             'error':     str(e),
             'traceback': traceback.format_exc(),
         }
+    finally:
+        try:
+            r.decr('mm_active_tasks')
+        except Exception:
+            pass
 
 
 def _make_progress_callback(task):
@@ -91,46 +107,67 @@ def _make_progress_callback(task):
     return progress_callback
 
 
+def _task_wrap(fn):
+    """incr/decr mm_active_tasks around fn(); return fn()'s result."""
+    try:
+        r.incr('mm_active_tasks')
+    except Exception:
+        pass
+    try:
+        return fn()
+    finally:
+        try:
+            r.decr('mm_active_tasks')
+        except Exception:
+            pass
+
+
 @celery.task(bind=True)
 def run_retirement_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
     _t = time.time()
-    try:
-        from retirement_logic import run_retirement_logic, run_withdrawal_logic
-        if payload.get('_mode') == 'withdrawal':
-            result = run_withdrawal_logic(payload, progress_callback=cb)
-        else:
-            result = run_retirement_logic(payload, progress_callback=cb)
-        record_task_duration(time.time() - _t)
-        return {'status': 'SUCCESS', 'result': result}
-    except Exception as e:
-        import traceback
-        return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
+    def _run():
+        try:
+            from retirement_logic import run_retirement_logic, run_withdrawal_logic
+            if payload.get('_mode') == 'withdrawal':
+                result = run_withdrawal_logic(payload, progress_callback=cb)
+            else:
+                result = run_retirement_logic(payload, progress_callback=cb)
+            record_task_duration(time.time() - _t)
+            return {'status': 'SUCCESS', 'result': result}
+        except Exception as e:
+            import traceback
+            return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
+    return _task_wrap(_run)
 
 
 @celery.task(bind=True)
 def run_backtest_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
     _t = time.time()
-    try:
-        from backtest_logic import run_backtest_logic
-        result = run_backtest_logic(payload, progress_callback=cb)
-        record_task_duration(time.time() - _t)
-        return {'status': 'SUCCESS', 'result': result}
-    except Exception as e:
-        import traceback
-        return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
+    def _run():
+        try:
+            from backtest_logic import run_backtest_logic
+            result = run_backtest_logic(payload, progress_callback=cb)
+            record_task_duration(time.time() - _t)
+            return {'status': 'SUCCESS', 'result': result}
+        except Exception as e:
+            import traceback
+            return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
+    return _task_wrap(_run)
 
 
 @celery.task(bind=True)
 def run_dividend_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
     _t = time.time()
-    try:
-        from dividend_logic import run_dividend_scenario_logic
-        result = run_dividend_scenario_logic(payload, progress_callback=cb)
-        record_task_duration(time.time() - _t)
-        return {'status': 'SUCCESS', 'result': result}
-    except Exception as e:
-        import traceback
-        return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
+    def _run():
+        try:
+            from dividend_logic import run_dividend_scenario_logic
+            result = run_dividend_scenario_logic(payload, progress_callback=cb)
+            record_task_duration(time.time() - _t)
+            return {'status': 'SUCCESS', 'result': result}
+        except Exception as e:
+            import traceback
+            return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
+    return _task_wrap(_run)

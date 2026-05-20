@@ -399,17 +399,18 @@ def calculator_submit():
 @app.route('/api/task/<task_id>', methods=['GET'])
 def task_status(task_id: str):
     from celery_app import celery as celery_app
-    from tasks import get_queue_position, get_avg_duration
+    from tasks import get_queue_position, get_avg_duration, get_active_tasks
 
     task = celery_app.AsyncResult(task_id)
 
     if task.state == 'PENDING':
         queue_pos = get_queue_position(task_id)
         return jsonify({
-            'status':       'PENDING',
-            'queue_pos':    queue_pos,
-            'avg_duration': get_avg_duration(),
-            'percent':      0,
+            'status':        'PENDING',
+            'queue_pos':     queue_pos,
+            'active_tasks':  get_active_tasks(),
+            'avg_duration':  get_avg_duration(),
+            'percent':       0,
         })
 
     elif task.state == 'PROGRESS':

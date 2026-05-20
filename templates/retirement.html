@@ -716,7 +716,7 @@ async function retPollTask(taskId, maxWait = 600000) {
     const data = await res.json();
 
     if (data.status === 'PENDING') {
-      retUpdateProgressUI({ phase: '대기 중', queuePos: data.queue_pos, avgDuration: data.avg_duration, percent: 0, eta: null });
+      retUpdateProgressUI({ phase: '대기 중', queuePos: data.queue_pos, activeTasks: data.active_tasks || 0, avgDuration: data.avg_duration, percent: 0, eta: null });
     } else if (data.status === 'PROGRESS') {
       retUpdateProgressUI({ phase: '계산 중', percent: data.percent, current: data.current, total: data.total, elapsed: data.elapsed, eta: data.eta });
     } else if (data.status === 'SUCCESS') {
@@ -739,34 +739,38 @@ function retShowProgressUI() {
   if (etaEl) etaEl.textContent = '';
 }
 
-function retUpdateProgressUI({ phase, queuePos, avgDuration, percent, current, total, elapsed, eta }) {
+function _retSetAnim(barEl) {
+  if (barEl.dataset.anim === '1') return;
+  barEl.style.transition = 'none';
+  barEl.style.animation  = 'mm-indeterminate 1.4s ease-in-out infinite';
+  barEl.style.width      = '40%';
+  barEl.dataset.anim     = '1';
+}
+function retUpdateProgressUI({ phase, queuePos, activeTasks, avgDuration, percent, current, total, elapsed, eta }) {
   const phaseEl  = document.getElementById('retProgressPhase');
   const barEl    = document.getElementById('retProgressBar');
   const detailEl = document.getElementById('retProgressDetail');
   const etaEl    = document.getElementById('retProgressEta');
   if (!phaseEl) return;
-  if (queuePos > 0) {
-    phaseEl.textContent   = `⏳ ${queuePos}번째 대기 중`;
-    barEl.style.animation = '';
-    barEl.style.width     = '0%';
-    barEl.style.left      = '0%';
-    detailEl.textContent  = '앞 사람 처리 완료 후 자동으로 시작됩니다';
-    const waitSecs = queuePos * (avgDuration || 30);
-    const wm = Math.floor(waitSecs / 60), ws = waitSecs % 60;
+  if (!percent && activeTasks > 0) {
+    phaseEl.textContent  = `⏳ 앞에 ${activeTasks}개 계산 중 — 대기 중`;
+    _retSetAnim(barEl);
+    detailEl.textContent = '앞 계산 완료 후 자동으로 시작됩니다';
+    const w = activeTasks * (avgDuration || 30);
+    const wm = Math.floor(w / 60), ws = w % 60;
     etaEl.textContent = wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`;
   } else if (!percent) {
-    phaseEl.textContent   = `🔄 ${phase || '준비 중...'}`;
-    barEl.style.transition = 'none';
-    barEl.style.animation = 'mm-indeterminate 1.4s ease-in-out infinite';
-    barEl.style.width     = '40%';
-    detailEl.textContent  = '가격 데이터 로딩 중...';
-    etaEl.textContent     = '';
+    phaseEl.textContent  = `🔄 준비 중...`;
+    _retSetAnim(barEl);
+    detailEl.textContent = '가격 데이터 로딩 중...';
+    etaEl.textContent    = '';
   } else {
-    phaseEl.textContent   = `🔄 ${phase || '계산 중'} (${percent}%)`;
+    barEl.dataset.anim   = '';
     barEl.style.animation = '';
+    phaseEl.textContent  = `🔄 ${phase || '계산 중'} (${percent}%)`;
     barEl.style.transition = 'width 0.5s';
-    barEl.style.left      = '0%';
-    barEl.style.width     = `${percent}%`;
+    barEl.style.left     = '0%';
+    barEl.style.width    = `${percent}%`;
     if (current && total) detailEl.textContent = `${current} / ${total} 케이스`;
     if (eta) {
       const m = Math.floor(eta / 60), s = eta % 60;

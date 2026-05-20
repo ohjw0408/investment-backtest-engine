@@ -22,16 +22,21 @@ from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
 from modules.retirement.data_preparer import DataPreparer
 from modules.dividend_simulator import DividendSimulator
 from modules.rebalance.periodic import PeriodicRebalance
+from modules.market_quote_service import MarketQuoteService
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key')
 import datetime as _dt_mod
 app.config['PERMANENT_SESSION_LIFETIME'] = _dt_mod.timedelta(days=30)
 
+INDEX_DB_PATH = Path(__file__).parent / "data" / "meta" / "index_master.db"
+PRICE_DB_PATH = Path(__file__).parent / "data" / "price_cache" / "price_daily.db"
+
 init_holdings_db()
-data_engine      = DataEngine()
-info_engine      = InfoEngine()
-portfolio_engine = PortfolioEngine()
+data_engine          = DataEngine()
+info_engine          = InfoEngine()
+portfolio_engine     = PortfolioEngine()
+market_quote_service = MarketQuoteService(index_db_path=INDEX_DB_PATH)
 
 # Google OAuth
 oauth  = OAuth(app)
@@ -54,9 +59,6 @@ def inject_user():
 def current_user():
     uid = session.get('user_id')
     return get_user_by_id(uid) if uid else None
-
-INDEX_DB_PATH = Path(__file__).parent / "data" / "meta" / "index_master.db"
-PRICE_DB_PATH = Path(__file__).parent / "data" / "price_cache" / "price_daily.db"
 
 # -----------------------------------------------
 # Google OAuth 라우트
@@ -611,55 +613,7 @@ def _get_krx_gold():
 
 @app.route('/api/market')
 def market():
-    yf_tickers = [
-        {"id": "sp500",  "name": "S&P 500",      "tag": "S&P",    "ticker": "^GSPC", "prefix": "",  "fmt": "int"},
-        {"id": "nasdaq", "name": "NASDAQ",         "tag": "NASDAQ", "ticker": "^IXIC", "prefix": "",  "fmt": "int"},
-        {"id": "kospi",  "name": "코스피 (KOSPI)", "tag": "KOSPI",  "ticker": "^KS11", "prefix": "",  "fmt": "int"},
-        {"id": "gold",   "name": "금 (국제)",      "tag": "USD/oz", "ticker": "GC=F",  "prefix": "$", "fmt": "float"},
-        {"id": "usdkrw", "name": "환율",           "tag": "USD/KRW","ticker": "KRW=X", "prefix": "₩", "fmt": "float"},
-    ]
-
-    yf_result = {}
-    for info in yf_tickers:
-        try:
-            series = data_engine.get_symbol_data(info["ticker"])
-            if hasattr(series, 'squeeze'):
-                series = series.squeeze()
-            if series.empty or len(series) < 2:
-                continue
-            current = float(series.iloc[-1].iloc[0]) if hasattr(series.iloc[-1], 'iloc') else float(series.iloc[-1])
-            prev    = float(series.iloc[-2].iloc[0]) if hasattr(series.iloc[-2], 'iloc') else float(series.iloc[-2])
-            change  = round((current - prev) / prev * 100, 2)
-            spark   = [round(float(v), 2) for v in series.iloc[-20:].values.flatten().tolist()]
-            value_str = f"{info['prefix']}{current:,.0f}" if info["fmt"] == "int" else f"{info['prefix']}{current:,.2f}"
-            yf_result[info["id"]] = {
-                "id":     info["id"],
-                "name":   info["name"],
-                "tag":    info["tag"],
-                "value":  value_str,
-                "change": f"{'+' if change >= 0 else ''}{change}%",
-                "up":     change >= 0,
-                "spark":  spark,
-            }
-        except Exception as e:
-            print(f"[market] {info['id']} 오류: {e}")
-
-    result = []
-    for id_ in ["sp500", "nasdaq", "kospi"]:
-        if id_ in yf_result:
-            result.append(yf_result[id_])
-
-    if "gold" in yf_result:
-        result.append(yf_result["gold"])
-
-    krx_gold = _get_krx_gold()
-    if krx_gold:
-        result.append(krx_gold)
-
-    if "usdkrw" in yf_result:
-        result.append(yf_result["usdkrw"])
-
-    return jsonify(result)
+    return jsonify(market_quote_service.get_all())
 
 
 # -----------------------------------------------

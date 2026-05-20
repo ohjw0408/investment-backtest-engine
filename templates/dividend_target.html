@@ -540,8 +540,8 @@ async function dtPollTask(taskId, maxWait = 600000) {
 
       if (data.status === 'PENDING') {
         const rank = data.queue_rank;
-        if (rank !== null && rank !== undefined && rank > 0) {
-          if (_initialRank === null) _initialRank = rank;
+        if (rank !== null && rank !== undefined) {
+          if (_initialRank === null) _initialRank = Math.max(rank, 1);
           const rawPct = Math.round((_initialRank - rank) / _initialRank * 100);
           const pct = Math.min(99, Math.max(8, rawPct));
           dtUpdateProgressUI({ phase: '대기 중', queueRank: rank, isWaiting: true, avgDuration: data.avg_duration, percent: pct, current: 0, total: 0, eta: null });
@@ -603,13 +603,13 @@ function dtUpdateProgressUI({ phase, queueRank, isWaiting, avgDuration, percent,
   const barEl    = document.getElementById('dtProgressBar');
   const detailEl = document.getElementById('dtProgressDetail');
   const etaEl    = document.getElementById('dtProgressEta');
-  if (isWaiting && queueRank > 0) {
+  if (isWaiting) {
     if (barEl) { barEl.dataset.anim = ''; barEl.style.animation = ''; barEl.style.transition = 'width 0.5s'; barEl.style.left = '0%'; barEl.style.width = percent + '%'; }
-    if (phaseEl)  phaseEl.textContent  = `⏳ 내 앞에 ${queueRank}개 대기 중 (${percent}%)`;
+    if (phaseEl)  phaseEl.textContent  = queueRank > 0 ? `⏳ 내 앞에 ${queueRank}개 대기 중 (${percent}%)` : `⏳ 곧 시작됩니다...`;
     if (detailEl) detailEl.textContent = '앞 계산 완료 후 자동으로 시작됩니다';
     const w = queueRank * (avgDuration || 30);
     const wm = Math.floor(w / 60), ws = w % 60;
-    if (etaEl) etaEl.textContent = wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`;
+    if (etaEl) etaEl.textContent = queueRank > 0 ? (wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`) : '';
   } else if (percent > 0) {
     if (barEl) { barEl.dataset.anim = ''; barEl.style.animation = ''; barEl.style.transition = 'width 0.4s ease'; barEl.style.left = '0%'; barEl.style.width = percent + '%'; }
     if (phaseEl)  phaseEl.textContent  = `🔄 ${phase || '계산 중'} (${percent}%)`;

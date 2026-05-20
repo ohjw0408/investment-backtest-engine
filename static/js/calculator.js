@@ -263,8 +263,8 @@ async function pollTask(taskId, maxWait = 600000) {
 
     if (data.status === 'PENDING') {
       const rank = data.queue_rank;
-      if (rank !== null && rank !== undefined && rank > 0) {
-        if (_initialRank === null) _initialRank = rank;
+      if (rank !== null && rank !== undefined) {
+        if (_initialRank === null) _initialRank = Math.max(rank, 1);
         const rawPct = Math.round((_initialRank - rank) / _initialRank * 100);
         const pct = Math.min(99, Math.max(8, rawPct));
         updateProgressUI({ phase: '대기 중', queueRank: rank, isWaiting: true, avgDuration: data.avg_duration, percent: pct });
@@ -344,17 +344,21 @@ function updateProgressUI({ phase, queueRank, isWaiting, avgDuration, percent, c
   const etaEl    = document.getElementById('progressEta');
   if (!phaseEl) return;
 
-  if (isWaiting && queueRank > 0) {
+  if (isWaiting) {
     barEl.dataset.anim    = '';
     barEl.style.animation = '';
     barEl.style.transition = 'width 0.5s';
     barEl.style.left      = '0%';
     barEl.style.width     = `${percent}%`;
-    phaseEl.textContent   = `⏳ 내 앞에 ${queueRank}개 대기 중 (${percent}%)`;
+    phaseEl.textContent   = queueRank > 0
+      ? `⏳ 내 앞에 ${queueRank}개 대기 중 (${percent}%)`
+      : `⏳ 곧 시작됩니다...`;
     detailEl.textContent  = '앞 계산 완료 후 자동으로 시작됩니다';
     const waitSecs = queueRank * (avgDuration || 30);
     const wm = Math.floor(waitSecs / 60), ws = waitSecs % 60;
-    etaEl.textContent = wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`;
+    etaEl.textContent = queueRank > 0
+      ? (wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`)
+      : '';
   } else if (percent > 0) {
     _clearIndeterminate(barEl);
     phaseEl.textContent   = `🔄 ${phase || '계산 중'} (${percent}%)`;

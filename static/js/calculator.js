@@ -265,7 +265,8 @@ async function pollTask(taskId, maxWait = 600000) {
       const rank = data.queue_rank;
       if (rank !== null && rank !== undefined && rank > 0) {
         if (_initialRank === null) _initialRank = rank;
-        const pct = Math.min(99, Math.round((_initialRank - rank) / _initialRank * 100));
+        const rawPct = Math.round((_initialRank - rank) / _initialRank * 100);
+        const pct = Math.min(99, Math.max(8, rawPct));
         updateProgressUI({ phase: '대기 중', queueRank: rank, isWaiting: true, avgDuration: data.avg_duration, percent: pct });
       } else {
         updateProgressUI({ phase: '준비 중', percent: 0, isWaiting: false });

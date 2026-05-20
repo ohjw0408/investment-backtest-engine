@@ -418,7 +418,9 @@ async function runBacktest() {
         } : {},
       }),
     });
-    const { task_id } = await res.json();
+    const resData = await res.json();
+    if (res.status === 429) throw new Error(resData.error);
+    const { task_id } = resData;
     await btPollTask(task_id);
   } catch(e) {
     alert('오류: ' + e.message);

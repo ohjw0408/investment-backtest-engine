@@ -509,7 +509,9 @@ async function runDividendTarget() {
     const res = await fetch('/api/dividend-target/submit', {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
     });
-    const { task_id } = await res.json();
+    const resData = await res.json();
+    if (res.status === 429) throw new Error(resData.error);
+    const { task_id } = resData;
     window._dtLastBody = body;
     await dtPollTask(task_id);
   } catch(e) {

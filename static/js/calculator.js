@@ -232,7 +232,9 @@ async function runCalculator() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const { task_id } = await submitRes.json();
+    const submitData = await submitRes.json();
+    if (submitRes.status === 429) throw new Error(submitData.error);
+    const { task_id } = submitData;
 
     const result = await pollTask(task_id);
 

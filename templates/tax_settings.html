@@ -90,10 +90,10 @@
       <div class="input-row" style="margin-bottom:12px;">
         <label>연간 근로/사업소득</label>
         <div class="input-group">
-          <input type="number" id="earnedIncome" class="calc-input" value="50000000" min="0" step="1000000">
+          <input type="number" id="earnedIncome" class="calc-input" placeholder="예: 50000000" min="0" step="1000000">
           <span class="unit">원</span>
         </div>
-        <div class="input-hint" id="earnedIncomeHint">₩5,000만</div>
+        <div class="input-hint" id="earnedIncomeHint"></div>
       </div>
       <div class="input-row">
         <label>나이 <span style="font-size:11px;color:var(--text-muted);">(연금 수령 세율 계산용)</span></label>
@@ -255,7 +255,7 @@ function applySettings(s) {
       if (s.accounts[name] && !state[name]) toggleAccount(name);
     });
   }
-  document.getElementById('earnedIncomeHint').textContent = fmtKRW(s.earned_income || 0);
+  document.getElementById('earnedIncomeHint').textContent = s.earned_income ? fmtKRW(s.earned_income) : '';
 }
 
 async function loadSettings() {

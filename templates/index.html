@@ -31,6 +31,7 @@
     <div class="market-header">
       <span class="star">★</span>
       <span class="market-title">시장 지수</span>
+      <span id="marketRefreshTime" style="font-size:0.72rem;color:var(--text-muted);margin-left:auto;margin-right:4px;"></span>
       <span class="market-news">📰</span>
     </div>
     <div class="market-grid" id="marketGrid">
@@ -62,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPortfolio();
   loadMarket();
   loadAssets();
+  setInterval(loadMarket, 5 * 60 * 1000);
 
   document.querySelectorAll('.period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -86,8 +88,8 @@ async function loadPortfolio(period = '1m') {
   const canvas = document.getElementById('portfolioChart');
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, 200);
-  grad.addColorStop(0, 'rgba(33,150,243,0.3)');
-  grad.addColorStop(1, 'rgba(33,150,243,0)');
+  grad.addColorStop(0, 'rgba(249,115,22,0.25)');
+  grad.addColorStop(1, 'rgba(249,115,22,0)');
 
   if (portfolioChart) portfolioChart.destroy();
   portfolioChart = new Chart(ctx, {
@@ -96,13 +98,13 @@ async function loadPortfolio(period = '1m') {
       labels: slicedLabels,
       datasets: [{
         data: slicedValues,
-        borderColor: '#1976D2',
+        borderColor: '#F97316',
         borderWidth: 2.5,
         fill: true,
         backgroundColor: grad,
         pointRadius: 0,
         pointHoverRadius: 5,
-        pointHoverBackgroundColor: '#1976D2',
+        pointHoverBackgroundColor: '#F97316',
         tension: 0.4
       }]
     },
@@ -134,16 +136,20 @@ async function loadPortfolio(period = '1m') {
 }
 
 // ── 시장 지수 ──
-// 순서: S&P500, NASDAQ, KOSPI, KRX금, USD/KRW
-// API가 반환하는 순서에서 KRX금(id=krx_gold)을 4번째,
-// 환율(id=usdkrw)을 5번째로 재정렬
 async function loadMarket() {
   const res   = await fetch('/api/market');
   const items = await res.json();
   const grid  = document.getElementById('marketGrid');
   grid.innerHTML = '';
 
-  // API에서 이미 순서대로 반환: sp500, nasdaq, kospi, gold(국제), krx_gold, usdkrw
+  // 갱신 시각 표시
+  if (items.length > 0 && items[0].fetched_at) {
+    const fetchedAt = new Date(items[0].fetched_at + 'Z');
+    const mins = Math.round((Date.now() - fetchedAt.getTime()) / 60000);
+    const el = document.getElementById('marketRefreshTime');
+    if (el) el.textContent = mins <= 1 ? '방금 업데이트' : `${mins}분 전 업데이트`;
+  }
+
   items.forEach((item, i) => {
     const colIdx = i % 3;
     const rowIdx = Math.floor(i / 3);

@@ -16,7 +16,7 @@ from pathlib import Path
 import redis
 import yfinance as yf
 
-TTL_SECONDS = 4 * 3600  # 4시간
+TTL_SECONDS = 4 * 3600  # 기본 4시간 (장외 시간)
 
 YF_TICKERS = [
     {"id": "sp500",  "name": "S&P 500",      "tag": "S&P",    "ticker": "^GSPC", "prefix": "",  "fmt": "int"},
@@ -46,6 +46,19 @@ class MarketQuoteService:
             print(f"[MarketQuoteService] Redis 연결 실패, 캐시 비활성화: {e}")
             self._redis = None
             self._redis_ok = False
+
+    # ── Smart TTL ────────────────────────────────────────
+
+    @staticmethod
+    def _get_ttl() -> int:
+        """미국 정규장 (UTC 13:30~20:00, 월~금) → 15분, 나머지 → 4시간."""
+        now = datetime.utcnow()
+        if now.weekday() >= 5:  # 토,일
+            return TTL_SECONDS
+        now_min = now.hour * 60 + now.minute
+        if 13 * 60 + 30 <= now_min <= 20 * 60:
+            return 15 * 60
+        return TTL_SECONDS
 
     # ── 캐시 helpers ─────────────────────────────────────
 
@@ -83,13 +96,14 @@ class MarketQuoteService:
             else f"{info['prefix']}{current:,.2f}"
         )
         return {
-            "id":     info["id"],
-            "name":   info["name"],
-            "tag":    info["tag"],
-            "value":  value_str,
-            "change": f"{'+' if change >= 0 else ''}{change}%",
-            "up":     change >= 0,
-            "spark":  spark,
+            "id":         info["id"],
+            "name":       info["name"],
+            "tag":        info["tag"],
+            "value":      value_str,
+            "change":     f"{'+' if change >= 0 else ''}{change}%",
+            "up":         change >= 0,
+            "spark":      spark,
+            "fetched_at": datetime.utcnow().isoformat(),
         }
 
     # ── KRX 금현물 조회 ───────────────────────────────────
@@ -186,7 +200,7 @@ class MarketQuoteService:
         if ticker_id == "krx_gold":
             data = self._fetch_krx_gold()
             if data:
-                self._set("mq:krx_gold", data)
+                self._set("mq:krx_gold", data, self._get_ttl())
             return data
 
         return None
@@ -204,7 +218,7 @@ class MarketQuoteService:
             try:
                 data = self._fetch_yf(info)
                 if data:
-                    self._set(key, data)
+                    self._set(key, data, self._get_ttl())
                     result_map[info["id"]] = data
             except Exception as e:
                 print(f"[MarketQuoteService] {info['id']} 오류: {e}")
@@ -214,7 +228,7 @@ class MarketQuoteService:
         if not krx:
             krx = self._fetch_krx_gold()
             if krx:
-                self._set("mq:krx_gold", krx)
+                self._set("mq:krx_gold", krx, self._get_ttl())
         if krx:
             result_map["krx_gold"] = krx
 

@@ -8,6 +8,8 @@ from celery_app import celery
 
 r = redis.Redis(host='localhost', port=6379, db=0)
 
+_DURATION_KEY = 'mm_task_durations'
+
 
 def get_queue_position(task_id: str) -> int:
     try:
@@ -18,6 +20,24 @@ def get_queue_position(task_id: str) -> int:
         return 0
     except Exception:
         return 0
+
+
+def record_task_duration(seconds: float) -> None:
+    try:
+        r.rpush(_DURATION_KEY, seconds)
+        r.ltrim(_DURATION_KEY, -20, -1)
+    except Exception:
+        pass
+
+
+def get_avg_duration() -> int:
+    try:
+        vals = r.lrange(_DURATION_KEY, 0, -1)
+        if not vals:
+            return 30
+        return round(sum(float(v) for v in vals) / len(vals))
+    except Exception:
+        return 30
 
 
 @celery.task(bind=True)
@@ -41,6 +61,7 @@ def run_simulation_task(self, payload: dict) -> dict:
     try:
         from calculator_logic import run_calculator_logic
         result = run_calculator_logic(payload, progress_callback=progress_callback)
+        record_task_duration(time.time() - start_time)
         return {'status': 'SUCCESS', 'result': result}
     except Exception as e:
         import traceback
@@ -73,12 +94,14 @@ def _make_progress_callback(task):
 @celery.task(bind=True)
 def run_retirement_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
+    _t = time.time()
     try:
         from retirement_logic import run_retirement_logic, run_withdrawal_logic
         if payload.get('_mode') == 'withdrawal':
             result = run_withdrawal_logic(payload, progress_callback=cb)
         else:
             result = run_retirement_logic(payload, progress_callback=cb)
+        record_task_duration(time.time() - _t)
         return {'status': 'SUCCESS', 'result': result}
     except Exception as e:
         import traceback
@@ -88,9 +111,11 @@ def run_retirement_task(self, payload: dict) -> dict:
 @celery.task(bind=True)
 def run_backtest_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
+    _t = time.time()
     try:
         from backtest_logic import run_backtest_logic
         result = run_backtest_logic(payload, progress_callback=cb)
+        record_task_duration(time.time() - _t)
         return {'status': 'SUCCESS', 'result': result}
     except Exception as e:
         import traceback
@@ -100,9 +125,11 @@ def run_backtest_task(self, payload: dict) -> dict:
 @celery.task(bind=True)
 def run_dividend_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
+    _t = time.time()
     try:
         from dividend_logic import run_dividend_scenario_logic
         result = run_dividend_scenario_logic(payload, progress_callback=cb)
+        record_task_duration(time.time() - _t)
         return {'status': 'SUCCESS', 'result': result}
     except Exception as e:
         import traceback

@@ -710,7 +710,7 @@ async function retPollTask(taskId, maxWait = 600000) {
     const data = await res.json();
 
     if (data.status === 'PENDING') {
-      retUpdateProgressUI({ phase: '대기 중', queuePos: data.queue_pos, percent: 0, eta: null });
+      retUpdateProgressUI({ phase: '대기 중', queuePos: data.queue_pos, avgDuration: data.avg_duration, percent: 0, eta: null });
     } else if (data.status === 'PROGRESS') {
       retUpdateProgressUI({ phase: '계산 중', percent: data.percent, current: data.current, total: data.total, elapsed: data.elapsed, eta: data.eta });
     } else if (data.status === 'SUCCESS') {
@@ -733,17 +733,19 @@ function retShowProgressUI() {
   if (etaEl) etaEl.textContent = '';
 }
 
-function retUpdateProgressUI({ phase, queuePos, percent, current, total, elapsed, eta }) {
+function retUpdateProgressUI({ phase, queuePos, avgDuration, percent, current, total, elapsed, eta }) {
   const phaseEl  = document.getElementById('retProgressPhase');
   const barEl    = document.getElementById('retProgressBar');
   const detailEl = document.getElementById('retProgressDetail');
   const etaEl    = document.getElementById('retProgressEta');
   if (!phaseEl) return;
   if (queuePos > 0) {
-    phaseEl.textContent  = `⏳ 대기 중 — 내 앞에 ${queuePos}개`;
+    phaseEl.textContent  = `⏳ 대기 중 (${queuePos}번째)`;
     barEl.style.width    = '0%';
     detailEl.textContent = '이전 요청 처리 중...';
-    etaEl.textContent    = '';
+    const waitSecs = queuePos * (avgDuration || 30);
+    const m = Math.floor(waitSecs / 60), s = waitSecs % 60;
+    etaEl.textContent = m > 0 ? `약 ${m}분 ${s}초 대기 예상` : `약 ${s}초 대기 예상`;
   } else {
     phaseEl.textContent = `🔄 ${phase || '계산 중'} (${percent || 0}%)`;
     barEl.style.width   = `${percent || 0}%`;

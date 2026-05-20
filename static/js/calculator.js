@@ -262,10 +262,11 @@ async function pollTask(taskId, maxWait = 600000) {
 
     if (data.status === 'PENDING') {
       updateProgressUI({
-        phase:    '대기 중',
-        queuePos: data.queue_pos,
-        percent:  0,
-        eta:      null,
+        phase:       '대기 중',
+        queuePos:    data.queue_pos,
+        avgDuration: data.avg_duration,
+        percent:     0,
+        eta:         null,
       });
 
     } else if (data.status === 'PROGRESS') {
@@ -315,7 +316,7 @@ function showProgressUI() {
   document.getElementById('resultContent').style.display = 'none';
 }
 
-function updateProgressUI({ phase, queuePos, percent, current, total, elapsed, eta }) {
+function updateProgressUI({ phase, queuePos, avgDuration, percent, current, total, elapsed, eta }) {
   const phaseEl  = document.getElementById('progressPhase');
   const barEl    = document.getElementById('progressBar');
   const detailEl = document.getElementById('progressDetail');
@@ -323,10 +324,12 @@ function updateProgressUI({ phase, queuePos, percent, current, total, elapsed, e
   if (!phaseEl) return;
 
   if (queuePos > 0) {
-    phaseEl.textContent  = `⏳ 대기 중 — 내 앞에 ${queuePos}개`;
+    phaseEl.textContent  = `⏳ 대기 중 (${queuePos}번째)`;
     barEl.style.width    = '0%';
     detailEl.textContent = '이전 요청 처리 중...';
-    etaEl.textContent    = '';
+    const waitSecs = queuePos * (avgDuration || 30);
+    const m = Math.floor(waitSecs / 60), s = waitSecs % 60;
+    etaEl.textContent = m > 0 ? `약 ${m}분 ${s}초 대기 예상` : `약 ${s}초 대기 예상`;
   } else {
     phaseEl.textContent  = `🔄 ${phase || '계산 중'} (${percent || 0}%)`;
     barEl.style.width    = `${percent || 0}%`;

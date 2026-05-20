@@ -399,16 +399,17 @@ def calculator_submit():
 @app.route('/api/task/<task_id>', methods=['GET'])
 def task_status(task_id: str):
     from celery_app import celery as celery_app
-    from tasks import get_queue_position
+    from tasks import get_queue_position, get_avg_duration
 
     task = celery_app.AsyncResult(task_id)
 
     if task.state == 'PENDING':
         queue_pos = get_queue_position(task_id)
         return jsonify({
-            'status':    'PENDING',
-            'queue_pos': queue_pos,
-            'percent':   0,
+            'status':       'PENDING',
+            'queue_pos':    queue_pos,
+            'avg_duration': get_avg_duration(),
+            'percent':      0,
         })
 
     elif task.state == 'PROGRESS':
@@ -550,15 +551,20 @@ def dividend_target_solve():
 
 @app.route('/api/portfolio/history')
 def portfolio_history():
-    val = 7870200
-    data = []
-    for i in range(80):
-        val += (random.random() - 0.38) * 300000
-        val = max(val, 7000000)
-        data.append(round(val))
-    data[-1] = 15870200
-    labels = [f"{2017 + i//12}년 {i%12+1}월" for i in range(80)]
-    return jsonify({"labels": labels, "values": data, "current": 15870200, "change": 1.8})
+    uid = session.get('user_id')
+    if uid:
+        holdings = get_holdings(uid)
+        if holdings:
+            val = 7870200
+            data = []
+            for i in range(80):
+                val += (random.random() - 0.38) * 300000
+                val = max(val, 7000000)
+                data.append(round(val))
+            data[-1] = 15870200
+            labels = [f"{2017 + i//12}년 {i%12+1}월" for i in range(80)]
+            return jsonify({"labels": labels, "values": data, "current": 15870200, "change": 1.8})
+    return jsonify({"empty": True, "labels": [], "values": []})
 
 
 # -----------------------------------------------

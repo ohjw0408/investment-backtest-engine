@@ -105,34 +105,25 @@
     </div>
   </div>
 
-  <!-- 일반 계좌 -->
-  <div class="tax-card" id="card-general">
-    <div class="tax-card-header">
-      <span class="tax-card-icon">📈</span>
-      <div>
-        <div class="tax-card-title">일반 계좌</div>
-        <div class="tax-card-sub">배당소득세 15.4% (미국 ETF 15%), 금융소득 종합과세 적용</div>
-      </div>
-      <button class="tax-toggle" id="toggle-general" onclick="toggleAccount('general')"></button>
-    </div>
-  </div>
-
   <!-- ISA -->
-  <div class="tax-card" id="card-isa">
+  <div class="tax-card active" id="card-isa">
     <div class="tax-card-header">
       <span class="tax-card-icon">🛡️</span>
       <div>
         <div class="tax-card-title">ISA 계좌</div>
         <div class="tax-card-sub">운용 중 비과세, 만기 시 200~400만 비과세 후 9.9%</div>
       </div>
-      <button class="tax-toggle" id="toggle-isa" onclick="toggleAccount('isa')"></button>
     </div>
-    <div class="tax-card-body" id="body-isa">
+    <div class="tax-card-body show">
       <div class="input-row">
-        <label>ISA 유형</label>
+        <label>ISA 가입 여부</label>
         <div class="rebal-options">
           <label class="rebal-option">
-            <input type="radio" name="isaType" value="general" checked>
+            <input type="radio" name="isaType" value="none" checked>
+            <span class="rebal-label">미가입</span>
+          </label>
+          <label class="rebal-option">
+            <input type="radio" name="isaType" value="general">
             <span class="rebal-label">일반형 (200만 비과세)</span>
           </label>
           <label class="rebal-option">
@@ -197,7 +188,7 @@
 {% block scripts %}
 <script>
 const STORAGE_KEY = 'domino_tax_settings';
-const accounts = ['general', 'isa', 'pension', 'harvest'];
+const toggleAccounts = ['pension', 'harvest'];
 
 function fmtKRW(v) {
   if (v >= 100000000) return '₩'+(v/100000000).toFixed(1)+'억';
@@ -205,8 +196,7 @@ function fmtKRW(v) {
   return '₩'+Math.round(v).toLocaleString();
 }
 
-// 토글 상태
-const state = { general: false, isa: false, pension: false, harvest: false };
+const state = { pension: false, harvest: false };
 
 function toggleAccount(name) {
   state[name] = !state[name];
@@ -223,7 +213,7 @@ async function saveSettings() {
     earned_income: parseFloat(document.getElementById('earnedIncome').value) || 0,
     age:           parseInt(document.getElementById('userAge').value) || 40,
     pension_age:   parseInt(document.getElementById('pensionAge').value) || 65,
-    isa_type:      document.querySelector('input[name="isaType"]:checked')?.value || 'general',
+    isa_type:      document.querySelector('input[name="isaType"]:checked')?.value || 'none',
     accounts:      { ...state },
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -246,12 +236,11 @@ function applySettings(s) {
   if (s.earned_income) document.getElementById('earnedIncome').value = s.earned_income;
   if (s.age)           document.getElementById('userAge').value = s.age;
   if (s.pension_age)   document.getElementById('pensionAge').value = s.pension_age;
-  if (s.isa_type) {
-    const radio = document.querySelector(`input[name="isaType"][value="${s.isa_type}"]`);
-    if (radio) radio.checked = true;
-  }
+  const isaVal = s.isa_type || 'none';
+  const radio = document.querySelector(`input[name="isaType"][value="${isaVal}"]`);
+  if (radio) radio.checked = true;
   if (s.accounts) {
-    accounts.forEach(name => {
+    toggleAccounts.forEach(name => {
       if (s.accounts[name] && !state[name]) toggleAccount(name);
     });
   }

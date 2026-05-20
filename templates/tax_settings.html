@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}세금 설정 — Domino Invest{% endblock %}
+{% block title %}세금 설정 — Money Milestone{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
@@ -73,7 +73,6 @@
   <div style="margin-bottom:24px;">
     <h2 style="font-size:1.3rem;font-weight:800;margin-bottom:4px;">세금 설정</h2>
     <p style="font-size:0.85rem;color:var(--text-muted);">
-      입력한 정보는 기기에만 저장되며 서버로 전송되지 않습니다.<br>
       배당금 계산기와 포트폴리오 시뮬레이션에 적용됩니다.
     </p>
   </div>
@@ -219,7 +218,7 @@ function toggleAccount(name) {
   if (body) body.classList.toggle('show', state[name]);
 }
 
-function saveSettings() {
+async function saveSettings() {
   const settings = {
     earned_income: parseFloat(document.getElementById('earnedIncome').value) || 0,
     age:           parseInt(document.getElementById('userAge').value) || 40,
@@ -228,32 +227,54 @@ function saveSettings() {
     accounts:      { ...state },
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-
-  // 토스트
+  try {
+    const me = await fetch('/api/me').then(r => r.json());
+    if (me.logged_in) {
+      await fetch('/api/settings/tax', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(settings),
+      });
+    }
+  } catch(e) {}
   const toast = document.getElementById('saveToast');
   toast.style.display = 'block';
   setTimeout(() => toast.style.display = 'none', 2000);
 }
 
-function loadSettings() {
+function applySettings(s) {
+  if (s.earned_income) document.getElementById('earnedIncome').value = s.earned_income;
+  if (s.age)           document.getElementById('userAge').value = s.age;
+  if (s.pension_age)   document.getElementById('pensionAge').value = s.pension_age;
+  if (s.isa_type) {
+    const radio = document.querySelector(`input[name="isaType"][value="${s.isa_type}"]`);
+    if (radio) radio.checked = true;
+  }
+  if (s.accounts) {
+    accounts.forEach(name => {
+      if (s.accounts[name] && !state[name]) toggleAccount(name);
+    });
+  }
+  document.getElementById('earnedIncomeHint').textContent = fmtKRW(s.earned_income || 0);
+}
+
+async function loadSettings() {
+  try {
+    const me = await fetch('/api/me').then(r => r.json());
+    if (me.logged_in) {
+      const res = await fetch('/api/settings/tax');
+      if (res.ok) {
+        const dbData = await res.json();
+        if (dbData && Object.keys(dbData).length > 0) {
+          applySettings(dbData);
+          return;
+        }
+      }
+    }
+  } catch(e) {}
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return;
-  try {
-    const s = JSON.parse(raw);
-    if (s.earned_income) document.getElementById('earnedIncome').value = s.earned_income;
-    if (s.age)           document.getElementById('userAge').value = s.age;
-    if (s.pension_age)   document.getElementById('pensionAge').value = s.pension_age;
-    if (s.isa_type) {
-      const radio = document.querySelector(`input[name="isaType"][value="${s.isa_type}"]`);
-      if (radio) radio.checked = true;
-    }
-    if (s.accounts) {
-      accounts.forEach(name => {
-        if (s.accounts[name] && !state[name]) toggleAccount(name);
-      });
-    }
-    document.getElementById('earnedIncomeHint').textContent = fmtKRW(s.earned_income || 0);
-  } catch(e) {}
+  try { applySettings(JSON.parse(raw)); } catch(e) {}
 }
 
 document.getElementById('earnedIncome').addEventListener('input', function() {

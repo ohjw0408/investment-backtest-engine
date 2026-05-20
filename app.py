@@ -10,7 +10,7 @@ from modules.auth_manager import (
     init_db, get_or_create_user, get_user_by_id,
     get_groups, upsert_group, delete_group,
     get_holdings, upsert_holding, delete_holding,
-    init_holdings_db,
+    init_holdings_db, get_settings, save_settings,
 )
 
 load_dotenv()
@@ -104,6 +104,23 @@ def me():
         'email':     user['email'],
         'picture':   user['picture'],
     })
+
+
+@app.route('/api/settings/tax', methods=['GET'])
+def get_tax_settings():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({})
+    return jsonify(get_settings(uid))
+
+
+@app.route('/api/settings/tax', methods=['POST'])
+def save_tax_settings():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    save_settings(uid, request.get_json())
+    return jsonify({'ok': True})
 
 
 # -----------------------------------------------

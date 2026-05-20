@@ -15,6 +15,17 @@ from modules.auth_manager import (
 
 load_dotenv()
 
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+_sentry_dsn = os.environ.get('SENTRY_DSN', '')
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=0,
+        send_default_pii=False,
+    )
+
 from modules.data_engine import DataEngine
 from modules.info_engine import InfoEngine
 from modules.portfolio_engine import PortfolioEngine

@@ -72,6 +72,7 @@ requests==2.32.5
 requests-file==3.0.1
 rpds-py==0.30.0
 scipy==1.17.1
+sentry-sdk[flask]
 six==1.17.0
 smmap==5.0.2
 soupsieve==2.8.3

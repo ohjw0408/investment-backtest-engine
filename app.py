@@ -390,27 +390,26 @@ def calculator_run():
 
 @app.route('/api/calculator/submit', methods=['POST'])
 def calculator_submit():
-    from tasks import run_simulation_task
+    from tasks import run_simulation_task, add_to_queue
     payload = request.get_json()
     task    = run_simulation_task.delay(payload)
+    add_to_queue(task.id)
     return jsonify({'task_id': task.id, 'status': 'PENDING'})
 
 
 @app.route('/api/task/<task_id>', methods=['GET'])
 def task_status(task_id: str):
     from celery_app import celery as celery_app
-    from tasks import get_queue_position, get_avg_duration, get_active_tasks
+    from tasks import get_queue_rank, get_avg_duration
 
     task = celery_app.AsyncResult(task_id)
 
     if task.state == 'PENDING':
-        queue_pos = get_queue_position(task_id)
         return jsonify({
-            'status':        'PENDING',
-            'queue_pos':     queue_pos,
-            'active_tasks':  get_active_tasks(),
-            'avg_duration':  get_avg_duration(),
-            'percent':       0,
+            'status':       'PENDING',
+            'queue_rank':   get_queue_rank(task_id),
+            'avg_duration': get_avg_duration(),
+            'percent':      0,
         })
 
     elif task.state == 'PROGRESS':
@@ -447,24 +446,27 @@ def task_status(task_id: str):
 
 @app.route('/api/retirement/submit', methods=['POST'])
 def retirement_submit():
-    from tasks import run_retirement_task
+    from tasks import run_retirement_task, add_to_queue
     payload = request.get_json()
     payload['_mode'] = 'withdrawal' if payload.get('_withdrawal_only') else 'full'
     task = run_retirement_task.delay(payload)
+    add_to_queue(task.id)
     return jsonify({'task_id': task.id, 'status': 'PENDING'})
 
 
 @app.route('/api/backtest/submit', methods=['POST'])
 def backtest_submit():
-    from tasks import run_backtest_task
+    from tasks import run_backtest_task, add_to_queue
     task = run_backtest_task.delay(request.get_json())
+    add_to_queue(task.id)
     return jsonify({'task_id': task.id, 'status': 'PENDING'})
 
 
 @app.route('/api/dividend-target/submit', methods=['POST'])
 def dividend_target_submit():
-    from tasks import run_dividend_task
+    from tasks import run_dividend_task, add_to_queue
     task = run_dividend_task.delay(request.get_json())
+    add_to_queue(task.id)
     return jsonify({'task_id': task.id, 'status': 'PENDING'})
 
 

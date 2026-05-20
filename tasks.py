@@ -11,15 +11,28 @@ r = redis.Redis(host='localhost', port=6379, db=0)
 _DURATION_KEY = 'mm_task_durations'
 
 
-def get_queue_position(task_id: str) -> int:
+def add_to_queue(task_id: str) -> None:
     try:
-        queue = r.lrange('celery', 0, -1)
-        for i, item in enumerate(queue):
-            if task_id.encode() in item:
-                return i
-        return 0
+        r.zadd('mm_task_queue', {task_id: time.time()})
+        r.expire('mm_task_queue', 3600)
     except Exception:
-        return 0
+        pass
+
+
+def get_queue_rank(task_id: str):
+    """내 앞에 아직 시작 안 된 태스크 수. None=이미 픽업됨."""
+    try:
+        rank = r.zrank('mm_task_queue', task_id)
+        return int(rank) if rank is not None else None
+    except Exception:
+        return None
+
+
+def _remove_from_queue(task_id: str) -> None:
+    try:
+        r.zrem('mm_task_queue', task_id)
+    except Exception:
+        pass
 
 
 def record_task_duration(seconds: float) -> None:
@@ -50,6 +63,7 @@ def get_active_tasks() -> int:
 @celery.task(bind=True)
 def run_simulation_task(self, payload: dict) -> dict:
     start_time = time.time()
+    _remove_from_queue(self.request.id)
     try:
         r.incr('mm_active_tasks')
     except Exception:
@@ -107,8 +121,10 @@ def _make_progress_callback(task):
     return progress_callback
 
 
-def _task_wrap(fn):
-    """incr/decr mm_active_tasks around fn(); return fn()'s result."""
+def _task_wrap(fn, task_id=None):
+    """incr/decr mm_active_tasks around fn(); ZREM from queue on start."""
+    if task_id:
+        _remove_from_queue(task_id)
     try:
         r.incr('mm_active_tasks')
     except Exception:
@@ -138,7 +154,7 @@ def run_retirement_task(self, payload: dict) -> dict:
         except Exception as e:
             import traceback
             return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
-    return _task_wrap(_run)
+    return _task_wrap(_run, self.request.id)
 
 
 @celery.task(bind=True)
@@ -154,7 +170,7 @@ def run_backtest_task(self, payload: dict) -> dict:
         except Exception as e:
             import traceback
             return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
-    return _task_wrap(_run)
+    return _task_wrap(_run, self.request.id)
 
 
 @celery.task(bind=True)
@@ -170,4 +186,4 @@ def run_dividend_task(self, payload: dict) -> dict:
         except Exception as e:
             import traceback
             return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
-    return _task_wrap(_run)
+    return _task_wrap(_run, self.request.id)

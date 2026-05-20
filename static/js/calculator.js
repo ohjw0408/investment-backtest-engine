@@ -253,6 +253,7 @@ async function runCalculator() {
 
 async function pollTask(taskId, maxWait = 600000) {
   const start = Date.now();
+  let _initialRank = null;
 
   while (Date.now() - start < maxWait) {
     await new Promise(r => setTimeout(r, 1500));
@@ -261,14 +262,14 @@ async function pollTask(taskId, maxWait = 600000) {
     const data = await res.json();
 
     if (data.status === 'PENDING') {
-      updateProgressUI({
-        phase:        '대기 중',
-        queuePos:     data.queue_pos,
-        activeTasks:  data.active_tasks || 0,
-        avgDuration:  data.avg_duration,
-        percent:      0,
-        eta:          null,
-      });
+      const rank = data.queue_rank;
+      if (rank !== null && rank !== undefined && rank > 0) {
+        if (_initialRank === null) _initialRank = rank;
+        const pct = Math.min(99, Math.round((_initialRank - rank) / _initialRank * 100));
+        updateProgressUI({ phase: '대기 중', queueRank: rank, isWaiting: true, avgDuration: data.avg_duration, percent: pct });
+      } else {
+        updateProgressUI({ phase: '준비 중', percent: 0, isWaiting: false });
+      }
 
     } else if (data.status === 'PROGRESS') {
       updateProgressUI({
@@ -278,6 +279,7 @@ async function pollTask(taskId, maxWait = 600000) {
         total:   data.total,
         elapsed: data.elapsed,
         eta:     data.eta,
+        isWaiting: false,
       });
 
     } else if (data.status === 'SUCCESS') {
@@ -334,26 +336,25 @@ function _clearIndeterminate(barEl) {
   barEl.style.animation  = '';
 }
 
-function updateProgressUI({ phase, queuePos, activeTasks, avgDuration, percent, current, total, elapsed, eta }) {
+function updateProgressUI({ phase, queueRank, isWaiting, avgDuration, percent, current, total, elapsed, eta }) {
   const phaseEl  = document.getElementById('progressPhase');
   const barEl    = document.getElementById('progressBar');
   const detailEl = document.getElementById('progressDetail');
   const etaEl    = document.getElementById('progressEta');
   if (!phaseEl) return;
 
-  if (!percent && activeTasks > 0) {
-    phaseEl.textContent  = `⏳ 앞에 ${activeTasks}개 계산 중 — 대기 중`;
-    _setIndeterminate(barEl);
-    detailEl.textContent = '앞 계산 완료 후 자동으로 시작됩니다';
-    const waitSecs = activeTasks * (avgDuration || 30);
+  if (isWaiting && queueRank > 0) {
+    barEl.dataset.anim    = '';
+    barEl.style.animation = '';
+    barEl.style.transition = 'width 0.5s';
+    barEl.style.left      = '0%';
+    barEl.style.width     = `${percent}%`;
+    phaseEl.textContent   = `⏳ 내 앞에 ${queueRank}개 대기 중 (${percent}%)`;
+    detailEl.textContent  = '앞 계산 완료 후 자동으로 시작됩니다';
+    const waitSecs = queueRank * (avgDuration || 30);
     const wm = Math.floor(waitSecs / 60), ws = waitSecs % 60;
     etaEl.textContent = wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`;
-  } else if (!percent) {
-    phaseEl.textContent  = `🔄 준비 중...`;
-    _setIndeterminate(barEl);
-    detailEl.textContent = '가격 데이터 로딩 중...';
-    etaEl.textContent    = '';
-  } else {
+  } else if (percent > 0) {
     _clearIndeterminate(barEl);
     phaseEl.textContent   = `🔄 ${phase || '계산 중'} (${percent}%)`;
     barEl.style.transition = 'width 0.5s';
@@ -364,6 +365,11 @@ function updateProgressUI({ phase, queuePos, activeTasks, avgDuration, percent, 
       const m = Math.floor(eta / 60), s = eta % 60;
       etaEl.textContent = m > 0 ? `약 ${m}분 ${s}초 남음` : `약 ${s}초 남음`;
     }
+  } else {
+    phaseEl.textContent  = '🔄 준비 중...';
+    _setIndeterminate(barEl);
+    detailEl.textContent = '가격 데이터 로딩 중...';
+    etaEl.textContent    = '';
   }
 }
 

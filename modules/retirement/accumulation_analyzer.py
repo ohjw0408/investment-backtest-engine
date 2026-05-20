@@ -142,6 +142,11 @@ class AccumulationAnalyzer:
                 if self.tax_engine:
                     final_value = self._apply_liquidation_tax(result, final_value)
 
+            if result["history"].empty:
+                cur    += relativedelta(months=self.step_months)
+                run_id += 1
+                continue
+
             metrics              = self._calc_metrics(result["history"], self.accumulation_years)
             metrics["run_id"]    = run_id
             metrics["start"]     = cur.strftime("%Y-%m-%d")

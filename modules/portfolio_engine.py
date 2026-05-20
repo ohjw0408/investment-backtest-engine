@@ -115,7 +115,7 @@ class PortfolioEngine:
 
         return {
             "history":     history_df,
-            "final_value": history_df["portfolio_value"].iloc[-1],
+            "final_value": float(history_df["portfolio_value"].iloc[-1]) if not history_df.empty else 0.0,
             "portfolio":   portfolio,
             "last_prices": last_prices,
         }

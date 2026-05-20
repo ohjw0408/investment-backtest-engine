@@ -54,6 +54,8 @@ class HistoryRecorder:
         self.history.append(row)
 
     def to_dataframe(self):
+        if not self.history:
+            return pd.DataFrame()
         df = pd.DataFrame(self.history)
         df = df.sort_values("date").reset_index(drop=True)
         return df

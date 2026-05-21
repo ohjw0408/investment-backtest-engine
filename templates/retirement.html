@@ -426,6 +426,9 @@
         <span id="retProgressDetail">계산 준비 중</span>
         <span id="retProgressEta"></span>
       </div>
+      <div style="text-align:center;margin-top:10px;">
+        <button onclick="retCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:white;color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+      </div>
     </div>
   </div>
 
@@ -516,6 +519,7 @@
 {% block scripts %}
 <script>
 let retTickers = [];
+let _retTaskId = null, _retCancelled = false;
 let retCharts  = {};
 let retMode    = 'sim';  // 'sim' or 'wd'
 
@@ -698,11 +702,15 @@ async function runRetirement() {
     const submitData = await submitRes.json();
     if (submitRes.status === 429) throw new Error(submitData.error);
     const { task_id } = submitData;
+    _retTaskId = task_id;
+    localStorage.setItem('mm_task_retirement', JSON.stringify({task_id, body, timestamp: Date.now()}));
     const data = await retPollTask(task_id);
-    renderRetirement(data, body);
+    if (data) renderRetirement(data, body);
   } catch(e) {
-    alert('오류가 발생했습니다: ' + e.message);
+    if (e.message !== 'CANCELLED') alert('오류가 발생했습니다: ' + e.message);
   } finally {
+    localStorage.removeItem('mm_task_retirement');
+    _retTaskId = null;
     document.getElementById('retRunBtn').disabled       = false;
     document.getElementById('retLoading').style.display = 'none';
   }
@@ -712,7 +720,9 @@ async function retPollTask(taskId, maxWait = 600000) {
   const start = Date.now();
   let _initialRank = null;
   while (Date.now() - start < maxWait) {
+    if (_retCancelled) { _retCancelled = false; throw new Error('CANCELLED'); }
     await new Promise(r => setTimeout(r, 1500));
+    if (_retCancelled) { _retCancelled = false; throw new Error('CANCELLED'); }
     const res  = await fetch(`/api/task/${taskId}`);
     const data = await res.json();
 
@@ -795,6 +805,40 @@ function retUpdateProgressUI({ phase, queueRank, isWaiting, avgDuration, percent
     etaEl.textContent    = '';
   }
 }
+
+async function retCancelTask() {
+  _retCancelled = true;
+  const tid = _retTaskId;
+  if (tid) {
+    try { await fetch(`/api/task/${tid}/cancel`, {method:'POST'}); } catch(e) {}
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const saved = localStorage.getItem('mm_task_retirement');
+  if (!saved) return;
+  let state;
+  try { state = JSON.parse(saved); } catch(e) { localStorage.removeItem('mm_task_retirement'); return; }
+  if (Date.now() - state.timestamp > 3600000) { localStorage.removeItem('mm_task_retirement'); return; }
+  _retTaskId = state.task_id;
+  document.getElementById('retRunBtn').disabled = true;
+  document.getElementById('retLoading').style.display = 'block';
+  document.getElementById('retResultEmpty').style.display = 'none';
+  retShowProgressUI();
+  try {
+    const data = await retPollTask(state.task_id);
+    if (data) renderRetirement(data, state.body || {});
+  } catch(e) {
+    if (e.message !== 'CANCELLED') {
+      document.getElementById('retResultEmpty').style.display = 'block';
+    }
+  } finally {
+    localStorage.removeItem('mm_task_retirement');
+    _retTaskId = null;
+    document.getElementById('retRunBtn').disabled = false;
+    document.getElementById('retLoading').style.display = 'none';
+  }
+});
 
 // ── 세금 토글 ──────────────────────────────────────────
 window.retTaxEnabled = false;

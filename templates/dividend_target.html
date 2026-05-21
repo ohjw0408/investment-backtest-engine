@@ -246,6 +246,9 @@
         <span id="dtProgressDetail">계산 준비 중</span>
         <span id="dtProgressEta"></span>
       </div>
+      <div style="text-align:center;margin-top:10px;">
+        <button onclick="dtCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:white;color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+      </div>
     </div>
     <div class="result-empty" id="dtResultEmpty">
       <div class="result-empty-icon">💰</div>
@@ -276,6 +279,7 @@
 {% block scripts %}
 <script>
 let dtTickers = [], dtSearchTimer = null, dtCharts = {};
+let _dtTaskId = null, _dtCancelled = false;
 const dtInput = document.getElementById('dtSearchInput');
 const dtDropdown = document.getElementById('dtSearchDropdown');
 
@@ -519,12 +523,16 @@ async function runDividendTarget() {
     if (res.status === 429) throw new Error(resData.error);
     const { task_id } = resData;
     window._dtLastBody = body;
+    _dtTaskId = task_id;
+    localStorage.setItem('mm_task_dividend', JSON.stringify({task_id, body, timestamp: Date.now()}));
     await dtPollTask(task_id);
   } catch(e) {
-    alert('오류: '+e.message);
+    if (e.message !== 'CANCELLED') alert('오류: '+e.message);
     dtHideProgressUI();
     document.getElementById('dtResultEmpty').style.display = 'block';
   } finally {
+    localStorage.removeItem('mm_task_dividend');
+    _dtTaskId = null;
     btn.disabled=false; btnText.textContent='시뮬레이션 실행'; spinner.style.display='none';
   }
 }
@@ -534,8 +542,10 @@ async function dtPollTask(taskId, maxWait = 600000) {
   let _initialRank = null;
   let _pollCount = 0;
   while (Date.now() < deadline) {
+    if (_dtCancelled) { _dtCancelled = false; throw new Error('CANCELLED'); }
     await new Promise(r => setTimeout(r, _pollCount < 10 ? 300 : 1500));
     _pollCount++;
+    if (_dtCancelled) { _dtCancelled = false; throw new Error('CANCELLED'); }
     try {
       const res  = await fetch(`/api/task/${taskId}`);
       const data = await res.json();
@@ -641,6 +651,40 @@ function dtUpdateProgressUI({ phase, queueRank, isWaiting, isLoading, avgDuratio
 function dtHideProgressUI() {
   document.getElementById('dtLoading').style.display = 'none';
 }
+
+async function dtCancelTask() {
+  _dtCancelled = true;
+  const tid = _dtTaskId;
+  if (tid) {
+    try { await fetch(`/api/task/${tid}/cancel`, {method:'POST'}); } catch(e) {}
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const saved = localStorage.getItem('mm_task_dividend');
+  if (!saved) return;
+  let state;
+  try { state = JSON.parse(saved); } catch(e) { localStorage.removeItem('mm_task_dividend'); return; }
+  if (Date.now() - state.timestamp > 3600000) { localStorage.removeItem('mm_task_dividend'); return; }
+  _dtTaskId = state.task_id;
+  if (state.body) window._dtLastBody = state.body;
+  const btn = document.getElementById('dtRunBtn');
+  if (btn) btn.disabled = true;
+  document.getElementById('dtLoading').style.display = 'block';
+  document.getElementById('dtResultEmpty').style.display = 'none';
+  try {
+    await dtPollTask(state.task_id);
+  } catch(e) {
+    if (e.message !== 'CANCELLED') {
+      document.getElementById('dtResultEmpty').style.display = 'block';
+    }
+  } finally {
+    localStorage.removeItem('mm_task_dividend');
+    _dtTaskId = null;
+    if (btn) { btn.disabled = false; document.getElementById('dtRunBtnText').textContent = '시뮬레이션 실행'; document.getElementById('dtRunBtnSpinner').style.display = 'none'; }
+    dtHideProgressUI();
+  }
+});
 
 // ── 결과 렌더링 ──
 const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0','#00BCD4','#FF5722','#607D8B'];

@@ -228,6 +228,9 @@
         <span id="btProgressDetail">계산 준비 중</span>
         <span id="btProgressEta"></span>
       </div>
+      <div style="text-align:center;margin-top:10px;">
+        <button onclick="btCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:white;color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+      </div>
     </div>
   </div>
 
@@ -272,6 +275,7 @@
 document.getElementById('btEndDate').value = new Date().toISOString().split('T')[0];
 
 let btTickers = [];
+let _btTaskId = null, _btCancelled = false;
 let btCharts  = {};
 
 function fmtKRW(v) {
@@ -427,12 +431,18 @@ async function runBacktest() {
     const resData = await res.json();
     if (res.status === 429) throw new Error(resData.error);
     const { task_id } = resData;
+    _btTaskId = task_id;
+    localStorage.setItem('mm_task_backtest', JSON.stringify({task_id, timestamp: Date.now()}));
     await btPollTask(task_id);
   } catch(e) {
-    alert('오류: ' + e.message);
-    btHideProgressUI();
-    document.getElementById('btResultEmpty').style.display = 'flex';
+    if (e.message !== 'CANCELLED') {
+      alert('오류: ' + e.message);
+      btHideProgressUI();
+      document.getElementById('btResultEmpty').style.display = 'flex';
+    }
   } finally {
+    localStorage.removeItem('mm_task_backtest');
+    _btTaskId = null;
     document.getElementById('btRunBtn').disabled = false;
   }
 }
@@ -441,7 +451,9 @@ async function btPollTask(taskId, maxWait = 600000) {
   const deadline = Date.now() + maxWait;
   let _initialRank = null;
   while (Date.now() < deadline) {
+    if (_btCancelled) { _btCancelled = false; throw new Error('CANCELLED'); }
     await new Promise(r => setTimeout(r, 1500));
+    if (_btCancelled) { _btCancelled = false; throw new Error('CANCELLED'); }
     try {
       const res  = await fetch(`/api/task/${taskId}`);
       const data = await res.json();
@@ -532,6 +544,38 @@ function btUpdateProgressUI({ phase, queueRank, isWaiting, avgDuration, percent,
 function btHideProgressUI() {
   document.getElementById('btLoading').style.display = 'none';
 }
+
+async function btCancelTask() {
+  _btCancelled = true;
+  const tid = _btTaskId;
+  if (tid) {
+    try { await fetch(`/api/task/${tid}/cancel`, {method:'POST'}); } catch(e) {}
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const saved = localStorage.getItem('mm_task_backtest');
+  if (!saved) return;
+  let state;
+  try { state = JSON.parse(saved); } catch(e) { localStorage.removeItem('mm_task_backtest'); return; }
+  if (Date.now() - state.timestamp > 3600000) { localStorage.removeItem('mm_task_backtest'); return; }
+  _btTaskId = state.task_id;
+  document.getElementById('btRunBtn').disabled = true;
+  btShowProgressUI();
+  try {
+    await btPollTask(state.task_id);
+  } catch(e) {
+    if (e.message !== 'CANCELLED') {
+      btHideProgressUI();
+      document.getElementById('btResultEmpty').style.display = 'flex';
+    }
+  } finally {
+    localStorage.removeItem('mm_task_backtest');
+    _btTaskId = null;
+    document.getElementById('btRunBtn').disabled = false;
+    btHideProgressUI();
+  }
+});
 
 // ── 렌더링 ──
 function renderBacktest(data) {

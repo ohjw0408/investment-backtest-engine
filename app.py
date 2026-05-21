@@ -397,6 +397,15 @@ def calculator_submit():
     return jsonify({'task_id': task.id, 'status': 'PENDING'})
 
 
+@app.route('/api/task/<task_id>/cancel', methods=['POST'])
+def cancel_task(task_id: str):
+    from celery_app import celery as celery_app
+    from tasks import _remove_from_queue
+    celery_app.control.revoke(task_id, terminate=True)
+    _remove_from_queue(task_id)
+    return jsonify({'ok': True})
+
+
 @app.route('/api/task/<task_id>', methods=['GET'])
 def task_status(task_id: str):
     from celery_app import celery as celery_app

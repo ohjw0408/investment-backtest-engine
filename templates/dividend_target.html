@@ -503,7 +503,7 @@ async function runDividendTarget() {
     : 'none';
 
   const body = {
-    tickers:            dtTickers.map(t=>({code:t.code, weight:t.weight/100})),
+    tickers:            dtTickers.map(t=>({code:t.code, name:t.name, badge:t.badge, weight:t.weight/100})),
     target_monthly_div: parseFloat(document.getElementById('dtTargetDiv').value)||0,
     probability:        parseFloat(document.getElementById('dtProbSlider').value)/100,
     dividend_mode:      document.querySelector('input[name="dtDividend"]:checked').value,
@@ -583,6 +583,12 @@ async function dtPollTask(taskId, maxWait = 600000) {
         try { localStorage.setItem('mm_result_dividend', JSON.stringify({result, body: window._dtLastBody, ts: Date.now()})); } catch(e) {}
         return;
       }
+      if (data.status === 'CANCELLED') {
+        dtHideProgressUI();
+        document.getElementById('dtResultEmpty').style.display = 'block';
+        document.getElementById('dtResultContent').style.display = 'none';
+        return;
+      }
       if (data.status === 'FAILURE') {
         dtHideProgressUI();
         document.getElementById('dtResultEmpty').style.display = 'block';
@@ -653,6 +659,20 @@ function dtHideProgressUI() {
   document.getElementById('dtLoading').style.display = 'none';
 }
 
+function dtRestoreForm(body) {
+  if (!body) return;
+  if (body.tickers?.length) {
+    dtTickers = body.tickers.map(t => ({code: t.code, name: t.name || t.code, badge: t.badge || '', weight: Math.round(t.weight * 100)}));
+    renderDtTickers();
+  }
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v; };
+  set('dtTargetDiv', body.target_monthly_div);
+  if (body.probability !== undefined) set('dtProbSlider', Math.round(body.probability * 100));
+  if (body.seed?.center !== undefined) set('dtSeedVal', body.seed.center);
+  if (body.monthly?.center !== undefined) set('dtMonthlyVal', body.monthly.center);
+  if (body.years?.center !== undefined) set('dtYearsVal', body.years.center);
+}
+
 async function dtCancelTask() {
   _dtCancelled = true;
   const tid = _dtTaskId;
@@ -695,6 +715,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (Date.now() - ts < 7200000) {
         window._dtLastBody = body || {};
         renderResult(result, body || {});
+        dtRestoreForm(body);
       } else {
         localStorage.removeItem('mm_result_dividend');
       }

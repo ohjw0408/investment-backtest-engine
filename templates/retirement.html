@@ -659,7 +659,7 @@ async function runRetirement() {
     const retAge    = parseInt(document.getElementById('retTaxAge')?.value || 40);
     const retAccYrs = parseInt(document.getElementById('simAccYears').value) || 20;
     body = {
-      tickers:              retTickers.map(t => ({ code: t.code, weight: t.weight })),
+      tickers:              retTickers.map(t => ({ code: t.code, name: t.name, weight: t.weight })),
       initial_capital:      parseFloat(document.getElementById('simSeed').value) || 0,
       monthly_contribution: parseFloat(document.getElementById('simMonthly').value) || 0,
       accumulation_years:   retAccYrs,
@@ -681,7 +681,7 @@ async function runRetirement() {
     };
   } else {
     body = {
-      tickers:            retTickers.map(t => ({ code: t.code, weight: t.weight })),
+      tickers:            retTickers.map(t => ({ code: t.code, name: t.name, weight: t.weight })),
       initial_capital:    parseFloat(document.getElementById('wdSeed').value) || 0,
       monthly_withdrawal: parseFloat(document.getElementById('wdWithdraw').value) || 0,
       withdrawal_years:   parseInt(document.getElementById('wdYears').value) || 30,
@@ -742,6 +742,8 @@ async function retPollTask(taskId, maxWait = 600000) {
       }
     } else if (data.status === 'PROGRESS') {
       retUpdateProgressUI({ phase: '계산 중', percent: data.percent, current: data.current, total: data.total, elapsed: data.elapsed, eta: data.eta, isWaiting: false });
+    } else if (data.status === 'CANCELLED') {
+      throw new Error('CANCELLED');
     } else if (data.status === 'SUCCESS') {
       return data.result;
     } else if (data.status === 'FAILURE') {
@@ -810,6 +812,30 @@ function retUpdateProgressUI({ phase, queueRank, isWaiting, avgDuration, percent
   }
 }
 
+function retRestoreForm(body) {
+  if (!body) return;
+  if (body.tickers?.length) {
+    retTickers.length = 0;
+    body.tickers.forEach(t => retTickers.push({code: t.code, name: t.name || t.code, weight: t.weight}));
+    updateRetWeightUI();
+  }
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v; };
+  if (body._mode === 'withdrawal') {
+    set('wdSeed', body.initial_capital);
+    set('wdWithdraw', body.monthly_withdrawal);
+    set('wdYears', body.withdrawal_years);
+  } else {
+    set('simSeed', body.initial_capital);
+    set('simMonthly', body.monthly_contribution);
+    set('simWithdraw', body.monthly_withdrawal);
+    if (body.accumulation_years !== undefined) { set('simAccYears', body.accumulation_years); const sl = document.getElementById('simAccYearsSlider'); if (sl) sl.value = body.accumulation_years; }
+    if (body.withdrawal_years !== undefined) { set('simWdYears', body.withdrawal_years); const sl = document.getElementById('simWdYearsSlider'); if (sl) sl.value = body.withdrawal_years; }
+    if (body.dividend_mode) { const el = document.querySelector(`input[name="simDividend"][value="${body.dividend_mode}"]`); if (el) el.checked = true; }
+    if (body.rebal_mode) { const el = document.querySelector(`input[name="simRebal"][value="${body.rebal_mode}"]`); if (el) el.checked = true; }
+  }
+  if (body.target_percentile !== undefined) set('retTargetProb', Math.round(body.target_percentile * 100));
+}
+
 async function retCancelTask() {
   _retCancelled = true;
   const tid = _retTaskId;
@@ -854,6 +880,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const {result, body, ts} = JSON.parse(resultSaved);
       if (Date.now() - ts < 7200000) {
         renderRetirement(result, body || {});
+        retRestoreForm(body);
       } else {
         localStorage.removeItem('mm_result_retirement');
       }

@@ -8,6 +8,23 @@ let searchTimer  = null;
 const chartInstances = {};
 let _calcTaskId = null, _calcCancelled = false;
 
+// ── 폼 복원 ──
+function calcRestoreForm(payload) {
+  if (!payload) return;
+  if (payload.tickers?.length) {
+    tickers.length = 0;
+    payload.tickers.forEach(t => tickers.push({code: t.code, name: t.name || t.code, badge: t.badge || '', weight: Math.round(t.weight * 100)}));
+    renderTickers();
+    updateWeightBar();
+  }
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v; };
+  if (payload.initial_capital !== undefined) { set('initialCapital', payload.initial_capital); document.getElementById('initialHint').textContent = '₩' + (payload.initial_capital||0).toLocaleString(); }
+  if (payload.monthly_contribution !== undefined) { set('monthlyContrib', payload.monthly_contribution); document.getElementById('monthlyHint').textContent = '₩' + (payload.monthly_contribution||0).toLocaleString(); }
+  if (payload.years !== undefined) { set('yearsSlider', payload.years); document.getElementById('yearsLabel').textContent = payload.years + '년'; }
+  if (payload.dividend_mode) { const el = document.querySelector(`input[name="dividend"][value="${payload.dividend_mode}"]`); if (el) el.checked = true; }
+  if (payload.rebal_mode) { const el = document.querySelector(`input[name="rebal"][value="${payload.rebal_mode}"]`); if (el) el.checked = true; }
+}
+
 // ── 취소 ──
 async function cancelCalcTask() {
   _calcCancelled = true;
@@ -101,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (result) {
               hideProgressUI();
               renderResult(result, state.payload || {});
+              calcRestoreForm(state.payload);
               localStorage.setItem('mm_result_calculator', JSON.stringify({result, payload: state.payload, ts: Date.now()}));
             }
           } catch(e) {
@@ -125,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const {result, payload, ts} = JSON.parse(resultSaved);
         if (Date.now() - ts < 7200000) {
           renderResult(result, payload || {});
+          calcRestoreForm(payload);
         } else {
           localStorage.removeItem('mm_result_calculator');
         }
@@ -262,7 +281,7 @@ async function runCalculator() {
     : totalMon;
 
   const payload = {
-    tickers:              tickers.map(t => ({ code: t.code, weight: t.weight / 100 })),
+    tickers:              tickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: t.weight / 100 })),
     initial_capital:      isSingle ? totalInit : effectiveInit,
     monthly_contribution: isSingle ? totalMon  : effectiveMon,
     years:                Number(document.getElementById('yearsSlider').value),
@@ -351,6 +370,9 @@ async function pollTask(taskId, maxWait = 600000) {
         eta:     data.eta,
         isWaiting: false,
       });
+
+    } else if (data.status === 'CANCELLED') {
+      throw new Error('CANCELLED');
 
     } else if (data.status === 'SUCCESS') {
       return data.result;

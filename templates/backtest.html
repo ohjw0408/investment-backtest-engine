@@ -408,17 +408,20 @@ async function runBacktest() {
   btShowProgressUI();
 
   try {
+    window._btLastBody = {
+      tickers:              btTickers.map(t => ({ code: t.code, name: t.name, weight: t.weight })),
+      start_date:           startDate,
+      end_date:             endDate,
+      initial_capital:      parseFloat(document.getElementById('btSeed').value) || 0,
+      monthly_contribution: parseFloat(document.getElementById('btMonthly').value) || 0,
+      dividend_mode:        document.querySelector('input[name="btDividend"]:checked').value,
+      rebal_mode:           document.querySelector('input[name="btRebal"]:checked').value,
+    };
     const res = await fetch('/api/backtest/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        tickers:              btTickers.map(t => ({ code: t.code, weight: t.weight })),
-        start_date:           startDate,
-        end_date:             endDate,
-        initial_capital:      parseFloat(document.getElementById('btSeed').value) || 0,
-        monthly_contribution: parseFloat(document.getElementById('btMonthly').value) || 0,
-        dividend_mode:        document.querySelector('input[name="btDividend"]:checked').value,
-        rebal_mode:           document.querySelector('input[name="btRebal"]:checked').value,
+        ...window._btLastBody,
         tax_enabled:          window.btTaxEnabled || false,
         account_type:         document.getElementById('btTaxAccount')?.value || '위탁',
         gain_harvesting: window.btTaxEnabled && document.getElementById('btTaxAccount')?.value === '위탁' && (document.getElementById('btGainHarvestingCheck')?.checked ?? false),
@@ -487,7 +490,13 @@ async function btPollTask(taskId, maxWait = 600000) {
         btHideProgressUI();
         const btResult = data.result?.result ?? data.result;
         renderBacktest(btResult);
-        try { localStorage.setItem('mm_result_backtest', JSON.stringify({result: btResult, ts: Date.now()})); } catch(e) {}
+        try { localStorage.setItem('mm_result_backtest', JSON.stringify({result: btResult, body: window._btLastBody, ts: Date.now()})); } catch(e) {}
+        return;
+      }
+      if (data.status === 'CANCELLED') {
+        btHideProgressUI();
+        document.getElementById('btResultEmpty').style.display = 'flex';
+        document.getElementById('btResultContent').style.display = 'none';
         return;
       }
       if (data.status === 'FAILURE') {
@@ -497,6 +506,7 @@ async function btPollTask(taskId, maxWait = 600000) {
         return;
       }
     } catch(e) {
+      if (e.message === 'CANCELLED') { btHideProgressUI(); document.getElementById('btResultEmpty').style.display = 'flex'; return; }
       btHideProgressUI();
       document.getElementById('btResultEmpty').style.display = 'flex';
       alert('폴링 오류: ' + e.message);
@@ -549,6 +559,24 @@ function btHideProgressUI() {
   document.getElementById('btLoading').style.display = 'none';
 }
 
+function btRestoreForm(body) {
+  if (!body) return;
+  if (body.tickers?.length) {
+    btTickers.length = 0;
+    body.tickers.forEach(t => btTickers.push({code: t.code, name: t.name || t.code, weight: t.weight}));
+    updateBtWeightUI();
+  }
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v; };
+  set('btStartDate', body.start_date);
+  set('btEndDate', body.end_date);
+  set('btSeed', body.initial_capital);
+  set('btMonthly', body.monthly_contribution);
+  if (body.initial_capital !== undefined) document.getElementById('btSeedHint').textContent = '₩' + (body.initial_capital||0).toLocaleString();
+  if (body.monthly_contribution !== undefined) document.getElementById('btMonthlyHint').textContent = '₩' + (body.monthly_contribution||0).toLocaleString();
+  if (body.dividend_mode) { const el = document.querySelector(`input[name="btDividend"][value="${body.dividend_mode}"]`); if (el) el.checked = true; }
+  if (body.rebal_mode) { const el = document.querySelector(`input[name="btRebal"][value="${body.rebal_mode}"]`); if (el) el.checked = true; }
+}
+
 async function btCancelTask() {
   _btCancelled = true;
   const tid = _btTaskId;
@@ -585,9 +613,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const resultSaved = localStorage.getItem('mm_result_backtest');
   if (resultSaved) {
     try {
-      const {result, ts} = JSON.parse(resultSaved);
+      const {result, body, ts} = JSON.parse(resultSaved);
       if (Date.now() - ts < 7200000) {
         renderBacktest(result);
+        btRestoreForm(body);
+        window._btLastBody = body;
       } else {
         localStorage.removeItem('mm_result_backtest');
       }

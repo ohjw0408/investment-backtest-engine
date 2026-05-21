@@ -9,6 +9,28 @@ from celery_app import celery
 r = redis.Redis(host='localhost', port=6379, db=0)
 
 _DURATION_KEY = 'mm_task_durations'
+_CANCEL_PREFIX = 'mm_cancel_'
+
+
+def set_cancel_flag(task_id: str) -> None:
+    try:
+        r.set(f'{_CANCEL_PREFIX}{task_id}', '1', ex=300)
+    except Exception:
+        pass
+
+
+def check_cancel_flag(task_id: str) -> bool:
+    try:
+        return bool(r.get(f'{_CANCEL_PREFIX}{task_id}'))
+    except Exception:
+        return False
+
+
+def clear_cancel_flag(task_id: str) -> None:
+    try:
+        r.delete(f'{_CANCEL_PREFIX}{task_id}')
+    except Exception:
+        pass
 
 
 def add_to_queue(task_id: str) -> None:
@@ -70,6 +92,8 @@ def run_simulation_task(self, payload: dict) -> dict:
         pass
 
     def progress_callback(current: int, total: int, elapsed: float, phase: str = 'computing'):
+        if check_cancel_flag(self.request.id):
+            raise Exception('__CANCELLED__')
         eta = (elapsed / current * (total - current)) if current > 0 else None
         self.update_state(
             state='PROGRESS',
@@ -90,6 +114,9 @@ def run_simulation_task(self, payload: dict) -> dict:
         record_task_duration(time.time() - start_time)
         return {'status': 'SUCCESS', 'result': result}
     except Exception as e:
+        if check_cancel_flag(self.request.id):
+            clear_cancel_flag(self.request.id)
+            return {'status': 'CANCELLED'}
         import traceback
         return {
             'status':    'FAILURE',
@@ -107,6 +134,8 @@ def _make_progress_callback(task):
     def progress_callback(current: int, total: int, elapsed: float, phase: str = 'computing'):
         if total <= 0:
             return
+        if check_cancel_flag(task.request.id):
+            raise Exception('__CANCELLED__')
         eta = (elapsed / current * (total - current)) if current > 0 else None
         task.update_state(
             state='PROGRESS',
@@ -132,7 +161,13 @@ def _task_wrap(fn, task_id=None):
     except Exception:
         pass
     try:
-        return fn()
+        result = fn()
+        return result
+    except Exception:
+        if task_id and check_cancel_flag(task_id):
+            clear_cancel_flag(task_id)
+            return {'status': 'CANCELLED'}
+        raise
     finally:
         try:
             r.decr('mm_active_tasks')

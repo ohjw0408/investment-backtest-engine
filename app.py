@@ -407,7 +407,8 @@ def calculator_submit():
 @app.route('/api/task/<task_id>/cancel', methods=['POST'])
 def cancel_task(task_id: str):
     from celery_app import celery as celery_app
-    from tasks import _remove_from_queue
+    from tasks import _remove_from_queue, set_cancel_flag
+    set_cancel_flag(task_id)
     celery_app.control.revoke(task_id, terminate=True)
     _remove_from_queue(task_id)
     return jsonify({'ok': True})
@@ -442,6 +443,8 @@ def task_status(task_id: str):
 
     elif task.state == 'SUCCESS':
         result = task.result or {}
+        if result.get('status') == 'CANCELLED':
+            return jsonify({'status': 'CANCELLED'})
         if result.get('status') == 'FAILURE':
             return jsonify({'status': 'FAILURE', 'error': result.get('error', '알 수 없는 오류')})
         return jsonify({

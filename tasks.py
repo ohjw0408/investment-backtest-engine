@@ -130,6 +130,13 @@ def run_simulation_task(self, payload: dict) -> dict:
             pass
 
 
+def _make_cancel_check(task):
+    def cancel_check():
+        if check_cancel_flag(task.request.id):
+            raise Exception('__CANCELLED__')
+    return cancel_check
+
+
 def _make_progress_callback(task):
     def progress_callback(current: int, total: int, elapsed: float, phase: str = 'computing'):
         if total <= 0:
@@ -189,6 +196,9 @@ def run_retirement_task(self, payload: dict) -> dict:
             record_task_duration(time.time() - _t)
             return {'status': 'SUCCESS', 'result': result}
         except Exception as e:
+            if check_cancel_flag(self.request.id):
+                clear_cancel_flag(self.request.id)
+                return {'status': 'CANCELLED'}
             import traceback
             return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
     return _task_wrap(_run, self.request.id)
@@ -205,6 +215,9 @@ def run_backtest_task(self, payload: dict) -> dict:
             record_task_duration(time.time() - _t)
             return {'status': 'SUCCESS', 'result': result}
         except Exception as e:
+            if check_cancel_flag(self.request.id):
+                clear_cancel_flag(self.request.id)
+                return {'status': 'CANCELLED'}
             import traceback
             return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
     return _task_wrap(_run, self.request.id)
@@ -213,14 +226,18 @@ def run_backtest_task(self, payload: dict) -> dict:
 @celery.task(bind=True)
 def run_dividend_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
+    cc = _make_cancel_check(self)
     _t = time.time()
     def _run():
         try:
             from dividend_logic import run_dividend_scenario_logic
-            result = run_dividend_scenario_logic(payload, progress_callback=cb)
+            result = run_dividend_scenario_logic(payload, progress_callback=cb, cancel_check=cc)
             record_task_duration(time.time() - _t)
             return {'status': 'SUCCESS', 'result': result}
         except Exception as e:
+            if check_cancel_flag(self.request.id):
+                clear_cancel_flag(self.request.id)
+                return {'status': 'CANCELLED'}
             import traceback
             return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
     return _task_wrap(_run, self.request.id)

@@ -344,15 +344,17 @@ class DividendSimulator:
             return None
         return max(0.0, (logit(target_prob) - b) / k)
 
-    def _find_anchor_years(self, seed, monthly, target_monthly_div, probability):
+    def _find_anchor_years(self, seed, monthly, target_monthly_div, probability, cancel_check=None):
         checkpoints = [1, 5, 10, 15, 20, 25, 30]
         lo_y, lo_p = 1, 0.0
         for y in checkpoints:
+            if cancel_check: cancel_check()
             p = self._calc_prob(self._run_rolling(seed, monthly, y), target_monthly_div)
             if p >= probability:
                 hi_y = y
                 # lo~hi 사이를 1년 단위로 스윕 (early stop)
                 for yy in range(lo_y, hi_y + 1):
+                    if cancel_check: cancel_check()
                     pp = self._calc_prob(self._run_rolling(seed, monthly, yy), target_monthly_div)
                     if pp >= probability:
                         return float(yy)
@@ -360,11 +362,12 @@ class DividendSimulator:
             lo_y, lo_p = y, p
         return None
 
-    def _find_anchor_seed(self, monthly, years, target_monthly_div, probability):
+    def _find_anchor_seed(self, monthly, years, target_monthly_div, probability, cancel_check=None):
         step = target_monthly_div * 10
         xs, probs = [], []
         # 1단계: 고정 스텝 8번 스윕
         for i in range(8):
+            if cancel_check: cancel_check()
             s = step * i
             p = self._calc_prob(self._run_rolling(s, monthly, years), target_monthly_div)
             xs.append(s)
@@ -377,6 +380,7 @@ class DividendSimulator:
         # 2단계: 못 찾으면 지수 탐색으로 범위 확장
         s = step * 8
         for _ in range(10):
+            if cancel_check: cancel_check()
             p = self._calc_prob(self._run_rolling(s, monthly, years), target_monthly_div)
             xs.append(s)
             probs.append(p)
@@ -388,11 +392,12 @@ class DividendSimulator:
             s *= 2
         return None
 
-    def _find_anchor_monthly(self, seed, years, target_monthly_div, probability):
+    def _find_anchor_monthly(self, seed, years, target_monthly_div, probability, cancel_check=None):
         step = target_monthly_div * 0.5
         xs, probs = [], []
         # 1단계: 고정 스텝 8번 스윕
         for i in range(8):
+            if cancel_check: cancel_check()
             m = step * i
             p = self._calc_prob(self._run_rolling(seed, m, years), target_monthly_div)
             xs.append(m)
@@ -405,6 +410,7 @@ class DividendSimulator:
         # 2단계: 못 찾으면 지수 탐색으로 범위 확장
         m = step * 8
         for _ in range(10):
+            if cancel_check: cancel_check()
             p = self._calc_prob(self._run_rolling(seed, m, years), target_monthly_div)
             xs.append(m)
             probs.append(p)
@@ -606,6 +612,7 @@ class DividendSimulator:
         opt_seed, opt_monthly, opt_years,
         seed_cfg, monthly_cfg, years_cfg,
         progress_callback=None,
+        cancel_check=None,
     ) -> dict:
         """최적화 모드: 탐색 변수 각 값에 대해 최적화 변수 역산 → 등위선"""
 
@@ -614,13 +621,13 @@ class DividendSimulator:
         # 탐색 없이 최적화만 → 단일값 반환
         if vary_count == 0:
             if opt_seed:
-                v = self._find_anchor_seed(monthly_cfg['center'], years_cfg['center'], target_monthly_div, probability)
+                v = self._find_anchor_seed(monthly_cfg['center'], years_cfg['center'], target_monthly_div, probability, cancel_check=cancel_check)
                 return {"mode": "probability", "result": {"solved_seed": v, "probability": probability}}
             elif opt_monthly:
-                v = self._find_anchor_monthly(seed_cfg['center'], years_cfg['center'], target_monthly_div, probability)
+                v = self._find_anchor_monthly(seed_cfg['center'], years_cfg['center'], target_monthly_div, probability, cancel_check=cancel_check)
                 return {"mode": "probability", "result": {"solved_monthly": v, "probability": probability}}
             else:
-                v = self._find_anchor_years(seed_cfg['center'], monthly_cfg['center'], target_monthly_div, probability)
+                v = self._find_anchor_years(seed_cfg['center'], monthly_cfg['center'], target_monthly_div, probability, cancel_check=cancel_check)
                 return {"mode": "probability", "result": {"solved_years": v, "probability": probability}}
 
         # 탐색 1개 → X축 = 탐색 변수, Y축 = 최적화 변수 (등위선 1개)
@@ -687,11 +694,11 @@ class DividendSimulator:
             for xv in x_vals:
                 s, m, y = get_s(xv, lv), get_m(xv, lv), get_y(xv, lv)
                 if opt_seed:
-                    opt_val = self._find_anchor_seed(m, y, target_monthly_div, probability)
+                    opt_val = self._find_anchor_seed(m, y, target_monthly_div, probability, cancel_check=cancel_check)
                 elif opt_monthly:
-                    opt_val = self._find_anchor_monthly(s, y, target_monthly_div, probability)
+                    opt_val = self._find_anchor_monthly(s, y, target_monthly_div, probability, cancel_check=cancel_check)
                 else:
-                    opt_val = self._find_anchor_years(s, m, target_monthly_div, probability)
+                    opt_val = self._find_anchor_years(s, m, target_monthly_div, probability, cancel_check=cancel_check)
                 if opt_val is not None:
                     points.append({x_key: xv, opt_key: opt_val})
                 done += 1
@@ -740,6 +747,7 @@ class DividendSimulator:
         monthly_cfg:        dict,
         years_cfg:          dict,
         progress_callback=None,
+        cancel_check=None,
     ) -> dict:
         import time as _t
         _scenario_start = _t.time()
@@ -778,6 +786,7 @@ class DividendSimulator:
                 opt_seed, opt_monthly, opt_years,
                 seed_cfg, monthly_cfg, years_cfg,
                 progress_callback=progress_callback,
+                cancel_check=cancel_check,
             )
 
         if vary_count == 3:

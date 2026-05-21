@@ -14,7 +14,7 @@ def _get_portfolio_engine():
     return _portfolio_engine
 
 
-def run_dividend_scenario_logic(body: dict, progress_callback=None) -> dict:
+def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check=None) -> dict:
     from modules.dividend_simulator import DividendSimulator
 
     portfolio_engine = _get_portfolio_engine()
@@ -42,4 +42,5 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None) -> dict:
         monthly_cfg        = monthly_cfg,
         years_cfg          = years_cfg,
         progress_callback  = progress_callback,
+        cancel_check       = cancel_check,
     )

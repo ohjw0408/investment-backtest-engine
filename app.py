@@ -409,7 +409,6 @@ def cancel_task(task_id: str):
     from celery_app import celery as celery_app
     from tasks import _remove_from_queue, set_cancel_flag
     set_cancel_flag(task_id)
-    celery_app.control.revoke(task_id, terminate=True)
     _remove_from_queue(task_id)
     return jsonify({'ok': True})
 

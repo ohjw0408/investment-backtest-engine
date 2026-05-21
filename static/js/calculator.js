@@ -5,7 +5,17 @@
 // ── 상태 ──
 const tickers = [];
 let searchTimer  = null;
-const chartInstances = {};  // 모든 차트 인스턴스 관리
+const chartInstances = {};
+let _calcTaskId = null, _calcCancelled = false;
+
+// ── 취소 ──
+async function cancelCalcTask() {
+  _calcCancelled = true;
+  const tid = _calcTaskId;
+  if (tid) {
+    try { await fetch(`/api/task/${tid}/cancel`, {method:'POST'}); } catch(e) {}
+  }
+}
 
 // ── 초기화 ──
 document.addEventListener('DOMContentLoaded', () => {
@@ -75,6 +85,52 @@ document.addEventListener('DOMContentLoaded', () => {
       dropdown.style.display = 'none';
     }
   });
+
+  // ── 페이지 복원 ──
+  (async () => {
+    const taskSaved = localStorage.getItem('mm_task_calculator');
+    if (taskSaved) {
+      try {
+        const state = JSON.parse(taskSaved);
+        if (Date.now() - state.timestamp < 3600000) {
+          _calcTaskId = state.task_id;
+          document.getElementById('runBtn').disabled = true;
+          showProgressUI();
+          try {
+            const result = await pollTask(state.task_id);
+            if (result) {
+              hideProgressUI();
+              renderResult(result, state.payload || {});
+              localStorage.setItem('mm_result_calculator', JSON.stringify({result, payload: state.payload, ts: Date.now()}));
+            }
+          } catch(e) {
+            if (e.message !== 'CANCELLED') hideProgressUI();
+          } finally {
+            localStorage.removeItem('mm_task_calculator');
+            _calcTaskId = null;
+            document.getElementById('runBtn').disabled = false;
+            document.getElementById('runBtnText').style.display = 'inline';
+            document.getElementById('runBtnSpinner').style.display = 'none';
+            hideProgressUI();
+          }
+          return;
+        }
+      } catch(e) {}
+      localStorage.removeItem('mm_task_calculator');
+    }
+
+    const resultSaved = localStorage.getItem('mm_result_calculator');
+    if (resultSaved) {
+      try {
+        const {result, payload, ts} = JSON.parse(resultSaved);
+        if (Date.now() - ts < 7200000) {
+          renderResult(result, payload || {});
+        } else {
+          localStorage.removeItem('mm_result_calculator');
+        }
+      } catch(e) { localStorage.removeItem('mm_result_calculator'); }
+    }
+  })();
 });
 
 function badgeColor(badge) {
@@ -235,18 +291,29 @@ async function runCalculator() {
     const submitData = await submitRes.json();
     if (submitRes.status === 429) throw new Error(submitData.error);
     const { task_id } = submitData;
+    _calcTaskId = task_id;
+    localStorage.removeItem('mm_result_calculator');
+    localStorage.setItem('mm_task_calculator', JSON.stringify({task_id, payload, timestamp: Date.now()}));
 
     const result = await pollTask(task_id);
 
     hideProgressUI();
-    renderResult(result, payload);
+    if (result) {
+      renderResult(result, payload);
+      localStorage.setItem('mm_result_calculator', JSON.stringify({result, payload, ts: Date.now()}));
+    }
   } catch (err) {
-    hideProgressUI();
-    alert('오류: ' + err.message);
+    if (err.message !== 'CANCELLED') {
+      hideProgressUI();
+      alert('오류: ' + err.message);
+    }
   } finally {
+    localStorage.removeItem('mm_task_calculator');
+    _calcTaskId = null;
     btn.disabled = false;
     document.getElementById('runBtnText').style.display    = 'inline';
     document.getElementById('runBtnSpinner').style.display = 'none';
+    hideProgressUI();
   }
 }
 
@@ -256,7 +323,9 @@ async function pollTask(taskId, maxWait = 600000) {
   let _initialRank = null;
 
   while (Date.now() - start < maxWait) {
+    if (_calcCancelled) { _calcCancelled = false; throw new Error('CANCELLED'); }
     await new Promise(r => setTimeout(r, 1500));
+    if (_calcCancelled) { _calcCancelled = false; throw new Error('CANCELLED'); }
 
     const res  = await fetch(`/api/task/${taskId}`);
     const data = await res.json();
@@ -320,6 +389,9 @@ function showProgressUI() {
       <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
         <span id="progressDetail">가격 데이터 로딩 중...</span>
         <span id="progressEta"></span>
+      </div>
+      <div style="text-align:center;margin-top:10px;">
+        <button onclick="cancelCalcTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:white;color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
       </div>
     </div>`;
   document.getElementById('resultContent').style.display = 'none';

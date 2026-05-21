@@ -15,13 +15,20 @@ from modules.auth_manager import (
 
 load_dotenv()
 
-import sentry_sdk
-from sentry_sdk.integrations.flask import FlaskIntegration
+try:
+    import sentry_sdk  # type: ignore[import-untyped]
+    from sentry_sdk.integrations.flask import FlaskIntegration as _FlaskIntegration  # type: ignore[import-untyped]
+    _sentry_available = True
+except ImportError:
+    sentry_sdk = None  # type: ignore[assignment]
+    _FlaskIntegration = None  # type: ignore[assignment]
+    _sentry_available = False
+
 _sentry_dsn = os.environ.get('SENTRY_DSN', '')
-if _sentry_dsn:
+if _sentry_dsn and _sentry_available:
     sentry_sdk.init(
         dsn=_sentry_dsn,
-        integrations=[FlaskIntegration()],
+        integrations=[_FlaskIntegration()],
         traces_sample_rate=0,
         send_default_pii=False,
     )

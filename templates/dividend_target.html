@@ -580,6 +580,7 @@ async function dtPollTask(taskId, maxWait = 600000) {
         const result = data.result;
         if (result.error) { alert('오류: '+result.error); document.getElementById('dtResultEmpty').style.display='block'; return; }
         renderResult(result, window._dtLastBody || {});
+        try { localStorage.setItem('mm_result_dividend', JSON.stringify({result, body: window._dtLastBody, ts: Date.now()})); } catch(e) {}
         return;
       }
       if (data.status === 'FAILURE') {
@@ -661,28 +662,43 @@ async function dtCancelTask() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const saved = localStorage.getItem('mm_task_dividend');
-  if (!saved) return;
-  let state;
-  try { state = JSON.parse(saved); } catch(e) { localStorage.removeItem('mm_task_dividend'); return; }
-  if (Date.now() - state.timestamp > 3600000) { localStorage.removeItem('mm_task_dividend'); return; }
-  _dtTaskId = state.task_id;
-  if (state.body) window._dtLastBody = state.body;
-  const btn = document.getElementById('dtRunBtn');
-  if (btn) btn.disabled = true;
-  document.getElementById('dtLoading').style.display = 'block';
-  document.getElementById('dtResultEmpty').style.display = 'none';
-  try {
-    await dtPollTask(state.task_id);
-  } catch(e) {
-    if (e.message !== 'CANCELLED') {
-      document.getElementById('dtResultEmpty').style.display = 'block';
+  const taskSaved = localStorage.getItem('mm_task_dividend');
+  if (taskSaved) {
+    let state;
+    try { state = JSON.parse(taskSaved); } catch(e) { localStorage.removeItem('mm_task_dividend'); }
+    if (state && Date.now() - state.timestamp < 3600000) {
+      _dtTaskId = state.task_id;
+      if (state.body) window._dtLastBody = state.body;
+      const btn = document.getElementById('dtRunBtn');
+      if (btn) btn.disabled = true;
+      document.getElementById('dtLoading').style.display = 'block';
+      document.getElementById('dtResultEmpty').style.display = 'none';
+      try {
+        await dtPollTask(state.task_id);
+      } catch(e) {
+        document.getElementById('dtResultEmpty').style.display = 'block';
+      } finally {
+        localStorage.removeItem('mm_task_dividend');
+        _dtTaskId = null;
+        if (btn) { btn.disabled = false; document.getElementById('dtRunBtnText').textContent = '시뮬레이션 실행'; document.getElementById('dtRunBtnSpinner').style.display = 'none'; }
+        dtHideProgressUI();
+      }
+      return;
     }
-  } finally {
     localStorage.removeItem('mm_task_dividend');
-    _dtTaskId = null;
-    if (btn) { btn.disabled = false; document.getElementById('dtRunBtnText').textContent = '시뮬레이션 실행'; document.getElementById('dtRunBtnSpinner').style.display = 'none'; }
-    dtHideProgressUI();
+  }
+
+  const resultSaved = localStorage.getItem('mm_result_dividend');
+  if (resultSaved) {
+    try {
+      const {result, body, ts} = JSON.parse(resultSaved);
+      if (Date.now() - ts < 7200000) {
+        window._dtLastBody = body || {};
+        renderResult(result, body || {});
+      } else {
+        localStorage.removeItem('mm_result_dividend');
+      }
+    } catch(e) { localStorage.removeItem('mm_result_dividend'); }
   }
 });
 

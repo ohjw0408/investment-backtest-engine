@@ -432,18 +432,20 @@ async function runBacktest() {
     if (res.status === 429) throw new Error(resData.error);
     const { task_id } = resData;
     _btTaskId = task_id;
+    localStorage.removeItem('mm_result_backtest');
     localStorage.setItem('mm_task_backtest', JSON.stringify({task_id, timestamp: Date.now()}));
     await btPollTask(task_id);
   } catch(e) {
     if (e.message !== 'CANCELLED') {
       alert('오류: ' + e.message);
-      btHideProgressUI();
-      document.getElementById('btResultEmpty').style.display = 'flex';
     }
+    document.getElementById('btResultEmpty').style.display = 'flex';
+    document.getElementById('btResultContent').style.display = 'none';
   } finally {
     localStorage.removeItem('mm_task_backtest');
     _btTaskId = null;
     document.getElementById('btRunBtn').disabled = false;
+    btHideProgressUI();
   }
 }
 
@@ -483,7 +485,9 @@ async function btPollTask(taskId, maxWait = 600000) {
       }
       if (data.status === 'SUCCESS') {
         btHideProgressUI();
-        renderBacktest(data.result?.result ?? data.result);
+        const btResult = data.result?.result ?? data.result;
+        renderBacktest(btResult);
+        try { localStorage.setItem('mm_result_backtest', JSON.stringify({result: btResult, ts: Date.now()})); } catch(e) {}
         return;
       }
       if (data.status === 'FAILURE') {
@@ -554,26 +558,40 @@ async function btCancelTask() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const saved = localStorage.getItem('mm_task_backtest');
-  if (!saved) return;
-  let state;
-  try { state = JSON.parse(saved); } catch(e) { localStorage.removeItem('mm_task_backtest'); return; }
-  if (Date.now() - state.timestamp > 3600000) { localStorage.removeItem('mm_task_backtest'); return; }
-  _btTaskId = state.task_id;
-  document.getElementById('btRunBtn').disabled = true;
-  btShowProgressUI();
-  try {
-    await btPollTask(state.task_id);
-  } catch(e) {
-    if (e.message !== 'CANCELLED') {
-      btHideProgressUI();
-      document.getElementById('btResultEmpty').style.display = 'flex';
+  const taskSaved = localStorage.getItem('mm_task_backtest');
+  if (taskSaved) {
+    let state;
+    try { state = JSON.parse(taskSaved); } catch(e) { localStorage.removeItem('mm_task_backtest'); }
+    if (state && Date.now() - state.timestamp < 3600000) {
+      _btTaskId = state.task_id;
+      document.getElementById('btRunBtn').disabled = true;
+      btShowProgressUI();
+      try {
+        await btPollTask(state.task_id);
+      } catch(e) {
+        document.getElementById('btResultEmpty').style.display = 'flex';
+        document.getElementById('btResultContent').style.display = 'none';
+      } finally {
+        localStorage.removeItem('mm_task_backtest');
+        _btTaskId = null;
+        document.getElementById('btRunBtn').disabled = false;
+        btHideProgressUI();
+      }
+      return;
     }
-  } finally {
     localStorage.removeItem('mm_task_backtest');
-    _btTaskId = null;
-    document.getElementById('btRunBtn').disabled = false;
-    btHideProgressUI();
+  }
+
+  const resultSaved = localStorage.getItem('mm_result_backtest');
+  if (resultSaved) {
+    try {
+      const {result, ts} = JSON.parse(resultSaved);
+      if (Date.now() - ts < 7200000) {
+        renderBacktest(result);
+      } else {
+        localStorage.removeItem('mm_result_backtest');
+      }
+    } catch(e) { localStorage.removeItem('mm_result_backtest'); }
   }
 });
 

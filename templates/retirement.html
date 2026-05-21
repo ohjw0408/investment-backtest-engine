@@ -703,9 +703,13 @@ async function runRetirement() {
     if (submitRes.status === 429) throw new Error(submitData.error);
     const { task_id } = submitData;
     _retTaskId = task_id;
+    localStorage.removeItem('mm_result_retirement');
     localStorage.setItem('mm_task_retirement', JSON.stringify({task_id, body, timestamp: Date.now()}));
     const data = await retPollTask(task_id);
-    if (data) renderRetirement(data, body);
+    if (data) {
+      renderRetirement(data, body);
+      try { localStorage.setItem('mm_result_retirement', JSON.stringify({result: data, body, ts: Date.now()})); } catch(e) {}
+    }
   } catch(e) {
     if (e.message !== 'CANCELLED') alert('오류가 발생했습니다: ' + e.message);
   } finally {
@@ -815,28 +819,45 @@ async function retCancelTask() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const saved = localStorage.getItem('mm_task_retirement');
-  if (!saved) return;
-  let state;
-  try { state = JSON.parse(saved); } catch(e) { localStorage.removeItem('mm_task_retirement'); return; }
-  if (Date.now() - state.timestamp > 3600000) { localStorage.removeItem('mm_task_retirement'); return; }
-  _retTaskId = state.task_id;
-  document.getElementById('retRunBtn').disabled = true;
-  document.getElementById('retLoading').style.display = 'block';
-  document.getElementById('retResultEmpty').style.display = 'none';
-  retShowProgressUI();
-  try {
-    const data = await retPollTask(state.task_id);
-    if (data) renderRetirement(data, state.body || {});
-  } catch(e) {
-    if (e.message !== 'CANCELLED') {
-      document.getElementById('retResultEmpty').style.display = 'block';
+  const taskSaved = localStorage.getItem('mm_task_retirement');
+  if (taskSaved) {
+    let state;
+    try { state = JSON.parse(taskSaved); } catch(e) { localStorage.removeItem('mm_task_retirement'); }
+    if (state && Date.now() - state.timestamp < 3600000) {
+      _retTaskId = state.task_id;
+      document.getElementById('retRunBtn').disabled = true;
+      document.getElementById('retLoading').style.display = 'block';
+      document.getElementById('retResultEmpty').style.display = 'none';
+      retShowProgressUI();
+      try {
+        const data = await retPollTask(state.task_id);
+        if (data) {
+          renderRetirement(data, state.body || {});
+          try { localStorage.setItem('mm_result_retirement', JSON.stringify({result: data, body: state.body, ts: Date.now()})); } catch(e) {}
+        }
+      } catch(e) {
+        document.getElementById('retResultEmpty').style.display = 'block';
+      } finally {
+        localStorage.removeItem('mm_task_retirement');
+        _retTaskId = null;
+        document.getElementById('retRunBtn').disabled = false;
+        document.getElementById('retLoading').style.display = 'none';
+      }
+      return;
     }
-  } finally {
     localStorage.removeItem('mm_task_retirement');
-    _retTaskId = null;
-    document.getElementById('retRunBtn').disabled = false;
-    document.getElementById('retLoading').style.display = 'none';
+  }
+
+  const resultSaved = localStorage.getItem('mm_result_retirement');
+  if (resultSaved) {
+    try {
+      const {result, body, ts} = JSON.parse(resultSaved);
+      if (Date.now() - ts < 7200000) {
+        renderRetirement(result, body || {});
+      } else {
+        localStorage.removeItem('mm_result_retirement');
+      }
+    } catch(e) { localStorage.removeItem('mm_result_retirement'); }
   }
 });
 

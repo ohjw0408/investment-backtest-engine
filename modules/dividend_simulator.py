@@ -716,8 +716,9 @@ class DividendSimulator:
         return [v for v in vals if v >= min_val]
 
     def _preload_all(self, progress_callback=None):
-        import time as _t
         n = len(self.tickers)
+        if progress_callback:
+            progress_callback(current=0, total=max(n, 1), elapsed=0, phase='loading')
         for i, ticker in enumerate(self.tickers):
             self._load(ticker)
             if progress_callback:

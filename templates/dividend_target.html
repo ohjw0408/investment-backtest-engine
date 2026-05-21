@@ -532,8 +532,10 @@ async function runDividendTarget() {
 async function dtPollTask(taskId, maxWait = 600000) {
   const deadline = Date.now() + maxWait;
   let _initialRank = null;
+  let _pollCount = 0;
   while (Date.now() < deadline) {
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, _pollCount < 10 ? 300 : 1500));
+    _pollCount++;
     try {
       const res  = await fetch(`/api/task/${taskId}`);
       const data = await res.json();
@@ -613,10 +615,16 @@ function dtUpdateProgressUI({ phase, queueRank, isWaiting, isLoading, avgDuratio
     const wm = Math.floor(w / 60), ws = w % 60;
     if (etaEl) etaEl.textContent = queueRank > 0 ? (wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`) : '';
   } else if (isLoading) {
-    if (barEl) { barEl.dataset.anim = ''; barEl.style.animation = ''; barEl.style.transition = 'width 0.4s ease'; barEl.style.left = '0%'; barEl.style.width = percent + '%'; }
-    if (phaseEl)  phaseEl.textContent  = `⬇ 데이터 로딩 중 (${percent}%)`;
-    if (detailEl) detailEl.textContent = total > 0 ? `${current} / ${total} 종목` : '종목 데이터 로딩 중...';
-    if (etaEl)    etaEl.textContent    = '';
+    if (percent > 0) {
+      if (barEl) { barEl.dataset.anim = ''; barEl.style.animation = ''; barEl.style.transition = 'width 0.4s ease'; barEl.style.left = '0%'; barEl.style.width = percent + '%'; }
+      if (phaseEl)  phaseEl.textContent  = `⬇ 데이터 로딩 중 (${percent}%)`;
+      if (detailEl) detailEl.textContent = total > 0 && current > 0 ? `${current} / ${total} 종목 완료` : '종목 데이터 로딩 중...';
+    } else {
+      _dtSetAnim(barEl);
+      if (phaseEl)  phaseEl.textContent  = '⬇ 데이터 로딩 중...';
+      if (detailEl) detailEl.textContent = '종목 데이터 로딩 중...';
+    }
+    if (etaEl) etaEl.textContent = '';
   } else if (percent > 0) {
     if (barEl) { barEl.dataset.anim = ''; barEl.style.animation = ''; barEl.style.transition = 'width 0.4s ease'; barEl.style.left = '0%'; barEl.style.width = percent + '%'; }
     if (phaseEl)  phaseEl.textContent  = `🔄 ${phase || '계산 중'} (${percent}%)`;

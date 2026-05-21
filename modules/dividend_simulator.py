@@ -715,6 +715,14 @@ class DividendSimulator:
         vals = [center + step * i for i in range(-n, n + 1)]
         return [v for v in vals if v >= min_val]
 
+    def _preload_all(self, progress_callback=None):
+        import time as _t
+        n = len(self.tickers)
+        for i, ticker in enumerate(self.tickers):
+            self._load(ticker)
+            if progress_callback:
+                progress_callback(current=i + 1, total=n, elapsed=0, phase='loading')
+
     def run_scenario(
         self,
         target_monthly_div: float,
@@ -726,6 +734,8 @@ class DividendSimulator:
     ) -> dict:
         import time as _t
         _scenario_start = _t.time()
+        if progress_callback:
+            self._preload_all(progress_callback)
         seed_mode    = seed_cfg.get('mode', 'fixed')
         monthly_mode = monthly_cfg.get('mode', 'fixed')
         years_mode   = years_cfg.get('mode', 'fixed')

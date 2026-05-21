@@ -551,13 +551,15 @@ async function dtPollTask(taskId, maxWait = 600000) {
         continue;
       }
       if (data.status === 'PROGRESS') {
+        const isLoading = data.phase === 'loading';
         dtUpdateProgressUI({
-          phase:    '시뮬레이션 중...',
+          phase:     isLoading ? '데이터 로딩 중' : '시뮬레이션 중...',
           isWaiting: false,
-          percent:  data.percent || 0,
-          current:  data.current || 0,
-          total:    data.total   || 0,
-          eta:      data.eta,
+          isLoading,
+          percent:   data.percent || 0,
+          current:   data.current || 0,
+          total:     data.total   || 0,
+          eta:       isLoading ? null : data.eta,
         });
         continue;
       }
@@ -598,7 +600,7 @@ function _dtSetAnim(barEl) {
   barEl.style.width      = '40%';
   barEl.dataset.anim     = '1';
 }
-function dtUpdateProgressUI({ phase, queueRank, isWaiting, avgDuration, percent, current, total, eta }) {
+function dtUpdateProgressUI({ phase, queueRank, isWaiting, isLoading, avgDuration, percent, current, total, eta }) {
   const phaseEl  = document.getElementById('dtProgressPhase');
   const barEl    = document.getElementById('dtProgressBar');
   const detailEl = document.getElementById('dtProgressDetail');
@@ -610,6 +612,11 @@ function dtUpdateProgressUI({ phase, queueRank, isWaiting, avgDuration, percent,
     const w = queueRank * (avgDuration || 30);
     const wm = Math.floor(w / 60), ws = w % 60;
     if (etaEl) etaEl.textContent = queueRank > 0 ? (wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`) : '';
+  } else if (isLoading) {
+    if (barEl) { barEl.dataset.anim = ''; barEl.style.animation = ''; barEl.style.transition = 'width 0.4s ease'; barEl.style.left = '0%'; barEl.style.width = percent + '%'; }
+    if (phaseEl)  phaseEl.textContent  = `⬇ 데이터 로딩 중 (${percent}%)`;
+    if (detailEl) detailEl.textContent = total > 0 ? `${current} / ${total} 종목` : '종목 데이터 로딩 중...';
+    if (etaEl)    etaEl.textContent    = '';
   } else if (percent > 0) {
     if (barEl) { barEl.dataset.anim = ''; barEl.style.animation = ''; barEl.style.transition = 'width 0.4s ease'; barEl.style.left = '0%'; barEl.style.width = percent + '%'; }
     if (phaseEl)  phaseEl.textContent  = `🔄 ${phase || '계산 중'} (${percent}%)`;
@@ -738,7 +745,7 @@ function drawScenarioChart(data, flipped) {
       label: line.label||'달성 확률',
       data: allX.map(xv=>{ const pt=line.points.find(p=>p[xKey]===xv); return pt?Math.round((pt.probability||0)*100):null; }),
       borderColor:palette[i%palette.length], backgroundColor:palette[i%palette.length]+'15',
-      fill:lines.length===1, tension:0.35, pointRadius:5, pointHoverRadius:7, borderWidth:2.5, spanGaps:true,
+      fill:lines.length===1, cubicInterpolationMode:'monotone', pointRadius:5, pointHoverRadius:7, borderWidth:2.5, spanGaps:true,
     }))},
     options:{
       responsive:true, maintainAspectRatio:false,
@@ -794,7 +801,7 @@ function drawIsocurveChart(data) {
     borderColor: palette[i % palette.length],
     backgroundColor: palette[i % palette.length] + '15',
     fill: lines.length === 1,
-    tension: 0.35,
+    cubicInterpolationMode: 'monotone',
     pointRadius: 6, pointHoverRadius: 8,
     pointBackgroundColor: palette[i % palette.length],
     borderWidth: 2.5,

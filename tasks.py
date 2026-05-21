@@ -69,7 +69,7 @@ def run_simulation_task(self, payload: dict) -> dict:
     except Exception:
         pass
 
-    def progress_callback(current: int, total: int, elapsed: float):
+    def progress_callback(current: int, total: int, elapsed: float, phase: str = 'computing'):
         eta = (elapsed / current * (total - current)) if current > 0 else None
         self.update_state(
             state='PROGRESS',
@@ -80,6 +80,7 @@ def run_simulation_task(self, payload: dict) -> dict:
                 'elapsed':   round(elapsed),
                 'eta':       round(eta) if eta is not None else None,
                 'queue_pos': 0,
+                'phase':     phase,
             }
         )
 
@@ -103,7 +104,7 @@ def run_simulation_task(self, payload: dict) -> dict:
 
 
 def _make_progress_callback(task):
-    def progress_callback(current: int, total: int, elapsed: float):
+    def progress_callback(current: int, total: int, elapsed: float, phase: str = 'computing'):
         if total <= 0:
             return
         eta = (elapsed / current * (total - current)) if current > 0 else None
@@ -116,6 +117,7 @@ def _make_progress_callback(task):
                 'elapsed':   round(elapsed),
                 'eta':       round(eta) if eta is not None else None,
                 'queue_pos': 0,
+                'phase':     phase,
             }
         )
     return progress_callback

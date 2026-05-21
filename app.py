@@ -421,6 +421,7 @@ def task_status(task_id: str):
             'total':   meta.get('total', 0),
             'elapsed': meta.get('elapsed', 0),
             'eta':     meta.get('eta'),
+            'phase':   meta.get('phase', 'computing'),
         })
 
     elif task.state == 'SUCCESS':

@@ -563,7 +563,7 @@ async function dtPollTask(taskId, maxWait = 600000) {
       }
       if (data.status === 'SUCCESS') {
         dtHideProgressUI();
-        const result = data.result?.result ?? data.result;
+        const result = data.result;
         if (result.error) { alert('오류: '+result.error); document.getElementById('dtResultEmpty').style.display='block'; return; }
         renderResult(result, window._dtLastBody || {});
         return;

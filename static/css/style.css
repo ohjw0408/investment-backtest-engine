@@ -313,14 +313,6 @@ a { text-decoration: none; color: inherit; }
   grid-template-columns: 1fr 1fr 1fr;
 }
 
-/* rows 0-2: 3 cols, rows 3-4: span halves */
-.market-item:nth-child(4),
-.market-item:nth-child(5) {
-  grid-column: span 1;
-}
-
-.market-item:nth-child(4) { border-right: 1px solid var(--border) !important; }
-.market-item:nth-child(5) { grid-column: span 2; }
 
 .market-loading {
   padding: 30px;

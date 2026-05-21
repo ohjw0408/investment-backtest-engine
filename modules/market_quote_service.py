@@ -85,7 +85,9 @@ class MarketQuoteService:
         hist = yf.Ticker(info["ticker"]).history(period="1mo")
         if hist.empty or len(hist) < 2:
             return None
-        closes  = hist["Close"]
+        closes  = hist["Close"].dropna()
+        if len(closes) < 2:
+            return None
         current = float(closes.iloc[-1])
         prev    = float(closes.iloc[-2])
         change  = round((current - prev) / prev * 100, 2)

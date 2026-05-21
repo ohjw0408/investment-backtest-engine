@@ -605,6 +605,7 @@ class DividendSimulator:
         vary_seed, vary_monthly, vary_years,
         opt_seed, opt_monthly, opt_years,
         seed_cfg, monthly_cfg, years_cfg,
+        progress_callback=None,
     ) -> dict:
         """최적화 모드: 탐색 변수 각 값에 대해 최적화 변수 역산 → 등위선"""
 
@@ -676,6 +677,10 @@ class DividendSimulator:
         line_label = ('초기 투자금' if line_key == 'seed' else '월 적립금' if line_key == 'monthly' else '투자 기간') if line_key else None
         line_label_of = lambda v: fmtKRW_py(v) if line_key != 'years' else f'{v}년'
 
+        import time as _t
+        _opt_start = _t.time()
+        total_pts = len(line_vals) * len(x_vals)
+        done = 0
         lines = []
         for lv in line_vals:
             points = []
@@ -689,6 +694,9 @@ class DividendSimulator:
                     opt_val = self._find_anchor_years(s, m, target_monthly_div, probability)
                 if opt_val is not None:
                     points.append({x_key: xv, opt_key: opt_val})
+                done += 1
+                if progress_callback:
+                    progress_callback(current=done, total=total_pts, elapsed=_t.time() - _opt_start)
 
             lbl = None if lv is None else (
                 f'{line_label}={lv//10000}만' if line_key in ("seed","monthly") else f'{line_label}={lv}년'
@@ -769,6 +777,7 @@ class DividendSimulator:
                 vary_seed, vary_monthly, vary_years,
                 opt_seed, opt_monthly, opt_years,
                 seed_cfg, monthly_cfg, years_cfg,
+                progress_callback=progress_callback,
             )
 
         if vary_count == 3:

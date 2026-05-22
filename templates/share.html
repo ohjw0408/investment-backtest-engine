@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  {% set t = data.get('t', '') %}
+  {% set m = data.get('m', {}) %}
+  {% set label = data.get('label', '') %}
+  {% set period = data.get('period', '') %}
+
+  {% if t == 'bt' %}
+    {% set og_title = label + ' 백테스트 결과' if label else '포트폴리오 백테스트 결과' %}
+    {% set og_desc = 'CAGR ' + (m.get('cagr', 0)|round(1)|string) + '% | MDD ' + (m.get('mdd', 0)|round(1)|string) + '% | Sharpe ' + (m.get('sharpe', 0)|round(2)|string) + ' | ' + period %}
+  {% elif t == 'calc' %}
+    {% set og_title = label + ' 롤링 시뮬레이션' if label else '롤링 투자 시뮬레이션' %}
+    {% set og_desc = '중간값 ' + (m.get('p50', 0)|round(1)|string) + '억 | CAGR ' + (m.get('cagr', 0)|round(1)|string) + '% | ' + (data.get('years', 0)|string) + '년 시뮬레이션' %}
+  {% elif t == 'div' %}
+    {% set og_title = '배당금 계산기 결과' %}
+    {% set og_desc = '목표 월 배당 ' + (m.get('target_monthly', 0)|string) + '만원 | 필요 월 납입 ' + (m.get('solved_monthly', 0)|string) + '만원' %}
+  {% elif t == 'ret' %}
+    {% set og_title = '은퇴 설계 결과' %}
+    {% set og_desc = '자산 생존 확률 ' + (m.get('survival', 0)|round(1)|string) + '% | 초기 자산 ' + (m.get('initial', 0)|round(1)|string) + '억 | 월 인출 ' + (m.get('monthly', 0)|string) + '만원' %}
+  {% else %}
+    {% set og_title = 'Money Milestone 분석 결과' %}
+    {% set og_desc = '투자 계산기, 포트폴리오 백테스트, 배당금 계산기' %}
+  {% endif %}
+
+  <title>{{ og_title }} — Money Milestone</title>
+  <meta name="description" content="{{ og_desc }}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ og_title }}">
+  <meta property="og:description" content="{{ og_desc }}">
+  <meta property="og:url" content="{{ base_url }}/share?d={{ d }}">
+  {% if d %}
+  <meta property="og:image" content="{{ base_url }}/share/og-thumb?d={{ d }}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ base_url }}/share/og-thumb?d={{ d }}">
+  {% endif %}
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans KR', sans-serif; background: #F0F4F8; color: #1A2332; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 32px 16px; }
+    .share-wrap { width: 100%; max-width: 700px; }
+    .share-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; font-size: 1.1rem; font-weight: 800; color: #1976D2; text-decoration: none; }
+    .share-card { background: white; border-radius: 20px; border: 1.5px solid #E0E7EF; box-shadow: 0 4px 24px rgba(0,0,0,0.07); padding: 28px 32px; margin-bottom: 20px; }
+    .share-type-badge { display: inline-block; font-size: 0.75rem; font-weight: 700; background: #E3F2FD; color: #1976D2; border-radius: 8px; padding: 3px 10px; margin-bottom: 12px; }
+    .share-label { font-size: 1.25rem; font-weight: 800; margin-bottom: 4px; }
+    .share-period { font-size: 0.82rem; color: #78909C; margin-bottom: 20px; }
+    .share-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+    .share-metric { background: #F8FAFC; border-radius: 12px; padding: 14px 16px; }
+    .share-metric-label { font-size: 0.75rem; color: #78909C; margin-bottom: 4px; }
+    .share-metric-value { font-size: 1.2rem; font-weight: 800; font-family: 'DM Mono', monospace; }
+    .up { color: #2E7D32; }
+    .down { color: #C62828; }
+    .neutral { color: #1A2332; }
+    .share-spark { margin-top: 8px; }
+    .share-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .share-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 10px; font-size: 0.88rem; font-weight: 700; text-decoration: none; cursor: pointer; border: none; font-family: inherit; }
+    .share-btn-primary { background: #1976D2; color: white; }
+    .share-btn-primary:hover { background: #1565C0; }
+    .share-btn-secondary { background: #F0F4F8; color: #1A2332; border: 1.5px solid #E0E7EF; }
+    .share-btn-secondary:hover { background: #E3F2FD; }
+    .share-footer { text-align: center; font-size: 0.78rem; color: #90A4AE; margin-top: 16px; }
+    .share-footer a { color: #1976D2; text-decoration: none; }
+    .empty-state { text-align: center; padding: 48px 0; color: #78909C; }
+    .empty-state-icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state-title { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+<div class="share-wrap">
+  <a href="/" class="share-logo">💰 Money Milestone</a>
+
+  {% if data %}
+  <div class="share-card">
+    {% if t == 'bt' %}
+      <div class="share-type-badge">포트폴리오 백테스트</div>
+      <div class="share-label">{{ label or '포트폴리오 분석' }}</div>
+      <div class="share-period">{{ period }}</div>
+      <div class="share-metrics">
+        <div class="share-metric">
+          <div class="share-metric-label">CAGR</div>
+          <div class="share-metric-value {{ 'up' if m.get('cagr', 0) >= 0 else 'down' }}">{{ '%+.1f' % m.get('cagr', 0) }}%</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">MDD</div>
+          <div class="share-metric-value down">{{ '%.1f' % m.get('mdd', 0) }}%</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">Sharpe</div>
+          <div class="share-metric-value neutral">{{ '%.2f' % m.get('sharpe', 0) }}</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">총 수익률</div>
+          <div class="share-metric-value {{ 'up' if m.get('total_return', 0) >= 0 else 'down' }}">{{ '%+.1f' % m.get('total_return', 0) }}%</div>
+        </div>
+      </div>
+      {% if data.get('spark') %}
+      <div class="share-spark"><canvas id="sparkChart" height="80"></canvas></div>
+      {% endif %}
+
+    {% elif t == 'calc' %}
+      <div class="share-type-badge">롤링 시뮬레이션</div>
+      <div class="share-label">{{ label or '투자 계산기' }}</div>
+      <div class="share-period">{{ data.get('years', 0) }}년 시뮬레이션</div>
+      <div class="share-metrics">
+        <div class="share-metric">
+          <div class="share-metric-label">비관적 (P10)</div>
+          <div class="share-metric-value neutral">{{ '%.1f' % m.get('p10', 0) }}억</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">중간값 (P50)</div>
+          <div class="share-metric-value up">{{ '%.1f' % m.get('p50', 0) }}억</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">낙관적 (P90)</div>
+          <div class="share-metric-value up">{{ '%.1f' % m.get('p90', 0) }}억</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">중간 CAGR</div>
+          <div class="share-metric-value neutral">{{ '%.1f' % m.get('cagr', 0) }}%</div>
+        </div>
+      </div>
+
+    {% elif t == 'div' %}
+      <div class="share-type-badge">배당금 계산기</div>
+      <div class="share-label">{{ label or '배당금 역산 결과' }}</div>
+      <div class="share-period">{{ m.get('period', 0) }}년 투자</div>
+      <div class="share-metrics">
+        <div class="share-metric">
+          <div class="share-metric-label">목표 월 배당</div>
+          <div class="share-metric-value neutral">{{ '{:,}'.format(m.get('target_monthly', 0)) }}만원</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">필요 월 납입</div>
+          <div class="share-metric-value up">{{ '{:,}'.format(m.get('solved_monthly', 0)) }}만원</div>
+        </div>
+      </div>
+
+    {% elif t == 'ret' %}
+      <div class="share-type-badge">은퇴 설계</div>
+      <div class="share-label">{{ label or '은퇴 시뮬레이션 결과' }}</div>
+      <div class="share-period">{{ m.get('years', 0) }}년 시뮬레이션</div>
+      <div class="share-metrics">
+        <div class="share-metric">
+          <div class="share-metric-label">초기 자산</div>
+          <div class="share-metric-value neutral">{{ '%.1f' % m.get('initial', 0) }}억</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">월 인출</div>
+          <div class="share-metric-value neutral">{{ '{:,}'.format(m.get('monthly', 0)) }}만원</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">자산 생존 확률</div>
+          {% set sv = m.get('survival', 0) %}
+          <div class="share-metric-value {{ 'up' if sv >= 80 else ('neutral' if sv >= 60 else 'down') }}">{{ '%.1f' % sv }}%</div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="share-actions">
+    {% if t == 'bt' %}
+      <a href="/backtest" class="share-btn share-btn-primary">📊 직접 분석해보기</a>
+    {% elif t == 'calc' %}
+      <a href="/calculator" class="share-btn share-btn-primary">🧮 직접 계산해보기</a>
+    {% elif t == 'div' %}
+      <a href="/dividend-target" class="share-btn share-btn-primary">💰 직접 계산해보기</a>
+    {% elif t == 'ret' %}
+      <a href="/retirement" class="share-btn share-btn-primary">🌅 직접 계산해보기</a>
+    {% else %}
+      <a href="/" class="share-btn share-btn-primary">🏠 홈으로</a>
+    {% endif %}
+    <button class="share-btn share-btn-secondary" onclick="copyLink()">🔗 링크 복사</button>
+  </div>
+
+  {% else %}
+  <div class="share-card">
+    <div class="empty-state">
+      <div class="empty-state-icon">🔗</div>
+      <div class="empty-state-title">잘못된 공유 링크입니다</div>
+      <div>링크가 만료되었거나 잘못된 주소입니다</div>
+    </div>
+  </div>
+  <div class="share-actions">
+    <a href="/" class="share-btn share-btn-primary">🏠 홈으로</a>
+  </div>
+  {% endif %}
+
+  <div class="share-footer">
+    <a href="/">Money Milestone</a> — 투자 계산기, 포트폴리오 분석, 배당금 계산기
+  </div>
+</div>
+
+{% if data.get('spark') and t == 'bt' %}
+<script>
+const spark = {{ data.get('spark', []) | tojson }};
+const ctx = document.getElementById('sparkChart').getContext('2d');
+const mn = Math.min(...spark), mx = Math.max(...spark);
+const grad = ctx.createLinearGradient(0, 0, 0, 80);
+grad.addColorStop(0, 'rgba(25,118,210,0.25)');
+grad.addColorStop(1, 'rgba(25,118,210,0)');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: spark.map((_, i) => i),
+    datasets: [{ data: spark, borderColor: '#1976D2', borderWidth: 2, fill: true, backgroundColor: grad, pointRadius: 0, tension: 0.3 }]
+  },
+  options: {
+    responsive: true, animation: false,
+    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    scales: { x: { display: false }, y: { display: false } }
+  }
+});
+</script>
+{% endif %}
+
+<script>
+function copyLink() {
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✅ 복사됨!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+</script>
+</body>
+</html>

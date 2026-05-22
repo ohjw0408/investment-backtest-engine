@@ -3,6 +3,11 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+.share-pill { background:#E3F2FD;color:#1976D2;border:none;border-radius:20px;padding:5px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:inherit; }
+.share-pill:hover { background:#BBDEFB; }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -197,6 +202,10 @@
         <div class="result-title-row">
           <h3 class="result-title">시뮬레이션 결과</h3>
           <span class="result-period" id="resultPeriodLabel"></span>
+        </div>
+        <div id="calcShareBtns" style="display:none;gap:8px;margin-top:8px;">
+          <button onclick="calcCopyLink()" class="share-pill">🔗 링크 복사</button>
+          <button onclick="calcDownloadImg()" class="share-pill">📷 이미지 저장</button>
         </div>
       </div>
 

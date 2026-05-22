@@ -3,7 +3,10 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
+.share-pill { background:#E3F2FD;color:#1976D2;border:none;border-radius:20px;padding:5px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:inherit; }
+.share-pill:hover { background:#BBDEFB; }
 .ret-layout {
   display: flex; gap: 24px; align-items: flex-start; padding: 24px;
 }
@@ -460,7 +463,13 @@
 
       <!-- 생존율 -->
       <div class="acc-dist-card">
-        <div class="acc-dist-title">🎯 시뮬레이션 결과</div>
+        <div class="acc-dist-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>🎯 시뮬레이션 결과</span>
+          <div id="retShareBtns" style="display:none;gap:8px;">
+            <button onclick="retCopyLink()" class="share-pill">🔗 링크 복사</button>
+            <button onclick="retDownloadImg()" class="share-pill">📷 이미지 저장</button>
+          </div>
+        </div>
         <div class="survival-bar-wrap">
           <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:4px;">
             <span>생존 확률</span>
@@ -1020,6 +1029,19 @@ function renderRetirement(data, body) {
     msgBox.textContent = `⚠️ 목표 신뢰도 ${tPct}%에 ${shortfall}%p 부족합니다. 월 인출금을 줄이거나 적립 기간을 늘려보세요.`;
   }
 
+  // 공유 데이터
+  window._retShareData = {
+    t: 'ret',
+    m: {
+      initial:  +((body.initial_asset || 0) / 1e8).toFixed(1),
+      monthly:  Math.round((body.monthly_withdrawal || 0) / 10000),
+      survival: +(survival * 100).toFixed(1),
+      years:    body.withdrawal_years || 0,
+    },
+  };
+  const retShare = document.getElementById('retShareBtns');
+  if (retShare) retShare.style.display = 'flex';
+
   // 축적기 결과 (시뮬 모드만)
   const showAcc = retMode === 'sim' && data.accumulation_summary;
   document.getElementById('retAccCard').style.display    = showAcc ? 'block' : 'none';
@@ -1110,6 +1132,34 @@ function renderHistogram(canvasId, values, color) {
         y: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { color: 'rgba(0,0,0,0.05)' } }
       }
     }
+  });
+}
+
+// ── 공유 (C5) ──
+function mmEncodeShare(data) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(data))))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function retCopyLink() {
+  if (!window._retShareData) return;
+  const url = location.origin + '/share?d=' + mmEncodeShare(window._retShareData);
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = event.target; const orig = btn.textContent;
+    btn.textContent = '✅ 복사됨!'; setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+function retDownloadImg() {
+  const el = document.getElementById('retResultContent');
+  if (!el || typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
+  html2canvas(el, { scale:2, backgroundColor:'#F0F4F8', useCORS:true }).then(canvas => {
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, canvas.height - 52, canvas.width, 52);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.round(canvas.width * 0.018)}px sans-serif`;
+    ctx.fillText('Money Milestone | moneymilestone.duckdns.org', 20, canvas.height - 18);
+    const a = document.createElement('a'); a.href = canvas.toDataURL('image/png');
+    a.download = 'retirement-result.png'; a.click();
   });
 }
 </script>

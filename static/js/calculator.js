@@ -556,6 +556,22 @@ function renderResult(data, payload) {
       warn.textContent = years < 3 ? '⚠ 배당 CAGR은 최소 3년 이상 시뮬레이션 시 의미 있는 값이 나옵니다' : '';
     }
   });
+
+  // 공유 데이터 저장
+  const tickers = (payload.tickers || []).map(t => `${t.code} ${t.weight}%`).join('+');
+  window._calcShareData = {
+    t: 'calc',
+    label: tickers,
+    years: payload.years || 0,
+    m: {
+      p10:  +(dist.end_value.p10  / 1e8).toFixed(2),
+      p50:  +(dist.end_value.p50  / 1e8).toFixed(2),
+      p90:  +(dist.end_value.p90  / 1e8).toFixed(2),
+      cagr: +(dist.cagr.median    * 100).toFixed(2),
+    },
+  };
+  const shareBtns = document.getElementById('calcShareBtns');
+  if (shareBtns) shareBtns.style.display = 'flex';
 }
 
 // ── 히스토그램 렌더링 ──
@@ -837,4 +853,38 @@ function checkTaxLimits() {
   if (warnEl) warnEl.innerHTML = warnings.map(w =>
     `<div style="font-size:0.75rem;color:#C62828;background:#FFEBEE;padding:6px 10px;border-radius:6px;margin-bottom:4px;">${w}</div>`
   ).join('');
+}
+// ── 공유 (C5) ──
+function mmEncodeShare(data) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(data))))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function calcCopyLink() {
+  if (!window._calcShareData) return;
+  const d = mmEncodeShare(window._calcShareData);
+  const url = location.origin + '/share?d=' + d;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✅ 복사됨!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+function calcDownloadImg() {
+  const el = document.getElementById('resultContent');
+  if (!el || typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
+  html2canvas(el, { scale: 2, backgroundColor: '#F0F4F8', useCORS: true }).then(canvas => {
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, canvas.height - 52, canvas.width, 52);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.round(canvas.width * 0.018)}px sans-serif`;
+    ctx.fillText('Money Milestone | moneymilestone.duckdns.org', 20, canvas.height - 18);
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'simulation-result.png';
+    a.click();
+  });
 }

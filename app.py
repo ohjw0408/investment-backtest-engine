@@ -1470,6 +1470,154 @@ def assets():
 
 
 # -----------------------------------------------
+# C5: 결과 공유
+
+@app.route('/share')
+def share():
+    import base64, json as _json
+    d = request.args.get('d', '')
+    data = {}
+    if d:
+        try:
+            data = _json.loads(base64.urlsafe_b64decode(d + '=='))
+        except Exception:
+            pass
+    base_url = request.host_url.rstrip('/')
+    return render_template('share.html', data=data, d=d, base_url=base_url)
+
+
+@app.route('/share/og-thumb')
+def share_og_thumb():
+    import base64, json as _json, io
+    d = request.args.get('d', '')
+    data = {}
+    if d:
+        try:
+            data = _json.loads(base64.urlsafe_b64decode(d + '=='))
+        except Exception:
+            pass
+
+    from PIL import Image, ImageDraw, ImageFont
+    from flask import send_file
+
+    W, H = 1200, 630
+    BG   = (15, 23, 42)
+    CARD = (30, 41, 59)
+    BLUE = (25, 118, 210)
+    GREEN = (46, 125, 50)
+    RED  = (198, 40, 40)
+    WHITE = (255, 255, 255)
+    MUTED = (148, 163, 184)
+
+    img  = Image.new('RGB', (W, H), BG)
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_lg = ImageFont.load_default(size=56)
+        font_md = ImageFont.load_default(size=36)
+        font_sm = ImageFont.load_default(size=26)
+        font_xs = ImageFont.load_default(size=20)
+    except Exception:
+        font_lg = font_md = font_sm = font_xs = ImageFont.load_default()
+
+    t = data.get('t', '')
+    m = data.get('m', {})
+    label = data.get('label', '')
+
+    TYPE_NAMES = {
+        'bt':   'Portfolio Backtest',
+        'calc': 'Rolling Simulation',
+        'div':  'Dividend Calculator',
+        'ret':  'Retirement Planner',
+    }
+    type_name = TYPE_NAMES.get(t, 'Analysis Result')
+
+    # 헤더 영역
+    draw.rectangle([0, 0, W, 110], fill=CARD)
+    draw.text((48, 28), 'Money Milestone', font=font_md, fill=BLUE)
+    draw.text((48, 68), type_name, font=font_sm, fill=MUTED)
+    if label:
+        draw.text((W - 48, 28), label, font=font_sm, fill=WHITE, anchor='ra')
+
+    # 핵심 지표 그리드
+    def draw_metric(x, y, label_text, value_text, color=WHITE):
+        draw.text((x, y), label_text, font=font_xs, fill=MUTED)
+        draw.text((x, y + 30), value_text, font=font_lg, fill=color)
+
+    if t == 'bt':
+        period = data.get('period', '')
+        if period:
+            draw.text((48, 130), period, font=font_sm, fill=MUTED)
+        items = [
+            ('CAGR',         f"{m.get('cagr', 0):+.1f}%",  GREEN if m.get('cagr', 0) >= 0 else RED),
+            ('MDD',          f"{m.get('mdd', 0):.1f}%",    RED),
+            ('Sharpe',       f"{m.get('sharpe', 0):.2f}",  WHITE),
+            ('Total Return', f"{m.get('total_return', 0):+.1f}%", GREEN if m.get('total_return', 0) >= 0 else RED),
+        ]
+        for i, (lbl, val, col) in enumerate(items):
+            draw_metric(48 + i * 290, 180, lbl, val, col)
+
+        # 스파크라인
+        spark = data.get('spark', [])
+        if len(spark) >= 2:
+            sx, sy, sw, sh = 48, 370, W - 96, 180
+            mn, mx = min(spark), max(spark)
+            rng = mx - mn or 1
+            pts = [(sx + int(sw * i / (len(spark) - 1)),
+                    sy + sh - int(sh * (v - mn) / rng))
+                   for i, v in enumerate(spark)]
+            for i in range(len(pts) - 1):
+                draw.line([pts[i], pts[i+1]], fill=BLUE, width=3)
+
+    elif t == 'calc':
+        years = data.get('years', 0)
+        if years:
+            draw.text((48, 130), f'{years}-year rolling simulation', font=font_sm, fill=MUTED)
+        items = [
+            ('Pessimistic (P10)', f"{m.get('p10', 0):.1f} 억", MUTED),
+            ('Median (P50)',      f"{m.get('p50', 0):.1f} 억", WHITE),
+            ('Optimistic (P90)', f"{m.get('p90', 0):.1f} 억", GREEN),
+            ('Median CAGR',      f"{m.get('cagr', 0):.1f}%",       BLUE),
+        ]
+        for i, (lbl, val, col) in enumerate(items):
+            draw_metric(48 + i * 290, 200, lbl, val, col)
+
+    elif t == 'div':
+        items = [
+            ('Target Monthly', f"{m.get('target_monthly', 0):,}만", WHITE),
+            ('Required Monthly', f"{m.get('solved_monthly', 0):,}만", GREEN),
+            ('Period', f"{m.get('period', 0)}yr", MUTED),
+        ]
+        for i, (lbl, val, col) in enumerate(items):
+            draw_metric(48 + i * 380, 200, lbl, val, col)
+
+    elif t == 'ret':
+        survival = m.get('survival', 0)
+        s_color = GREEN if survival >= 80 else (WHITE if survival >= 60 else RED)
+        items = [
+            ('Initial Asset', f"{m.get('initial', 0):.1f} 억", WHITE),
+            ('Monthly', f"{m.get('monthly', 0):,}만", WHITE),
+            ('Survival Rate', f"{survival:.1f}%", s_color),
+            ('Period', f"{m.get('years', 0)}yr", MUTED),
+        ]
+        for i, (lbl, val, col) in enumerate(items):
+            draw_metric(48 + i * 290, 200, lbl, val, col)
+
+    # 하단 워터마크
+    draw.rectangle([0, H - 60, W, H], fill=CARD)
+    draw.text((48, H - 40), 'moneymilestone.duckdns.org', font=font_xs, fill=MUTED)
+
+    buf = io.BytesIO()
+    img.save(buf, 'PNG')
+    buf.seek(0)
+
+    from flask import make_response
+    resp = make_response(send_file(buf, mimetype='image/png'))
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    return resp
+
+
+# -----------------------------------------------
 
 if __name__ == '__main__':
     import multiprocessing

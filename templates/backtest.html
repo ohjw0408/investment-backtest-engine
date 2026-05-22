@@ -852,10 +852,10 @@ function mmEncodeShare(data) {
 }
 
 function btCopyLink() {
-  if (!window._btShareData) return;
+  const btn = event.target; const orig = btn.textContent;
+  if (!window._btShareData) { btn.textContent = '⚠️ 먼저 분석하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
   const d = mmEncodeShare(window._btShareData);
   const url = location.origin + '/share?d=' + d;
-  const btn = event.target; const orig = btn.textContent;
   mmCopyText(url).then(() => {
     btn.textContent = '✅ 복사됨!';
     setTimeout(() => btn.textContent = orig, 2000);

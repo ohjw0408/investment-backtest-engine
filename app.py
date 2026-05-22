@@ -1,4 +1,5 @@
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 import random
 import datetime
 import sqlite3
@@ -43,6 +44,7 @@ from modules.rebalance.periodic import PeriodicRebalance
 from modules.market_quote_service import MarketQuoteService
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key')
 import datetime as _dt_mod
 app.config['PERMANENT_SESSION_LIFETIME'] = _dt_mod.timedelta(days=30)

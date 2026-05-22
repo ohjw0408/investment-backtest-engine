@@ -1033,9 +1033,9 @@ function mmEncodeShare(data) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 function divCopyLink() {
-  if (!window._divShareData) return;
-  const url = location.origin + '/share?d=' + mmEncodeShare(window._divShareData);
   const btn = event.target; const orig = btn.textContent;
+  if (!window._divShareData) { btn.textContent = '⚠️ 먼저 계산하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
+  const url = location.origin + '/share?d=' + mmEncodeShare(window._divShareData);
   mmCopyText(url).then(() => {
     btn.textContent = '✅ 복사됨!'; setTimeout(() => btn.textContent = orig, 2000);
   });

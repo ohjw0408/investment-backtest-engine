@@ -863,10 +863,10 @@ function mmEncodeShare(data) {
 }
 
 function calcCopyLink() {
-  if (!window._calcShareData) return;
+  const btn = event.target; const orig = btn.textContent;
+  if (!window._calcShareData) { btn.textContent = '⚠️ 먼저 계산하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
   const d = mmEncodeShare(window._calcShareData);
   const url = location.origin + '/share?d=' + d;
-  const btn = event.target; const orig = btn.textContent;
   mmCopyText(url).then(() => {
     btn.textContent = '✅ 복사됨!';
     setTimeout(() => btn.textContent = orig, 2000);

@@ -424,11 +424,11 @@ class PriceLoader:
 
         # ── 가격 로드 ─────────────────────────────────
         is_kr = self.is_kr_etf(code)
-        _INDEX_FUTURES = frozenset({'GC=F', 'SI=F', 'CL=F', 'NG=F'})
+        _INDEX_FUTURES = frozenset({'GC=F', 'SI=F', 'CL=F', 'NG=F', 'KRW=X'})
         is_index = code.startswith('^') or code in _INDEX_FUTURES
         if is_index:
             country  = 'KR' if code == '^KS11' else 'US'
-            currency = 'KRW' if code == '^KS11' else 'USD'
+            currency = 'KRW' if code in ('^KS11', 'KRW=X') else 'USD'
         else:
             currency = "KRW" if is_kr else "USD"
             country  = "KR"  if is_kr else "US"

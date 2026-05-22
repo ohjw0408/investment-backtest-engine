@@ -153,10 +153,12 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
             "dividend_mode":    dividend_mode,
             "step_months":      6,
         },
-        monthly_withdrawal = monthly_withdrawal,
-        withdrawal_years   = withdrawal_years,
-        inflation          = inflation,
-        verbose            = False,
+        monthly_withdrawal  = monthly_withdrawal,
+        withdrawal_years    = withdrawal_years,
+        inflation           = inflation,
+        verbose             = False,
+        progress_callback   = progress_callback,
+        start_time          = _acc_start,
     )
     report = planner.run(target_percentile=target_percentile)
 

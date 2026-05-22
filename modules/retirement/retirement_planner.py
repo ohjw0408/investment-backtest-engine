@@ -53,6 +53,8 @@ class RetirementPlanner:
         withdrawal_years:   int,
         inflation:          float = 0.0,
         verbose:            bool  = False,
+        progress_callback=None,     # fn(current, total, elapsed)
+        start_time:         float = None,
     ):
         self.acc_result         = acc_result
         self.wd_config          = wd_config
@@ -60,6 +62,8 @@ class RetirementPlanner:
         self.withdrawal_years   = withdrawal_years
         self.inflation          = inflation
         self.verbose            = verbose
+        self.progress_callback  = progress_callback
+        self.start_time         = start_time
 
     # ════════════════════════════════════════════════════════
     # 메인 실행
@@ -137,10 +141,13 @@ class RetirementPlanner:
         list of dict
             percentile, initial_capital, success_rate, end_value_ratio, wd_result
         """
+        import time as _time
         acc_values = np.array(self.acc_result["distribution"]["end_value"]["values"])
         results    = []
+        n_samples  = len(SAMPLE_PERCENTILES)
+        t0         = self.start_time or _time.time()
 
-        for pct in SAMPLE_PERCENTILES:
+        for i, pct in enumerate(SAMPLE_PERCENTILES):
             initial_capital = float(np.percentile(acc_values, pct))
 
             if self.verbose:
@@ -174,6 +181,15 @@ class RetirementPlanner:
             if self.verbose:
                 print(f"         성공률={wd_result['success_rate']:.1%}  "
                       f"종료자산={initial_capital * wd_result['distribution']['end_value_ratio']['p50']:,.0f}")
+
+            # 50~99% 구간: 샘플마다 progress 업데이트 (취소 체크 포함)
+            if self.progress_callback:
+                done_pct = round(50 + (i + 1) / n_samples * 49)
+                self.progress_callback(
+                    current=done_pct,
+                    total=100,
+                    elapsed=_time.time() - t0,
+                )
 
         return results
 

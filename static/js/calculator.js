@@ -4,7 +4,6 @@
 
 // ── 상태 ──
 const tickers = [];
-let searchTimer  = null;
 const chartInstances = {};
 let _calcTaskId = null, _calcCancelled = false;
 

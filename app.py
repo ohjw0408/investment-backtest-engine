@@ -1345,11 +1345,19 @@ def symbol_api(code):
 
 @app.route('/api/assets')
 def assets():
+    if not session.get('user_id'):
+        return jsonify([])
+    groups = get_groups(session['user_id'])
+    if not groups:
+        return jsonify([])
+    total_target = sum(g['target_pct'] for g in groups) or 100
     return jsonify([
-        {"name": "주식",                "icon": "🏢", "color": "#1976D2", "change": "+7%",   "up": True,  "pct": 0.55},
-        {"name": "채권",                "icon": "📜", "color": "#43A047", "change": "+2.5%", "up": True,  "pct": 0.25},
-        {"name": "금",                  "icon": "🥇", "color": "#F9A825", "change": "+1.5%", "up": True,  "pct": 0.12},
-        {"name": "원자재 (Commodities)","icon": "🪨", "color": "#EF5350", "change": "-0.5%", "up": False, "pct": 0.08},
+        {
+            "name":  g['name'],
+            "color": g['color'],
+            "pct":   g['target_pct'] / total_target,
+        }
+        for g in groups if g['target_pct'] > 0
     ])
 
 

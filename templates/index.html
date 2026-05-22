@@ -210,35 +210,38 @@ async function loadAssets() {
   const items = await res.json();
 
   const list = document.getElementById('assetList');
+  if (!items.length) {
+    list.innerHTML = '<div style="color:#aaa;font-size:13px;padding:8px 0">내 자산 탭에서 그룹을 설정하면 표시됩니다.</div>';
+    document.getElementById('stackedBar').innerHTML = '';
+    return;
+  }
+
   list.innerHTML = items.map(a => `
     <div class="asset-item">
-      <div class="asset-dot" style="background:${a.color}22">${a.icon}</div>
+      <div class="asset-dot" style="background:${a.color}22; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center;"></div>
       <div class="asset-info">
         <div class="asset-name">${a.name}</div>
-        <div class="asset-change ${a.up ? 'up' : 'down'}">${a.change}</div>
+        <div class="asset-change">${Math.round(a.pct * 100)}%</div>
       </div>
     </div>
   `).join('');
 
   const bar = document.getElementById('stackedBar');
   bar.innerHTML = '';
-  ['현재', '목표'].forEach((label, ci) => {
-    const col = document.createElement('div');
-    col.className = 'bar-col';
-    items.forEach(a => {
-      const seg = document.createElement('div');
-      seg.className = 'bar-seg';
-      const pct = a.pct + (ci === 1 ? (Math.random() - 0.5) * 0.08 : 0);
-      seg.style.height = (pct * 130) + 'px';
-      seg.style.background = a.color;
-      col.appendChild(seg);
-    });
-    const lbl = document.createElement('div');
-    lbl.className = 'bar-col-label';
-    lbl.textContent = label;
-    col.appendChild(lbl);
-    bar.appendChild(col);
+  const col = document.createElement('div');
+  col.className = 'bar-col';
+  items.forEach(a => {
+    const seg = document.createElement('div');
+    seg.className = 'bar-seg';
+    seg.style.height = (a.pct * 130) + 'px';
+    seg.style.background = a.color;
+    col.appendChild(seg);
   });
+  const lbl = document.createElement('div');
+  lbl.className = 'bar-col-label';
+  lbl.textContent = '목표';
+  col.appendChild(lbl);
+  bar.appendChild(col);
 }
 </script>
 {% endblock %}

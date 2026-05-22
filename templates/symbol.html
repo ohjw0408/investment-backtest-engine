@@ -4,7 +4,9 @@
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
 <style>
-.symbol-wrap { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
+/* main-content 기본 grid 무력화 — symbol 페이지 전체 너비 사용 */
+.main-content { display: block !important; padding: 0 !important; }
+.symbol-wrap { max-width: 100%; padding: 20px 28px; }
 
 /* 헤더 */
 .symbol-header {
@@ -33,9 +35,31 @@
 /* 2열 본문 */
 .symbol-body {
   display: grid;
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: 6fr 4fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+}
+
+/* 차트 카드 — 높이 전체 채우기 */
+.chart-card {
+  display: flex;
+  flex-direction: column;
+}
+.chart-canvas-wrap {
+  flex: 1;
+  min-height: 260px;
+  position: relative;
+}
+
+/* 오른쪽 컬럼 — 스택 전체 높이 채우기 */
+.symbol-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.symbol-right-col .symbol-card:last-child {
+  flex: 1;
+  overflow-y: auto;
 }
 
 /* 카드 */
@@ -162,7 +186,7 @@ function renderPage(data) {
     <!-- 2열 본문 -->
     <div class="symbol-body">
       <!-- 왼쪽: 차트 -->
-      <div class="symbol-card">
+      <div class="symbol-card chart-card">
         <div class="symbol-card-title">📈 가격 차트</div>
         <div class="period-tabs">
           <button class="period-tab active">1개월</button>
@@ -170,11 +194,13 @@ function renderPage(data) {
           <button class="period-tab">1년</button>
           <button class="period-tab">전체</button>
         </div>
-        <canvas id="priceChart" height="280"></canvas>
+        <div class="chart-canvas-wrap">
+          <canvas id="priceChart"></canvas>
+        </div>
       </div>
 
       <!-- 오른쪽: 지표 + 배당 -->
-      <div>
+      <div class="symbol-right-col">
         <div class="symbol-card">
           <div class="symbol-card-title">📊 핵심 지표</div>
           <div class="stats-grid">
@@ -276,6 +302,7 @@ function renderChart(prices, period) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: {
         callbacks: { label: ctx => allData.currency === 'KRW'
           ? '₩' + Math.round(ctx.parsed.y).toLocaleString()

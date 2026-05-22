@@ -64,6 +64,25 @@
   padding: 10px 24px; border-radius: 8px;
   font-size: 0.85rem; display: none; z-index: 9999;
 }
+.summary-card {
+  background: #F0F7FF;
+  border: 1.5px solid #BBDEFB;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+.summary-card-title {
+  font-size: 0.78rem; font-weight: 700; color: #1976D2;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+}
+.summary-row {
+  display: flex; flex-wrap: wrap; gap: 8px 16px;
+}
+.summary-item {
+  display: flex; align-items: center; gap: 4px; font-size: 0.83rem;
+}
+.summary-label { color: var(--text-muted); }
+.summary-value { font-weight: 600; color: var(--text); }
 </style>
 {% endblock %}
 
@@ -75,6 +94,18 @@
     <p style="font-size:0.85rem;color:var(--text-muted);">
       배당금 계산기와 포트폴리오 시뮬레이션에 적용됩니다.
     </p>
+  </div>
+
+  <!-- 현재 설정 요약 -->
+  <div class="summary-card" id="summaryCard">
+    <div class="summary-card-title">현재 설정</div>
+    <div class="summary-row" id="summaryRow">
+      <div class="summary-item"><span class="summary-label">나이</span><span class="summary-value" id="sum-age">—</span></div>
+      <div class="summary-item"><span class="summary-label">연소득</span><span class="summary-value" id="sum-income">—</span></div>
+      <div class="summary-item"><span class="summary-label">ISA</span><span class="summary-value" id="sum-isa">—</span></div>
+      <div class="summary-item"><span class="summary-label">연금계좌</span><span class="summary-value" id="sum-pension">—</span></div>
+      <div class="summary-item"><span class="summary-label">절세매매</span><span class="summary-value" id="sum-harvest">—</span></div>
+    </div>
   </div>
 
   <!-- 기본 소득 정보 -->
@@ -227,9 +258,23 @@ async function saveSettings() {
       });
     }
   } catch(e) {}
+  updateSummary();
   const toast = document.getElementById('saveToast');
   toast.style.display = 'block';
   setTimeout(() => toast.style.display = 'none', 2000);
+}
+
+const ISA_LABELS = { none: '미가입', general: '일반형', preferential: '서민형' };
+
+function updateSummary() {
+  const age    = parseInt(document.getElementById('userAge').value) || null;
+  const income = parseFloat(document.getElementById('earnedIncome').value) || 0;
+  const isa    = document.querySelector('input[name="isaType"]:checked')?.value || 'none';
+  document.getElementById('sum-age').textContent     = age ? age + '세' : '미입력';
+  document.getElementById('sum-income').textContent  = income ? fmtKRW(income) : '미입력';
+  document.getElementById('sum-isa').textContent     = ISA_LABELS[isa] || '미가입';
+  document.getElementById('sum-pension').textContent = state.pension ? '사용' : '미사용';
+  document.getElementById('sum-harvest').textContent = state.harvest ? '사용' : '미사용';
 }
 
 function applySettings(s) {
@@ -245,6 +290,7 @@ function applySettings(s) {
     });
   }
   document.getElementById('earnedIncomeHint').textContent = s.earned_income ? fmtKRW(s.earned_income) : '';
+  updateSummary();
 }
 
 async function loadSettings() {
@@ -262,8 +308,8 @@ async function loadSettings() {
     }
   } catch(e) {}
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return;
-  try { applySettings(JSON.parse(raw)); } catch(e) {}
+  if (!raw) { updateSummary(); return; }
+  try { applySettings(JSON.parse(raw)); } catch(e) { updateSummary(); }
 }
 
 document.getElementById('earnedIncome').addEventListener('input', function() {

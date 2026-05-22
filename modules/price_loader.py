@@ -442,11 +442,10 @@ class PriceLoader:
             '^DJI':  '다우존스',         '^N225': '닛케이 225',
         }
         if is_index and self.index_conn is not None:
-            db_code   = _INDEX_DB_ALIAS.get(code, code)
-            cutoff_30y = (_dt.today() - _td(days=365 * 30)).strftime("%Y-%m-%d")
+            db_code  = _INDEX_DB_ALIAS.get(code, code)
             idx_rows = self.index_conn.execute(
-                "SELECT date, close FROM index_daily WHERE code=? AND date>=? ORDER BY date",
-                (db_code, cutoff_30y)
+                "SELECT date, close FROM index_daily WHERE code=? ORDER BY date",
+                (db_code,)
             ).fetchall()
             if idx_rows:
                 prices    = [{"date": r[0], "close": round(float(r[1]), 4)} for r in idx_rows]

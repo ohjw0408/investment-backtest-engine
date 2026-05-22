@@ -25,6 +25,7 @@
     <a class="nav-link {% if request.path.startswith('/backtest') %}active{% endif %}" href="/backtest">포트폴리오 분석</a>
     <a class="nav-link {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">내 자산</a>
     <a class="nav-link {% if request.path.startswith('/tax-settings') %}active{% endif %}" href="/tax-settings">세금 설정</a>
+    <a class="nav-link {% if request.path.startswith('/search') %}active{% endif %}" href="/search">검색</a>
   </div>
   <div class="nav-search-wrap">
     <div class="nav-search-box">
@@ -127,8 +128,8 @@ if (navInput) {
           <div class="nav-search-result" onclick="selectSymbol('${item.code}', '${item.name.replace(/'/g, "\'")}')">
             <span class="nav-search-badge" style="background:${badgeColor(item.badge)}22; color:${badgeColor(item.badge)}">${item.badge}</span>
             <div class="nav-search-info">
-              <div class="nav-search-code">${item.code}</div>
-              <div class="nav-search-name">${item.name}</div>
+              <div class="nav-search-code">${item.name}</div>
+              <div class="nav-search-name">${item.code}</div>
               ${item.subtitle ? `<div class="nav-search-sub">${item.subtitle}</div>` : ''}
             </div>
           </div>

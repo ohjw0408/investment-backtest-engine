@@ -74,6 +74,39 @@
 }
 .year-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
 .year-table tr:last-child td { border-bottom: none; }
+
+/* 종목 아이템 */
+.ticker-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; margin-bottom: 6px;
+  background: var(--bg); border-radius: 10px;
+  border: 1.5px solid var(--border);
+}
+.ticker-badge {
+  font-size: 0.72rem; font-weight: 700; color: #1976D2;
+  background: #E3F2FD; border-radius: 6px;
+  padding: 2px 7px; white-space: nowrap; flex-shrink: 0;
+}
+.ticker-name {
+  font-size: 0.82rem; color: var(--text); flex: 1;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ticker-weight-input {
+  width: 46px; text-align: center; font-size: 0.82rem; font-weight: 700;
+  border: 1.5px solid var(--border); border-radius: 6px;
+  padding: 3px 4px; background: white; color: var(--text);
+  outline: none; flex-shrink: 0;
+}
+.ticker-weight-input:focus { border-color: var(--blue); }
+.ticker-weight-slider {
+  flex: 1; min-width: 40px; accent-color: #1976D2;
+}
+.ticker-remove-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 1.1rem; line-height: 1;
+  padding: 0 2px; flex-shrink: 0;
+}
+.ticker-remove-btn:hover { color: #C62828; }
 </style>
 {% endblock %}
 

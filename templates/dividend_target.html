@@ -809,16 +809,18 @@ function renderResult(data, body) {
       <div class="dist-card optimistic"><div class="dist-card-label">기준 확률</div><div class="dist-card-value">${Math.round(body.probability*100)}%</div></div>`;
 
     // 공유 데이터
-    const tickers = (body.tickers||[]).map(t=>`${t.code} ${t.weight}%`).join('+');
-    const solvedMonthly = res.solved_monthly !== undefined ? Math.round(res.solved_monthly/10000) : 0;
-    window._divShareData = {
-      t: 'div', label: tickers,
-      m: {
-        target_monthly: Math.round((body.target_monthly_div||0)/10000),
-        solved_monthly: solvedMonthly,
-        period: body.years || 0,
-      },
-    };
+    try {
+      const tickers = (body.tickers||[]).map(t=>`${t.code} ${Math.round(t.weight*100)}%`).join('+');
+      const solvedMonthly = res.solved_monthly !== undefined ? Math.round(res.solved_monthly/10000) : 0;
+      window._divShareData = {
+        t: 'div', label: tickers,
+        m: {
+          target_monthly: Math.round((body.target_monthly_div||0)/10000),
+          solved_monthly: solvedMonthly,
+          period: body.years || 0,
+        },
+      };
+    } catch(e) {}
     const divShare = document.getElementById('divShareBtns');
     if (divShare) divShare.style.display = 'flex';
     return;

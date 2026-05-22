@@ -725,23 +725,25 @@ function renderBacktest(data) {
   `).join('');
 
   // 공유 버튼 표시 + 데이터 저장
-  const body = window._btLastBody || {};
-  const tickers = (body.tickers || []).map(t => `${t.code} ${t.weight}%`).join('+') || '';
-  const startDate = (body.start_date || '').slice(0,7);
-  const endDate   = (body.end_date   || '').slice(0,7);
-  window._btShareData = {
-    t: 'bt',
-    label: tickers,
-    period: startDate && endDate ? startDate + ' ~ ' + endDate : '',
-    m: {
-      cagr:         +(m.cagr         || 0).toFixed(2),
-      mdd:          +(m.mdd          || 0).toFixed(2),
-      sharpe:       +(m.sharpe       || 0).toFixed(3),
-      total_return: +(m.total_return || 0).toFixed(2),
-      years:        +(m.years        || 0).toFixed(1),
-    },
-    spark: downsample(data.history.map(h => h.portfolio_value), 80),
-  };
+  try {
+    const body = window._btLastBody || {};
+    const tickers = (body.tickers || []).map(t => `${t.code} ${t.weight}%`).join('+') || '';
+    const startDate = (body.start_date || '').slice(0,7);
+    const endDate   = (body.end_date   || '').slice(0,7);
+    window._btShareData = {
+      t: 'bt',
+      label: tickers,
+      period: startDate && endDate ? startDate + ' ~ ' + endDate : '',
+      m: {
+        cagr:         +(m.cagr         || 0).toFixed(2),
+        mdd:          +(m.mdd          || 0).toFixed(2),
+        sharpe:       +(m.sharpe       || 0).toFixed(3),
+        total_return: +(m.total_return || 0).toFixed(2),
+        years:        +(m.years        || 0).toFixed(1),
+      },
+      spark: downsample((data.history || []).map(h => h.portfolio_value), 80),
+    };
+  } catch(e) {}
   document.getElementById('btShareBtns').style.display = 'flex';
 
   // 가치 추이 차트

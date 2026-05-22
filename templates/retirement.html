@@ -1030,15 +1030,17 @@ function renderRetirement(data, body) {
   }
 
   // 공유 데이터
-  window._retShareData = {
-    t: 'ret',
-    m: {
-      initial:  +((body.initial_asset || 0) / 1e8).toFixed(1),
-      monthly:  Math.round((body.monthly_withdrawal || 0) / 10000),
-      survival: +(survival * 100).toFixed(1),
-      years:    body.withdrawal_years || 0,
-    },
-  };
+  try {
+    window._retShareData = {
+      t: 'ret',
+      m: {
+        initial:  +((body.initial_asset || 0) / 1e8).toFixed(1),
+        monthly:  Math.round((body.monthly_withdrawal || 0) / 10000),
+        survival: +(survival * 100).toFixed(1),
+        years:    body.withdrawal_years || 0,
+      },
+    };
+  } catch(e) {}
   const retShare = document.getElementById('retShareBtns');
   if (retShare) retShare.style.display = 'flex';
 

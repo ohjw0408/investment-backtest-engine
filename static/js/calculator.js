@@ -558,18 +558,20 @@ function renderResult(data, payload) {
   });
 
   // 공유 데이터 저장
-  const tickers = (payload.tickers || []).map(t => `${t.code} ${t.weight}%`).join('+');
-  window._calcShareData = {
-    t: 'calc',
-    label: tickers,
-    years: payload.years || 0,
-    m: {
-      p10:  +(dist.end_value.p10  / 1e8).toFixed(2),
-      p50:  +(dist.end_value.p50  / 1e8).toFixed(2),
-      p90:  +(dist.end_value.p90  / 1e8).toFixed(2),
-      cagr: +(dist.cagr.median    * 100).toFixed(2),
-    },
-  };
+  try {
+    const tickers = (payload.tickers || []).map(t => `${t.code} ${Math.round(t.weight*100)}%`).join('+');
+    window._calcShareData = {
+      t: 'calc',
+      label: tickers,
+      years: payload.years || 0,
+      m: {
+        p10:  +((dist.end_value?.p10  || 0) / 1e8).toFixed(2),
+        p50:  +((dist.end_value?.p50  || 0) / 1e8).toFixed(2),
+        p90:  +((dist.end_value?.p90  || 0) / 1e8).toFixed(2),
+        cagr: +((dist.cagr?.p50       || 0) * 100).toFixed(2),
+      },
+    };
+  } catch(e) {}
   const shareBtns = document.getElementById('calcShareBtns');
   if (shareBtns) shareBtns.style.display = 'flex';
 }

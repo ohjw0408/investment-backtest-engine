@@ -80,8 +80,8 @@ input.addEventListener('input', () => {
         <a class="result-item" href="/symbol/${item.code}">
           <span class="result-badge" style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
           <div>
-            <div class="result-code">${item.code}</div>
-            <div class="result-name">${item.name}${item.subtitle ? ' · ' + item.subtitle : ''}</div>
+            <div class="result-code">${item.name}</div>
+            <div class="result-name">${item.code}${item.subtitle ? ' · ' + item.subtitle : ''}</div>
           </div>
         </a>
       `).join('');

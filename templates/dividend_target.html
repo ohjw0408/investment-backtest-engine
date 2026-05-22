@@ -189,10 +189,30 @@
       </div>
     </div>
 
-    <!-- 05. 세금 설정 -->
+    <!-- 05. 리밸런싱 -->
+    <div class="calc-section">
+      <div class="calc-section-title"><span class="calc-section-num">05</span> 리밸런싱</div>
+      <div class="rebal-options">
+        <label class="rebal-option"><input type="radio" name="dtRebal" value="none" checked><span class="rebal-label">안 함</span></label>
+        <label class="rebal-option"><input type="radio" name="dtRebal" value="monthly"><span class="rebal-label">매월</span></label>
+        <label class="rebal-option"><input type="radio" name="dtRebal" value="quarterly"><span class="rebal-label">분기</span></label>
+        <label class="rebal-option"><input type="radio" name="dtRebal" value="yearly"><span class="rebal-label">매년</span></label>
+        <label class="rebal-option"><input type="radio" name="dtRebal" value="band"><span class="rebal-label">밴드</span></label>
+      </div>
+      <div id="dtBandSettings" style="display:none;margin-top:8px;">
+        <label style="font-size:0.8rem;color:var(--text-muted);">밴드 폭 <span id="dtBandLabel">5%</span></label>
+        <input type="range" id="dtBandSlider" class="calc-slider" min="1" max="30" value="5" step="1">
+        <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+          비중이 목표 대비 ±<span id="dtBandNoteVal">5</span>% 벗어나면 리밸런싱
+        </div>
+      </div>
+    </div>
+
+    <!-- 06. 세금 설정 -->
     <div class="calc-section">
       <div class="calc-section-title">
-        <span class="calc-section-num">05</span> 세금 설정
+        <span class="calc-section-num">06</span> 세금 설정
         <a href="/tax-settings" style="font-size:11px;font-weight:600;color:var(--blue);margin-left:8px;text-decoration:none;">⚙ 세금 프로필 설정 →</a>
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -465,6 +485,18 @@ function validateModes() {
 
 onModeChange();
 
+// ── 리밸런싱 밴드 핸들러 ──
+document.querySelectorAll('input[name="dtRebal"]').forEach(el => {
+  el.addEventListener('change', function() {
+    const show = this.value === 'band';
+    document.getElementById('dtBandSettings').style.display = show ? 'block' : 'none';
+  });
+});
+document.getElementById('dtBandSlider').addEventListener('input', function() {
+  document.getElementById('dtBandLabel').textContent = this.value + '%';
+  document.getElementById('dtBandNoteVal').textContent = this.value;
+});
+
 // ── 실행 ──
 async function runDividendTarget() {
   if (!dtTickers.length) { alert('종목을 최소 1개 추가해주세요.'); return; }
@@ -507,6 +539,8 @@ async function runDividendTarget() {
     target_monthly_div: parseFloat(document.getElementById('dtTargetDiv').value)||0,
     probability:        parseFloat(document.getElementById('dtProbSlider').value)/100,
     dividend_mode:      document.querySelector('input[name="dtDividend"]:checked').value,
+    rebal_mode:         document.querySelector('input[name="dtRebal"]:checked').value,
+    band_width:         Number(document.getElementById('dtBandSlider').value) / 100,
     account_type:       accountType,
     earned_income:      taxProfile.earned_income || 50000000,
     isa_type:           taxProfile.isa_type || 'general',

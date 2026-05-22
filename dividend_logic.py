@@ -29,6 +29,8 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
         weights     = target_weights,
         div_mode    = body.get('dividend_mode', 'reinvest'),
         step_months = 3,
+        rebal_mode  = body.get('rebal_mode', 'none'),
+        band_width  = float(body.get('band_width', 0.05)),
     )
 
     seed_cfg    = body.get('seed',    {"center": 0,      "step": 0, "n": 0, "mode": "fixed"})

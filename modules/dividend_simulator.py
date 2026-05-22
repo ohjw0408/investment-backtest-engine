@@ -40,8 +40,10 @@ class DividendSimulator:
         loader,
         tickers,
         weights,
-        div_mode:    str  = "reinvest",
-        step_months: int  = 3,
+        div_mode:    str   = "reinvest",
+        step_months: int   = 3,
+        rebal_mode:  str   = "none",
+        band_width:  float = 0.05,
         tax_engine:  Optional[TaxEngine] = None,
         fee_engine:  Optional[FeeEngine] = None,
     ):
@@ -50,6 +52,8 @@ class DividendSimulator:
         self.weights     = weights
         self.div_mode    = div_mode
         self.step_months = step_months
+        self.rebal_mode  = rebal_mode
+        self.band_width  = band_width
         self.tax_engine  = tax_engine
         self.fee_engine  = fee_engine
         self._price_cache: Dict[str, pd.DataFrame] = {}
@@ -152,6 +156,39 @@ class DividendSimulator:
                         price = float(row.close)
                         if price > 0:
                             quantities[t] += net_div / price
+
+            # 리밸런싱
+            if self.rebal_mode != 'none' and len(self.tickers) > 1:
+                prices_now = {}
+                for t in self.tickers:
+                    idx = data[t]["close"].index.searchsorted(month_end, side='right') - 1
+                    if idx >= 0:
+                        prices_now[t] = float(data[t]["close"].iloc[idx])
+
+                total_val = sum(quantities[t] * prices_now.get(t, 0.0) for t in self.tickers)
+
+                should_rebal = False
+                if total_val > 0:
+                    if self.rebal_mode == 'monthly':
+                        should_rebal = True
+                    elif self.rebal_mode == 'quarterly':
+                        should_rebal = (month_end.month % 3 == 0)
+                    elif self.rebal_mode == 'yearly':
+                        should_rebal = (month_end.month == 12)
+                    elif self.rebal_mode == 'band':
+                        for t in self.tickers:
+                            p = prices_now.get(t, 0.0)
+                            if p > 0:
+                                current_w = (quantities[t] * p) / total_val
+                                if abs(current_w - self.weights[t]) > self.band_width:
+                                    should_rebal = True
+                                    break
+
+                if should_rebal:
+                    for t in self.tickers:
+                        p = prices_now.get(t, 0.0)
+                        if p > 0:
+                            quantities[t] = (self.weights[t] * total_val) / p
 
         return last_year_div
 

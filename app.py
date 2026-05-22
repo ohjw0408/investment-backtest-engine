@@ -681,7 +681,7 @@ def portfolio_history():
             try:
                 import yfinance as _yf
                 ticker = _yf.Ticker(f"{code}.KS")
-                hist = ticker.history(period="3y", interval="1d", actions=True)
+                hist = ticker.history(period="3y", interval="1d", auto_adjust=False, actions=True)
                 if not hist.empty:
                     hist.index = hist.index.tz_localize(None) if hist.index.tz else hist.index
                     rows_to_insert = [

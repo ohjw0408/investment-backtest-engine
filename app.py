@@ -612,19 +612,84 @@ def dividend_target_solve():
 
 
 # -----------------------------------------------
-# API - 포트폴리오 히스토리 (임시 더미)
+# API - 포트폴리오 히스토리 (실제 역산)
 # -----------------------------------------------
 
 @app.route('/api/portfolio/history')
 def portfolio_history():
+    import sqlite3 as _sq
+    from pathlib import Path as _P
+    from datetime import datetime, timedelta
+    import re
+
     uid = session.get('user_id')
-    if uid:
-        holdings = get_holdings(uid)
-        if holdings:
-            total = sum(h['avg_price'] * h['quantity'] for h in holdings if h['avg_price'] and h['quantity'])
-            if total > 0:
-                return jsonify({"empty": True, "labels": [], "values": [], "current": round(total), "change": None})
-    return jsonify({"empty": True, "labels": [], "values": []})
+    if not uid:
+        return jsonify({"empty": True, "labels": [], "values": []})
+
+    holdings = get_holdings(uid)
+    valid = [(h['code'], float(h['quantity'])) for h in holdings if h.get('quantity') and h['quantity'] > 0]
+    if not valid:
+        return jsonify({"empty": True, "labels": [], "values": []})
+
+    # USD/KRW 환율
+    try:
+        idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
+        ic = _sq.connect(str(idx_db))
+        row = ic.execute("SELECT close FROM index_daily WHERE code='USD/KRW' ORDER BY date DESC LIMIT 1").fetchone()
+        ic.close()
+        usdkrw = float(row[0]) if row else 1300.0
+    except Exception:
+        usdkrw = 1300.0
+
+    kr_pattern = re.compile(r'^\d{6}$')
+    def is_kr(code):
+        return bool(kr_pattern.match(code)) or code == 'KRX_GOLD'
+
+    price_db = _P(__file__).parent / 'data' / 'price_cache' / 'price_daily.db'
+    pc = _sq.connect(str(price_db))
+    cutoff = (datetime.now() - timedelta(days=3*365)).strftime('%Y-%m-%d')
+
+    # 종목별 날짜→종가 맵
+    price_map = {}
+    for code, _ in valid:
+        rows = pc.execute(
+            "SELECT date, close FROM price_daily WHERE code=? AND date>=? ORDER BY date",
+            (code, cutoff)
+        ).fetchall()
+        if rows:
+            price_map[code] = {r[0]: r[1] for r in rows}
+    pc.close()
+
+    if not price_map:
+        return jsonify({"empty": True, "labels": [], "values": []})
+
+    # 전체 날짜 합집합 정렬
+    all_dates = sorted(set().union(*[set(v.keys()) for v in price_map.values()]))
+
+    labels, values = [], []
+    last_prices = {}
+    for date in all_dates:
+        total = 0.0
+        ok = False
+        for code, qty in valid:
+            if code not in price_map:
+                continue
+            px = price_map[code].get(date) or last_prices.get(code)
+            if px is None:
+                continue
+            last_prices[code] = px
+            total += qty * (px if is_kr(code) else px * usdkrw)
+            ok = True
+        if ok and total > 0:
+            labels.append(date)
+            values.append(round(total))
+
+    if not values:
+        return jsonify({"empty": True, "labels": [], "values": []})
+
+    current = values[-1]
+    change = round((values[-1] / values[0] - 1) * 100, 2) if values[0] else 0
+    return jsonify({"labels": labels, "values": values, "current": current, "change": change})
 
 
 # -----------------------------------------------

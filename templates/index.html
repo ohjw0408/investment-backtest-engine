@@ -81,13 +81,8 @@ async function loadPortfolio(period = '1m') {
   const data = await res.json();
 
   if (data.empty) {
-    if (data.current) {
-      document.getElementById('portfolioValue').textContent = '₩' + data.current.toLocaleString();
-      document.getElementById('portfolioChange').textContent = '(매입가 기준)';
-    } else {
-      document.getElementById('portfolioValue').textContent = '—';
-      document.getElementById('portfolioChange').textContent = '';
-    }
+    document.getElementById('portfolioValue').textContent = '—';
+    document.getElementById('portfolioChange').textContent = '';
     const canvas = document.getElementById('portfolioChart');
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -98,9 +93,17 @@ async function loadPortfolio(period = '1m') {
     return;
   }
 
+  document.getElementById('portfolioValue').textContent = '₩' + data.current.toLocaleString();
+  if (data.change !== null) {
+    const sign = data.change >= 0 ? '+' : '';
+    const el = document.getElementById('portfolioChange');
+    el.textContent = sign + data.change + '%';
+    el.className = 'portfolio-change ' + (data.change >= 0 ? 'up' : 'down');
+  }
+
   const { labels, values } = data;
-  const slices = { '1m': 20, '3m': 40, '1y': 60, 'all': 80 };
-  const n = slices[period] || 20;
+  const slices = { '1m': 22, '3m': 66, '1y': 252, 'all': values.length };
+  const n = slices[period] || 22;
   const slicedLabels = labels.slice(-n);
   const slicedValues = values.slice(-n);
 

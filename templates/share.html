@@ -223,12 +223,20 @@ new Chart(ctx, {
 
 <script>
 function copyLink() {
-  navigator.clipboard.writeText(window.location.href).then(() => {
-    const btn = event.target;
-    const orig = btn.textContent;
-    btn.textContent = '✅ 복사됨!';
-    setTimeout(() => btn.textContent = orig, 2000);
-  });
+  const url = window.location.href;
+  const btn = event.target; const orig = btn.textContent;
+  const doFeedback = () => { btn.textContent = '✅ 복사됨!'; setTimeout(() => btn.textContent = orig, 2000); };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(url).then(doFeedback);
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    doFeedback();
+  }
 }
 </script>
 </body>

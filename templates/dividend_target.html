@@ -1035,8 +1035,8 @@ function mmEncodeShare(data) {
 function divCopyLink() {
   if (!window._divShareData) return;
   const url = location.origin + '/share?d=' + mmEncodeShare(window._divShareData);
-  navigator.clipboard.writeText(url).then(() => {
-    const btn = event.target; const orig = btn.textContent;
+  const btn = event.target; const orig = btn.textContent;
+  mmCopyText(url).then(() => {
     btn.textContent = '✅ 복사됨!'; setTimeout(() => btn.textContent = orig, 2000);
   });
 }

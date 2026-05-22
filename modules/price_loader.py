@@ -433,6 +433,57 @@ class PriceLoader:
             currency = "KRW" if is_kr else "USD"
             country  = "KR"  if is_kr else "US"
 
+        # ── 지수: index_daily 우선 조회, stale이면 yfinance로 최근분 보충 ──
+        _INDEX_DB_ALIAS = {'KRW=X': 'USD/KRW', '^KS11': 'KS200'}
+        _INDEX_NAMES    = {
+            'KRW=X': '달러/원 환율',    '^GSPC': 'S&P 500',
+            '^IXIC': 'NASDAQ Composite', '^KS11': '코스피 (KOSPI)',
+            'GC=F':  '금 선물 (COMEX)', '^NDX':  'NASDAQ-100',
+            '^DJI':  '다우존스',         '^N225': '닛케이 225',
+        }
+        if is_index and self.index_conn is not None:
+            db_code   = _INDEX_DB_ALIAS.get(code, code)
+            cutoff_30y = (_dt.today() - _td(days=365 * 30)).strftime("%Y-%m-%d")
+            idx_rows = self.index_conn.execute(
+                "SELECT date, close FROM index_daily WHERE code=? AND date>=? ORDER BY date",
+                (db_code, cutoff_30y)
+            ).fetchall()
+            if idx_rows:
+                prices    = [{"date": r[0], "close": round(float(r[1]), 4)} for r in idx_rows]
+                last_date = prices[-1]["date"]
+                five_ago  = (_dt.today() - _td(days=5)).strftime("%Y-%m-%d")
+                if last_date < five_ago:
+                    try:
+                        gap_start = (_dt.strptime(last_date, "%Y-%m-%d") + _td(days=1)).strftime("%Y-%m-%d")
+                        yf_raw = yf.download(code, start=gap_start, end=today,
+                                             progress=False, auto_adjust=False, threads=False)
+                        if not yf_raw.empty:
+                            if isinstance(yf_raw.columns, pd.MultiIndex):
+                                yf_raw.columns = yf_raw.columns.get_level_values(0)
+                            yf_raw = yf_raw.reset_index()
+                            for _, r in yf_raw.iterrows():
+                                d = r["Date"].strftime("%Y-%m-%d") if hasattr(r["Date"], "strftime") else str(r["Date"])[:10]
+                                prices.append({"date": d, "close": round(float(r["Close"]), 4)})
+                    except Exception:
+                        pass
+                cur_price  = prices[-1]["close"]
+                prev_price = prices[-2]["close"] if len(prices) > 1 else None
+                last_date  = prices[-1]["date"]
+                cutoff_1y  = (_dt.today() - _td(days=365)).strftime("%Y-%m-%d")
+                prices_1y  = [p["close"] for p in prices if p["date"] >= cutoff_1y]
+                return {
+                    "code": code, "name": _INDEX_NAMES.get(code, code),
+                    "country": country, "currency": currency,
+                    "current_price": cur_price, "prev_price": prev_price,
+                    "last_date": last_date,
+                    "high_52w": max(prices_1y) if prices_1y else None,
+                    "low_52w":  min(prices_1y) if prices_1y else None,
+                    "div_yield": None, "issuer": None, "category": "INDEX",
+                    "expense_ratio": None, "aum": None,
+                    "dividends": [], "prices": prices, "is_index": True,
+                }
+            # index_daily에 없으면 아래 yfinance 경로로 fall-through
+
         df = self.get_price(code, start_dl, today, apply_fx=False)
 
         # get_price 실패 시 yfinance 직접 (BTC-USD 등)

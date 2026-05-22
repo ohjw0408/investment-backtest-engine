@@ -37,10 +37,11 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
     initial    = float(body.get('initial_capital', 10_000_000))
     monthly    = float(body.get('monthly_contribution', 0))
     div_mode   = body.get('dividend_mode', 'reinvest')
-    rebal_mode = body.get('rebal_mode', 'none')
+    rebal_mode  = body.get('rebal_mode', 'none')
+    band_width  = float(body.get('band_width', 0.05))
 
-    rebal_freq = None if rebal_mode == 'none' else rebal_mode
-    drift      = 0.05 if rebal_mode == 'band' else None
+    rebal_freq  = None if rebal_mode in ('none', 'band') else rebal_mode
+    drift       = band_width if rebal_mode == 'band' else None
 
     strategy = PeriodicRebalance(
         target_weights      = weights,

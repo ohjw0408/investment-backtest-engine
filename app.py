@@ -773,12 +773,13 @@ def retirement_run():
         accumulation_years   = int(body['accumulation_years'])
         dividend_mode        = body.get('dividend_mode', 'reinvest')
         rebal_mode           = body.get('rebal_mode', 'none')
+        band_width           = float(body.get('band_width', 0.05))
         monthly_withdrawal   = float(body['monthly_withdrawal'])
         withdrawal_years     = int(body['withdrawal_years'])
         inflation            = float(body.get('inflation', 0.02))
         target_percentile    = float(body.get('target_percentile', 0.90))
 
-        strategy_factory = _make_strategy_factory(target_weights, rebal_mode)
+        strategy_factory = _make_strategy_factory(target_weights, rebal_mode, band_width)
 
         data_end = datetime.date.today().strftime('%Y-%m-%d')
 
@@ -1147,9 +1148,10 @@ def backtest_run():
         monthly    = float(body.get('monthly_contribution', 0))
         div_mode   = body.get('dividend_mode', 'reinvest')
         rebal_mode = body.get('rebal_mode', 'none')
+        band_width = float(body.get('band_width', 0.05))
 
-        rebal_freq = None if rebal_mode == 'none' else rebal_mode
-        drift      = 0.05 if rebal_mode == 'band' else None
+        rebal_freq = None if rebal_mode in ('none', 'band') else rebal_mode
+        drift      = band_width if rebal_mode == 'band' else None
 
         strategy = PeriodicRebalance(
             target_weights      = weights,

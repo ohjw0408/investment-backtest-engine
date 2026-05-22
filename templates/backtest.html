@@ -147,10 +147,19 @@
       <div class="input-row">
         <label>리밸런싱</label>
         <div class="rebal-options">
-          <label class="rebal-option"><input type="radio" name="btRebal" value="none" checked><span class="rebal-label">없음</span></label>
-          <label class="rebal-option"><input type="radio" name="btRebal" value="monthly"><span class="rebal-label">월</span></label>
-          <label class="rebal-option"><input type="radio" name="btRebal" value="yearly"><span class="rebal-label">연</span></label>
+          <label class="rebal-option"><input type="radio" name="btRebal" value="none" checked><span class="rebal-label">안 함</span></label>
+          <label class="rebal-option"><input type="radio" name="btRebal" value="monthly"><span class="rebal-label">매월</span></label>
+          <label class="rebal-option"><input type="radio" name="btRebal" value="quarterly"><span class="rebal-label">분기</span></label>
+          <label class="rebal-option"><input type="radio" name="btRebal" value="yearly"><span class="rebal-label">매년</span></label>
           <label class="rebal-option"><input type="radio" name="btRebal" value="band"><span class="rebal-label">밴드</span></label>
+        </div>
+        <div class="band-settings" id="btBandSettings" style="display:none">
+          <div class="input-row">
+            <label>밴드 폭 <span id="btBandLabel" class="label-val">5%</span></label>
+            <input type="range" id="btBandSlider" class="calc-slider" min="1" max="30" value="5">
+            <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
+          </div>
+          <div class="band-note">비중이 목표에서 <strong id="btBandNoteVal">5%</strong> 이상 벗어나면 리밸런싱</div>
         </div>
       </div>
     </div>
@@ -416,6 +425,7 @@ async function runBacktest() {
       monthly_contribution: parseFloat(document.getElementById('btMonthly').value) || 0,
       dividend_mode:        document.querySelector('input[name="btDividend"]:checked').value,
       rebal_mode:           document.querySelector('input[name="btRebal"]:checked').value,
+      band_width:           Number(document.getElementById('btBandSlider').value) / 100,
     };
     const res = await fetch('/api/backtest/submit', {
       method: 'POST',
@@ -574,7 +584,16 @@ function btRestoreForm(body) {
   if (body.initial_capital !== undefined) document.getElementById('btSeedHint').textContent = '₩' + (body.initial_capital||0).toLocaleString();
   if (body.monthly_contribution !== undefined) document.getElementById('btMonthlyHint').textContent = '₩' + (body.monthly_contribution||0).toLocaleString();
   if (body.dividend_mode) { const el = document.querySelector(`input[name="btDividend"][value="${body.dividend_mode}"]`); if (el) el.checked = true; }
-  if (body.rebal_mode) { const el = document.querySelector(`input[name="btRebal"][value="${body.rebal_mode}"]`); if (el) el.checked = true; }
+  if (body.rebal_mode) {
+    const el = document.querySelector(`input[name="btRebal"][value="${body.rebal_mode}"]`);
+    if (el) { el.checked = true; document.getElementById('btBandSettings').style.display = body.rebal_mode === 'band' ? 'block' : 'none'; }
+  }
+  if (body.band_width) {
+    const pct = Math.round(body.band_width * 100);
+    document.getElementById('btBandSlider').value = pct;
+    document.getElementById('btBandLabel').textContent = pct + '%';
+    document.getElementById('btBandNoteVal').textContent = pct + '%';
+  }
 }
 
 async function btCancelTask() {
@@ -586,6 +605,16 @@ async function btCancelTask() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  document.querySelectorAll('input[name="btRebal"]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.getElementById('btBandSettings').style.display = r.value === 'band' ? 'block' : 'none';
+    });
+  });
+  document.getElementById('btBandSlider').addEventListener('input', e => {
+    document.getElementById('btBandLabel').textContent   = e.target.value + '%';
+    document.getElementById('btBandNoteVal').textContent = e.target.value + '%';
+  });
+
   const taskSaved = localStorage.getItem('mm_task_backtest');
   if (taskSaved) {
     let state;

@@ -214,10 +214,19 @@
         <div class="input-row">
           <label>리밸런싱</label>
           <div class="rebal-options">
-            <label class="rebal-option"><input type="radio" name="simRebal" value="none" checked><span class="rebal-label">없음</span></label>
-            <label class="rebal-option"><input type="radio" name="simRebal" value="monthly"><span class="rebal-label">월</span></label>
-            <label class="rebal-option"><input type="radio" name="simRebal" value="yearly"><span class="rebal-label">연</span></label>
+            <label class="rebal-option"><input type="radio" name="simRebal" value="none" checked><span class="rebal-label">안 함</span></label>
+            <label class="rebal-option"><input type="radio" name="simRebal" value="monthly"><span class="rebal-label">매월</span></label>
+            <label class="rebal-option"><input type="radio" name="simRebal" value="quarterly"><span class="rebal-label">분기</span></label>
+            <label class="rebal-option"><input type="radio" name="simRebal" value="yearly"><span class="rebal-label">매년</span></label>
             <label class="rebal-option"><input type="radio" name="simRebal" value="band"><span class="rebal-label">밴드</span></label>
+          </div>
+          <div class="band-settings" id="simBandSettings" style="display:none">
+            <div class="input-row">
+              <label>밴드 폭 <span id="simBandLabel" class="label-val">5%</span></label>
+              <input type="range" id="simBandSlider" class="calc-slider" min="1" max="30" value="5">
+              <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
+            </div>
+            <div class="band-note">비중이 목표에서 <strong id="simBandNoteVal">5%</strong> 이상 벗어나면 리밸런싱</div>
           </div>
         </div>
 
@@ -306,10 +315,19 @@
         <div class="input-row">
           <label>리밸런싱</label>
           <div class="rebal-options">
-            <label class="rebal-option"><input type="radio" name="wdRebal" value="none" checked><span class="rebal-label">없음</span></label>
-            <label class="rebal-option"><input type="radio" name="wdRebal" value="monthly"><span class="rebal-label">월</span></label>
-            <label class="rebal-option"><input type="radio" name="wdRebal" value="yearly"><span class="rebal-label">연</span></label>
+            <label class="rebal-option"><input type="radio" name="wdRebal" value="none" checked><span class="rebal-label">안 함</span></label>
+            <label class="rebal-option"><input type="radio" name="wdRebal" value="monthly"><span class="rebal-label">매월</span></label>
+            <label class="rebal-option"><input type="radio" name="wdRebal" value="quarterly"><span class="rebal-label">분기</span></label>
+            <label class="rebal-option"><input type="radio" name="wdRebal" value="yearly"><span class="rebal-label">매년</span></label>
             <label class="rebal-option"><input type="radio" name="wdRebal" value="band"><span class="rebal-label">밴드</span></label>
+          </div>
+          <div class="band-settings" id="wdBandSettings" style="display:none">
+            <div class="input-row">
+              <label>밴드 폭 <span id="wdBandLabel" class="label-val">5%</span></label>
+              <input type="range" id="wdBandSlider" class="calc-slider" min="1" max="30" value="5">
+              <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
+            </div>
+            <div class="band-note">비중이 목표에서 <strong id="wdBandNoteVal">5%</strong> 이상 벗어나면 리밸런싱</div>
           </div>
         </div>
       </div>
@@ -665,6 +683,7 @@ async function runRetirement() {
       accumulation_years:   retAccYrs,
       dividend_mode:        document.querySelector('input[name="simDividend"]:checked').value,
       rebal_mode:           document.querySelector('input[name="simRebal"]:checked').value,
+      band_width:           Number(document.getElementById('simBandSlider').value) / 100,
       monthly_withdrawal:   parseFloat(document.getElementById('simWithdraw').value) || 0,
       withdrawal_years:     parseInt(document.getElementById('simWdYears').value) || 30,
       inflation:            parseFloat(document.getElementById('simInflation').value) / 100 || 0,
@@ -688,6 +707,7 @@ async function runRetirement() {
       inflation:          parseFloat(document.getElementById('wdInflation').value) / 100 || 0,
       dividend_mode:      document.querySelector('input[name="wdDividend"]:checked').value,
       rebal_mode:         document.querySelector('input[name="wdRebal"]:checked').value,
+      band_width:         Number(document.getElementById('wdBandSlider').value) / 100,
       target_percentile:  targetProb,
       _withdrawal_only:   true,
     };
@@ -845,6 +865,27 @@ async function retCancelTask() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // 은퇴시뮬 band
+  document.querySelectorAll('input[name="simRebal"]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.getElementById('simBandSettings').style.display = r.value === 'band' ? 'block' : 'none';
+    });
+  });
+  document.getElementById('simBandSlider').addEventListener('input', e => {
+    document.getElementById('simBandLabel').textContent   = e.target.value + '%';
+    document.getElementById('simBandNoteVal').textContent = e.target.value + '%';
+  });
+  // 인출기 band
+  document.querySelectorAll('input[name="wdRebal"]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.getElementById('wdBandSettings').style.display = r.value === 'band' ? 'block' : 'none';
+    });
+  });
+  document.getElementById('wdBandSlider').addEventListener('input', e => {
+    document.getElementById('wdBandLabel').textContent   = e.target.value + '%';
+    document.getElementById('wdBandNoteVal').textContent = e.target.value + '%';
+  });
+
   const taskSaved = localStorage.getItem('mm_task_retirement');
   if (taskSaved) {
     let state;

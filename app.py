@@ -646,18 +646,55 @@ def portfolio_history():
         return bool(kr_pattern.match(code)) or code == 'KRX_GOLD'
 
     price_db = _P(__file__).parent / 'data' / 'price_cache' / 'price_daily.db'
-    pc = _sq.connect(str(price_db))
-    cutoff = (datetime.now() - timedelta(days=3*365)).strftime('%Y-%m-%d')
+    idx_db   = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
+    cutoff   = (datetime.now() - timedelta(days=3*365)).strftime('%Y-%m-%d')
 
     # 종목별 날짜→종가 맵
     price_map = {}
-    for code, _ in valid:
+    codes = list({code for code, _ in valid})
+
+    pc = _sq.connect(str(price_db))
+    for code in codes:
+        if code == 'KRX_GOLD':
+            # index_master.db에서 조회
+            try:
+                ic = _sq.connect(str(idx_db))
+                rows = ic.execute(
+                    "SELECT date, close FROM index_daily WHERE code='KRX_GOLD' AND date>=? ORDER BY date",
+                    (cutoff,)
+                ).fetchall()
+                ic.close()
+                if rows:
+                    price_map[code] = {r[0]: r[1] for r in rows}
+            except Exception:
+                pass
+            continue
+
         rows = pc.execute(
             "SELECT date, close FROM price_daily WHERE code=? AND date>=? ORDER BY date",
             (code, cutoff)
         ).fetchall()
         if rows:
             price_map[code] = {r[0]: r[1] for r in rows}
+        elif is_kr(code):
+            # price_daily.db에 없는 KR 종목 → yfinance .KS로 fetch 후 저장
+            try:
+                import yfinance as _yf
+                hist = _yf.Ticker(f"{code}.KS").history(period="3y", interval="1d")
+                if not hist.empty:
+                    hist.index = hist.index.tz_localize(None) if hist.index.tz else hist.index
+                    rows_to_insert = [
+                        (code, d.strftime('%Y-%m-%d'), row['Open'], row['High'], row['Low'], row['Close'], row['Volume'])
+                        for d, row in hist.iterrows()
+                    ]
+                    pc.executemany(
+                        "INSERT OR REPLACE INTO price_daily (code,date,open,high,low,close,volume) VALUES (?,?,?,?,?,?,?)",
+                        rows_to_insert
+                    )
+                    pc.commit()
+                    price_map[code] = {r[1]: r[5] for r in rows_to_insert if r[1] >= cutoff}
+            except Exception:
+                pass
     pc.close()
 
     if not price_map:

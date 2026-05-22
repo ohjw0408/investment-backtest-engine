@@ -160,8 +160,13 @@ function renderPage(data) {
   const curr   = data.currency;
   const isKR     = data.country === 'KR';
   const isCrypto = data.category === 'CRYPTO';
-  const badgeLabel = isCrypto ? 'CRYPTO' : (isKR ? 'KR ETF' : 'US ETF');
-  const badgeClass = isCrypto ? 'crypto' : (isKR ? 'kr' : '');
+  const isIndex  = data.is_index || data.category === '금현물';
+  const badgeLabel = isIndex  ? '지수/선물'
+                   : isCrypto ? 'CRYPTO'
+                   : isKR     ? 'KR ETF' : 'US ETF';
+  const badgeClass = isIndex  ? ''
+                   : isCrypto ? 'crypto'
+                   : isKR     ? 'kr' : '';
 
   document.getElementById('symbolContent').innerHTML = `
     <!-- 상단 헤더 (full width) -->
@@ -215,7 +220,7 @@ function renderPage(data) {
               <div class="stat-label">배당수익률</div>
               <div class="stat-value">${data.div_yield ? data.div_yield.toFixed(2) + '%' : '—'}</div>
             </div>
-            ${!isCrypto ? `
+            ${(!isCrypto && !isIndex) ? `
             <div class="stat-item">
               <div class="stat-label">운용사</div>
               <div class="stat-value" style="font-size:0.82rem;">${data.issuer || '—'}</div>
@@ -236,6 +241,7 @@ function renderPage(data) {
           </div>
         </div>
 
+        ${!isIndex ? `
         <div class="symbol-card">
           <div class="symbol-card-title">💰 배당 내역</div>
           ${data.dividends && data.dividends.length ? `
@@ -250,7 +256,7 @@ function renderPage(data) {
               `).join('')}
             </tbody>
           </table>` : '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">배당 데이터 없음</div>'}
-        </div>
+        </div>` : ''}
       </div>
     </div>
   `;

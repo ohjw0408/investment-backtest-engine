@@ -419,13 +419,19 @@ class PriceLoader:
                 "low_52w":  min(prices_1y) if prices_1y else None,
                 "div_yield": None, "issuer": "KRX", "category": "금현물",
                 "expense_ratio": None, "aum": None,
-                "dividends": [], "prices": prices,
+                "dividends": [], "prices": prices, "is_index": True,
             }
 
         # ── 가격 로드 ─────────────────────────────────
         is_kr = self.is_kr_etf(code)
-        currency = "KRW" if is_kr else "USD"
-        country  = "KR"  if is_kr else "US"
+        _INDEX_FUTURES = frozenset({'GC=F', 'SI=F', 'CL=F', 'NG=F'})
+        is_index = code.startswith('^') or code in _INDEX_FUTURES
+        if is_index:
+            country  = 'KR' if code == '^KS11' else 'US'
+            currency = 'KRW' if code == '^KS11' else 'USD'
+        else:
+            currency = "KRW" if is_kr else "USD"
+            country  = "KR"  if is_kr else "US"
 
         df = self.get_price(code, start_dl, today, apply_fx=False)
 
@@ -458,15 +464,19 @@ class PriceLoader:
         high_52w  = max(prices_1y) if prices_1y else None
         low_52w   = min(prices_1y) if prices_1y else None
 
-        # 배당 내역
-        divs_raw = self.conn.execute(
-            "SELECT date, dividend FROM corporate_actions "
-            "WHERE code=? AND dividend > 0 ORDER BY date DESC LIMIT 12",
-            (code,)
-        ).fetchall()
-        dividends   = [{"date": r[0], "dividend": round(float(r[1]), 6)} for r in divs_raw]
-        recent_divs = [d["dividend"] for d in dividends if d["date"] >= cutoff_1y]
-        div_yield   = (sum(recent_divs) / cur_price * 100) if cur_price and recent_divs else None
+        # 배당 내역 (지수/선물은 배당 없음)
+        if is_index:
+            dividends = []
+            div_yield = None
+        else:
+            divs_raw = self.conn.execute(
+                "SELECT date, dividend FROM corporate_actions "
+                "WHERE code=? AND dividend > 0 ORDER BY date DESC LIMIT 12",
+                (code,)
+            ).fetchall()
+            dividends   = [{"date": r[0], "dividend": round(float(r[1]), 6)} for r in divs_raw]
+            recent_divs = [d["dividend"] for d in dividends if d["date"] >= cutoff_1y]
+            div_yield   = (sum(recent_divs) / cur_price * 100) if cur_price and recent_divs else None
 
         # 메타 정보 (symbol_master.db)
         sym_db = META_DIR / "symbol_master.db"
@@ -526,6 +536,8 @@ class PriceLoader:
 
         if not name:
             name = code
+        if is_index and not category:
+            category = 'INDEX'
 
         return {
             "code": code, "name": name,
@@ -535,4 +547,5 @@ class PriceLoader:
             "div_yield": div_yield, "issuer": issuer, "category": category,
             "expense_ratio": expense_ratio, "aum": aum,
             "dividends": dividends, "prices": prices,
+            "is_index": is_index,
         }

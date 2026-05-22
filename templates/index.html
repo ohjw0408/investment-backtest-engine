@@ -81,8 +81,13 @@ async function loadPortfolio(period = '1m') {
   const data = await res.json();
 
   if (data.empty) {
-    document.getElementById('portfolioValue').textContent = '—';
-    document.getElementById('portfolioChange').textContent = '';
+    if (data.current) {
+      document.getElementById('portfolioValue').textContent = '₩' + data.current.toLocaleString();
+      document.getElementById('portfolioChange').textContent = '(매입가 기준)';
+    } else {
+      document.getElementById('portfolioValue').textContent = '—';
+      document.getElementById('portfolioChange').textContent = '';
+    }
     const canvas = document.getElementById('portfolioChart');
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);

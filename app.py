@@ -617,6 +617,13 @@ def dividend_target_solve():
 
 @app.route('/api/portfolio/history')
 def portfolio_history():
+    uid = session.get('user_id')
+    if uid:
+        holdings = get_holdings(uid)
+        if holdings:
+            total = sum(h['avg_price'] * h['quantity'] for h in holdings if h['avg_price'] and h['quantity'])
+            if total > 0:
+                return jsonify({"empty": True, "labels": [], "values": [], "current": round(total), "change": None})
     return jsonify({"empty": True, "labels": [], "values": []})
 
 

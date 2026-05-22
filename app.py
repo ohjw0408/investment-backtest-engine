@@ -680,7 +680,8 @@ def portfolio_history():
             # price_daily.db에 없는 KR 종목 → yfinance .KS로 fetch 후 저장
             try:
                 import yfinance as _yf
-                hist = _yf.Ticker(f"{code}.KS").history(period="3y", interval="1d")
+                ticker = _yf.Ticker(f"{code}.KS")
+                hist = ticker.history(period="3y", interval="1d", actions=True)
                 if not hist.empty:
                     hist.index = hist.index.tz_localize(None) if hist.index.tz else hist.index
                     rows_to_insert = [
@@ -691,6 +692,17 @@ def portfolio_history():
                         "INSERT OR REPLACE INTO price_daily (code,date,open,high,low,close,volume) VALUES (?,?,?,?,?,?,?)",
                         rows_to_insert
                     )
+                    # 배당 데이터도 함께 저장
+                    if 'Dividends' in hist.columns:
+                        div_rows = [
+                            (code, d.strftime('%Y-%m-%d'), float(row['Dividends']), 1.0)
+                            for d, row in hist.iterrows() if row['Dividends'] > 0
+                        ]
+                        if div_rows:
+                            pc.executemany(
+                                "INSERT OR REPLACE INTO corporate_actions (code,date,dividend,split) VALUES (?,?,?,?)",
+                                div_rows
+                            )
                     pc.commit()
                     price_map[code] = {r[1]: r[5] for r in rows_to_insert if r[1] >= cutoff}
             except Exception:

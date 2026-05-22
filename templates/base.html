@@ -13,10 +13,10 @@
 
 <!-- ===== NAVBAR ===== -->
 <nav class="navbar">
-  <div class="logo">
+  <a href="/" class="logo" style="text-decoration:none;color:inherit;">
     <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Money Milestone" style="height:32px; vertical-align:middle;">
     Money <span>Milestone</span>
-  </div>
+  </a>
   <div class="nav-links">
     <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">홈</a>
     <a class="nav-link {% if request.path.startswith('/calculator') %}active{% endif %}" href="/calculator">투자 계산기</a>

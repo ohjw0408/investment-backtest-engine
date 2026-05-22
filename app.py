@@ -617,19 +617,6 @@ def dividend_target_solve():
 
 @app.route('/api/portfolio/history')
 def portfolio_history():
-    uid = session.get('user_id')
-    if uid:
-        holdings = get_holdings(uid)
-        if holdings:
-            val = 7870200
-            data = []
-            for i in range(80):
-                val += (random.random() - 0.38) * 300000
-                val = max(val, 7000000)
-                data.append(round(val))
-            data[-1] = 15870200
-            labels = [f"{2017 + i//12}년 {i%12+1}월" for i in range(80)]
-            return jsonify({"labels": labels, "values": data, "current": 15870200, "change": 1.8})
     return jsonify({"empty": True, "labels": [], "values": []})
 
 

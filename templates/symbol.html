@@ -17,8 +17,8 @@
   background: #E3F2FD; color: #1565C0;
 }
 .symbol-badge.kr { background: #E8F5E9; color: #2E7D32; }
-.symbol-code { font-size: 1.6rem; font-weight: 900; color: var(--text); }
-.symbol-name { font-size: 0.9rem; color: var(--text-muted); margin-top: 2px; }
+.symbol-name { font-size: 1.6rem; font-weight: 900; color: var(--text); margin-top: 6px; }
+.symbol-code { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
 .symbol-price-wrap { margin-left: auto; text-align: right; }
 .symbol-price { font-size: 2rem; font-weight: 800; color: var(--text); }
 .symbol-change { font-size: 0.9rem; font-weight: 700; margin-top: 2px; }
@@ -128,8 +128,8 @@ function renderPage(data) {
     <div class="symbol-header">
       <div>
         <span class="symbol-badge ${isKR ? 'kr' : ''}">${isKR ? 'KR ETF' : 'US ETF'}</span>
-        <div class="symbol-code" style="margin-top:6px;">${data.code}</div>
         <div class="symbol-name">${data.name}</div>
+        <div class="symbol-code">${data.code}</div>
       </div>
       <div class="symbol-price-wrap">
         <div class="symbol-price">${fmtPrice(cur, curr)}</div>

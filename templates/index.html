@@ -76,9 +76,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── 포트폴리오 차트 ──
 let portfolioChart = null;
+let _portfolioData = null;
 async function loadPortfolio(period = '1m') {
-  const res  = await fetch('/api/portfolio/history');
-  const data = await res.json();
+  if (!_portfolioData) {
+    const res = await fetch('/api/portfolio/history');
+    _portfolioData = await res.json();
+  }
+  const data = _portfolioData;
 
   if (data.empty) {
     document.getElementById('portfolioValue').textContent = '—';
@@ -93,19 +97,24 @@ async function loadPortfolio(period = '1m') {
     return;
   }
 
-  document.getElementById('portfolioValue').textContent = '₩' + data.current.toLocaleString();
-  if (data.change !== null) {
-    const sign = data.change >= 0 ? '+' : '';
-    const el = document.getElementById('portfolioChange');
-    el.textContent = sign + data.change + '%';
-    el.className = 'portfolio-change ' + (data.change >= 0 ? 'up' : 'down');
-  }
-
   const { labels, values } = data;
   const slices = { '1m': 22, '3m': 66, '1y': 252, 'all': values.length };
   const n = slices[period] || 22;
   const slicedLabels = labels.slice(-n);
   const slicedValues = values.slice(-n);
+
+  document.getElementById('portfolioValue').textContent = '₩' + (slicedValues[slicedValues.length - 1] || 0).toLocaleString();
+  const periodChange = slicedValues.length > 1
+    ? ((slicedValues[slicedValues.length - 1] - slicedValues[0]) / slicedValues[0] * 100).toFixed(2)
+    : null;
+  const changeEl = document.getElementById('portfolioChange');
+  if (periodChange !== null) {
+    const sign = periodChange >= 0 ? '+' : '';
+    changeEl.textContent = sign + periodChange + '%';
+    changeEl.className = 'portfolio-change ' + (periodChange >= 0 ? 'up' : 'down');
+  } else {
+    changeEl.textContent = '';
+  }
 
   const canvas = document.getElementById('portfolioChart');
   const ctx = canvas.getContext('2d');

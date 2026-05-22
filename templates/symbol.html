@@ -16,7 +16,8 @@
   font-size: 0.75rem; font-weight: 700;
   background: #E3F2FD; color: #1565C0;
 }
-.symbol-badge.kr { background: #E8F5E9; color: #2E7D32; }
+.symbol-badge.kr     { background: #E8F5E9; color: #2E7D32; }
+.symbol-badge.crypto { background: #FFF3E0; color: #E65100; }
 .symbol-name { font-size: 1.6rem; font-weight: 900; color: var(--text); margin-top: 6px; }
 .symbol-code { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
 .symbol-price-wrap { margin-left: auto; text-align: right; }
@@ -121,13 +122,16 @@ function renderPage(data) {
   const chgPct = prev ? (chg / prev * 100) : 0;
   const isUp   = chg >= 0;
   const curr   = data.currency;
-  const isKR   = data.country === 'KR';
+  const isKR     = data.country === 'KR';
+  const isCrypto = data.category === 'CRYPTO';
+  const badgeLabel = isCrypto ? 'CRYPTO' : (isKR ? 'KR ETF' : 'US ETF');
+  const badgeClass = isCrypto ? 'crypto' : (isKR ? 'kr' : '');
 
   document.getElementById('symbolContent').innerHTML = `
     <!-- 헤더 -->
     <div class="symbol-header">
       <div>
-        <span class="symbol-badge ${isKR ? 'kr' : ''}">${isKR ? 'KR ETF' : 'US ETF'}</span>
+        <span class="symbol-badge ${badgeClass}">${badgeLabel}</span>
         <div class="symbol-name">${data.name}</div>
         <div class="symbol-code">${data.code}</div>
       </div>
@@ -168,6 +172,7 @@ function renderPage(data) {
           <div class="stat-label">배당수익률</div>
           <div class="stat-value">${data.div_yield ? data.div_yield.toFixed(2) + '%' : '—'}</div>
         </div>
+        ${!isCrypto ? `
         <div class="stat-item">
           <div class="stat-label">운용사</div>
           <div class="stat-value">${data.issuer || '—'}</div>
@@ -179,7 +184,7 @@ function renderPage(data) {
         <div class="stat-item">
           <div class="stat-label">보수율</div>
           <div class="stat-value">${data.expense_ratio ? (data.expense_ratio * 100).toFixed(2) + '%' : '—'}</div>
-        </div>
+        </div>` : ''}
         ${data.aum ? `
         <div class="stat-item">
           <div class="stat-label">AUM</div>

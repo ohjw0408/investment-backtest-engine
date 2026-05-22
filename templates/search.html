@@ -3,7 +3,7 @@
 
 {% block head %}
 <style>
-.search-page { max-width: 700px; margin: 0 auto; padding: 24px 16px; }
+.search-page { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
 .search-bar {
   display: flex; align-items: center; gap: 10px;
   background: white; border: 1.5px solid var(--border);
@@ -17,20 +17,41 @@
   background: transparent;
 }
 .search-icon { font-size: 1.2rem; color: var(--text-muted); }
-.result-item {
+
+/* 2열 그리드 */
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (max-width: 560px) {
+  .results-grid { grid-template-columns: 1fr; }
+}
+
+.result-card {
   background: white; border: 1.5px solid var(--border);
-  border-radius: 10px; padding: 14px 16px; margin-bottom: 8px;
-  cursor: pointer; display: flex; align-items: center; gap: 12px;
+  border-radius: 12px; padding: 14px 16px;
+  cursor: pointer; text-decoration: none; color: var(--text);
   transition: border-color 0.15s, box-shadow 0.15s;
-  text-decoration: none; color: var(--text);
+  display: flex; flex-direction: column; gap: 6px;
 }
-.result-item:hover { border-color: var(--blue-bright); box-shadow: var(--shadow); }
+.result-card:hover { border-color: var(--blue-bright); box-shadow: var(--shadow); }
+
+.card-top { display: flex; align-items: center; justify-content: space-between; }
 .result-badge {
-  font-size: 0.7rem; font-weight: 700;
-  padding: 2px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;
+  font-size: 0.68rem; font-weight: 700;
+  padding: 2px 8px; border-radius: 6px; white-space: nowrap;
 }
-.result-code { font-weight: 700; font-size: 0.95rem; }
-.result-name { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
+.card-price { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.card-name { font-size: 0.97rem; font-weight: 700; color: var(--text); line-height: 1.3; }
+.card-code { font-size: 0.78rem; color: var(--text-muted); }
+.card-change {
+  font-size: 0.8rem; font-weight: 700; text-align: right;
+}
+.card-change.up   { color: #2E7D32; }
+.card-change.down { color: #C62828; }
+.card-change.flat { color: var(--text-muted); }
+
 .search-hint { text-align: center; color: var(--text-muted); padding: 48px 0; font-size: 0.9rem; }
 </style>
 {% endblock %}
@@ -57,6 +78,21 @@ function badgeColor(badge) {
   return '#78909C';
 }
 
+function fmtPrice(price, currency) {
+  if (price == null) return '—';
+  if (currency === 'KRW') {
+    if (price >= 10000) return '₩' + Math.round(price / 100) * 100 .toLocaleString();
+    return '₩' + Math.round(price).toLocaleString();
+  }
+  return '$' + price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function fmtChange(pct) {
+  if (pct == null) return { text: '—', cls: 'flat' };
+  const sign = pct >= 0 ? '+' : '';
+  return { text: sign + pct.toFixed(2) + '%', cls: pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat' };
+}
+
 const input      = document.getElementById('searchInput');
 const resultsDiv = document.getElementById('searchResults');
 let timer = null;
@@ -77,15 +113,23 @@ input.addEventListener('input', () => {
         resultsDiv.innerHTML = '<div class="search-hint">검색 결과가 없습니다</div>';
         return;
       }
-      resultsDiv.innerHTML = data.map(item => `
-        <a class="result-item" href="/symbol/${item.code}">
-          <span class="result-badge" style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
-          <div>
-            <div class="result-code">${item.name}</div>
-            <div class="result-name">${item.code}${item.subtitle ? ' · ' + item.subtitle : ''}</div>
-          </div>
-        </a>
-      `).join('');
+      const color = (b) => badgeColor(b);
+      resultsDiv.innerHTML = '<div class="results-grid">' + data.map(item => {
+        const chg = fmtChange(item.change_pct);
+        const priceStr = fmtPrice(item.price, item.currency);
+        return `
+          <a class="result-card" href="/symbol/${item.code}">
+            <div class="card-top">
+              <span class="result-badge" style="background:${color(item.badge)}22;color:${color(item.badge)}">${item.badge}</span>
+              <span class="card-price">${priceStr}</span>
+            </div>
+            <div class="card-name">${item.name}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="card-code">${item.code}${item.subtitle ? ' · ' + item.subtitle : ''}</span>
+              <span class="card-change ${chg.cls}">${chg.text}</span>
+            </div>
+          </a>`;
+      }).join('') + '</div>';
     } catch(e) {
       resultsDiv.innerHTML = '<div class="search-hint">오류가 발생했습니다</div>';
     }

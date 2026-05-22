@@ -218,6 +218,50 @@ def search():
                     'country':  row.get('country', ''),
                     'is_etf':   bool(row.get('is_etf', 0)),
                 })
+
+        # 가격 배치 조회 (price_daily.db)
+        if results:
+            try:
+                import sqlite3 as _sq
+                pdb = PRICE_DB_PATH
+                if pdb.exists():
+                    pconn = _sq.connect(str(pdb))
+                    codes = [r['code'] for r in results]
+                    ph = ','.join('?' * len(codes))
+                    # 최근 종가
+                    cur_rows = pconn.execute(f"""
+                        SELECT p.code, p.close FROM price_daily p
+                        INNER JOIN (
+                            SELECT code, MAX(date) as mx FROM price_daily
+                            WHERE code IN ({ph}) AND close IS NOT NULL GROUP BY code
+                        ) m ON p.code=m.code AND p.date=m.mx
+                    """, codes).fetchall()
+                    # 전일 종가
+                    prev_rows = pconn.execute(f"""
+                        SELECT p.code, p.close FROM price_daily p
+                        INNER JOIN (
+                            SELECT p2.code, MAX(p2.date) as mx2
+                            FROM price_daily p2
+                            INNER JOIN (
+                                SELECT code, MAX(date) as mx FROM price_daily
+                                WHERE code IN ({ph}) AND close IS NOT NULL GROUP BY code
+                            ) m ON p2.code=m.code AND p2.date < m.mx AND p2.close IS NOT NULL
+                            GROUP BY p2.code
+                        ) prev ON p.code=prev.code AND p.date=prev.mx2
+                    """, codes).fetchall()
+                    pconn.close()
+                    price_map = {r[0]: r[1] for r in cur_rows}
+                    prev_map  = {r[0]: r[1] for r in prev_rows}
+                    for res in results:
+                        c = res['code']
+                        cur = price_map.get(c)
+                        prv = prev_map.get(c)
+                        res['price'] = round(cur, 2) if cur else None
+                        res['change_pct'] = round((cur - prv) / prv * 100, 2) if cur and prv else None
+                        res['currency'] = 'KRW' if res['country'] == 'KR' else 'USD'
+            except Exception as e:
+                print(f"[search price] {e}")
+
         return jsonify(results[:20])
     except Exception as e:
         print(f"[search] 오류: {e}")

@@ -203,9 +203,12 @@
           <h3 class="result-title">시뮬레이션 결과</h3>
           <span class="result-period" id="resultPeriodLabel"></span>
         </div>
-        <div id="calcShareBtns" style="display:none;gap:8px;margin-top:8px;">
-          <button onclick="calcCopyLink()" class="share-pill">🔗 링크 복사</button>
-          <button onclick="calcDownloadImg()" class="share-pill">📷 이미지 저장</button>
+        <div id="calcShareBtns" style="display:none;flex-direction:column;gap:4px;margin-top:8px;">
+          <div style="display:flex;gap:8px;">
+            <button onclick="calcCopyLink()" class="share-pill">🔗 링크 복사</button>
+            <button onclick="calcDownloadImg()" class="share-pill">📷 이미지 저장</button>
+          </div>
+          <div class="share-url-box" id="calcShareUrlBox"></div>
         </div>
       </div>
 

@@ -866,6 +866,8 @@ function calcCopyLink() {
   if (!window._calcShareData) { btn.textContent = '⚠️ 먼저 계산하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
   const d = mmEncodeShare(window._calcShareData);
   const url = location.origin + '/share?d=' + d;
+  const box = document.getElementById('calcShareUrlBox');
+  if (box) { box.style.display = 'block'; box.innerHTML = '🔗 공유 링크: <a href="' + url + '" target="_blank">' + url.slice(0, 60) + '…</a>'; }
   mmCopyText(url).then(() => {
     btn.textContent = '✅ 복사됨!';
     setTimeout(() => btn.textContent = orig, 2000);
@@ -875,12 +877,25 @@ function calcCopyLink() {
 function calcDownloadImg() {
   const el = document.getElementById('resultContent');
   if (!el || typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
-  html2canvas(el, { scale: 2, backgroundColor: '#F0F4F8', useCORS: true }).then(canvas => {
+  html2canvas(el, {
+    scale: 2, backgroundColor: '#F0F4F8', useCORS: true, allowTaint: true,
+    onclone: function(doc, clonedEl) {
+      const origCanvases = el.querySelectorAll('canvas');
+      const clonedCanvases = clonedEl.querySelectorAll('canvas');
+      origCanvases.forEach(function(orig, i) {
+        if (clonedCanvases[i] && orig.width > 0 && orig.height > 0) {
+          clonedCanvases[i].width = orig.width;
+          clonedCanvases[i].height = orig.height;
+          clonedCanvases[i].getContext('2d').drawImage(orig, 0, 0);
+        }
+      });
+    }
+  }).then(function(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.fillRect(0, canvas.height - 52, canvas.width, 52);
     ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(canvas.width * 0.018)}px sans-serif`;
+    ctx.font = 'bold ' + Math.round(canvas.width * 0.018) + 'px sans-serif';
     ctx.fillText('Money Milestone | moneymilestone.duckdns.org', 20, canvas.height - 18);
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');

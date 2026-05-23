@@ -293,9 +293,12 @@
       <div class="bt-card">
         <div class="bt-card-title" style="display:flex;align-items:center;justify-content:space-between;">
           <span>📈 분석 결과</span>
-          <div class="share-btns" id="btShareBtns" style="display:none;gap:8px;display:none;">
-            <button onclick="btCopyLink()" class="share-pill">🔗 링크 복사</button>
-            <button onclick="btDownloadImg()" class="share-pill">📷 이미지 저장</button>
+          <div id="btShareBtns" style="display:none;flex-direction:column;gap:4px;">
+            <div style="display:flex;gap:8px;">
+              <button onclick="btCopyLink()" class="share-pill">🔗 링크 복사</button>
+              <button onclick="btDownloadImg()" class="share-pill">📷 이미지 저장</button>
+            </div>
+            <div class="share-url-box" id="btShareUrlBox"></div>
           </div>
         </div>
         <div class="metrics-grid" id="btMetrics"></div>
@@ -856,6 +859,8 @@ function btCopyLink() {
   if (!window._btShareData) { btn.textContent = '⚠️ 먼저 분석하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
   const d = mmEncodeShare(window._btShareData);
   const url = location.origin + '/share?d=' + d;
+  const box = document.getElementById('btShareUrlBox');
+  if (box) { box.style.display = 'block'; box.innerHTML = '🔗 공유 링크: <a href="' + url + '" target="_blank">' + url.slice(0, 60) + '…</a>'; }
   mmCopyText(url).then(() => {
     btn.textContent = '✅ 복사됨!';
     setTimeout(() => btn.textContent = orig, 2000);
@@ -865,12 +870,25 @@ function btCopyLink() {
 function btDownloadImg() {
   const el = document.getElementById('btResultContent');
   if (!el || typeof html2canvas === 'undefined') { alert('이미지 저장 기능을 불러오는 중입니다.'); return; }
-  html2canvas(el, { scale: 2, backgroundColor: '#F0F4F8', useCORS: true }).then(canvas => {
+  html2canvas(el, {
+    scale: 2, backgroundColor: '#F0F4F8', useCORS: true, allowTaint: true,
+    onclone: function(doc, clonedEl) {
+      const origCanvases = el.querySelectorAll('canvas');
+      const clonedCanvases = clonedEl.querySelectorAll('canvas');
+      origCanvases.forEach(function(orig, i) {
+        if (clonedCanvases[i] && orig.width > 0 && orig.height > 0) {
+          clonedCanvases[i].width = orig.width;
+          clonedCanvases[i].height = orig.height;
+          clonedCanvases[i].getContext('2d').drawImage(orig, 0, 0);
+        }
+      });
+    }
+  }).then(function(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.fillRect(0, canvas.height - 52, canvas.width, 52);
     ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(canvas.width * 0.018)}px sans-serif`;
+    ctx.font = 'bold ' + Math.round(canvas.width * 0.018) + 'px sans-serif';
     ctx.fillText('Money Milestone | moneymilestone.duckdns.org', 20, canvas.height - 18);
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');

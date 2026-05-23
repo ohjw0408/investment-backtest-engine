@@ -465,9 +465,12 @@
       <div class="acc-dist-card">
         <div class="acc-dist-title" style="display:flex;align-items:center;justify-content:space-between;">
           <span>🎯 시뮬레이션 결과</span>
-          <div id="retShareBtns" style="display:none;gap:8px;">
-            <button onclick="retCopyLink()" class="share-pill">🔗 링크 복사</button>
-            <button onclick="retDownloadImg()" class="share-pill">📷 이미지 저장</button>
+          <div id="retShareBtns" style="display:none;flex-direction:column;gap:4px;">
+            <div style="display:flex;gap:8px;">
+              <button onclick="retCopyLink()" class="share-pill">🔗 링크 복사</button>
+              <button onclick="retDownloadImg()" class="share-pill">📷 이미지 저장</button>
+            </div>
+            <div class="share-url-box" id="retShareUrlBox"></div>
           </div>
         </div>
         <div class="survival-bar-wrap">
@@ -1146,6 +1149,8 @@ function retCopyLink() {
   const btn = event.target; const orig = btn.textContent;
   if (!window._retShareData) { btn.textContent = '⚠️ 먼저 계산하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
   const url = location.origin + '/share?d=' + mmEncodeShare(window._retShareData);
+  const box = document.getElementById('retShareUrlBox');
+  if (box) { box.style.display = 'block'; box.innerHTML = '🔗 공유 링크: <a href="' + url + '" target="_blank">' + url.slice(0, 60) + '…</a>'; }
   mmCopyText(url).then(() => {
     btn.textContent = '✅ 복사됨!'; setTimeout(() => btn.textContent = orig, 2000);
   });
@@ -1153,12 +1158,18 @@ function retCopyLink() {
 function retDownloadImg() {
   const el = document.getElementById('retResultContent');
   if (!el || typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
-  html2canvas(el, { scale:2, backgroundColor:'#F0F4F8', useCORS:true }).then(canvas => {
+  html2canvas(el, {
+    scale:2, backgroundColor:'#F0F4F8', useCORS:true, allowTaint:true,
+    onclone: function(doc, clonedEl) {
+      const origC = el.querySelectorAll('canvas'), clonedC = clonedEl.querySelectorAll('canvas');
+      origC.forEach(function(o, i) { if (clonedC[i] && o.width > 0) { clonedC[i].width = o.width; clonedC[i].height = o.height; clonedC[i].getContext('2d').drawImage(o, 0, 0); } });
+    }
+  }).then(function(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.fillRect(0, canvas.height - 52, canvas.width, 52);
     ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(canvas.width * 0.018)}px sans-serif`;
+    ctx.font = 'bold ' + Math.round(canvas.width * 0.018) + 'px sans-serif';
     ctx.fillText('Money Milestone | moneymilestone.duckdns.org', 20, canvas.height - 18);
     const a = document.createElement('a'); a.href = canvas.toDataURL('image/png');
     a.download = 'retirement-result.png'; a.click();

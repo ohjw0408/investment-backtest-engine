@@ -88,7 +88,7 @@ def current_user():
 def google_login():
     ua = request.headers.get('User-Agent', '')
     import re
-    if re.search(r'KAKAOTALK|Instagram|FBAN|FBAV|Line/|everytimeapp|DaumApps', ua, re.I):
+    if re.search(r'KAKAOTALK|Instagram|FBAN|FBAV|FB_IAB|Line/|everytimeapp|DaumApps|TwitterAndroid|Pinterest|Snapchat|Threads|TikTok', ua, re.I):
         return '''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>외부 브라우저에서 열어주세요</title>

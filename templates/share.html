@@ -42,7 +42,6 @@
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Noto Sans KR', sans-serif; background: #F0F4F8; color: #1A2332; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 32px 16px; }
@@ -59,7 +58,8 @@
     .up { color: #2E7D32; }
     .down { color: #C62828; }
     .neutral { color: #1A2332; }
-    .share-spark { margin-top: 8px; }
+    .share-chart-section { margin-top: 20px; }
+    .share-chart-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; color: #1A2332; }
     .share-actions { display: flex; gap: 10px; flex-wrap: wrap; }
     .share-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 10px; font-size: 0.88rem; font-weight: 700; text-decoration: none; cursor: pointer; border: none; font-family: inherit; }
     .share-btn-primary { background: #1976D2; color: white; }
@@ -92,7 +92,30 @@
       <div class="share-type-badge">포트폴리오 백테스트</div>
       <div class="share-label">{{ label or '포트폴리오 분석' }}</div>
       <div class="share-period">{{ period }}</div>
-      <div class="share-metrics">
+      {% set end_v = m.get('end_v', 0) %}
+      {% set inv_v = m.get('inv', 0) %}
+      {% set div_v = m.get('div', 0) %}
+      <div class="share-metrics" style="grid-template-columns:repeat(3,1fr);">
+        <div class="share-metric">
+          <div class="share-metric-label">최종 자산</div>
+          <div class="share-metric-value neutral">
+            {%- if end_v >= 10000 %}₩{{ (end_v / 10000) | round(1) }}억
+            {%- elif end_v > 0 %}₩{{ end_v }}만
+            {%- else %}—{%- endif %}
+          </div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">총 납입금</div>
+          <div class="share-metric-value neutral">
+            {%- if inv_v >= 10000 %}₩{{ (inv_v / 10000) | round(1) }}억
+            {%- elif inv_v > 0 %}₩{{ inv_v }}만
+            {%- else %}—{%- endif %}
+          </div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">총 수익률</div>
+          <div class="share-metric-value {{ 'up' if m.get('total_return', 0) >= 0 else 'down' }}">{{ '%+.1f' % m.get('total_return', 0) }}%</div>
+        </div>
         <div class="share-metric">
           <div class="share-metric-label">CAGR</div>
           <div class="share-metric-value {{ 'up' if m.get('cagr', 0) >= 0 else 'down' }}">{{ '%+.1f' % m.get('cagr', 0) }}%</div>
@@ -106,12 +129,35 @@
           <div class="share-metric-value neutral">{{ '%.2f' % m.get('sharpe', 0) }}</div>
         </div>
         <div class="share-metric">
-          <div class="share-metric-label">총 수익률</div>
-          <div class="share-metric-value {{ 'up' if m.get('total_return', 0) >= 0 else 'down' }}">{{ '%+.1f' % m.get('total_return', 0) }}%</div>
+          <div class="share-metric-label">총 배당금</div>
+          <div class="share-metric-value neutral">
+            {%- if div_v >= 10000 %}₩{{ (div_v / 10000) | round(1) }}억
+            {%- elif div_v > 0 %}₩{{ div_v }}만
+            {%- else %}—{%- endif %}
+          </div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">분석 기간</div>
+          <div class="share-metric-value neutral">{{ '%.1f' % m.get('years', 0) }}년</div>
         </div>
       </div>
       {% if data.get('spark') %}
-      <div class="share-spark"><canvas id="sparkChart" height="80"></canvas></div>
+      <div class="share-chart-section">
+        <div class="share-chart-title">💹 포트폴리오 가치 추이</div>
+        <canvas id="sparkChart" height="130"></canvas>
+      </div>
+      {% endif %}
+      {% if data.get('annual') %}
+      <div class="share-chart-section">
+        <div class="share-chart-title">📅 연간 수익률</div>
+        <canvas id="annualChart" height="100"></canvas>
+      </div>
+      {% endif %}
+      {% if data.get('dd') %}
+      <div class="share-chart-section">
+        <div class="share-chart-title">📉 낙폭 (Drawdown)</div>
+        <canvas id="ddChart" height="80"></canvas>
+      </div>
       {% endif %}
 
     {% elif t == 'calc' %}
@@ -207,26 +253,88 @@
   </div>
 </div>
 
-{% if data.get('spark') and t == 'bt' %}
+{% if t == 'bt' and data %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-const spark = {{ data.get('spark', []) | tojson }};
-const ctx = document.getElementById('sparkChart').getContext('2d');
-const mn = Math.min(...spark), mx = Math.max(...spark);
-const grad = ctx.createLinearGradient(0, 0, 0, 80);
-grad.addColorStop(0, 'rgba(25,118,210,0.25)');
-grad.addColorStop(1, 'rgba(25,118,210,0)');
-new Chart(ctx, {
-  type: 'line',
-  data: {
-    labels: spark.map((_, i) => i),
-    datasets: [{ data: spark, borderColor: '#1976D2', borderWidth: 2, fill: true, backgroundColor: grad, pointRadius: 0, tension: 0.3 }]
-  },
-  options: {
-    responsive: true, animation: false,
-    plugins: { legend: { display: false }, tooltip: { enabled: false } },
-    scales: { x: { display: false }, y: { display: false } }
-  }
-});
+function fmtMw(v) {
+  if (Math.abs(v) >= 10000) return (v < 0 ? '-' : '') + '₩' + (Math.abs(v)/10000).toFixed(1) + '억';
+  return (v < 0 ? '-₩' : '₩') + Math.abs(Math.round(v)).toLocaleString() + '만';
+}
+
+{% if data.get('spark') %}
+(function() {
+  const spark = {{ data.get('spark', []) | tojson }};
+  const svMn  = {{ m.get('sv_mn', 0) }};
+  const svMx  = {{ m.get('sv_mx', 0) }};
+  const period = "{{ period }}";
+  const parts  = period.split(' ~ ');
+  const sy = parseInt((parts[0] || '').slice(0,4)) || 2000;
+  const ey = parseInt((parts[1] || '').slice(0,4)) || sy + 1;
+  const sm = parseInt((parts[0] || '').slice(5,7)) || 1;
+  const em = parseInt((parts[1] || '').slice(5,7)) || 12;
+  const totalMo = (ey - sy) * 12 + (em - sm);
+  const n = spark.length;
+  const labels = spark.map((_, i) => {
+    const mo = sm - 1 + Math.round(i / (n - 1) * totalMo);
+    return (sy + Math.floor(mo / 12)) + '-' + String((mo % 12) + 1).padStart(2,'0');
+  });
+  const rng = svMx - svMn || 1;
+  const values = spark.map(v => +(svMn + (v / 9999) * rng).toFixed(0));
+  const ctx = document.getElementById('sparkChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 130);
+  grad.addColorStop(0, 'rgba(25,118,210,0.25)');
+  grad.addColorStop(1, 'rgba(25,118,210,0)');
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [{ data: values, borderColor: '#1976D2', borderWidth: 2, fill: true, backgroundColor: grad, pointRadius: 0, tension: 0.3 }] },
+    options: {
+      responsive: true, animation: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtMw(c.parsed.y) } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => fmtMw(v) }, grid: { color: 'rgba(0,0,0,0.04)' } }
+      }
+    }
+  });
+})();
+{% endif %}
+
+{% if data.get('annual') %}
+(function() {
+  const annual = {{ data.get('annual', []) | tojson }};
+  const colors = annual.map(a => a.r >= 0 ? 'rgba(46,125,50,0.8)' : 'rgba(198,40,40,0.8)');
+  new Chart(document.getElementById('annualChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels: annual.map(a => a.y + '년'), datasets: [{ data: annual.map(a => a.r), backgroundColor: colors, borderRadius: 4 }] },
+    options: {
+      responsive: true, animation: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => (c.parsed.y >= 0 ? '+' : '') + c.parsed.y.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.04)' } }
+      }
+    }
+  });
+})();
+{% endif %}
+
+{% if data.get('dd') %}
+(function() {
+  const dd = {{ data.get('dd', []) | tojson }};
+  new Chart(document.getElementById('ddChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: dd.map((_, i) => i), datasets: [{ data: dd, borderColor: '#C62828', borderWidth: 1.5, backgroundColor: 'rgba(198,40,40,0.1)', fill: true, pointRadius: 0, tension: 0.2 }] },
+    options: {
+      responsive: true, animation: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + '%' } } },
+      scales: {
+        x: { display: false },
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.04)' } }
+      }
+    }
+  });
+})();
+{% endif %}
 </script>
 {% endif %}
 

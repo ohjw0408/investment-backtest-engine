@@ -733,6 +733,7 @@ function renderBacktest(data) {
     const tickers = (body.tickers || []).map(t => `${t.code} ${t.weight}%`).join('+') || '';
     const startDate = (body.start_date || '').slice(0,7);
     const endDate   = (body.end_date   || '').slice(0,7);
+    const rawPV = (data.history || []).map(h => h.portfolio_value);
     window._btShareData = {
       t: 'bt',
       label: tickers,
@@ -743,8 +744,15 @@ function renderBacktest(data) {
         sharpe:       +(m.sharpe        || 0).toFixed(3),
         total_return: +((m.total_return || 0) * 100).toFixed(2),
         years:        +(m.years         || 0).toFixed(1),
+        end_v: Math.round((m.end_value      || 0) / 10000),
+        inv:   Math.round((m.total_invested || 0) / 10000),
+        div:   Math.round((m.total_dividend || 0) / 10000),
+        sv_mn: rawPV.length ? Math.round(Math.min(...rawPV) / 10000) : 0,
+        sv_mx: rawPV.length ? Math.round(Math.max(...rawPV) / 10000) : 0,
       },
-      spark: downsample((data.history || []).map(h => h.portfolio_value), 80),
+      spark:  downsample(rawPV, 80),
+      annual: (data.annual_returns || []).map(a => ({y: a.year, r: +(a.return * 100).toFixed(1)})),
+      dd:     downsampleDd((data.history || []).map(h => +(h.drawdown * 100).toFixed(1)), 80),
     };
   } catch(e) {}
   document.getElementById('btShareBtns').style.display = 'flex';
@@ -845,6 +853,17 @@ function downsample(arr, n) {
   for (let i = 0; i < n; i++) {
     const idx = Math.round(i * (arr.length - 1) / (n - 1));
     result.push(Math.round((arr[idx] - mn) / rng * 9999));
+  }
+  return result;
+}
+
+function downsampleDd(arr, n) {
+  if (!arr || arr.length === 0) return [];
+  if (arr.length <= n) return arr;
+  const result = [];
+  for (let i = 0; i < n; i++) {
+    const idx = Math.round(i * (arr.length - 1) / (n - 1));
+    result.push(arr[idx]);
   }
   return result;
 }

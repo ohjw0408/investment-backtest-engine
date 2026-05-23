@@ -132,6 +132,9 @@ class AccumulationAnalyzer:
                     portfolio_class      = portfolio_class,
                 )
 
+                # ytd 실현차익 캡처 (청산세 250만 공제 중복 방지용)
+                ytd_us_gains = getattr(sim_loop.executor, '_ytd_us_gains', 0.0)
+
                 # ── 원본 복원 ──────────────────────────────────
                 sim_loop.dividend_engine = orig_div_engine
                 sim_loop.executor        = orig_executor
@@ -140,7 +143,7 @@ class AccumulationAnalyzer:
 
                 # ── 최종 청산세 적용 ────────────────────────────
                 if self.tax_engine:
-                    final_value = self._apply_liquidation_tax(result, final_value)
+                    final_value = self._apply_liquidation_tax(result, final_value, ytd_us_gains)
 
             if result["history"].empty:
                 cur    += relativedelta(months=self.step_months)
@@ -256,65 +259,25 @@ class AccumulationAnalyzer:
 
         return current_capital
 
-    def _apply_liquidation_tax(self, result: dict, final_value: float) -> float:
-        """최종 청산 시 세금 계산 및 차감."""
-        portfolio   = result.get("portfolio")
-        last_prices = result.get("last_prices", {})
-
-        # ISA / 연금저축 / IRP: after_tax_withdrawal로 처리
-        if self.account_type in ("ISA", "연금저축", "IRP"):
-            total_contrib = (
-                self.initial_capital +
-                self.monthly_contribution * self.accumulation_years * 12
-            )
-            # 수령 나이 = 현재 나이 + 적립 기간
-            withdrawal_age = self.tax_engine.age + self.accumulation_years
-            return self.tax_engine.after_tax_withdrawal(
-                final_value, self.account_type, total_contrib,
-                age=withdrawal_age,
-                pension_years=self.accumulation_years,
-            )
-
-        # 위탁: 미실현 차익에 대한 최종 청산세 (손익통산 적용)
-        if portfolio is None or not last_prices:
-            return final_value
-
-        liquidation_tax = 0.0
-
-        # 자산 타입별로 손익 분리해서 통산
-        kr_foreign_gains  = 0.0  # KR_FOREIGN: 손익통산 후 15.4%
-        us_direct_gains   = 0.0  # US_DIRECT: 손익통산 후 250만 공제, 22%
-
-        for ticker, position in portfolio.positions.items():
-            if ticker not in last_prices or position.quantity <= 0:
-                continue
-            price = last_prices[ticker]
-            unrealized = (
-                portfolio.unrealized_gain(ticker, price)
-                if hasattr(portfolio, "unrealized_gain")
-                else 0.0
-            )
-            if unrealized == 0.0:
-                continue
-
-            asset_type = self.tax_engine.classify_asset(ticker)
-
-            if asset_type == "KR_FOREIGN":
-                kr_foreign_gains += unrealized  # 음수(손실)도 포함해서 통산
-            elif asset_type == "US_DIRECT":
-                us_direct_gains += unrealized   # 음수(손실)도 포함해서 통산
-            # KR_DOMESTIC: 비과세
-
-        # KR_FOREIGN 손익통산 후 과세
-        if kr_foreign_gains > 0:
-            liquidation_tax += kr_foreign_gains * 0.154
-
-        # US_DIRECT 손익통산 후 250만 공제
-        if us_direct_gains > 0:
-            taxable = max(0.0, us_direct_gains - 2_500_000)
-            liquidation_tax += taxable * 0.22
-
-        return max(0.0, final_value - liquidation_tax)
+    def _apply_liquidation_tax(self, result: dict, final_value: float, ytd_us_realized_gains: float = 0.0) -> float:
+        """최종 청산 시 세금 계산 및 차감. 공통 모듈에 위임."""
+        from modules.tax.liquidation import apply_liquidation_tax
+        total_contrib = (
+            self.initial_capital +
+            self.monthly_contribution * self.accumulation_years * 12
+        )
+        withdrawal_age = self.tax_engine.age + self.accumulation_years
+        return apply_liquidation_tax(
+            end_value=final_value,
+            portfolio=result.get("portfolio"),
+            last_prices=result.get("last_prices", {}),
+            tax_engine=self.tax_engine,
+            account_type=self.account_type,
+            total_contribution=total_contrib,
+            ytd_us_realized_gains=ytd_us_realized_gains,
+            age=withdrawal_age,
+            pension_years=self.accumulation_years,
+        )
 
     def _calc_metrics(self, history: pd.DataFrame, years: int) -> dict:
         pv = history["portfolio_value"]

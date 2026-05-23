@@ -113,29 +113,23 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
     end_value      = float(pv.iloc[-1])
 
     if tax_enabled and bt_tax_engine:
-        if account_type == 'ISA':
-            end_value = bt_tax_engine.after_tax_withdrawal(end_value, 'ISA', total_invested)
-        elif account_type in ('연금저축', 'IRP'):
-            end_value = bt_tax_engine.after_tax_withdrawal(
-                end_value, account_type, total_invested, age=user_settings.get('age', 40))
-        else:
-            gain = end_value - total_invested
-            if gain > 0:
-                kr_foreign_gains = 0.0
-                us_direct_gains  = 0.0
-                for t, w in weights.items():
-                    t_gain     = gain * w
-                    asset_type = bt_tax_engine.classify_asset(t)
-                    if asset_type == 'KR_FOREIGN':
-                        kr_foreign_gains += t_gain
-                    elif asset_type == 'US_DIRECT':
-                        us_direct_gains  += t_gain
-                total_tax = 0.0
-                if kr_foreign_gains > 0:
-                    total_tax += kr_foreign_gains * 0.154
-                if us_direct_gains > 0:
-                    total_tax += max(0.0, us_direct_gains - 2_500_000) * 0.22
-                end_value -= total_tax
+        from modules.tax.liquidation import apply_liquidation_tax
+        last_prices = {
+            t: float(price_data[t]['close'].iloc[-1])
+            for t in tickers
+            if t in price_data and not price_data[t].empty
+        }
+        ytd_us_gains = getattr(exec_engine, '_ytd_us_gains', 0.0)
+        end_value = apply_liquidation_tax(
+            end_value=end_value,
+            portfolio=portfolio,
+            last_prices=last_prices,
+            tax_engine=bt_tax_engine,
+            account_type=account_type,
+            total_contribution=total_invested,
+            ytd_us_realized_gains=ytd_us_gains,
+            age=user_settings.get('age', 40),
+        )
 
     total_return = (end_value / total_invested - 1) if total_invested > 0 else 0
     cagr         = (end_value / total_invested) ** (1 / years) - 1 if years > 0 and total_invested > 0 else 0

@@ -199,6 +199,18 @@ class TaxedOrderExecutor(OrderExecutor):
         ):
             self._do_gain_harvest(portfolio, price_dict, date)
 
+    def maybe_gain_harvest(self, portfolio, price_dict: Dict[str, float], date) -> None:
+        """
+        12월에 리밸런싱 없이도 절세매도 실행.
+        simulation_loop에서 매 거래일 호출 — 12월 여부와 중복 실행 여부를 내부에서 판단.
+        """
+        if not self.gain_harvesting or self.account_type != "위탁":
+            return
+        if date is None or date.month != 12:
+            return
+        self._update_year(date)
+        self._do_gain_harvest(portfolio, price_dict, date)
+
     def _do_gain_harvest(self, portfolio, price_dict: Dict[str, float], date) -> None:
         """
         연간 250만원 공제 소진 절세 매도.

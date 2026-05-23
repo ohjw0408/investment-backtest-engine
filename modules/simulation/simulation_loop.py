@@ -137,6 +137,10 @@ class SimulationLoop:
                 orders = strategy.generate_orders(portfolio, price_dict)
                 self.executor.execute_orders(portfolio, orders, price_dict, date=date)
 
+            # ── 12월 절세매도 (rebal_mode: none 포함, 중복 방지는 executor 내부에서) ──
+            if hasattr(self.executor, "maybe_gain_harvest"):
+                self.executor.maybe_gain_harvest(portfolio, price_dict, date)
+
             # ── dividend sweep ───────────────────────
             if config.dividend_mode in ("reinvest", "withdraw") and config.withdrawal_amount == 0:
                 cash_target = config.target_weights.get("CASH", 0)

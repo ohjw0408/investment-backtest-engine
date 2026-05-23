@@ -1141,38 +1141,66 @@ function renderHistogram(canvasId, values, color) {
 }
 
 // ── 공유 (C5) ──
-function mmEncodeShare(data) {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(data))))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-function retCopyLink() {
-  const btn = event.target; const orig = btn.textContent;
-  if (!window._retShareData) { btn.textContent = '⚠️ 먼저 계산하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
-  const url = location.origin + '/share?d=' + mmEncodeShare(window._retShareData);
-  const box = document.getElementById('retShareUrlBox');
-  if (box) { box.style.display = 'block'; box.innerHTML = '🔗 공유 링크: <a href="' + url + '" target="_blank">' + url.slice(0, 60) + '…</a>'; }
-  mmCopyText(url).then(() => {
-    btn.textContent = '✅ 복사됨!'; setTimeout(() => btn.textContent = orig, 2000);
+async function retMakeCanvas() {
+  const el = document.getElementById('retResultContent');
+  const body = window._retShareData || {};
+  const m = body.m || {};
+  const initial = m.initial !== undefined ? Number(m.initial).toLocaleString() + '억' : '—';
+  const monthly = m.monthly ? Number(m.monthly).toLocaleString() + '만/월' : '없음';
+  const survival = m.survival !== undefined ? m.survival + '%' : '—';
+  const years = m.years ? m.years + '년' : '—';
+  return html2canvas(el, {
+    scale: 2, backgroundColor: '#F0F4F8', useCORS: true, allowTaint: true,
+    onclone: function(doc, clonedEl) {
+      const hdr = doc.createElement('div');
+      hdr.style.cssText = 'background:#1A2332;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin-bottom:4px;';
+      hdr.innerHTML = '<span style="color:#1976D2;font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
+                    + '<span style="color:#90A4AE;font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
+      clonedEl.insertBefore(hdr, clonedEl.firstChild);
+      const cond = doc.createElement('div');
+      cond.style.cssText = 'background:white;border:1.5px solid #E0E7EF;border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';
+      cond.innerHTML = [
+        ['초기자산', initial], ['월적립', monthly], ['목표생존율', survival], ['기간', years],
+      ].map(([l,v]) => '<div><span style="font-size:0.68rem;color:#90A4AE;display:block;">' + l + '</span><span style="font-size:0.82rem;font-weight:700;color:#1A2332;">' + v + '</span></div>').join('');
+      hdr.insertAdjacentElement('afterend', cond);
+      const origCanvases = el.querySelectorAll('canvas');
+      const clonedCanvases = clonedEl.querySelectorAll('canvas');
+      origCanvases.forEach(function(orig, i) {
+        const cl = clonedCanvases[i];
+        if (cl && orig.width > 0) { cl.width = orig.width; cl.height = orig.height; cl.getContext('2d').drawImage(orig, 0, 0); }
+      });
+    }
   });
 }
+async function retCopyLink() {
+  const btn = event.target; const orig = btn.textContent;
+  if (!window._retShareData) { btn.textContent = '⚠️ 먼저 계산하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
+  btn.textContent = '⏳ 생성 중...'; btn.disabled = true;
+  try {
+    const canvas = await retMakeCanvas();
+    const b64 = canvas.toDataURL('image/png');
+    const res = await fetch('/api/share/upload', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({image: b64}),
+    });
+    const { id } = await res.json();
+    const url = location.origin + '/share/img/' + id;
+    const box = document.getElementById('retShareUrlBox');
+    if (box) { box.style.display = 'block'; box.innerHTML = '🔗 공유 링크: <a href="' + url + '" target="_blank">' + url + '</a>'; }
+    await mmCopyText(url);
+    btn.textContent = '✅ 복사됨!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  } catch(e) {
+    btn.textContent = '⚠️ 오류'; setTimeout(() => btn.textContent = orig, 2000);
+  } finally { btn.disabled = false; }
+}
 function retDownloadImg() {
-  const el = document.getElementById('retResultContent');
-  if (!el || typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
-  html2canvas(el, {
-    scale:2, backgroundColor:'#F0F4F8', useCORS:true, allowTaint:true,
-    onclone: function(doc, clonedEl) {
-      const origC = el.querySelectorAll('canvas'), clonedC = clonedEl.querySelectorAll('canvas');
-      origC.forEach(function(o, i) { if (clonedC[i] && o.width > 0) { clonedC[i].width = o.width; clonedC[i].height = o.height; clonedC[i].getContext('2d').drawImage(o, 0, 0); } });
-    }
-  }).then(function(canvas) {
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillRect(0, canvas.height - 52, canvas.width, 52);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold ' + Math.round(canvas.width * 0.018) + 'px sans-serif';
-    ctx.fillText('Money Milestone | moneymilestone.duckdns.org', 20, canvas.height - 18);
-    const a = document.createElement('a'); a.href = canvas.toDataURL('image/png');
-    a.download = 'retirement-result.png'; a.click();
+  if (typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
+  retMakeCanvas().then(function(canvas) {
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'retirement-result.png';
+    a.click();
   });
 }
 </script>

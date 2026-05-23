@@ -856,47 +856,62 @@ function checkTaxLimits() {
   ).join('');
 }
 // ── 공유 (C5) ──
-function mmEncodeShare(data) {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(data))))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function calcCopyLink() {
-  const btn = event.target; const orig = btn.textContent;
-  if (!window._calcShareData) { btn.textContent = '⚠️ 먼저 계산하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
-  const d = mmEncodeShare(window._calcShareData);
-  const url = location.origin + '/share?d=' + d;
-  const box = document.getElementById('calcShareUrlBox');
-  if (box) { box.style.display = 'block'; box.innerHTML = '🔗 공유 링크: <a href="' + url + '" target="_blank">' + url.slice(0, 60) + '…</a>'; }
-  mmCopyText(url).then(() => {
-    btn.textContent = '✅ 복사됨!';
-    setTimeout(() => btn.textContent = orig, 2000);
-  });
-}
-
-function calcDownloadImg() {
+async function calcMakeCanvas() {
   const el = document.getElementById('resultContent');
-  if (!el || typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
-  html2canvas(el, {
+  const body = window._calcShareData || {};
+  const label = body.label || '—';
+  const years = body.years ? body.years + '년' : '—';
+  const m = body.m || {};
+  const p50 = m.p50 !== undefined ? Number(m.p50).toLocaleString() + '억' : '—';
+  const cagr = m.cagr !== undefined ? Number(m.cagr).toFixed(1) + '%' : '—';
+  return html2canvas(el, {
     scale: 2, backgroundColor: '#F0F4F8', useCORS: true, allowTaint: true,
     onclone: function(doc, clonedEl) {
+      const hdr = doc.createElement('div');
+      hdr.style.cssText = 'background:#1A2332;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin-bottom:4px;';
+      hdr.innerHTML = '<span style="color:#1976D2;font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
+                    + '<span style="color:#90A4AE;font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
+      clonedEl.insertBefore(hdr, clonedEl.firstChild);
+      const cond = doc.createElement('div');
+      cond.style.cssText = 'background:white;border:1.5px solid #E0E7EF;border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';
+      cond.innerHTML = [
+        ['종목', label], ['기간', years], ['중간값', p50], ['CAGR', cagr],
+      ].map(([l,v]) => '<div><span style="font-size:0.68rem;color:#90A4AE;display:block;">' + l + '</span><span style="font-size:0.82rem;font-weight:700;color:#1A2332;">' + v + '</span></div>').join('');
+      hdr.insertAdjacentElement('afterend', cond);
       const origCanvases = el.querySelectorAll('canvas');
       const clonedCanvases = clonedEl.querySelectorAll('canvas');
       origCanvases.forEach(function(orig, i) {
-        if (clonedCanvases[i] && orig.width > 0 && orig.height > 0) {
-          clonedCanvases[i].width = orig.width;
-          clonedCanvases[i].height = orig.height;
-          clonedCanvases[i].getContext('2d').drawImage(orig, 0, 0);
-        }
+        const cl = clonedCanvases[i];
+        if (cl && orig.width > 0) { cl.width = orig.width; cl.height = orig.height; cl.getContext('2d').drawImage(orig, 0, 0); }
       });
     }
-  }).then(function(canvas) {
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillRect(0, canvas.height - 52, canvas.width, 52);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold ' + Math.round(canvas.width * 0.018) + 'px sans-serif';
-    ctx.fillText('Money Milestone | moneymilestone.duckdns.org', 20, canvas.height - 18);
+  });
+}
+async function calcCopyLink() {
+  const btn = event.target; const orig = btn.textContent;
+  if (!window._calcShareData) { btn.textContent = '⚠️ 먼저 계산하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
+  btn.textContent = '⏳ 생성 중...'; btn.disabled = true;
+  try {
+    const canvas = await calcMakeCanvas();
+    const b64 = canvas.toDataURL('image/png');
+    const res = await fetch('/api/share/upload', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({image: b64}),
+    });
+    const { id } = await res.json();
+    const url = location.origin + '/share/img/' + id;
+    const box = document.getElementById('calcShareUrlBox');
+    if (box) { box.style.display = 'block'; box.innerHTML = '🔗 공유 링크: <a href="' + url + '" target="_blank">' + url + '</a>'; }
+    await mmCopyText(url);
+    btn.textContent = '✅ 복사됨!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  } catch(e) {
+    btn.textContent = '⚠️ 오류'; setTimeout(() => btn.textContent = orig, 2000);
+  } finally { btn.disabled = false; }
+}
+function calcDownloadImg() {
+  if (typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
+  calcMakeCanvas().then(function(canvas) {
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = 'simulation-result.png';

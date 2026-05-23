@@ -86,6 +86,25 @@ def current_user():
 
 @app.route('/auth/google')
 def google_login():
+    ua = request.headers.get('User-Agent', '')
+    import re
+    if re.search(r'KAKAOTALK|Instagram|FBAN|FBAV|Line/|everytimeapp|DaumApps', ua, re.I):
+        return '''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>외부 브라우저에서 열어주세요</title>
+<style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#F0F4F8;padding:24px;text-align:center}
+.card{background:white;border-radius:16px;padding:32px 24px;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}
+h2{font-size:1.1rem;margin-bottom:12px;color:#1A2332}
+p{font-size:0.88rem;color:#546E7A;line-height:1.6;margin-bottom:20px}
+.btn{display:inline-block;background:#1976D2;color:white;padding:10px 24px;border-radius:10px;font-size:0.9rem;font-weight:700;text-decoration:none;cursor:pointer;border:none;font-family:inherit}
+</style></head><body>
+<div class="card">
+  <h2>⚠️ 카카오톡 내부 브라우저</h2>
+  <p>Google 로그인은 카카오톡 내부 브라우저에서 차단됩니다.<br><br>
+  아래 버튼을 눌러 <strong>외부 브라우저(크롬/사파리)</strong>로 열어주세요.</p>
+  <button class="btn" onclick="location.href='kakaotalk://web/openExternal?url='+encodeURIComponent('https://moneymilestone.duckdns.org')">외부 브라우저로 열기</button>
+</div>
+</body></html>''', 200
     redirect_uri = url_for('google_callback', _external=True)
     return google.authorize_redirect(redirect_uri)
 

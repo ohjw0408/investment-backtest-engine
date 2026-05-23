@@ -874,42 +874,48 @@ function mmEncodeShare(data) {
 }
 
 async function btMakeCanvas() {
-  const el = document.getElementById('btResultContent');
+  const layout = document.querySelector('.bt-layout');
+  const rightPanel = document.querySelector('.bt-right');
+  const rightW = rightPanel ? rightPanel.offsetWidth : 0;
 
-  const body = window._btLastBody || {};
-  const tickerStr = (body.tickers || []).map(t => t.code + ' ' + Math.round(t.weight * 100) + '%').join(' / ') || '—';
-  const period = (body.start_date || '') + ' ~ ' + (body.end_date || '');
-  const seed = body.initial_capital ? '₩' + (body.initial_capital / 10000).toLocaleString() + '만' : '—';
-  const monthly = body.monthly_contribution ? '₩' + (body.monthly_contribution / 10000).toLocaleString() + '만/월' : '없음';
-  const divMode = body.dividend_mode === 'reinvest' ? '배당 재투자' : '현금 보유';
-  const rebalLabels = {none:'없음', monthly:'매월', quarterly:'분기', yearly:'매년', band:'밴드'};
-  const rebalMode = rebalLabels[body.rebal_mode] || '없음';
-
-  return html2canvas(el, {
+  const rawCanvas = await html2canvas(layout, {
     scale: 2, backgroundColor: '#F0F4F8', useCORS: true, allowTaint: true,
-    onclone: function(doc, clonedEl) {
-      const hdr = doc.createElement('div');
-      hdr.style.cssText = 'background:#1A2332;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin-bottom:4px;';
-      hdr.innerHTML = '<span style="color:#1976D2;font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
-                    + '<span style="color:#90A4AE;font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
-      clonedEl.insertBefore(hdr, clonedEl.firstChild);
-
-      const cond = doc.createElement('div');
-      cond.style.cssText = 'background:white;border:1.5px solid #E0E7EF;border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';
-      cond.innerHTML = [
-        ['종목', tickerStr], ['기간', period], ['초기투자', seed],
-        ['월적립', monthly], ['배당', divMode], ['리밸런싱', rebalMode],
-      ].map(([l,v]) => '<div><span style="font-size:0.68rem;color:#90A4AE;display:block;">' + l + '</span><span style="font-size:0.82rem;font-weight:700;color:#1A2332;">' + v + '</span></div>').join('');
-      hdr.insertAdjacentElement('afterend', cond);
-
-      const origCanvases = el.querySelectorAll('canvas');
-      const clonedCanvases = clonedEl.querySelectorAll('canvas');
+    onclone: function(doc, clonedLayout) {
+      // Fix flex:1 width so html2canvas renders right panel correctly
+      const cr = clonedLayout.querySelector('.bt-right');
+      if (cr) { cr.style.width = rightW + 'px'; cr.style.flex = 'none'; cr.style.minWidth = '0'; }
+      // Hide elements that don't belong in a static image
+      ['#btLoading', '#btShareUrlBox'].forEach(sel => {
+        const e = clonedLayout.querySelector(sel); if (e) e.style.display = 'none';
+      });
+      // Copy canvas pixel data
+      const origCanvases = layout.querySelectorAll('canvas');
+      const clonedCanvases = clonedLayout.querySelectorAll('canvas');
       origCanvases.forEach(function(orig, i) {
         const cl = clonedCanvases[i];
         if (cl && orig.width > 0) { cl.width = orig.width; cl.height = orig.height; cl.getContext('2d').drawImage(orig, 0, 0); }
       });
     }
   });
+
+  // Add branding header bar via canvas API (avoids DOM restructuring)
+  const hdrH = 88; // pixels in @2x canvas (= 44px displayed)
+  const out = document.createElement('canvas');
+  out.width = rawCanvas.width;
+  out.height = rawCanvas.height + hdrH;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#1A2332';
+  ctx.fillRect(0, 0, out.width, hdrH);
+  const fontSize = Math.max(24, Math.round(out.width * 0.014));
+  ctx.font = 'bold ' + fontSize + 'px sans-serif';
+  ctx.fillStyle = '#1976D2';
+  ctx.fillText('Money Milestone', 40, hdrH * 0.66);
+  ctx.font = Math.max(18, Math.round(out.width * 0.010)) + 'px sans-serif';
+  ctx.fillStyle = '#90A4AE';
+  const sub = 'moneymilestone.duckdns.org  ·  무료 투자 분석 도구';
+  ctx.fillText(sub, out.width - ctx.measureText(sub).width - 40, hdrH * 0.66);
+  ctx.drawImage(rawCanvas, 0, hdrH);
+  return out;
 }
 
 async function btCopyLink() {

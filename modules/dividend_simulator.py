@@ -351,6 +351,41 @@ class DividendSimulator:
 
         return results
 
+    def _find_real_data_start(self) -> pd.Timestamp:
+        """
+        배당 주기 변화 감지로 실제 상장일(백필 끝나는 시점) 추정.
+        최근 배당 간격과 크게 다른 간격이 나오는 지점 = 백필/실데이터 경계.
+        """
+        candidates = []
+        for t in self.tickers:
+            df = self._load(t)
+            if df.empty:
+                continue
+            div_df = df[df["dividend"] > 0].sort_index()
+            if len(div_df) < 6:
+                candidates.append(div_df.index.min() if not div_df.empty else df.index.min())
+                continue
+
+            dates = div_df.index.to_list()
+            # 최근 12회 배당으로 정상 간격 계산
+            recent = dates[-min(12, len(dates)):]
+            if len(recent) < 2:
+                candidates.append(dates[0])
+                continue
+            recent_gap = (recent[-1] - recent[0]).days / (len(recent) - 1)
+
+            # 뒤에서 앞으로 스캔: 정상 간격 벗어나는 첫 지점 = 실데이터 시작
+            real_start = dates[0]
+            for i in range(len(dates) - 1, 0, -1):
+                gap = (dates[i] - dates[i - 1]).days
+                if gap > recent_gap * 1.8 or gap < recent_gap * 0.4:
+                    real_start = dates[i]
+                    break
+
+            candidates.append(real_start)
+
+        return max(candidates) if candidates else pd.Timestamp("1900-01-01")
+
     def _run_rolling(self, seed, monthly, years) -> List[float]:
         cache_key = f"{round(seed,-4)}_{round(monthly,-4)}_{years}"
         if cache_key in self._sim_cache:
@@ -360,13 +395,15 @@ class DividendSimulator:
         if actual_start is None:
             return []
 
-        actual_start_dt = pd.Timestamp(actual_start)
-        sim_end_latest  = pd.Timestamp.today() - pd.DateOffset(years=years)
+        actual_start_dt  = pd.Timestamp(actual_start)
+        real_data_start  = self._find_real_data_start()
+        effective_start  = max(actual_start_dt, real_data_start)
+        sim_end_latest   = pd.Timestamp.today() - pd.DateOffset(years=years)
 
         # 실제 데이터 롤링
         real_results = []
-        if actual_start_dt <= sim_end_latest:
-            roll_starts = pd.date_range(actual_start_dt, sim_end_latest, freq=f"{self.step_months}ME")
+        if effective_start <= sim_end_latest:
+            roll_starts = pd.date_range(effective_start, sim_end_latest, freq=f"{self.step_months}ME")
             for start in roll_starts:
                 val = self._simulate_one(seed, monthly, years, start.strftime("%Y-%m-%d"))
                 if val > 0:

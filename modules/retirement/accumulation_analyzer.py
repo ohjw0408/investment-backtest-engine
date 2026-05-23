@@ -75,43 +75,25 @@ class AccumulationAnalyzer:
 
     def _run_rolling(self) -> List[dict]:
         import time
-        from modules.tax.account_tax         import TaxedDividendEngine
-        from modules.execution.order_executor import TaxedOrderExecutor
-        from modules.core.portfolio           import TaxTrackedPortfolio
+        from modules.simulation.taxable_runner  import TaxableSimulationRunner
+        from modules.config.simulation_config   import SimulationConfig
 
-        sim_loop        = self.portfolio_engine.simulation_loop
-        orig_div_engine = sim_loop.dividend_engine
-        orig_executor   = sim_loop.executor
-
+        runner      = TaxableSimulationRunner()
         total_cases = self._estimate_total_cases() if self.progress_callback else 0
         start_time  = time.time()
         cases, cur, run_id = [], self.data_start, 1
+
         while True:
             end = cur + relativedelta(years=self.accumulation_years)
             if end > self.data_end:
                 break
             strategy = self.strategy_factory()
 
-            # ── 세금 컴포넌트 주입 ─────────────────────────
-            if self.tax_engine:
-                sim_loop.dividend_engine = TaxedDividendEngine(
-                    orig_div_engine, self.tax_engine, self.account_type
-                )
-                sim_loop.executor = TaxedOrderExecutor(
-                    self.tax_engine, self.account_type,
-                    gain_harvesting=self.gain_harvesting,
-                )
-                portfolio_class = TaxTrackedPortfolio
-            else:
-                portfolio_class = None
-
-            # ── ISA 풍차돌리기 ────────────────────────────
+            # ── ISA 풍차돌리기 (특수 경로 — 주기별 수동 청산·재가입) ────
             if self.isa_renewal and self.tax_engine:
-                sim_loop.dividend_engine = orig_div_engine
-                sim_loop.executor        = orig_executor
                 final_value = self._run_isa_renewal_cycle(cur, self.accumulation_years)
-                # metrics 계산을 위한 단순 1회 시뮬
-                result = self.portfolio_engine.run_simulation(
+                # 지표 계산용 무세금 시뮬 (history만 필요)
+                isa_result = self.portfolio_engine.run_simulation(
                     tickers              = self.tickers,
                     start_date           = cur.strftime("%Y-%m-%d"),
                     end_date             = end.strftime("%Y-%m-%d"),
@@ -120,44 +102,66 @@ class AccumulationAnalyzer:
                     strategy             = strategy,
                     dividend_mode        = self.dividend_mode,
                 )
+                history_df  = isa_result["history"]
+                raw_final   = float(isa_result["final_value"])
+
+            # ── 일반 경로 — Runner ───────────────────────────────────
             else:
-                result = self.portfolio_engine.run_simulation(
-                    tickers              = self.tickers,
+                try:
+                    price_data, dates = self.portfolio_engine.price_loader.load(
+                        self.tickers,
+                        cur.strftime("%Y-%m-%d"),
+                        end.strftime("%Y-%m-%d"),
+                    )
+                except Exception:
+                    cur    += relativedelta(months=self.step_months)
+                    run_id += 1
+                    continue
+
+                target_weights = getattr(strategy, 'target_weights',
+                                         {t: 1.0 / len(self.tickers) for t in self.tickers})
+                rebal_freq     = getattr(strategy, 'rebalance_frequency', None)
+
+                config = SimulationConfig(
                     start_date           = cur.strftime("%Y-%m-%d"),
                     end_date             = end.strftime("%Y-%m-%d"),
+                    tickers              = self.tickers,
+                    target_weights       = target_weights,
                     initial_capital      = self.initial_capital,
                     monthly_contribution = self.monthly_contribution,
-                    strategy             = strategy,
+                    withdrawal_amount    = 0,
                     dividend_mode        = self.dividend_mode,
-                    portfolio_class      = portfolio_class,
+                    rebalance_frequency  = rebal_freq,
+                    inflation            = 0.0,
                 )
 
-                # ytd 실현차익 캡처 (청산세 250만 공제 중복 방지용)
-                ytd_us_gains = getattr(sim_loop.executor, '_ytd_us_gains', 0.0)
+                run_result  = runner.run(
+                    config          = config,
+                    price_data      = price_data,
+                    dates           = dates,
+                    strategy        = strategy,
+                    tax_enabled     = bool(self.tax_engine),
+                    account_type    = self.account_type,
+                    tax_engine      = self.tax_engine,
+                    gain_harvesting = self.gain_harvesting,
+                )
+                history_df  = run_result.history_df
+                final_value = run_result.end_value
+                raw_final   = float(history_df['portfolio_value'].iloc[-1]) if not history_df.empty else 0.0
 
-                # ── 원본 복원 ──────────────────────────────────
-                sim_loop.dividend_engine = orig_div_engine
-                sim_loop.executor        = orig_executor
-
-                final_value = result["final_value"]
-
-                # ── 최종 청산세 적용 ────────────────────────────
-                if self.tax_engine:
-                    final_value = self._apply_liquidation_tax(result, final_value, ytd_us_gains)
-
-            if result["history"].empty:
+            if history_df is None or history_df.empty:
                 cur    += relativedelta(months=self.step_months)
                 run_id += 1
                 continue
 
-            metrics              = self._calc_metrics(result["history"], self.accumulation_years)
+            metrics              = self._calc_metrics(history_df, self.accumulation_years)
             metrics["run_id"]    = run_id
             metrics["start"]     = cur.strftime("%Y-%m-%d")
             metrics["end"]       = end.strftime("%Y-%m-%d")
             metrics["end_value"] = final_value
-            # ISA 풍차돌리기나 세금 적용 시 end_value가 세전 history와 달라짐
-            # → CAGR을 세후 최종값 기준으로 재계산
-            if final_value != result["final_value"]:
+
+            # 청산세 적용으로 end_value가 세전 history와 달라진 경우 → CAGR 재계산
+            if final_value != raw_final:
                 total_contrib = (
                     self.initial_capital
                     + self.monthly_contribution * self.accumulation_years * 12
@@ -166,6 +170,7 @@ class AccumulationAnalyzer:
                     metrics["cagr"] = (
                         (final_value / total_contrib) ** (1.0 / self.accumulation_years) - 1
                     )
+
             cases.append(metrics)
             if self.progress_callback:
                 self.progress_callback(
@@ -258,26 +263,6 @@ class AccumulationAnalyzer:
                     pass
 
         return current_capital
-
-    def _apply_liquidation_tax(self, result: dict, final_value: float, ytd_us_realized_gains: float = 0.0) -> float:
-        """최종 청산 시 세금 계산 및 차감. 공통 모듈에 위임."""
-        from modules.tax.liquidation import apply_liquidation_tax
-        total_contrib = (
-            self.initial_capital +
-            self.monthly_contribution * self.accumulation_years * 12
-        )
-        withdrawal_age = self.tax_engine.age + self.accumulation_years
-        return apply_liquidation_tax(
-            end_value=final_value,
-            portfolio=result.get("portfolio"),
-            last_prices=result.get("last_prices", {}),
-            tax_engine=self.tax_engine,
-            account_type=self.account_type,
-            total_contribution=total_contrib,
-            ytd_us_realized_gains=ytd_us_realized_gains,
-            age=withdrawal_age,
-            pension_years=self.accumulation_years,
-        )
 
     def _calc_metrics(self, history: pd.DataFrame, years: int) -> dict:
         pv = history["portfolio_value"]

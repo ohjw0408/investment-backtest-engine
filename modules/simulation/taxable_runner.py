@@ -26,6 +26,7 @@ class TaxableSimulationRunner:
         tax_enabled: bool = False,
         account_type: str = '위탁',
         user_settings: dict = None,
+        tax_engine=None,
         gain_harvesting: bool = False,
         progress_callback=None,
     ) -> RunResult:
@@ -41,11 +42,12 @@ class TaxableSimulationRunner:
         user_settings = user_settings or {}
 
         if tax_enabled:
-            from modules.tax.base_tax              import TaxEngine
+            if tax_engine is None:
+                from modules.tax.base_tax import TaxEngine
+                tax_engine = TaxEngine(user_settings)
             from modules.tax.account_tax           import TaxedDividendEngine
             from modules.execution.order_executor  import TaxedOrderExecutor
             from modules.core.portfolio            import TaxTrackedPortfolio
-            tax_engine  = TaxEngine(user_settings)
             div_engine  = TaxedDividendEngine(DividendEngine(), tax_engine, account_type)
             exec_engine = TaxedOrderExecutor(tax_engine, account_type,
                                              gain_harvesting=gain_harvesting)

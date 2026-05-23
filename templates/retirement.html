@@ -555,9 +555,14 @@ let retMode    = 'sim';  // 'sim' or 'wd'
 
 function fmtKRW(v) {
   if (v === null || v === undefined || isNaN(v)) return '—';
-  if (v >= 100000000) return '₩'+(v/100000000).toFixed(1)+'억';
-  if (v >= 10000)     return '₩'+Math.round(v/10000)+'만';
-  return '₩'+Math.round(v).toLocaleString();
+  const sign = v < 0 ? '-' : '';
+  const abs = Math.abs(v);
+  const uk = Math.floor(abs / 1e8);
+  const man = Math.floor((abs % 1e8) / 1e4);
+  if (uk > 0 && man > 0) return sign + '₩' + uk.toLocaleString() + '억 ' + man.toLocaleString() + '만';
+  if (uk > 0) return sign + '₩' + uk.toLocaleString() + '억';
+  if (abs >= 1e4) return sign + '₩' + Math.floor(abs / 1e4).toLocaleString() + '만';
+  return sign + '₩' + Math.round(abs).toLocaleString();
 }
 
 function fmtKRWHint(v) {

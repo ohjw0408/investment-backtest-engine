@@ -680,9 +680,15 @@ function renderRollingChart(cases) {
 
 // ── 포맷 헬퍼 ──
 function fmtKRW(v) {
-  if (Math.abs(v) >= 1e8) return '₩' + (v / 1e8).toFixed(1) + '억';
-  if (Math.abs(v) >= 1e4) return '₩' + (v / 1e4).toFixed(0) + '만';
-  return '₩' + Math.round(v).toLocaleString();
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  const sign = v < 0 ? '-' : '';
+  const abs = Math.abs(v);
+  const uk = Math.floor(abs / 1e8);
+  const man = Math.floor((abs % 1e8) / 1e4);
+  if (uk > 0 && man > 0) return sign + '₩' + uk.toLocaleString() + '억 ' + man.toLocaleString() + '만';
+  if (uk > 0) return sign + '₩' + uk.toLocaleString() + '억';
+  if (abs >= 1e4) return sign + '₩' + Math.floor(abs / 1e4).toLocaleString() + '만';
+  return sign + '₩' + Math.round(abs).toLocaleString();
 }
 
 function fmtPct(v) {
@@ -746,9 +752,14 @@ function rebalancePcts() {
 
 function fmtTaxKRW(v) {
   if (!v) return '₩0';
-  if (Math.abs(v) >= 1e8) return '₩' + (v/1e8).toFixed(1) + '억';
-  if (Math.abs(v) >= 1e4) return '₩' + Math.round(v/1e4) + '만';
-  return '₩' + Math.round(v).toLocaleString();
+  const sign = v < 0 ? '-' : '';
+  const abs = Math.abs(v);
+  const uk = Math.floor(abs / 1e8);
+  const man = Math.floor((abs % 1e8) / 1e4);
+  if (uk > 0 && man > 0) return sign + '₩' + uk.toLocaleString() + '억 ' + man.toLocaleString() + '만';
+  if (uk > 0) return sign + '₩' + uk.toLocaleString() + '억';
+  if (abs >= 1e4) return sign + '₩' + Math.floor(abs / 1e4).toLocaleString() + '만';
+  return sign + '₩' + Math.round(abs).toLocaleString();
 }
 
 function renderTaxAccounts() {

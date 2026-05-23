@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 from typing import Optional, List, Dict
 
-from modules.sim.tax_engine import TaxEngine
 from modules.sim.fee_engine import FeeEngine
 
 
@@ -40,12 +39,13 @@ class DividendSimulator:
         loader,
         tickers,
         weights,
-        div_mode:    str   = "reinvest",
-        step_months: int   = 3,
-        rebal_mode:  str   = "none",
-        band_width:  float = 0.05,
-        tax_engine:  Optional[TaxEngine] = None,
-        fee_engine:  Optional[FeeEngine] = None,
+        div_mode:     str   = "reinvest",
+        step_months:  int   = 3,
+        rebal_mode:   str   = "none",
+        band_width:   float = 0.05,
+        tax_engine=None,
+        fee_engine:   Optional[FeeEngine] = None,
+        account_type: str   = "위탁",
     ):
         self.loader      = loader
         self.tickers     = tickers
@@ -54,8 +54,9 @@ class DividendSimulator:
         self.step_months = step_months
         self.rebal_mode  = rebal_mode
         self.band_width  = band_width
-        self.tax_engine  = tax_engine
-        self.fee_engine  = fee_engine
+        self.tax_engine   = tax_engine
+        self.fee_engine   = fee_engine
+        self._account_type = account_type
         self._price_cache: Dict[str, pd.DataFrame] = {}
         self._sim_cache:   Dict[str, List[float]]   = {}
 
@@ -111,6 +112,7 @@ class DividendSimulator:
         paid_div_dates = {t: set() for t in self.tickers}
         last_year_start = end - pd.DateOffset(years=1)
         last_year_div   = 0.0
+        ytd_income: Dict[int, float] = {}  # year → ytd gross dividend (종합과세 판단용)
 
         # 배당 데이터 미리 numpy 배열로 변환 (iterrows 대신 itertuples)
         div_data = {}
@@ -147,7 +149,11 @@ class DividendSimulator:
                         continue
                     # 세금 차감
                     if self.tax_engine:
-                        net_div = self.tax_engine.apply_dividend_tax(gross_div, self._get_region(t), month_end.year)
+                        ytd = ytd_income.get(div_date.year, 0.0)
+                        net_div = self.tax_engine.after_tax_dividend(
+                            gross_div, t, self._account_type, ytd
+                        )
+                        ytd_income[div_date.year] = ytd + gross_div
                     else:
                         net_div = gross_div
                     if div_date >= last_year_start:
@@ -264,6 +270,9 @@ class DividendSimulator:
         asset = float(seed)
         last_year_start_q = max(0, n_quarters - 4)
         last_year_div = 0.0
+        # 합성 시뮬은 실제 날짜 없음 -> yr(0,1,2...) 인덱스로 연간 ytd 추적
+        synthetic_ytd: Dict[int, float] = {}
+        rep_ticker = self.tickers[0] if self.tickers else "SPY"
 
         for m in range(years * 12):
             # 주가 상승 반영 (자산가치 증가)
@@ -273,20 +282,32 @@ class DividendSimulator:
             yr = q // 4
 
             if div_freq >= 12:
-                div = asset * div_yield / 3.0
-                if div > 0:
+                gross = asset * div_yield / 3.0
+                if gross > 0:
                     if self.tax_engine:
-                        div = self.tax_engine.apply_dividend_tax(div, 'US', yr)
+                        ytd = synthetic_ytd.get(yr, 0.0)
+                        div = self.tax_engine.after_tax_dividend(
+                            gross, rep_ticker, self._account_type, ytd
+                        )
+                        synthetic_ytd[yr] = ytd + gross
+                    else:
+                        div = gross
                     if q >= last_year_start_q:
                         last_year_div += div
                     if self.div_mode == "reinvest":
                         asset += div
             else:
                 if m % 3 == 2:
-                    div = asset * div_yield
-                    if div > 0:
+                    gross = asset * div_yield
+                    if gross > 0:
                         if self.tax_engine:
-                            div = self.tax_engine.apply_dividend_tax(div, 'US', yr)
+                            ytd = synthetic_ytd.get(yr, 0.0)
+                            div = self.tax_engine.after_tax_dividend(
+                                gross, rep_ticker, self._account_type, ytd
+                            )
+                            synthetic_ytd[yr] = ytd + gross
+                        else:
+                            div = gross
                         if q >= last_year_start_q:
                             last_year_div += div
                         if self.div_mode == "reinvest":

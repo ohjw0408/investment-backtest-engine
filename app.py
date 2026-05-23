@@ -1509,6 +1509,17 @@ def share():
     return render_template('share.html', data=data, d=d, base_url=base_url)
 
 
+def _cleanup_old_share_images(max_age_days=7):
+    import time
+    cutoff = time.time() - max_age_days * 86400
+    for f in SHARE_IMG_DIR.glob('*.png'):
+        try:
+            if f.stat().st_mtime < cutoff:
+                f.unlink()
+        except Exception:
+            pass
+
+
 @app.route('/api/share/upload', methods=['POST'])
 def share_upload():
     import base64 as _b64, uuid as _uuid
@@ -1524,6 +1535,7 @@ def share_upload():
         return jsonify({'error': 'invalid base64'}), 400
     if len(img_bytes) > 8 * 1024 * 1024:
         return jsonify({'error': 'too large'}), 400
+    _cleanup_old_share_images()
     img_id = _uuid.uuid4().hex[:12]
     (SHARE_IMG_DIR / f"{img_id}.png").write_bytes(img_bytes)
     return jsonify({'id': img_id})
@@ -1533,7 +1545,15 @@ def share_upload():
 def share_img_page(img_id):
     img_path = SHARE_IMG_DIR / f"{img_id}.png"
     if not img_path.exists():
-        return "링크가 만료되었거나 잘못된 주소입니다", 404
+        return '''<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>링크 만료 — Money Milestone</title>
+<style>body{font-family:sans-serif;background:#F0F4F8;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;padding:24px}
+.card{background:white;border-radius:16px;padding:32px 24px;max-width:360px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.08)}
+h2{font-size:1.1rem;color:#1A2332;margin-bottom:8px}p{font-size:0.88rem;color:#546E7A;line-height:1.6}
+a{display:inline-block;margin-top:16px;background:#1976D2;color:white;padding:10px 24px;border-radius:10px;font-size:0.9rem;font-weight:700;text-decoration:none}</style></head>
+<body><div class="card"><div style="font-size:2.5rem">⏳</div><h2>링크가 만료되었습니다</h2>
+<p>공유 링크는 7일간만 유효합니다.<br>결과를 다시 보려면 직접 분석을 실행해주세요.</p>
+<a href="/backtest">📊 직접 분석해보기</a></div></body></html>''', 404
     base_url = request.host_url.rstrip('/')
     return render_template('share_img.html',
         img_id=img_id,

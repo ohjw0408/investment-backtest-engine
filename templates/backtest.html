@@ -874,19 +874,34 @@ function mmEncodeShare(data) {
 }
 
 async function btMakeCanvas() {
-  const el = document.querySelector('.bt-layout');
+  const el = document.getElementById('btResultContent');
+
+  const body = window._btLastBody || {};
+  const tickerStr = (body.tickers || []).map(t => t.code + ' ' + Math.round(t.weight * 100) + '%').join(' / ') || '—';
+  const period = (body.start_date || '') + ' ~ ' + (body.end_date || '');
+  const seed = body.initial_capital ? '₩' + (body.initial_capital / 10000).toLocaleString() + '만' : '—';
+  const monthly = body.monthly_contribution ? '₩' + (body.monthly_contribution / 10000).toLocaleString() + '만/월' : '없음';
+  const divMode = body.dividend_mode === 'reinvest' ? '배당 재투자' : '현금 보유';
+  const rebalLabels = {none:'없음', monthly:'매월', quarterly:'분기', yearly:'매년', band:'밴드'};
+  const rebalMode = rebalLabels[body.rebal_mode] || '없음';
+
   return html2canvas(el, {
     scale: 2, backgroundColor: '#F0F4F8', useCORS: true, allowTaint: true,
     onclone: function(doc, clonedEl) {
-      ['#btRunBtn', '#btLoading', '.calc-warning'].forEach(sel => {
-        const e = clonedEl.querySelector(sel);
-        if (e) e.style.display = 'none';
-      });
       const hdr = doc.createElement('div');
-      hdr.style.cssText = 'background:#1A2332;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;';
-      hdr.innerHTML = '<span style="color:#1976D2;font-size:1rem;font-weight:800;">💰 Money Milestone</span>'
-                    + '<span style="color:#90A4AE;font-size:0.82rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
+      hdr.style.cssText = 'background:#1A2332;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin-bottom:4px;';
+      hdr.innerHTML = '<span style="color:#1976D2;font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
+                    + '<span style="color:#90A4AE;font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
       clonedEl.insertBefore(hdr, clonedEl.firstChild);
+
+      const cond = doc.createElement('div');
+      cond.style.cssText = 'background:white;border:1.5px solid #E0E7EF;border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';
+      cond.innerHTML = [
+        ['종목', tickerStr], ['기간', period], ['초기투자', seed],
+        ['월적립', monthly], ['배당', divMode], ['리밸런싱', rebalMode],
+      ].map(([l,v]) => '<div><span style="font-size:0.68rem;color:#90A4AE;display:block;">' + l + '</span><span style="font-size:0.82rem;font-weight:700;color:#1A2332;">' + v + '</span></div>').join('');
+      hdr.insertAdjacentElement('afterend', cond);
+
       const origCanvases = el.querySelectorAll('canvas');
       const clonedCanvases = clonedEl.querySelectorAll('canvas');
       origCanvases.forEach(function(orig, i) {

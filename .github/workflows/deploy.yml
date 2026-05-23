@@ -11,7 +11,7 @@ jobs:
       - name: Deploy to Hetzner VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: 5.78.209.211
+          host: 178.105.84.213
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
           script: |

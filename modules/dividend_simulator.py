@@ -282,7 +282,7 @@ class DividendSimulator:
             yr = q // 4
 
             if div_freq >= 12:
-                gross = asset * div_yield / 3.0
+                gross = asset * div_yield
                 if gross > 0:
                     if self.tax_engine:
                         ytd = synthetic_ytd.get(yr, 0.0)

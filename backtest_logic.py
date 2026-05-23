@@ -17,16 +17,10 @@ def _get_portfolio_engine():
 
 
 def run_backtest_logic(body: dict, progress_callback=None) -> dict:
-    from modules.core.portfolio                 import Portfolio
-    from modules.config.simulation_config       import SimulationConfig
-    from modules.execution.order_executor       import OrderExecutor
-    from modules.execution.cash_allocator       import CashAllocator
-    from modules.simulation.dividend_engine     import DividendEngine
-    from modules.simulation.contribution_engine import ContributionEngine
-    from modules.simulation.withdrawal_engine   import WithdrawalEngine
-    from modules.simulation.history_recorder    import HistoryRecorder
-    from modules.simulation.simulation_loop     import SimulationLoop
-    from modules.rebalance.periodic             import PeriodicRebalance
+    import pandas as _pd
+    from modules.simulation.taxable_runner  import TaxableSimulationRunner
+    from modules.config.simulation_config   import SimulationConfig
+    from modules.rebalance.periodic         import PeriodicRebalance
 
     portfolio_engine = _get_portfolio_engine()
 
@@ -37,11 +31,11 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
     initial    = float(body.get('initial_capital', 10_000_000))
     monthly    = float(body.get('monthly_contribution', 0))
     div_mode   = body.get('dividend_mode', 'reinvest')
-    rebal_mode  = body.get('rebal_mode', 'none')
-    band_width  = float(body.get('band_width', 0.05))
+    rebal_mode = body.get('rebal_mode', 'none')
+    band_width = float(body.get('band_width', 0.05))
 
-    rebal_freq  = None if rebal_mode in ('none', 'band') else rebal_mode
-    drift       = band_width if rebal_mode == 'band' else None
+    rebal_freq = None if rebal_mode in ('none', 'band') else rebal_mode
+    drift      = band_width if rebal_mode == 'band' else None
 
     strategy = PeriodicRebalance(
         target_weights      = weights,
@@ -61,8 +55,6 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         inflation            = 0.0,
     )
 
-    price_data, dates = portfolio_engine.price_loader.load(tickers, start_date, end_date)
-
     tax_enabled     = body.get('tax_enabled', False)
     account_type    = body.get('account_type', '위탁')
     user_settings   = body.get('user_settings', {})
@@ -81,63 +73,34 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
                 'disclaimer': _check.get('disclaimer'),
             })
 
-    bt_tax_engine = None
-    if tax_enabled:
-        from modules.tax.base_tax    import TaxEngine
-        from modules.tax.account_tax import TaxedDividendEngine
-        from modules.execution.order_executor import TaxedOrderExecutor
-        from modules.core.portfolio  import TaxTrackedPortfolio
-        bt_tax_engine = TaxEngine(user_settings)
-        div_engine    = TaxedDividendEngine(DividendEngine(), bt_tax_engine, account_type)
-        exec_engine   = TaxedOrderExecutor(bt_tax_engine, account_type,
-                                           gain_harvesting=gain_harvesting)
-        portfolio     = TaxTrackedPortfolio(initial)
-    else:
-        div_engine  = DividendEngine()
-        exec_engine = OrderExecutor()
-        portfolio   = Portfolio(initial)
+    price_data, dates = portfolio_engine.price_loader.load(tickers, start_date, end_date)
 
-    loop     = SimulationLoop(div_engine, ContributionEngine(), WithdrawalEngine(),
-                              exec_engine, CashAllocator())
-    recorder = HistoryRecorder()
-    loop.run(portfolio, strategy, config, price_data, dates, recorder,
-             progress_callback=progress_callback)
-    history_df = recorder.to_dataframe()
+    runner = TaxableSimulationRunner()
+    result = runner.run(
+        config           = config,
+        price_data       = price_data,
+        dates            = dates,
+        strategy         = strategy,
+        tax_enabled      = tax_enabled,
+        account_type     = account_type,
+        user_settings    = user_settings,
+        gain_harvesting  = gain_harvesting,
+        progress_callback= progress_callback,
+    )
 
-    if history_df.empty:
-        raise ValueError("시뮬레이션 결과가 없습니다. 날짜 범위나 종목을 확인해주세요.")
+    history_df = result.history_df
+    end_value  = result.end_value
 
     pv             = history_df['portfolio_value']
     years          = len(history_df) / 252
     total_invested = initial + monthly * years * 12
-    end_value      = float(pv.iloc[-1])
-
-    if tax_enabled and bt_tax_engine:
-        from modules.tax.liquidation import apply_liquidation_tax
-        last_prices = {
-            t: float(price_data[t]['close'].iloc[-1])
-            for t in tickers
-            if t in price_data and not price_data[t].empty
-        }
-        ytd_us_gains = getattr(exec_engine, '_ytd_us_gains', 0.0)
-        end_value = apply_liquidation_tax(
-            end_value=end_value,
-            portfolio=portfolio,
-            last_prices=last_prices,
-            tax_engine=bt_tax_engine,
-            account_type=account_type,
-            total_contribution=total_invested,
-            ytd_us_realized_gains=ytd_us_gains,
-            age=user_settings.get('age', 40),
-        )
-
-    total_return = (end_value / total_invested - 1) if total_invested > 0 else 0
-    cagr         = (end_value / total_invested) ** (1 / years) - 1 if years > 0 and total_invested > 0 else 0
-    cummax       = pv.cummax()
-    mdd          = float(((pv - cummax) / cummax).min())
-    daily_ret    = pv.pct_change().dropna()
-    sharpe       = float(daily_ret.mean() / daily_ret.std() * np.sqrt(252)) if daily_ret.std() > 0 else 0
-    total_div    = float(history_df['dividend_income'].sum()) if 'dividend_income' in history_df.columns else 0
+    total_return   = (end_value / total_invested - 1) if total_invested > 0 else 0
+    cagr           = (end_value / total_invested) ** (1 / years) - 1 if years > 0 and total_invested > 0 else 0
+    cummax         = pv.cummax()
+    mdd            = float(((pv - cummax) / cummax).min())
+    daily_ret      = pv.pct_change().dropna()
+    sharpe         = float(daily_ret.mean() / daily_ret.std() * np.sqrt(252)) if daily_ret.std() > 0 else 0
+    total_div      = float(history_df['dividend_income'].sum()) if 'dividend_income' in history_df.columns else 0
 
     h = history_df.copy()
     h['drawdown']       = (pv - cummax) / cummax
@@ -154,7 +117,6 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         for _, row in h_sampled.iterrows()
     ]
 
-    import pandas as _pd
     h2 = history_df.copy()
     h2['year'] = _pd.to_datetime(h2['date']).dt.year
     annual_returns = []

@@ -885,7 +885,7 @@ async function btMakeCanvas() {
       const cr = clonedLayout.querySelector('.bt-right');
       if (cr) { cr.style.width = rightW + 'px'; cr.style.flex = 'none'; cr.style.minWidth = '0'; }
       // Hide elements that don't belong in a static image
-      ['#btLoading', '#btShareUrlBox'].forEach(sel => {
+      ['#btRunBtn', '#btLoading', '#btShareUrlBox'].forEach(sel => {
         const e = clonedLayout.querySelector(sel); if (e) e.style.display = 'none';
       });
       // Copy canvas pixel data

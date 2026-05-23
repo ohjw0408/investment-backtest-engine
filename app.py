@@ -49,8 +49,10 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key')
 import datetime as _dt_mod
 app.config['PERMANENT_SESSION_LIFETIME'] = _dt_mod.timedelta(days=30)
 
-INDEX_DB_PATH = Path(__file__).parent / "data" / "meta" / "index_master.db"
-PRICE_DB_PATH = Path(__file__).parent / "data" / "price_cache" / "price_daily.db"
+INDEX_DB_PATH  = Path(__file__).parent / "data" / "meta" / "index_master.db"
+PRICE_DB_PATH  = Path(__file__).parent / "data" / "price_cache" / "price_daily.db"
+SHARE_IMG_DIR  = Path(__file__).parent / "share_images"
+SHARE_IMG_DIR.mkdir(exist_ok=True)
 
 init_holdings_db()
 data_engine          = DataEngine()
@@ -1505,6 +1507,48 @@ def share():
             pass
     base_url = request.host_url.rstrip('/')
     return render_template('share.html', data=data, d=d, base_url=base_url)
+
+
+@app.route('/api/share/upload', methods=['POST'])
+def share_upload():
+    import base64 as _b64, uuid as _uuid
+    body = request.get_json(silent=True) or {}
+    img_b64 = body.get('image', '')
+    if not img_b64:
+        return jsonify({'error': 'no image'}), 400
+    if ',' in img_b64:
+        img_b64 = img_b64.split(',', 1)[1]
+    try:
+        img_bytes = _b64.b64decode(img_b64)
+    except Exception:
+        return jsonify({'error': 'invalid base64'}), 400
+    if len(img_bytes) > 8 * 1024 * 1024:
+        return jsonify({'error': 'too large'}), 400
+    img_id = _uuid.uuid4().hex[:12]
+    (SHARE_IMG_DIR / f"{img_id}.png").write_bytes(img_bytes)
+    return jsonify({'id': img_id})
+
+
+@app.route('/share/img/<img_id>')
+def share_img_page(img_id):
+    img_path = SHARE_IMG_DIR / f"{img_id}.png"
+    if not img_path.exists():
+        return "링크가 만료되었거나 잘못된 주소입니다", 404
+    base_url = request.host_url.rstrip('/')
+    return render_template('share_img.html',
+        img_id=img_id,
+        raw_url=f"{base_url}/share/img/{img_id}/raw")
+
+
+@app.route('/share/img/<img_id>/raw')
+def share_img_raw(img_id):
+    from flask import send_file as _send_file
+    img_path = SHARE_IMG_DIR / f"{img_id}.png"
+    if not img_path.exists():
+        return "", 404
+    resp = _send_file(img_path, mimetype='image/png')
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    return resp
 
 
 @app.route('/share/og-thumb')

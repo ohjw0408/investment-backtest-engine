@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>분석 결과 — Money Milestone</title>
+  <meta name="description" content="Money Milestone 포트폴리오 분석 결과">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="포트폴리오 분석 결과 — Money Milestone">
+  <meta property="og:description" content="투자 계산기, 포트폴리오 백테스트, 배당금 계산기">
+  <meta property="og:image" content="{{ raw_url }}">
+  <meta property="og:image:width" content="1200">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ raw_url }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #F0F4F8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 1.1rem; font-weight: 800; color: #1976D2;
+      text-decoration: none; margin-bottom: 20px;
+    }
+    .result-img {
+      width: 100%; max-width: 860px;
+      border-radius: 16px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.12);
+      display: block;
+    }
+    .actions {
+      display: flex; gap: 12px; margin-top: 24px;
+      flex-wrap: wrap; justify-content: center;
+    }
+    .btn-primary {
+      background: #1976D2; color: white;
+      padding: 11px 28px; border-radius: 10px;
+      font-size: 0.92rem; font-weight: 700;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-primary:hover { background: #1565C0; }
+    .footer {
+      margin-top: 28px;
+      font-size: 0.78rem; color: #90A4AE; text-align: center;
+    }
+    .footer a { color: #1976D2; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <a href="/" class="logo">💰 Money Milestone</a>
+  <img src="{{ raw_url }}" class="result-img" alt="분석 결과">
+  <div class="actions">
+    <a href="/backtest" class="btn-primary">📊 직접 분석해보기</a>
+  </div>
+  <div class="footer">
+    <a href="/">Money Milestone</a> — 투자 계산기, 포트폴리오 분석, 배당금 계산기
+  </div>
+</body>
+</html>

@@ -47,8 +47,8 @@ def apply_liquidation_tax(
     if portfolio is None or not last_prices or not hasattr(portfolio, "unrealized_gain"):
         return end_value
 
-    kr_foreign_gains = 0.0
     us_direct_gains = 0.0
+    liquidation_tax = 0.0
 
     for ticker, position in portfolio.positions.items():
         if ticker not in last_prices or position.quantity <= 0:
@@ -59,15 +59,14 @@ def apply_liquidation_tax(
             continue
 
         asset_type = tax_engine.classify_asset(ticker)
+
         if asset_type == "KR_FOREIGN":
-            kr_foreign_gains += unrealized  # 손실도 통산
+            # 배당소득세: 손익통산 없음 — 이익 포지션만 개별 과세
+            if unrealized > 0:
+                liquidation_tax += unrealized * 0.154
+
         elif asset_type == "US_DIRECT":
-            us_direct_gains += unrealized   # 손실도 통산
-
-    liquidation_tax = 0.0
-
-    if kr_foreign_gains > 0:
-        liquidation_tax += kr_foreign_gains * 0.154
+            us_direct_gains += unrealized   # 양도소득세: 손익통산 O
 
     if us_direct_gains > 0:
         # 당해연도 이미 실현한 차익 반영 → 250만 공제 중복 방지

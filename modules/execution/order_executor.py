@@ -166,6 +166,12 @@ class TaxedOrderExecutor(OrderExecutor):
 
             portfolio.sell(ticker, quantity, price)
 
+            # US_DIRECT 손실도 YTD에 반영 (손익통산 — 양도소득세)
+            if realized_gain < 0 and avg_cost != price:
+                asset_type = self.tax_engine.classify_asset(ticker)
+                if asset_type == "US_DIRECT":
+                    self._ytd_us_gains += realized_gain  # 음수 → 공제 여유 증가
+
             if realized_gain > 0:
                 cg_tax = self._calc_cg_tax(ticker, realized_gain)
                 if cg_tax > 0:

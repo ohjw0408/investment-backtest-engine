@@ -738,11 +738,11 @@ function renderBacktest(data) {
       label: tickers,
       period: startDate && endDate ? startDate + ' ~ ' + endDate : '',
       m: {
-        cagr:         +(m.cagr         || 0).toFixed(2),
-        mdd:          +(m.mdd          || 0).toFixed(2),
-        sharpe:       +(m.sharpe       || 0).toFixed(3),
-        total_return: +(m.total_return || 0).toFixed(2),
-        years:        +(m.years        || 0).toFixed(1),
+        cagr:         +((m.cagr         || 0) * 100).toFixed(2),
+        mdd:          +((m.mdd          || 0) * 100).toFixed(2),
+        sharpe:       +(m.sharpe        || 0).toFixed(3),
+        total_return: +((m.total_return || 0) * 100).toFixed(2),
+        years:        +(m.years         || 0).toFixed(1),
       },
       spark: downsample((data.history || []).map(h => h.portfolio_value), 80),
     };

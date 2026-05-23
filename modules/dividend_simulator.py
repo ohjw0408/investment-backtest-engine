@@ -239,12 +239,26 @@ class DividendSimulator:
             else:
                 mean_price_return = 0.07  # fallback: 연 7%
 
+            # 최근 3년 데이터로 div_freq/div_yield 계산 (백필 오염 레코드 제거)
+            recent_cutoff = div_df.index.max() - pd.DateOffset(years=3)
+            freq_df = div_df[div_df.index >= recent_cutoff]
+            if len(freq_df) >= 4:
+                freq_years = max(0.25, (freq_df.index[-1] - freq_df.index[0]).days / 365)
+                div_freq   = int(round(len(freq_df) / freq_years))
+                yield_mean = float(freq_df["div_yield"].mean())
+                yield_std  = float(freq_df["div_yield"].std())
+            else:
+                freq_years = max(1, (div_df.index[-1] - div_df.index[0]).days / 365)
+                div_freq   = int(round(len(div_df) / freq_years))
+                yield_mean = float(div_df["div_yield"].mean())
+                yield_std  = float(div_df["div_yield"].std())
+
             stats[t] = {
-                "div_yield_mean":    float(div_df["div_yield"].mean()),
-                "div_yield_std":     float(div_df["div_yield"].std()),
+                "div_yield_mean":    yield_mean,
+                "div_yield_std":     yield_std,
                 "growth_mean":       float(growth.mean()) if len(growth) > 0 else 0.10,
                 "growth_std":        float(growth.std())  if len(growth) > 0 else 0.07,
-                "div_freq":          int(round(len(div_df) / max(1, (div_df.index[-1] - div_df.index[0]).days / 365))),
+                "div_freq":          div_freq,
                 "price_return_mean": mean_price_return,
             }
         return stats
@@ -297,7 +311,8 @@ class DividendSimulator:
                     if self.div_mode == "reinvest":
                         asset += div
             else:
-                if m % 3 == 2:
+                pay_interval = max(1, round(12 / div_freq))
+                if m % pay_interval == pay_interval - 1:
                     gross = asset * div_yield
                     if gross > 0:
                         if self.tax_engine:

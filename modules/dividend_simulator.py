@@ -472,12 +472,24 @@ class DividendSimulator:
             lo_y, lo_p = y, p
         return None
 
+    def _bisect_anchor(self, lo, hi, fn_prob, probability, cancel_check, n=5):
+        """bracket [lo, hi] 안에서 이분탐색으로 threshold 정밀 추정."""
+        for _ in range(n):
+            if cancel_check: cancel_check()
+            mid = (lo + hi) / 2
+            if fn_prob(mid) >= probability:
+                hi = mid
+            else:
+                lo = mid
+        return hi
+
     def _find_anchor_seed(self, monthly, years, target_monthly_div, probability, cancel_check=None):
+        def _cc(): cancel_check() if cancel_check else None
         step = target_monthly_div * 10
         xs, probs = [], []
         # 1단계: 고정 스텝 8번 스윕
         for i in range(8):
-            if cancel_check: cancel_check()
+            _cc()
             s = step * i
             p = self._calc_prob(self._run_rolling(s, monthly, years), target_monthly_div)
             xs.append(s)
@@ -487,27 +499,31 @@ class DividendSimulator:
                 if fitted is not None:
                     return round(max(0.0, fitted), -4)
                 return round(s, -4)
-        # 2단계: 못 찾으면 지수 탐색으로 범위 확장
+        # 2단계: 지수 탐색으로 bracket 찾기 → 이분탐색으로 정밀화
         s = step * 8
         for _ in range(10):
-            if cancel_check: cancel_check()
+            _cc()
             p = self._calc_prob(self._run_rolling(s, monthly, years), target_monthly_div)
             xs.append(s)
             probs.append(p)
             if p >= probability:
-                fitted = self._logistic_fit(xs, probs, probability)
-                if fitted is not None:
-                    return round(max(0.0, fitted), -4)
-                return round(s, -4)
+                lo = s / 2
+                result = self._bisect_anchor(
+                    lo, s,
+                    lambda v: self._calc_prob(self._run_rolling(v, monthly, years), target_monthly_div),
+                    probability, cancel_check,
+                )
+                return round(result, -4)
             s *= 2
         return None
 
     def _find_anchor_monthly(self, seed, years, target_monthly_div, probability, cancel_check=None):
+        def _cc(): cancel_check() if cancel_check else None
         step = target_monthly_div * 0.5
         xs, probs = [], []
         # 1단계: 고정 스텝 8번 스윕
         for i in range(8):
-            if cancel_check: cancel_check()
+            _cc()
             m = step * i
             p = self._calc_prob(self._run_rolling(seed, m, years), target_monthly_div)
             xs.append(m)
@@ -517,18 +533,21 @@ class DividendSimulator:
                 if fitted is not None:
                     return round(max(0.0, fitted), -4)
                 return round(m, -4)
-        # 2단계: 못 찾으면 지수 탐색으로 범위 확장
+        # 2단계: 지수 탐색으로 bracket 찾기 → 이분탐색으로 정밀화
         m = step * 8
         for _ in range(10):
-            if cancel_check: cancel_check()
+            _cc()
             p = self._calc_prob(self._run_rolling(seed, m, years), target_monthly_div)
             xs.append(m)
             probs.append(p)
             if p >= probability:
-                fitted = self._logistic_fit(xs, probs, probability)
-                if fitted is not None:
-                    return round(max(0.0, fitted), -4)
-                return round(m, -4)
+                lo = m / 2
+                result = self._bisect_anchor(
+                    lo, m,
+                    lambda v: self._calc_prob(self._run_rolling(seed, v, years), target_monthly_div),
+                    probability, cancel_check,
+                )
+                return round(result, -4)
             m *= 2
         return None
 

@@ -24,10 +24,38 @@ def _load_us_tickers() -> set:
     if us_etf_path.exists():
         try:
             df = pd.read_csv(us_etf_path)
-            tickers = set(df["code"].dropna().tolist())
+            tickers = set(df["code"].dropna().astype(str).str.upper().tolist())
         except Exception:
             pass
     return tickers
+
+
+def _load_kr_tickers() -> set:
+    tickers = set()
+    for path in (META_DIR / "kr_etf_list.csv",):
+        if path.exists():
+            try:
+                df = pd.read_csv(path, dtype={"code": str})
+                tickers.update(df["code"].dropna().astype(str).str.upper().tolist())
+            except Exception:
+                pass
+
+    sym_db = META_DIR / "symbol_master.db"
+    if sym_db.exists():
+        try:
+            with sqlite3.connect(str(sym_db)) as conn:
+                rows = conn.execute(
+                    "SELECT code FROM symbols WHERE country='KR'"
+                ).fetchall()
+            tickers.update(str(row[0]).upper() for row in rows if row and row[0])
+        except Exception:
+            pass
+    return tickers
+
+
+def _looks_like_krx_code(code: str) -> bool:
+    code = str(code).split(".")[0].upper()
+    return bool(code) and len(code) == 6 and code[0].isdigit() and code.isalnum()
 
 
 class PriceLoader:
@@ -42,6 +70,7 @@ class PriceLoader:
             self.index_conn = sqlite3.connect(str(INDEX_DB_PATH), check_same_thread=False)
 
         self._us_tickers      = _load_us_tickers()
+        self._kr_tickers      = _load_kr_tickers()
         self._usdkrw_cache    = None
         self._backfill_engine = None   # 싱글톤
         self._price_cache     = {}     # 가격 데이터 캐시
@@ -166,12 +195,14 @@ class PriceLoader:
     # -------------------------------------------------
 
     def is_kr_etf(self, code: str) -> bool:
-        return code.isdigit() and len(code) == 6
+        code = str(code).split(".")[0].upper()
+        return code in self._kr_tickers or _looks_like_krx_code(code)
 
     def _kr_yf_ticker(self, code: str) -> str:
-        return f"{code}.KS"
+        return f"{str(code).split('.')[0].upper()}.KS"
 
     def is_us_asset(self, code: str) -> bool:
+        code = str(code).upper()
         if code in self._us_tickers: return True
         if code.startswith("^"):     return True
         if code.endswith("=F"):      return True
@@ -244,7 +275,7 @@ class PriceLoader:
             actions=True, threads=False
         )
         if df.empty:
-            return None, None
+            return self._fetch_krx_ohlcv(code, start, end)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         df = df.reset_index()
@@ -260,6 +291,52 @@ class PriceLoader:
         df["split"]    = df["split"].replace(0, 1).fillna(1)
         df["code"]     = code
         price_df  = df[["code", "date", "open", "high", "low", "close", "volume"]]
+        action_df = df[["code", "date", "dividend", "split"]]
+        return price_df, action_df
+
+    def _fetch_krx_ohlcv(self, code, start, end):
+        base = str(code).split(".")[0].upper()
+        if not self.is_kr_etf(base):
+            return None, None
+        try:
+            from pykrx import stock
+            start_ymd = start.replace("-", "")
+            end_ymd = end.replace("-", "")
+            df = stock.get_market_ohlcv_by_date(
+                start_ymd, end_ymd, base, adjusted=False
+            )
+        except Exception:
+            return None, None
+
+        if df is None or df.empty:
+            return None, None
+
+        df = df.reset_index()
+        date_col = "날짜" if "날짜" in df.columns else df.columns[0]
+        rename = {
+            date_col: "date",
+            "시가": "open",
+            "고가": "high",
+            "저가": "low",
+            "종가": "close",
+            "거래량": "volume",
+        }
+        df = df.rename(columns=rename)
+        required = ["date", "open", "high", "low", "close", "volume"]
+        if not all(col in df.columns for col in required):
+            return None, None
+
+        df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+        for col in ["open", "high", "low", "close", "volume"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        df = df.dropna(subset=["close"])
+        if df.empty:
+            return None, None
+
+        df["code"] = base
+        df["dividend"] = 0.0
+        df["split"] = 1.0
+        price_df = df[["code", "date", "open", "high", "low", "close", "volume"]]
         action_df = df[["code", "date", "dividend", "split"]]
         return price_df, action_df
 
@@ -286,6 +363,7 @@ class PriceLoader:
         - 미국 자산: USD/KRW 환율 적용 (apply_fx=True)
         - 캐시: 동일 코드+기간 두 번째 호출부터 즉시 반환
         """
+        code = str(code).split(".")[0].upper()
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date   = datetime.strptime(end_date,   "%Y-%m-%d").date()
 
@@ -393,6 +471,7 @@ class PriceLoader:
         import sqlite3 as _sq
         from datetime import datetime as _dt, timedelta as _td
 
+        code     = str(code).split(".")[0].upper()
         today    = _dt.today().strftime("%Y-%m-%d")
         start_dl = "2000-01-01"
 

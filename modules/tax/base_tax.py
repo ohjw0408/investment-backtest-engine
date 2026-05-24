@@ -23,6 +23,9 @@ import sqlite3
 _KR_ETF_LOOKUP: dict | None = None   # code → {name, index, leverage}
 _US_ETF_SET:    set   | None = None   # 미국 상장 ETF 코드 집합
 
+_KR_LISTED_SET: set | None = None
+
+
 def _get_kr_etf_lookup() -> dict:
     global _KR_ETF_LOOKUP
     if _KR_ETF_LOOKUP is None:
@@ -59,6 +62,35 @@ def _get_us_etf_set() -> set:
         except Exception:
             _US_ETF_SET = set()
     return _US_ETF_SET
+
+
+def _looks_like_krx_code(ticker: str) -> bool:
+    base = str(ticker).split(".")[0].upper()
+    return bool(base) and len(base) == 6 and base[0].isdigit() and base.isalnum()
+
+
+def _get_kr_listed_set() -> set:
+    global _KR_LISTED_SET
+    if _KR_LISTED_SET is None:
+        codes = set(_get_kr_etf_lookup().keys())
+        try:
+            db = Path(__file__).resolve().parents[2] / "data" / "meta" / "symbol_master.db"
+            if db.exists():
+                conn = sqlite3.connect(str(db))
+                rows = conn.execute(
+                    "SELECT code FROM symbols WHERE country='KR'"
+                ).fetchall()
+                conn.close()
+                codes.update(str(row[0]).upper() for row in rows if row and row[0])
+        except Exception:
+            pass
+        _KR_LISTED_SET = codes
+    return _KR_LISTED_SET
+
+
+def _is_kr_listed_code(ticker: str) -> bool:
+    base = str(ticker).split(".")[0].upper()
+    return base in _get_kr_listed_set() or _looks_like_krx_code(base)
 
 
 # ── 종합소득세 세율표 (2025년 기준) ─────────────────────────
@@ -506,8 +538,8 @@ class TaxEngine:
             return "KRX_GOLD"
 
         # "005930.KS", "069500.KQ" 등 야후 파이낸스 형식 → 국내 상장으로 처리
-        base = ticker.split(".")[0]
-        if base.isdigit() and len(base) == 6:
+        base = ticker.split(".")[0].upper()
+        if _is_kr_listed_code(base):
             return self._classify_kr_etf(base)
 
         # 미국 직접 (알파벳만, ^ 제외)
@@ -515,7 +547,7 @@ class TaxEngine:
             return "US_DIRECT"
 
         # 6자리 숫자 → 국내 상장
-        if ticker.isdigit() and len(ticker) == 6:
+        if _is_kr_listed_code(ticker):
             return self._classify_kr_etf(ticker)
 
         return "US_DIRECT"
@@ -558,8 +590,8 @@ class TaxEngine:
         """
         if ticker == "CASH":
             return True
-        base = ticker.split(".")[0]
-        if not (base.isdigit() and len(base) == 6):
+        base = ticker.split(".")[0].upper()
+        if not _is_kr_listed_code(base):
             return False  # KR 상장 ETF·CASH만 IRP 허용 대상
 
         info = _get_kr_etf_lookup().get(base)
@@ -594,7 +626,7 @@ class TaxEngine:
         'STOCK'         개별주식
         'UNKNOWN'       판별 불가
         """
-        base = ticker.split(".")[0]
+        base = ticker.split(".")[0].upper()
 
         # 1. symbol_master.db 조회 (is_etf, leverage 필드)
         try:
@@ -625,7 +657,7 @@ class TaxEngine:
             pass
 
         # 2. kr_etf_list.csv 조회 (6자리 국내 코드)
-        if base.isdigit() and len(base) == 6:
+        if _is_kr_listed_code(base):
             info = _get_kr_etf_lookup().get(base)
             if info:
                 lev = info["leverage"]

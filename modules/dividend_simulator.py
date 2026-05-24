@@ -12,6 +12,11 @@ from typing import Optional, List, Dict
 from modules.sim.fee_engine import FeeEngine
 
 
+def _looks_like_krx_code(ticker: str) -> bool:
+    code = str(ticker).split(".")[0].upper()
+    return bool(code) and len(code) == 6 and code[0].isdigit() and code.isalnum()
+
+
 def fmtKRW_py(v):
     if v >= 100000000: return f'{v/100000000:.1f}억'
     if v >= 10000:     return f'{round(v/10000)}만'
@@ -28,7 +33,7 @@ class DividendSimulator:
     def _get_region(self, ticker: str) -> str:
         if ticker in self.TICKER_REGION_MAP:
             return self.TICKER_REGION_MAP[ticker]
-        if ticker.isdigit() and len(ticker) == 6:
+        if _looks_like_krx_code(ticker):
             return "KR"
         if any("\uAC00" <= c <= "\uD7A3" for c in ticker):
             return "KR"

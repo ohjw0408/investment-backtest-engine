@@ -892,7 +892,7 @@ class DividendSimulator:
         years_mode   = years_cfg.get('mode', 'fixed')
 
         seeds    = self._expand_var(seed_cfg['center'],    seed_cfg['step'],    seed_cfg['n'],    min_val=0)
-        monthlys = self._expand_var(monthly_cfg['center'], monthly_cfg['step'], monthly_cfg['n'], min_val=0)
+        monthlys = self._expand_var(monthly_cfg['center'], monthly_cfg['step'], monthly_cfg['n'], min_val=1)
         yearss   = self._expand_var(years_cfg['center'],   years_cfg['step'],   years_cfg['n'],   min_val=1)
 
         vary_seed    = seed_mode    == 'explore' and seed_cfg['n']    > 0 and seed_cfg['step']    > 0

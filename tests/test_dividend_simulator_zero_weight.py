@@ -83,3 +83,35 @@ def test_synthetic_dividend_is_diluted_by_no_dividend_weight():
     assert one_pct_div > half_div
     assert 0.97 <= one_pct_div / base_div <= 1.0
     assert 0.45 <= half_div / base_div <= 0.55
+
+
+class MonthlyAnchorProbe(DividendSimulator):
+    def __init__(self):
+        pass
+
+    def _run_rolling(self, seed, monthly, years):
+        return seed, monthly, years
+
+    def _calc_prob(self, payload, target_monthly):
+        seed, monthly, _years = payload
+        threshold = 11_250_000 if seed == 100_000_000 else 9_000_000
+        return 1.0 if monthly >= threshold else 0.0
+
+
+def test_monthly_anchor_decreases_when_seed_increases():
+    sim = MonthlyAnchorProbe()
+
+    lower_seed_monthly = sim._find_anchor_monthly(
+        seed=100_000_000,
+        years=5,
+        target_monthly_div=3_000_000,
+        probability=0.90,
+    )
+    higher_seed_monthly = sim._find_anchor_monthly(
+        seed=200_000_000,
+        years=5,
+        target_monthly_div=3_000_000,
+        probability=0.90,
+    )
+
+    assert higher_seed_monthly <= lower_seed_monthly

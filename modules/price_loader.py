@@ -275,7 +275,7 @@ class PriceLoader:
             actions=True, threads=False
         )
         if df.empty:
-            return self._fetch_krx_ohlcv(code, start, end)
+            return None, None
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         df = df.reset_index()
@@ -291,52 +291,6 @@ class PriceLoader:
         df["split"]    = df["split"].replace(0, 1).fillna(1)
         df["code"]     = code
         price_df  = df[["code", "date", "open", "high", "low", "close", "volume"]]
-        action_df = df[["code", "date", "dividend", "split"]]
-        return price_df, action_df
-
-    def _fetch_krx_ohlcv(self, code, start, end):
-        base = str(code).split(".")[0].upper()
-        if not self.is_kr_etf(base):
-            return None, None
-        try:
-            from pykrx import stock
-            start_ymd = start.replace("-", "")
-            end_ymd = end.replace("-", "")
-            df = stock.get_market_ohlcv_by_date(
-                start_ymd, end_ymd, base, adjusted=False
-            )
-        except Exception:
-            return None, None
-
-        if df is None or df.empty:
-            return None, None
-
-        df = df.reset_index()
-        date_col = "날짜" if "날짜" in df.columns else df.columns[0]
-        rename = {
-            date_col: "date",
-            "시가": "open",
-            "고가": "high",
-            "저가": "low",
-            "종가": "close",
-            "거래량": "volume",
-        }
-        df = df.rename(columns=rename)
-        required = ["date", "open", "high", "low", "close", "volume"]
-        if not all(col in df.columns for col in required):
-            return None, None
-
-        df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-        for col in ["open", "high", "low", "close", "volume"]:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-        df = df.dropna(subset=["close"])
-        if df.empty:
-            return None, None
-
-        df["code"] = base
-        df["dividend"] = 0.0
-        df["split"] = 1.0
-        price_df = df[["code", "date", "open", "high", "low", "close", "volume"]]
         action_df = df[["code", "date", "dividend", "split"]]
         return price_df, action_df
 

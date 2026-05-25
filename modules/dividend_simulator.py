@@ -12,6 +12,14 @@ from typing import Optional, List, Dict
 from modules.sim.fee_engine import FeeEngine
 
 
+def _finite_float(value, default=0.0) -> float:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    return v if np.isfinite(v) else float(default)
+
+
 def _looks_like_krx_code(ticker: str) -> bool:
     code = str(ticker).split(".")[0].upper()
     return bool(code) and len(code) == 6 and code[0].isdigit() and code.isalnum()
@@ -53,8 +61,15 @@ class DividendSimulator:
         account_type: str   = "위탁",
     ):
         self.loader      = loader
-        self.tickers     = tickers
-        self.weights     = weights
+        active_tickers = [
+            ticker for ticker in tickers
+            if float(weights.get(ticker, 0) or 0) > 0
+        ]
+        self.tickers     = active_tickers or list(tickers)
+        self.weights     = {
+            ticker: float(weights.get(ticker, 0) or 0)
+            for ticker in self.tickers
+        }
         self.div_mode    = div_mode
         self.step_months = step_months
         self.rebal_mode  = rebal_mode
@@ -235,6 +250,7 @@ class DividendSimulator:
 
             # 연평균 주가 수익률 계산 (배당 제외, 순수 가격 상승)
             annual_prices = df["close"].resample("YE").last().dropna()
+            annual_prices = annual_prices[annual_prices.index.year < pd.Timestamp.today().year]
             if len(annual_prices) > 2:
                 price_returns = annual_prices.pct_change().dropna()
                 # 극단값 제거
@@ -266,6 +282,49 @@ class DividendSimulator:
                 "div_freq":          div_freq,
                 "price_return_mean": mean_price_return,
             }
+        for t, s in stats.items():
+            div_freq = max(0, int(round(_finite_float(s.get("div_freq"), 0))))
+            event_mean = _finite_float(s.get("div_yield_mean"), 0.0)
+            event_std = _finite_float(s.get("div_yield_std"), 0.0)
+            s["div_yield_mean"] = event_mean
+            s["div_yield_std"] = event_std
+            s["annual_yield_mean"] = _finite_float(event_mean * div_freq, 0.0)
+            s["annual_yield_std"] = _finite_float(event_std * (div_freq ** 0.5), 0.0)
+            s["growth_mean"] = _finite_float(s.get("growth_mean"), 0.10)
+            s["growth_std"] = _finite_float(s.get("growth_std"), 0.07)
+            s["div_freq"] = div_freq
+            s["div_obs"] = int(_finite_float(s.get("div_obs"), div_freq))
+            s["price_return_mean"] = _finite_float(s.get("price_return_mean"), 0.07)
+            s["reliable"] = s["div_obs"] >= 4
+
+        for t in self.tickers:
+            if t in stats:
+                continue
+            df = self._load(t)
+            if df.empty:
+                continue
+            current_year = pd.Timestamp.today().year
+            annual_prices = df["close"].resample("YE").last().dropna()
+            annual_prices = annual_prices[annual_prices.index.year < current_year]
+            if len(annual_prices) > 2:
+                price_returns = annual_prices.pct_change().dropna()
+                price_returns = price_returns[price_returns.abs() < 1.0]
+                price_return_mean = _finite_float(price_returns.mean(), 0.07)
+            else:
+                price_return_mean = 0.07
+            stats[t] = {
+                "div_yield_mean": 0.0,
+                "div_yield_std": 0.0,
+                "annual_yield_mean": 0.0,
+                "annual_yield_std": 0.0,
+                "growth_mean": 0.0,
+                "growth_std": 0.0,
+                "div_freq": 0,
+                "div_obs": 0,
+                "price_return_mean": price_return_mean,
+                "reliable": False,
+            }
+
         return stats
 
     def _simulate_synthetic(self, seed, monthly, years, div_stats, rng) -> float:
@@ -273,15 +332,24 @@ class DividendSimulator:
         가상 데이터 기반 시뮬 (자산가치 기반)
         배당률 고정 + 연평균 주가 상승률 반영
         """
-        total_yield_mean   = sum(div_stats[t]["div_yield_mean"]    * self.weights[t] for t in self.tickers if t in div_stats)
-        total_yield_std    = sum(div_stats[t]["div_yield_std"]      * self.weights[t] for t in self.tickers if t in div_stats)
         price_return_mean  = sum(div_stats[t]["price_return_mean"]  * self.weights[t] for t in self.tickers if t in div_stats)
-        div_freq           = max(div_stats[t]["div_freq"] for t in self.tickers if t in div_stats) if div_stats else 4
 
         n_quarters = years * 4
 
         # 배당률 고정 샘플링
-        div_yield = max(0.001, rng.normal(total_yield_mean, total_yield_std * 0.3))
+        # Synthetic cases use portfolio annual yield and distribute it monthly.
+        annual_yield_mean = sum(
+            _finite_float(div_stats[t].get("annual_yield_mean"), 0.0) * self.weights[t]
+            for t in self.tickers if t in div_stats
+        )
+        annual_yield_std = sum(
+            (_finite_float(div_stats[t].get("annual_yield_std"), 0.0) * self.weights[t]) ** 2
+            for t in self.tickers if t in div_stats
+        ) ** 0.5
+        sampled_annual_yield = rng.normal(annual_yield_mean, annual_yield_std * 0.3)
+        annual_div_yield = max(0.0, _finite_float(sampled_annual_yield, annual_yield_mean))
+        div_yield = annual_div_yield / 12.0
+        div_freq = 12
 
         # 월간 주가 상승률
         monthly_price_return = (1 + price_return_mean) ** (1 / 12) - 1
@@ -415,11 +483,10 @@ class DividendSimulator:
                     real_results.append(val)
 
         # 케이스 부족 시 가상 데이터로 보충
-        n_real    = len(real_results)
-        n_needed  = max(0, self.MIN_CASES - n_real)
-        synthetic = self._run_synthetic_rolling(seed, monthly, years, n_needed) if n_needed > 0 else []
-
-        results = real_results + synthetic
+        if len(real_results) >= self.MIN_CASES:
+            results = real_results
+        else:
+            results = self._run_synthetic_rolling(seed, monthly, years, self.MIN_CASES)
         self._sim_cache[cache_key] = results
         return results
 

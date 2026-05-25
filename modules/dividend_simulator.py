@@ -527,7 +527,7 @@ class DividendSimulator:
         return max(0.0, (logit(target_prob) - b) / k)
 
     def _find_anchor_years(self, seed, monthly, target_monthly_div, probability, cancel_check=None):
-        checkpoints = [1, 5, 10, 15, 20, 25, 30]
+        checkpoints = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
         lo_y, lo_p = 1, 0.0
         for y in checkpoints:
             if cancel_check: cancel_check()
@@ -554,6 +554,21 @@ class DividendSimulator:
             else:
                 lo = mid
         return hi
+
+    def _narrow_anchor_bracket(self, lo, hi, step, fn_prob, probability, cancel_check, max_steps=8):
+        if step <= 0 or hi - lo <= step * 2:
+            return lo, hi
+
+        probe = lo + step
+        while probe < hi and max_steps > 0:
+            if cancel_check:
+                cancel_check()
+            if fn_prob(probe) >= probability:
+                return probe - step, probe
+            lo = probe
+            probe += step
+            max_steps -= 1
+        return lo, hi
 
     def _find_anchor_seed(self, monthly, years, target_monthly_div, probability, cancel_check=None):
         def _cc(): cancel_check() if cancel_check else None
@@ -585,6 +600,11 @@ class DividendSimulator:
             probs.append(p)
             if p >= probability:
                 lo = s / 2
+                lo, s = self._narrow_anchor_bracket(
+                    lo, s, step,
+                    lambda v: self._calc_prob(self._run_rolling(v, monthly, years), target_monthly_div),
+                    probability, cancel_check,
+                )
                 result = self._bisect_anchor(
                     lo, s,
                     lambda v: self._calc_prob(self._run_rolling(v, monthly, years), target_monthly_div),
@@ -624,6 +644,11 @@ class DividendSimulator:
             probs.append(p)
             if p >= probability:
                 lo = m / 2
+                lo, m = self._narrow_anchor_bracket(
+                    lo, m, step,
+                    lambda v: self._calc_prob(self._run_rolling(seed, v, years), target_monthly_div),
+                    probability, cancel_check,
+                )
                 result = self._bisect_anchor(
                     lo, m,
                     lambda v: self._calc_prob(self._run_rolling(seed, v, years), target_monthly_div),

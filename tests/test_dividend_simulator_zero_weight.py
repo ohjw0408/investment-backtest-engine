@@ -115,3 +115,60 @@ def test_monthly_anchor_decreases_when_seed_increases():
     )
 
     assert higher_seed_monthly <= lower_seed_monthly
+
+
+class BracketNarrowingProbe(DividendSimulator):
+    def __init__(self):
+        pass
+
+    def _run_rolling(self, seed, monthly, years):
+        return seed, monthly, years
+
+    def _calc_prob(self, payload, target_monthly):
+        seed, monthly, years = payload
+        if years == 70:
+            return 1.0
+        if monthly >= 12_500_000:
+            return 1.0
+        if seed >= 250_000_000:
+            return 1.0
+        return 0.0
+
+
+def test_monthly_anchor_narrows_wide_expansion_bracket():
+    sim = BracketNarrowingProbe()
+
+    monthly = sim._find_anchor_monthly(
+        seed=0,
+        years=5,
+        target_monthly_div=3_000_000,
+        probability=0.90,
+    )
+
+    assert monthly <= 12_600_000
+
+
+def test_seed_anchor_narrows_wide_expansion_bracket():
+    sim = BracketNarrowingProbe()
+
+    seed = sim._find_anchor_seed(
+        monthly=0,
+        years=5,
+        target_monthly_div=3_000_000,
+        probability=0.90,
+    )
+
+    assert seed <= 260_000_000
+
+
+def test_year_anchor_extends_to_seventy_years():
+    sim = BracketNarrowingProbe()
+
+    years = sim._find_anchor_years(
+        seed=0,
+        monthly=0,
+        target_monthly_div=3_000_000,
+        probability=0.90,
+    )
+
+    assert years == 70.0

@@ -74,7 +74,8 @@ class PriceLoader:
         self._usdkrw_cache    = None
         self._backfill_engine = None   # 싱글톤
         self._price_cache     = {}     # 가격 데이터 캐시
-        self._backfilled_codes: set = set()  # backfill은 ticker당 1회만
+        self._backfilled_codes: set = set()  # backfill 성공한 ticker (재시도 불필요)
+        self._backfill_skip_codes: set = set()  # 재시도해도 의미없는 ticker (no_meta 등)
 
         self.create_tables()
         self._auto_update_usdkrw()
@@ -355,13 +356,24 @@ class PriceLoader:
             self._insert_ignore(action_df, "corporate_actions")
 
         # ── 백필링 자동 실행 (ticker당 1회) ─────────────────
-        if (self.is_kr_etf(code) or code in self._us_tickers) and code not in self._backfilled_codes:
+        # _backfilled_codes: 성공 완료 → 재시도 불필요
+        # _backfill_skip_codes: 영구 실패 (no_meta, no_index_map, no_pre_data) → 재시도 무의미
+        _PERMANENT_SKIP = {"no_meta", "no_index_map", "no_pre_data", "empty_after_scale"}
+        if (
+            (self.is_kr_etf(code) or code in self._us_tickers)
+            and code not in self._backfilled_codes
+            and code not in self._backfill_skip_codes
+        ):
             try:
                 bf     = self._get_backfill_engine()
                 result = bf.backfill(code)
-                if result.get("status") == "ok":
+                status = result.get("status", "")
+                if status == "ok":
                     print(f"[PriceLoader] 백필링 완료: {code} ({result['rows_added']:,}행 추가)")
-                self._backfilled_codes.add(code)
+                    self._backfilled_codes.add(code)
+                elif status in _PERMANENT_SKIP:
+                    self._backfill_skip_codes.add(code)
+                # 그 외(no_index_data, scale_failed, no_etf_data): 재시도 허용 → 아무것도 추가 안 함
             except Exception:
                 pass
 

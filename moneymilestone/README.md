@@ -77,12 +77,13 @@ moneymilestone/
 3. `wiki/log.md` 최근 3~5개 항목 읽기 → 최근 맥락 파악
 4. 작업 관련 wiki 페이지 읽기
 
-### 코드 작업 완료 후 반드시
+### 코드 작업 완료 후 반드시 (세션 마무리 기다리지 말고 작업 완료 즉시)
 
 1. `wiki/dev/status.md` 업데이트 (완료된 항목 ✅ 표시)
 2. `wiki/dev/bugs.md` 업데이트 (새 버그 발견 or 수정된 버그)
 3. `wiki/log.md`에 항목 추가
 4. `wiki/index.md` 업데이트 (새 페이지 생성했을 경우)
+5. **wiki 변경사항 git commit + push (코드 커밋에 포함하거나 별도 커밋)**
 
 ### 새 소스 ingest 시
 

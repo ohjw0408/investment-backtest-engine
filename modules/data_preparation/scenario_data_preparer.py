@@ -102,9 +102,15 @@ def prepare_scenario_data(
     dict — 상단 docstring 참조.
     """
     import datetime
+    import math
     db_path  = Path(price_db_path) if price_db_path else PRICE_DB_PATH
     today    = datetime.date.today().isoformat()
     data_end = data_end or today
+
+    # requested_start 있으면 required_years 자동 계산 (allow_synthetic=True 경로용)
+    if requested_start is not None and required_years is None:
+        delta = (pd.Timestamp(data_end) - pd.Timestamp(requested_start)).days
+        required_years = max(1, math.ceil(delta / 365.25))
 
     # ── allow_synthetic=True → 기존 DataPreparer 경유 ───────────────────────
     if allow_synthetic:

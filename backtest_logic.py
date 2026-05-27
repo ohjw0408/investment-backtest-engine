@@ -73,6 +73,21 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
                 'disclaimer': _check.get('disclaimer'),
             })
 
+    # ── 가상 데이터 옵트인 ────────────────────────────────────────────────
+    use_synthetic = bool(body.get('use_synthetic', False))
+    _prep_meta: dict = {}
+
+    if use_synthetic:
+        from modules.data_preparation import prepare_scenario_data
+        _prep_meta = prepare_scenario_data(
+            tickers          = tickers,
+            requested_start  = start_date,
+            data_end         = end_date,
+            allow_backfill   = True,
+            allow_synthetic  = True,
+            purpose          = "backtest",
+        )
+    # ── 가격 로드 ──────────────────────────────────────────────────────────
     price_data, dates = portfolio_engine.price_loader.load(tickers, start_date, end_date)
 
     runner = TaxableSimulationRunner()
@@ -127,8 +142,13 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
             annual_returns.append({'year': int(yr), 'return': round((e / s - 1), 4)})
 
     return {
-        'tax_enabled':  tax_enabled,
-        'account_type': account_type if tax_enabled else None,
+        'tax_enabled':    tax_enabled,
+        'account_type':   account_type if tax_enabled else None,
+        'used_synthetic': _prep_meta.get('used_synthetic', False),
+        'synthetic_info': _prep_meta.get('synthetic_info', {}),
+        'backfilled':     _prep_meta.get('backfilled', []),
+        'warnings':       _prep_meta.get('warnings', []),
+        'data_confidence': _prep_meta.get('data_confidence', 'actual'),
         'metrics': {
             'end_value':      round(end_value),
             'total_invested': round(total_invested),

@@ -96,3 +96,25 @@
 - KODEX 미국배당다우존스 그래프 개형 볼록함 수정 기록.
 - 기간 자동 역산 범위 1~70년 확장 기록.
 - 은퇴 시뮬레이션 유사 문제는 확인 필요 항목으로만 기록.
+
+---
+
+## [2026-05-28] decision | Codex ETF 백필 자동화 검토 반영
+
+- `ETF_BACKFILL_ARCHITECTURE_PLAN.md`에 `Codex Review Notes: Automation Risks and Practical Rollout` 섹션 추가.
+- 판단: 프록시 매핑 자동화는 완전 자동 정답 선택기가 아니라, 자동 후보 제안 + 검증된 좁은 패밀리만 자동 승인 + 나머지는 `needs_review`로 멈추는 운영 시스템이어야 함.
+- 주요 우려:
+  - `underlying_symbol`이 비어 있거나 불완전하면 단일종목/레버리지 자동화의 입력으로 사용할 수 없음.
+  - 이름/카테고리 기반 추론은 triage에는 유용하지만 최종 프록시 근거로는 위험함.
+  - 커버드콜, 테마/액티브, missing-underlying 레버리지 상품은 명시적 reject 정책이 먼저 필요함.
+  - provenance 없이 ETF 타입을 넓히면 잘못 생성된 장기 히스토리를 audit/delete/regenerate 하기 어려움.
+- 현실적 단계:
+  1. diagnostics
+  2. provenance tables
+  3. minimal `etf_proxy_map`
+  4. `BackfillEngine` reads `etf_proxy_map` first
+  5. explicit reject policies
+  6. reviewed-underlying daily-reset leverage
+  7. selected-family holdings/regression
+  8. bond/covered-call models later
+- 서명: Codex가 이 부분을 검토하고 수정함.

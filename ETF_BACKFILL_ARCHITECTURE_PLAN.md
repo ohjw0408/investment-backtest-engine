@@ -1069,6 +1069,179 @@ Keep small expected outputs for:
 - Backfill must be explainable in the UI/API.
 - Any automated mapping from name or category should default to `needs_review`.
 
+## Codex Review Notes: Automation Risks and Practical Rollout
+
+This section records an implementation review added by Codex on 2026-05-28.
+
+The proxy automation design is directionally correct, but it should be treated as an operations and review system, not as a fully automatic oracle. The safe target is:
+
+1. Automatically classify and propose candidate mappings.
+2. Automatically accept only narrow, validated A/B-grade families.
+3. Default ambiguous products to `needs_review`.
+4. Refuse to generate long histories when the system cannot explain the proxy, assumptions, confidence, and deletion path.
+
+### Main Concerns
+
+1. `underlying_symbol` is currently not a reliable input.
+   - `symbol_master.db` has the column, but current data may be empty or incomplete.
+   - Any leverage or single-stock automation that depends on this field must first populate and validate it.
+
+2. Name/category inference is useful for triage, but unsafe as final truth.
+   - Names such as TSLA, AI, robotics, semiconductor, income, or covered call can identify a product family.
+   - They do not prove that a stock, sector index, or broad market index is a valid historical proxy.
+   - Name/category-based mappings should be written with `review_status = needs_review` unless they belong to a narrow reviewed rule.
+
+3. Current broad U.S. category mappings are dangerous if promoted into the new system unchanged.
+   - Many U.S. ETF categories collapse into S&P 500 or Nasdaq proxies today.
+   - These mappings may be useful as low-confidence seed data for diagnostics, but should not produce A/B-grade generated histories.
+
+4. Leveraged ETFs require explicit underlying and daily-reset modeling.
+   - The existing leverage multiplication is a start, but the new model should include daily reset, fees/financing, validation against overlap, and volatility-drag diagnostics.
+   - Single-stock leveraged products must not be inferred only from ticker or name.
+
+5. Thematic and active ETFs need holdings or regression validation.
+   - If holdings are unavailable and regression is weak, no-backfill is better than a misleading long history.
+   - A Tesla value-chain ETF should not map to TSLA unless holdings or return behavior proves TSLA dominance.
+
+6. Covered call ETFs should remain rejected by default.
+   - They are not equivalent to their underlying index.
+   - A usable model must explain capped upside, option premium, downside exposure, distribution policy, and fees.
+
+7. Provenance should come before broad expansion.
+   - Without `backfill_runs`, `price_daily_source`, and `corporate_action_source`, wrong generated histories are difficult to audit, delete, or regenerate.
+   - This is more important than adding many ETF types quickly.
+
+### Practical Step-by-Step Rollout
+
+#### Slice 1. Make Current Generated Data Observable
+
+Goal: know what exists before changing behavior.
+
+Tasks:
+
+- Generate diagnostics for current actual range, generated range, volume-zero rows, mapped proxy, index range, and dividend source.
+- Flag unsafe families: category-only U.S. mappings, bond yield-as-price mappings, covered call mappings, leveraged products with missing underlying, and thematic mappings with missing proxy data.
+- Do not change generated rows in this slice.
+
+Acceptance:
+
+- A reviewer can see which ETFs are safe, suspicious, or unsupported.
+- The report can be rerun without modifying DBs.
+
+#### Slice 2. Add Minimal Provenance
+
+Goal: make future generated rows reversible.
+
+Tasks:
+
+- Add `backfill_runs`.
+- Add `price_daily_source`.
+- Add `corporate_action_source`.
+- Write provenance for newly generated rows only.
+- Add delete-by-run helper before any large regeneration.
+
+Acceptance:
+
+- New generated rows can be deleted without touching actual price rows.
+- Simulators can distinguish actual vs generated rows.
+
+#### Slice 3. Introduce `etf_proxy_map` as the Extension Point
+
+Goal: stop editing `backfill_engine.py` for every new ETF family.
+
+Tasks:
+
+- Create `etf_proxy_map`.
+- Seed only reviewed core families at first:
+  - S&P 500
+  - Nasdaq-100
+  - KOSPI200
+  - KOSDAQ150
+  - Dow Jones U.S. Dividend 100
+  - major physical gold products if proxy data is sufficient
+- Import old `INDEX_MAP` and `US_CATEGORY_MAP` only as low-confidence fallback or diagnostic seed rows.
+- Add `review_status`.
+
+Acceptance:
+
+- `BackfillEngine` reads `etf_proxy_map` first.
+- Hard-coded maps are fallback only.
+- A bad mapping can be rejected by DB row, not by code change.
+
+#### Slice 4. Add Explicit Reject Policies
+
+Goal: prevent known-bad automatic backfills.
+
+Tasks:
+
+- Mark covered call, buffer/defined-outcome, unknown crypto futures, unknown thematic, and missing-underlying leveraged products as `proxy_level = none` or `needs_review`.
+- Add user-facing status strings explaining why a product was not backfilled.
+- Add tests that reject covered call ETFs without an option model.
+
+Acceptance:
+
+- JEPI/JEPQ-like products do not silently receive S&P 500 histories.
+- TSLA/AI/thematic names do not automatically map to TSLA, QQQ, or S&P 500.
+
+#### Slice 5. Implement Daily-Reset Leverage for Reviewed Underlyings
+
+Goal: support broad-index and single-stock leveraged products only after the underlying is known.
+
+Tasks:
+
+- Store `underlying_symbol`, `leverage`, fee/financing assumptions, and confidence in `etf_proxy_map`.
+- Load underlying stock/index histories from the correct source.
+- Apply daily-reset compounding.
+- Validate against actual overlap when available.
+
+Acceptance:
+
+- KOSPI200/Nasdaq-100 leveraged products can be C/B-grade after validation.
+- Single-stock leveraged products are C-grade max and rejected if underlying is missing.
+
+#### Slice 6. Add Holdings and Regression Only for Selected Families
+
+Goal: support thematic/active ETFs without pretending weak proxies are factual.
+
+Tasks:
+
+- Start with a small reviewed ETF set.
+- Store holdings snapshots where available.
+- Build candidate factor returns.
+- Fit and validate regression models.
+- Store coefficients and validation summary.
+
+Acceptance:
+
+- A thematic ETF explains why a proxy was accepted or rejected.
+- Weak models remain C/D/F and are not shown as high-confidence long histories.
+
+#### Slice 7. Covered Call and Bond Models Later
+
+Goal: defer complex models until the core provenance and mapping system is stable.
+
+Tasks:
+
+- Bond duration/spread model after total-return bond index options are exhausted.
+- Covered call option-income model only after the simulator can represent capped upside, option premium, distribution policy, and fees.
+
+Acceptance:
+
+- Bond ETFs no longer use raw yield levels as price histories.
+- Covered call ETFs are not backfilled automatically unless a tested model exists.
+
+### Implementation Priority
+
+The next practical implementation target should be:
+
+1. Diagnostics.
+2. Provenance tables.
+3. Minimal `etf_proxy_map`.
+4. `BackfillEngine` reads `etf_proxy_map` first.
+5. Explicit rejects for covered call, unknown thematic, and missing-underlying leveraged products.
+
+This is intentionally smaller than full BackfillEngine V2. It creates the control surface needed for safe automation before adding more modeling complexity.
+
 ## Suggested First Implementation Slice
 
 Start small:

@@ -11,7 +11,20 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> Track A + Track B 완료. Gate 2c PASSED (SCHD tax OFF 3750만 vs tax ON 7125만, 458730 OFF 4125만 vs ON 7500만). 다음: Track C (합성 데이터 facade) 또는 Track D (세금 Phase 2d).
+> Track A + Track B + Track C (Phase 3~10) 완료. SYNTHETIC_DATA_INTEGRATION_PLAN Phase 0~10 전부 완료. 다음: Track D (세금 Phase 2d) 또는 ETF_BACKFILL Phase 1 착수.
+
+---
+
+## 최근 완료된 작업 (Claude 세션 2026-05-28 Track C Phase 9+10)
+
+- ✅ Phase 9 UI Warning — 가상 데이터 사용 시 경고 배너 표시
+  - calculator.html: synthWarningBanner + 체크박스 (이전 세션)
+  - calculator.js: renderResult에서 used_synthetic 시 배너 표시 + ticker별 날짜/행수
+  - backtest.html: btUseSyntheticCheck 체크박스 + use_synthetic → payload
+  - backtest.html: renderBacktest에서 btSynthWarningBanner 표시
+- ✅ Phase 10 Unit Tests — tests/test_scenario_data_preparer.py 20/20 PASS
+  - _calc_rolling_cases, _data_confidence, allow_synthetic=False 9케이스, allow_synthetic=True 3케이스
+- 커밋: 493d856
 
 ---
 

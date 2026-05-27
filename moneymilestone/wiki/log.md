@@ -4,6 +4,21 @@
 
 ---
 
+## [2026-05-28] feature | Track C Phase 9+10 완료 — UI 경고 + 단위테스트
+
+- Phase 9 UI Warning:
+  - `calculator.html` synthWarningBanner + renderResult 배너 로직 (calculator.js)
+  - `backtest.html` btUseSyntheticCheck 체크박스 + use_synthetic payload + renderBacktest 배너
+  - 가상 데이터 사용 시 ticker별 날짜/행수 표시, 참고용 경고 안내
+- Phase 10 Unit Tests: `tests/test_scenario_data_preparer.py` 20/20 PASS
+  - _calc_rolling_cases, _data_confidence, allow_synthetic=False/True 전 경로 커버
+- 커밋: 493d856 (push 대기)
+- SYNTHETIC_DATA_INTEGRATION_PLAN.md Phase 0~10 전부 완료
+
+_작성: Claude_
+
+---
+
 ## [2026-05-28] rule | Wiki 작성자 서명 규칙 도입
 
 - README.md에 서명 규칙 명문화: log.md 항목 끝 `_작성: Claude/Codex/오너_`, 테이블 셀 `(Claude)`, 계획 문서 섹션 끝 `_검토/추가: Codex, YYYY-MM-DD_`

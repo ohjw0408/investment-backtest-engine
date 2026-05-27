@@ -97,14 +97,30 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
     data_start = max([usdkrw_start] + price_starts) if price_starts else usdkrw_start
     data_end   = datetime.date.today().strftime('%Y-%m-%d')
 
-    start_dt  = datetime.datetime.strptime(data_start, '%Y-%m-%d').date()
-    max_years = (datetime.date.today() - start_dt).days // 365
+    # ── 가상 데이터 옵트인 ────────────────────────────────────────────
+    use_synthetic    = bool(body.get('use_synthetic', False))
+    _prep_meta: dict = {}  # ScenarioDataPreparer 결과 (used_synthetic, warnings 등)
 
-    if years > max_years:
-        raise ValueError(
-            f"데이터 부족: {ticker_codes}의 데이터는 {data_start}부터 있어서 "
-            f"최대 {max_years}년 시뮬레이션이 가능합니다."
+    if use_synthetic:
+        from modules.data_preparation import prepare_scenario_data
+        _prep_meta = prepare_scenario_data(
+            tickers        = ticker_codes,
+            required_years = years,
+            data_end       = data_end,
+            allow_backfill = True,
+            allow_synthetic = True,
+            purpose        = "calculator",
         )
+        data_start = _prep_meta["effective_start"]
+    # ── 데이터 부족 검사 (use_synthetic=False 시 기존 동작 유지) ───────
+    else:
+        start_dt  = datetime.datetime.strptime(data_start, '%Y-%m-%d').date()
+        max_years = (datetime.date.today() - start_dt).days // 365
+        if years > max_years:
+            raise ValueError(
+                f"데이터 부족: {ticker_codes}의 데이터는 {data_start}부터 있어서 "
+                f"최대 {max_years}년 시뮬레이션이 가능합니다."
+            )
 
     div_starts = [_get_dividend_start(portfolio_engine, t) for t in ticker_codes]
     div_starts = [d for d in div_starts if d]
@@ -161,7 +177,11 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
     ]
 
     return {
-        'cases':        cases_summary,
-        'cases_count':  len(cases_summary),
-        'distribution': result['distribution'],
+        'cases':          cases_summary,
+        'cases_count':    len(cases_summary),
+        'distribution':   result['distribution'],
+        'used_synthetic': _prep_meta.get('used_synthetic', False),
+        'synthetic_info': _prep_meta.get('synthetic_info', {}),
+        'backfilled':     _prep_meta.get('backfilled', []),
+        'warnings':       _prep_meta.get('warnings', []),
     }

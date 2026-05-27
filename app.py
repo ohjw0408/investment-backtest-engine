@@ -48,6 +48,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key')
 import datetime as _dt_mod
 app.config['PERMANENT_SESSION_LIFETIME'] = _dt_mod.timedelta(days=30)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 INDEX_DB_PATH  = Path(__file__).parent / "data" / "meta" / "index_master.db"
 PRICE_DB_PATH  = Path(__file__).parent / "data" / "price_cache" / "price_daily.db"
@@ -113,7 +114,11 @@ p{font-size:0.88rem;color:#546E7A;line-height:1.6;margin-bottom:20px}
 
 @app.route('/auth/google/callback')
 def google_callback():
-    token     = google.authorize_access_token()
+    try:
+        token = google.authorize_access_token()
+    except Exception:
+        # state mismatch (브라우저 전환/뒤로가기 등) → 재시도
+        return redirect(url_for('google_login'))
     userinfo  = token.get('userinfo')
     if not userinfo:
         return redirect('/')

@@ -11,7 +11,25 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> Track A + Track B + Track C (Phase 3~10) 완료. SYNTHETIC_DATA_INTEGRATION_PLAN Phase 0~10 전부 완료. 다음: Track D (세금 Phase 2d) 또는 ETF_BACKFILL Phase 1 착수.
+> 세금 리팩토링 Phase 1~3 전부 완료. SYNTHETIC_DATA_INTEGRATION_PLAN 완료. Gate 2a/2b/2c/2d PASS (28/28). 다음: ETF_BACKFILL Phase 2 (Provenance 스키마) 또는 PHASE4 기능 잔여.
+
+---
+
+## 최근 완료된 작업 (Claude 세션 2026-05-28 Tax Phase 2d/2e/3)
+
+- ✅ Tax Phase 2d: 은퇴 인출 세금 주입 (WithdrawalAnalyzer → TaxableSimulationRunner)
+  - Gate 2d PASSED 5/5: 위탁 survival/end_value, 연금 pension_tax_info, IRP 에러없음
+  - 커밋: 468e349
+- ✅ Tax Phase 2e: 종합과세 경고 + 분할매도 절세 패널
+  - split_sale_planner.py: 1~20년 분할 시나리오 세금 계산 (2천만 임계선 + 종합과세)
+  - backtest.html: btSplitSalePanel, 연수 슬라이더, 절감액 실시간 표시
+  - taxable_runner.py: kr_foreign_unrealized_gain 필드 추가
+  - 커밋: 2c7b308
+- ✅ Tax Phase 3: ISA 풍차돌리기 Runner 통일
+  - _run_isa_renewal_cycle: portfolio_engine.run_simulation → TaxableSimulationRunner N회
+  - isa_years_held 파라미터로 만기/중도해지 세율 자동 분기
+  - 회귀: Gate 2a/2b 4+4 PASS, 전체 28/28 PASS
+  - 커밋: f7f84c2
 
 ---
 
@@ -89,7 +107,10 @@ tags: [dev]
 - Phase 1: 공통 세금 코어, 절세매도 12월 분리, 청산세 통일 (Gate 1 ✅)
 - Phase 2a: `TaxableSimulationRunner` 구현, 백테스트 전환 (Gate 2a ✅)
 - Phase 2b: 투자계산기 + 은퇴 적립 Runner 전환 (Gate 2b ✅)
-- Phase 2c: 배당 역산 Runner 구현 완료 (Gate 검증 대기 중)
+- Phase 2c: 배당 역산 Runner 구현 완료 (Gate 2c ✅)
+- Phase 2d: 은퇴 인출 세금 주입 (Gate 2d ✅ 5/5)
+- Phase 2e: 종합과세 경고 + 분할매도 절세 패널 (backtest에 노출) ✅
+- Phase 3: ISA 풍차돌리기 Runner 통일 ✅
 - 버그픽스: KR_FOREIGN 청산 손익통산 제거 (개별 15.4% 분리과세)
 - 버그픽스: US_DIRECT 리밸런싱 손실 손익통산 반영
 

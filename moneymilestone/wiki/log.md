@@ -4,6 +4,20 @@
 
 ---
 
+## [2026-05-28] feature | Tax Phase 2d/2e/3 완료 — 세금 리팩토링 전 단계 완료
+
+- Phase 2d: WithdrawalAnalyzer → TaxableSimulationRunner 전환. Gate 2d 5/5 PASS
+  - SCHD 위탁: tax OFF p50=13.4억 vs ON p50=10.9억 (-23%)
+  - 연금저축: pension_tax_info 2개 구간(55-70, 70-80세). IRP 에러없음.
+- Phase 2e: split_sale_planner.py, backtest 종합과세 경고 + 분할매도 슬라이더 패널
+  - 2천만 초과 시에만 노출. 1~20년 분할 시나리오 + 절감액 실시간 계산
+- Phase 3: ISA 풍차돌리기 Runner 통일. isa_years_held 파라미터로 만기/중도해지 분기
+- 전체 회귀: Gate 2a/2b 4+4 + scenario_data 20 = 28/28 PASS
+
+_작성: Claude_
+
+---
+
 ## [2026-05-28] feature | Track C Phase 9+10 완료 — UI 경고 + 단위테스트
 
 - Phase 9 UI Warning:

@@ -11,7 +11,25 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> 세금 리팩토링 Phase 1~3 전부 완료. SYNTHETIC_DATA_INTEGRATION_PLAN 완료. Gate 2a/2b/2c/2d PASS (28/28). 다음: ETF_BACKFILL Phase 2 (Provenance 스키마) 또는 PHASE4 기능 잔여.
+> 세금 리팩토링 Phase 1~3 전부 완료. SYNTHETIC_DATA_INTEGRATION_PLAN 완료. Gate 2a/2b/2c/2d PASS (28/28). ETF_BACKFILL Phase 2 (Provenance 스키마 + 통합) 완료. 다음: ETF_BACKFILL Phase 3 (Universe 확장) 또는 PHASE4 기능 잔여.
+
+---
+
+## 최근 완료된 작업 (Claude 세션 2026-05-28 ETF_BACKFILL Phase 2)
+
+- ✅ modules/provenance.py 신규 생성
+  - backfill_runs, price_daily_source, corporate_action_source DDL
+  - ensure_provenance_tables, new_run_id, write_backfill_run, write_price_source, write_action_source
+  - delete_by_run_id: run_id 기준 안전 삭제 (실측 제외)
+  - is_generated: 실측 vs 생성 판별 (volume=0 fallback 포함)
+  - get_run_summary: 코드별 백필 이력 조회
+- ✅ BackfillEngine 통합
+  - __init__: ensure_provenance_tables 호출
+  - inject_quarterly_dividends: 반환 타입 int → (int, list[str])
+  - backfill(): 완료 후 3종 provenance 기록 (confidence B/C, run_id 반환)
+- ✅ synthetic_price_generator.py: generate_and_save 반환 dict에 dates 추가
+- ✅ data_preparer.py: 합성 데이터 생성 후 provenance 기록 (confidence D)
+- 커밋: dd722ec
 
 ---
 

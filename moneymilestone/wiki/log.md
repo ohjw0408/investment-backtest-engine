@@ -4,6 +4,25 @@
 
 ---
 
+## [2026-05-28] feature | ETF_BACKFILL Phase 2 완료 — Provenance 스키마 + 통합
+
+- modules/provenance.py 신규 (커밋 dd722ec)
+  - 3개 테이블: backfill_runs, price_daily_source, corporate_action_source
+  - 유틸: ensure_provenance_tables, new_run_id, write_backfill_run, write_price_source, write_action_source
+  - delete_by_run_id: run_id로 생성 데이터 안전 삭제 (source_type='actual' 제외)
+  - is_generated: 실측 vs 생성 판별 (provenance 레코드 없으면 volume=0 fallback)
+  - get_run_summary: 코드별 백필 실행 이력
+- BackfillEngine.__init__: ensure_provenance_tables 호출
+- inject_quarterly_dividends: 반환 타입 int → (int, list[str])
+- BackfillEngine.backfill(): 성공 시 provenance 3종 기록 (confidence B/C), run_id 반환
+- generate_and_save: 반환 dict에 dates 리스트 추가
+- data_preparer.py: 합성 데이터 생성 후 provenance 기록 (confidence D)
+- 다음: ETF_BACKFILL Phase 3 (Universe 확장) 또는 PHASE4 잔여 기능
+
+_작성: Claude_
+
+---
+
 ## [2026-05-28] feature | Tax Phase 2d/2e/3 완료 — 세금 리팩토링 전 단계 완료
 
 - Phase 2d: WithdrawalAnalyzer → TaxableSimulationRunner 전환. Gate 2d 5/5 PASS

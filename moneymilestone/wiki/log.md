@@ -31,6 +31,16 @@
 
 ---
 
+## [2026-05-28] feature | US ETF 리스트 162개 → 4593개 확장
+
+- ETFdb.com API로 전체 수집 (4595개 중 4593개, 중복 2개 제외)
+- symbol_master.db 업데이트 (전체 심볼 15,008개)
+- MSTY(YieldMax), JEPI, JEPQ 등 신규 인기 ETF 포함
+- 카테고리: US Equity / Fixed Income / Commodity / Real Estate / Multi-Asset 등
+- 커밋: ec788da
+
+---
+
 ## [2026-05-27] feature | 홈화면 가격불러오기 안정성 및 정시성 추가
 
 - market_quote_service: Redis SETNX 락으로 thundering herd 방지 (캐시 만료 시 yfinance 중복 호출 차단)

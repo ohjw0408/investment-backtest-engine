@@ -13,6 +13,7 @@ import pandas as pd
 class RunResult:
     history_df: pd.DataFrame
     end_value: float  # 청산세 적용 후 최종 자산
+    kr_foreign_unrealized_gain: float = 0.0  # 청산 시 KR_FOREIGN 미실현 이익 (Phase 2e 패널용)
 
 
 class TaxableSimulationRunner:
@@ -72,6 +73,7 @@ class TaxableSimulationRunner:
         total_invested = config.initial_capital + config.monthly_contribution * years * 12
         end_value      = float(history_df['portfolio_value'].iloc[-1])
 
+        kr_foreign_unrealized_gain = 0.0
         if tax_enabled and tax_engine is not None:
             from modules.tax.liquidation import apply_liquidation_tax
             last_prices = {
@@ -90,5 +92,17 @@ class TaxableSimulationRunner:
                 ytd_us_realized_gains=ytd_us_gains,
                 age=user_settings.get('age', 40),
             )
+            # KR_FOREIGN 미실현 이익 집계 (Phase 2e 분할매도 절세 패널용)
+            if account_type == "위탁" and hasattr(portfolio, 'positions'):
+                for ticker, pos in portfolio.positions.items():
+                    if ticker in last_prices and pos.quantity > 0:
+                        if tax_engine.classify_asset(ticker) == "KR_FOREIGN":
+                            gain = portfolio.unrealized_gain(ticker, last_prices[ticker])
+                            if gain > 0:
+                                kr_foreign_unrealized_gain += gain
 
-        return RunResult(history_df=history_df, end_value=end_value)
+        return RunResult(
+            history_df=history_df,
+            end_value=end_value,
+            kr_foreign_unrealized_gain=kr_foreign_unrealized_gain,
+        )

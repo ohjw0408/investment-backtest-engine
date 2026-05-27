@@ -103,8 +103,19 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         progress_callback= progress_callback,
     )
 
-    history_df = result.history_df
-    end_value  = result.end_value
+    history_df                 = result.history_df
+    end_value                  = result.end_value
+    kr_foreign_unrealized_gain = getattr(result, 'kr_foreign_unrealized_gain', 0.0)
+
+    # Phase 2e: 분할매도 절세 계획 (KR_FOREIGN > 2천만 시)
+    split_sale_plan = None
+    if tax_enabled and kr_foreign_unrealized_gain > 20_000_000:
+        from modules.tax.split_sale_planner import compute_split_sale_plan
+        split_sale_plan = compute_split_sale_plan(
+            kr_foreign_gain        = kr_foreign_unrealized_gain,
+            earned_income          = user_settings.get("earned_income", 0),
+            other_financial_income = 0.0,
+        )
 
     pv             = history_df['portfolio_value']
     years          = len(history_df) / 252
@@ -149,6 +160,8 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         'backfilled':     _prep_meta.get('backfilled', []),
         'warnings':       _prep_meta.get('warnings', []),
         'data_confidence': _prep_meta.get('data_confidence', 'actual'),
+        'kr_foreign_unrealized_gain': round(kr_foreign_unrealized_gain),
+        'split_sale_plan': split_sale_plan,
         'metrics': {
             'end_value':      round(end_value),
             'total_invested': round(total_invested),

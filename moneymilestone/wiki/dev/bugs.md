@@ -16,9 +16,9 @@ tags: [dev, bug]
 | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|
 | DJUSDIV100 데이터 부족 | SCHD vs TIGER 미국배당다우존스 결과 불일치 | `modules/backfill_engine.py`, `data/meta/index_master.db` | ✅ DJUSDIV_PROXY 체인으로 해결 (7b1dc6f) |
-| `_fetch_fred()` 미정의 | index_loader에서 FRED 데이터 로드 실패 | `modules/index_loader_develop.py` | ⏳ Track A에서 수정 예정 |
-| 백필 실패 코드가 완료 처리됨 | 실패한 ETF가 캐시에서 완료로 표시됨 | `modules/price_loader.py` | ⏳ Track A에서 수정 예정 |
-| 배당 시뮬 미완료 연도 포함 | 현재 연도(작년~현재) 통계를 끝난 것처럼 포함 | `modules/dividend_simulator.py` | ⏳ Track A에서 수정 예정 |
+| `_fetch_fred()` 미정의 | index_loader에서 FRED 데이터 로드 실패 | `modules/index_loader_develop.py` | ✅ def 선언 추가 (e1a4d6e) |
+| 백필 실패 코드가 완료 처리됨 | 실패한 ETF가 캐시에서 완료로 표시됨 | `modules/price_loader.py` | ✅ _backfill_skip_codes 분리 (a761750) |
+| 배당 시뮬 미완료 연도 포함 | 현재 연도(작년~현재) 통계를 끝난 것처럼 포함 | `modules/dividend_simulator.py` | ✅ complete_div 필터 추가 (ec56455) |
 
 ---
 

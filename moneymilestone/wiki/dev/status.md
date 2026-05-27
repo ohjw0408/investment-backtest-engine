@@ -11,7 +11,7 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> Track A Step 2-3 완료: DJUSDIV_PROXY 체인으로 DJ 배당 ETF 백필 복구. price_return_mean 수렴 확인. Step 4~8 진행 중.
+> Track A 전 단계 완료 (Step 1~9). DJUSDIV_PROXY 체인, KQ150, _fetch_fred 수정, 백필 실패처리, 충분성체크, 미완료연도제외. Phase 2c Gate 재검증 준비 완료.
 
 ---
 
@@ -20,6 +20,11 @@ tags: [dev]
 - ✅ Track A Step 1: 백필 현황 진단 — DJUSDIV100 1행, KQ150 없음, 백필 84.8% 확인
 - ✅ Track A Step 2: DJUSDIV100 소스 조사 — Yahoo Finance 미지원 확인, SDY(0.948)/DVY(0.937) 대안 발견
 - ✅ Track A Step 3: DJUSDIV_PROXY 체인 구축 — SCHD←SDY←DVY←^GSPC, 24,714행, 커밋 7b1dc6f
+- ✅ Track A Step 4: KOSDAQ150→KQ150 매핑 추가, KQ150 6,284행 (KODEX229200←^KQ11), 커밋 40696f5
+- ✅ Track A Step 5: index_loader_develop.py _fetch_fred() def 선언 누락 수정, 커밋 e1a4d6e
+- ✅ Track A Step 6: PriceLoader 백필 실패 시 완료 처리 버그 수정 (성공만 _backfilled_codes), 커밋 a761750
+- ✅ Track A Step 7: 인덱스 충분성 체크 추가 (100행 미만 거부), 커밋 e33eeeb
+- ✅ Track A Step 8: div_stats 현재 연도 미완료 데이터 제외 (complete_div 필터), 커밋 ec56455
 - ✅ Track A Step 9 선행 검증: SCHD/TIGER/ACE/SOL price_return_mean 9.61~9.63% 수렴 ✅
 
 ## 최근 완료된 작업 (Claude 세션 2026-05-27~28)

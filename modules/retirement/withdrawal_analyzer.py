@@ -72,20 +72,46 @@ def _run_wd_case(args: tuple):
             rebalance_frequency  = strategy_dict.get("rebalance_frequency"),
             inflation            = config_dict.get("inflation", 0.0),
         )
-        portfolio = Portfolio(config_dict["initial_capital"])
-        loop      = SimulationLoop(
-            DividendEngine(), ContributionEngine(), WithdrawalEngine(),
-            OrderExecutor(), CashAllocator()
-        )
-        recorder = HistoryRecorder()
-        loop.run(portfolio, strategy, config, sliced_data, sliced_dates, recorder)
-        history_df = recorder.to_dataframe()
+
+        # ── 세금 경로 분기 ───────────────────────────────────────
+        tax_enabled    = config_dict.get("tax_enabled", False)
+        account_type   = config_dict.get("account_type", "위탁")
+        user_settings  = config_dict.get("user_settings", {})
+        gain_harvesting = config_dict.get("gain_harvesting", False)
+
+        if tax_enabled:
+            # TaxableSimulationRunner: 배당세 + 리밸 CG세 + 청산세 적용
+            from modules.simulation.taxable_runner import TaxableSimulationRunner
+            runner     = TaxableSimulationRunner()
+            run_result = runner.run(
+                config          = config,
+                price_data      = sliced_data,
+                dates           = sliced_dates,
+                strategy        = strategy,
+                tax_enabled     = True,
+                account_type    = account_type,
+                user_settings   = user_settings,
+                gain_harvesting = gain_harvesting,
+            )
+            history_df    = run_result.history_df
+            tax_end_value = run_result.end_value
+        else:
+            portfolio = Portfolio(config_dict["initial_capital"])
+            loop      = SimulationLoop(
+                DividendEngine(), ContributionEngine(), WithdrawalEngine(),
+                OrderExecutor(), CashAllocator()
+            )
+            recorder = HistoryRecorder()
+            loop.run(portfolio, strategy, config, sliced_data, sliced_dates, recorder)
+            history_df    = recorder.to_dataframe()
+            tax_end_value = float(history_df["portfolio_value"].iloc[-1]) if not history_df.empty else 0.0
 
         return {
-            "history":  history_df,
-            "run_id":   run_id,
-            "start":    start_str,
-            "end":      end_str,
+            "history":       history_df,
+            "run_id":        run_id,
+            "start":         start_str,
+            "end":           end_str,
+            "tax_end_value": tax_end_value,
         }
     except Exception as e:
         return None
@@ -112,6 +138,8 @@ class WithdrawalAnalyzer:
         account_type:       str       = "위탁",
         current_age:        int       = 40,
         accumulation_years: int       = 0,
+        user_settings:      dict      = None,
+        gain_harvesting:    bool      = False,
         progress_callback             = None,
     ):
         self.portfolio_engine   = portfolio_engine
@@ -123,6 +151,8 @@ class WithdrawalAnalyzer:
         self.monthly_withdrawal    = monthly_withdrawal
         self.tax_engine            = tax_engine
         self.account_type          = account_type
+        self.user_settings         = user_settings or {}
+        self.gain_harvesting       = gain_harvesting and account_type == "위탁"
         self.withdrawal_start_age  = current_age + accumulation_years
         self.initial_capital    = initial_capital
         self.inflation          = inflation
@@ -207,6 +237,11 @@ class WithdrawalAnalyzer:
             "withdrawal_amount": gross_withdrawal,
             "dividend_mode":     self.dividend_mode,
             "inflation":         self.inflation,
+            # 세금 파라미터 (워커에서 TaxableSimulationRunner 사용)
+            "tax_enabled":       bool(self.tax_engine),
+            "account_type":      self.account_type,
+            "user_settings":     self.user_settings,
+            "gain_harvesting":   self.gain_harvesting,
         }
         task_args = [
             (s, e, config_dict, strategy_dict, rid)
@@ -253,6 +288,12 @@ class WithdrawalAnalyzer:
             metrics["start"]        = res["start"]
             metrics["end"]          = res["end"]
             metrics["is_synthetic"] = False
+            # 세금 적용된 최종값으로 override (TaxableSimulationRunner 청산세 포함)
+            if "tax_end_value" in res:
+                tv = res["tax_end_value"]
+                metrics["end_value"]       = tv
+                metrics["end_value_ratio"] = tv / self.initial_capital if self.initial_capital > 0 else 0.0
+                metrics["success"]         = tv > 0
             cases.append(metrics)
             if self.verbose:
                 status = "✅" if metrics["success"] else "🔴"

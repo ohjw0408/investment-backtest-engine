@@ -258,6 +258,8 @@ def run_withdrawal_logic(body: dict, progress_callback=None) -> dict:
         account_type       = account_type if tax_enabled else "위탁",
         current_age        = user_settings.get("age", 40) if tax_enabled else 40,
         accumulation_years = acc_years,
+        user_settings      = user_settings if tax_enabled else {},
+        gain_harvesting    = body.get("gain_harvesting", False) if tax_enabled else False,
         progress_callback  = progress_callback,
     )
     result = wd_analyzer.run()

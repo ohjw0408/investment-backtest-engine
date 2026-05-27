@@ -31,6 +31,17 @@
 
 ---
 
+## [2026-05-27] feature | 홈화면 가격불러오기 안정성 및 정시성 추가
+
+- market_quote_service: Redis SETNX 락으로 thundering herd 방지 (캐시 만료 시 yfinance 중복 호출 차단)
+- tasks.py: refresh_krx_gold Celery Beat 태스크 추가
+- celery_app.py: beat_schedule 추가 (평일 16:30 KST = 07:30 UTC 자동 실행)
+- deploy/domino-celery-beat.service: systemd Beat 서비스 파일 repo에 추가
+- deploy.yml: 배포 시 Beat 서비스 자동 등록/재시작 (이후 수동 SSH 불필요)
+- KRX 금현물은 장 마감 후에만 당일 데이터 생성됨 (API 특성)
+
+---
+
 ## [2026-05-27] bugfix | 배당금 계산기 세션 메모 wiki 갱신
 이 세션의 기억을 바탕으로 wiki를 갱신함. 확실히 확인된 내용만 반영:
 - 목표 배당금 계산기 9.4억 폭증 버그 수정 기록.

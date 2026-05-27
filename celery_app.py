@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 
 celery = Celery(
     'domino',
@@ -17,3 +18,12 @@ celery.conf.update(
     worker_max_tasks_per_child=10,
 )
 import tasks  # noqa
+
+# Beat 스케줄 — 평일 16:30 KST (= 07:30 UTC)
+celery.conf.timezone = 'UTC'
+celery.conf.beat_schedule = {
+    'refresh-krx-gold-daily': {
+        'task': 'tasks.refresh_krx_gold',
+        'schedule': crontab(hour=7, minute=30, day_of_week='mon-fri'),
+    },
+}

@@ -17,6 +17,9 @@ jobs:
           script: |
             cd /root/investment-backtest-engine
             git pull origin main
-            systemctl restart domino domino-celery
+            cp deploy/domino-celery-beat.service /etc/systemd/system/
+            systemctl daemon-reload
+            systemctl enable domino-celery-beat
+            systemctl restart domino domino-celery domino-celery-beat
             sleep 2
-            systemctl is-active domino domino-celery
+            systemctl is-active domino domino-celery domino-celery-beat

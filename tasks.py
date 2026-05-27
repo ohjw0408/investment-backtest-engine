@@ -241,3 +241,32 @@ def run_dividend_task(self, payload: dict) -> dict:
             import traceback
             return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
     return _task_wrap(_run, self.request.id)
+
+
+@celery.task
+def refresh_krx_gold():
+    """매 평일 16:30 KST Celery Beat 자동 실행 — KRX 금현물 당일 종가 저장."""
+    from datetime import datetime, timedelta
+    from modules.krx.fetch_krx_gold import KRXClient, init_db, save
+    try:
+        client = KRXClient()
+        conn = init_db()
+        today = datetime.today()
+        # 오늘부터 최대 3일 전까지 시도 (주말/공휴일 대비)
+        saved = False
+        for delta in range(3):
+            d = (today - timedelta(days=delta)).strftime("%Y%m%d")
+            try:
+                df = client.get_gold(d)
+                if not df.empty:
+                    n = save(conn, df)
+                    print(f"[refresh_krx_gold] {d} → {n}개 저장")
+                    saved = True
+                    break
+            except Exception:
+                continue
+        conn.close()
+        if not saved:
+            print("[refresh_krx_gold] 데이터 없음 (공휴일?)")
+    except Exception as e:
+        print(f"[refresh_krx_gold] 오류: {e}")

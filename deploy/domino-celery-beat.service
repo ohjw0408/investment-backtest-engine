@@ -1,0 +1,18 @@
+[Unit]
+Description=Money Milestone Celery Beat Scheduler
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/investment-backtest-engine
+ExecStart=/root/investment-backtest-engine/venv/bin/celery \
+    -A celery_app beat \
+    --loglevel=info \
+    --scheduler celery.beat.PersistentScheduler \
+    --schedule /tmp/celerybeat-schedule
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

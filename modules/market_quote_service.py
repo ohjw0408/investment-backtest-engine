@@ -207,10 +207,9 @@ class MarketQuoteService:
 
         return None
 
-    def get_all(self) -> list[dict]:
-        """전체 시장 지수 반환. 표시 순서 보장."""
+    def _fetch_all_fresh(self) -> dict:
+        """캐시 미스 항목만 yfinance 조회 후 캐시 저장. 락 획득 후 호출할 것."""
         result_map = {}
-
         for info in YF_TICKERS:
             key    = f"mq:{info['id']}"
             cached = self._get(key)
@@ -225,7 +224,6 @@ class MarketQuoteService:
             except Exception as e:
                 print(f"[MarketQuoteService] {info['id']} 오류: {e}")
 
-        # KRX 금현물
         krx = self._get("mq:krx_gold")
         if not krx:
             krx = self._fetch_krx_gold()
@@ -233,5 +231,40 @@ class MarketQuoteService:
                 self._set("mq:krx_gold", krx, self._get_ttl())
         if krx:
             result_map["krx_gold"] = krx
+        return result_map
+
+    def get_all(self) -> list[dict]:
+        """전체 시장 지수 반환. Redis 락으로 thundering herd 방지."""
+        # 1) 전부 캐시 히트 → 바로 반환
+        result_map = {}
+        cache_miss = False
+        for info in YF_TICKERS:
+            cached = self._get(f"mq:{info['id']}")
+            if cached:
+                result_map[info["id"]] = cached
+            else:
+                cache_miss = True
+
+        krx = self._get("mq:krx_gold")
+        if krx:
+            result_map["krx_gold"] = krx
+        else:
+            cache_miss = True
+
+        if not cache_miss:
+            return [result_map[id_] for id_ in DISPLAY_ORDER if id_ in result_map]
+
+        # 2) 캐시 미스 → 락 경쟁
+        if self._redis_ok:
+            lock_acquired = bool(self._redis.setnx("mq:lock:fetch_all", "1"))
+            if lock_acquired:
+                self._redis.expire("mq:lock:fetch_all", 30)
+                try:
+                    result_map.update(self._fetch_all_fresh())
+                finally:
+                    self._redis.delete("mq:lock:fetch_all")
+            # 락 실패 → 다른 요청이 fetch 중. 가진 것(stale) 그대로 반환.
+        else:
+            result_map.update(self._fetch_all_fresh())
 
         return [result_map[id_] for id_ in DISPLAY_ORDER if id_ in result_map]

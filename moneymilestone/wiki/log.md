@@ -52,6 +52,21 @@
 
 ---
 
+## [2026-05-28] feature | Track A Step 2-3: DJUSDIV_PROXY 프록시 체인 구축
+
+- 문제: DJUSDIV100 index_master.db에 1행뿐 (2026-03-18) → DJ 배당 ETF 백필 불가
+- ^DJDVP (Yahoo Finance) 역사 데이터 미지원 확인
+- 해결: SCHD(2011~) <- SDY(2005~) <- DVY(2003~) <- ^GSPC(1928~) adj close 체인 구성
+- SCHD/SDY/DVY 상관계수: SDY 0.948, DVY 0.937 (SCHD 기준)
+- scripts/build_djdiv_proxy.py 생성, DJUSDIV_PROXY 24,714행 index_master.db 저장
+- backfill_engine.py: DJ_US_DIVIDEND -> DJUSDIV_PROXY, _NO_DIVIDEND_INDICES 추가
+- us_etf_list.csv: SCHD->Dividend, VIG/DVY/SDY/etc->Dividend Growth, JEPI/JEPQ->Covered Call
+- 458730/446720/402970 재백필 성공, 접합점 연속성 확인
+- Step 9 선행 검증: price_return_mean 4종(SCHD/TIGER/ACE/SOL) 9.61~9.63% 수렴 확인
+- 커밋: 7b1dc6f
+
+---
+
 ## [2026-05-27] bugfix | 배당금 계산기 세션 메모 wiki 갱신
 이 세션의 기억을 바탕으로 wiki를 갱신함. 확실히 확인된 내용만 반영:
 - 목표 배당금 계산기 9.4억 폭증 버그 수정 기록.

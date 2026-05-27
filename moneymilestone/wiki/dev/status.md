@@ -11,9 +11,16 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> 배당 계산기 세금 연동(Phase 2c) 구현 완료. 단, ETF 데이터 불일치로 검증 게이트 블로킹. 데이터 안정화(Track A)가 지금 1순위.
+> Track A Step 2-3 완료: DJUSDIV_PROXY 체인으로 DJ 배당 ETF 백필 복구. price_return_mean 수렴 확인. Step 4~8 진행 중.
 
 ---
+
+## 최근 완료된 작업 (Claude 세션 2026-05-28 Track A)
+
+- ✅ Track A Step 1: 백필 현황 진단 — DJUSDIV100 1행, KQ150 없음, 백필 84.8% 확인
+- ✅ Track A Step 2: DJUSDIV100 소스 조사 — Yahoo Finance 미지원 확인, SDY(0.948)/DVY(0.937) 대안 발견
+- ✅ Track A Step 3: DJUSDIV_PROXY 체인 구축 — SCHD←SDY←DVY←^GSPC, 24,714행, 커밋 7b1dc6f
+- ✅ Track A Step 9 선행 검증: SCHD/TIGER/ACE/SOL price_return_mean 9.61~9.63% 수렴 ✅
 
 ## 최근 완료된 작업 (Claude 세션 2026-05-27~28)
 

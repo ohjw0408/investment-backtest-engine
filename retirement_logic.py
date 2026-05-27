@@ -57,7 +57,7 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     import time
     from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
     from modules.retirement.retirement_planner import RetirementPlanner
-    from modules.retirement.data_preparer import DataPreparer
+    from modules.data_preparation import prepare_scenario_data
 
     portfolio_engine = _get_portfolio_engine()
 
@@ -78,16 +78,18 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     strategy_factory = _make_strategy_factory(target_weights, rebal_mode)
     data_end         = datetime.date.today().strftime('%Y-%m-%d')
 
-    preparer = DataPreparer(price_db_path=PRICE_DB_PATH, verbose=False)
-    prep     = preparer.prepare(
-        tickers     = ticker_codes,
-        sim_years   = accumulation_years,
-        data_end    = data_end,
-        step_months = 3,
+    prep = prepare_scenario_data(
+        tickers          = ticker_codes,
+        required_years   = accumulation_years,
+        data_end         = data_end,
+        step_months      = 3,
+        allow_backfill   = True,
+        allow_synthetic  = True,
+        purpose          = "retirement",
+        price_db_path    = PRICE_DB_PATH,
     )
-    preparer.close()
 
-    data_start     = prep["data_start"]
+    data_start     = prep["effective_start"]
     synthetic_info = prep["synthetic_info"]
     backfilled     = prep["backfilled"]
 
@@ -199,7 +201,7 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
 
 def run_withdrawal_logic(body: dict, progress_callback=None) -> dict:
     from modules.retirement.withdrawal_analyzer import WithdrawalAnalyzer
-    from modules.retirement.data_preparer import DataPreparer
+    from modules.data_preparation import prepare_scenario_data
 
     portfolio_engine = _get_portfolio_engine()
 
@@ -217,16 +219,18 @@ def run_withdrawal_logic(body: dict, progress_callback=None) -> dict:
     strategy_factory = _make_strategy_factory(target_weights, rebal_mode)
     data_end         = datetime.date.today().strftime('%Y-%m-%d')
 
-    preparer = DataPreparer(price_db_path=PRICE_DB_PATH, verbose=False)
-    prep     = preparer.prepare(
-        tickers     = ticker_codes,
-        sim_years   = withdrawal_years,
-        data_end    = data_end,
-        step_months = 3,
+    prep = prepare_scenario_data(
+        tickers          = ticker_codes,
+        required_years   = withdrawal_years,
+        data_end         = data_end,
+        step_months      = 3,
+        allow_backfill   = True,
+        allow_synthetic  = True,
+        purpose          = "withdrawal",
+        price_db_path    = PRICE_DB_PATH,
     )
-    preparer.close()
 
-    data_start = prep["data_start"]
+    data_start = prep["effective_start"]
 
     tax_enabled   = body.get('tax_enabled', False)
     account_type  = body.get('account_type', '위탁')

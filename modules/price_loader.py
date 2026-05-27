@@ -358,7 +358,7 @@ class PriceLoader:
         # ── 백필링 자동 실행 (ticker당 1회) ─────────────────
         # _backfilled_codes: 성공 완료 → 재시도 불필요
         # _backfill_skip_codes: 영구 실패 (no_meta, no_index_map, no_pre_data) → 재시도 무의미
-        _PERMANENT_SKIP = {"no_meta", "no_index_map", "no_pre_data", "empty_after_scale"}
+        _PERMANENT_SKIP = {"no_meta", "no_index_map", "no_pre_data", "empty_after_scale", "index_insufficient"}
         if (
             (self.is_kr_etf(code) or code in self._us_tickers)
             and code not in self._backfilled_codes

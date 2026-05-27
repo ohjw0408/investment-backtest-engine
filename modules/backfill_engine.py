@@ -451,6 +451,15 @@ class BackfillEngine:
         if index_series is None:
             return {"code": code, "status": f"no_index_data ({index_code})"}
 
+        # 인덱스 충분성 체크: 100행 미만이면 프록시로 사용 거부
+        # (예: DJUSDIV100 1행처럼 사실상 빈 데이터 방지)
+        _MIN_INDEX_ROWS = 100
+        if len(index_series) < _MIN_INDEX_ROWS:
+            return {
+                "code": code,
+                "status": f"index_insufficient ({index_code}: {len(index_series)} rows < {_MIN_INDEX_ROWS})",
+            }
+
         # ETF 상장일 이전 지수 데이터 확인
         pre_series = index_series[index_series.index < etf_start]
         if pre_series.empty:

@@ -1115,158 +1115,39 @@ The proxy automation design is directionally correct, but it should be treated a
    - Without `backfill_runs`, `price_daily_source`, and `corporate_action_source`, wrong generated histories are difficult to audit, delete, or regenerate.
    - This is more important than adding many ETF types quickly.
 
-### Practical Step-by-Step Rollout
+### Recommended Implementation Order
 
-#### Slice 1. Make Current Generated Data Observable
+Full per-phase detail is in Phase 0–10 above. Recommended sequence within that plan:
 
-Goal: know what exists before changing behavior.
+1. **Phase 0** (Diagnostics) — see current state before changing anything
+2. **Phase 2** (Provenance) — reversibility before any expansion
+3. **Phase 4** (Proxy Map) — `etf_proxy_map` as the extension point; explicit rejects for covered call, unknown thematic, missing-underlying leveraged
+4. **Phase 5** (BackfillEngine V2) — leverage/daily-reset after underlying is confirmed; holdings/regression only for reviewed families
+5. **Phase 7/8/9** (Bond, Holdings, Regression) — after core provenance and mapping system is stable
 
-Tasks:
-
-- Generate diagnostics for current actual range, generated range, volume-zero rows, mapped proxy, index range, and dividend source.
-- Flag unsafe families: category-only U.S. mappings, bond yield-as-price mappings, covered call mappings, leveraged products with missing underlying, and thematic mappings with missing proxy data.
-- Do not change generated rows in this slice.
-
-Acceptance:
-
-- A reviewer can see which ETFs are safe, suspicious, or unsupported.
-- The report can be rerun without modifying DBs.
-
-#### Slice 2. Add Minimal Provenance
-
-Goal: make future generated rows reversible.
-
-Tasks:
-
-- Add `backfill_runs`.
-- Add `price_daily_source`.
-- Add `corporate_action_source`.
-- Write provenance for newly generated rows only.
-- Add delete-by-run helper before any large regeneration.
-
-Acceptance:
-
-- New generated rows can be deleted without touching actual price rows.
-- Simulators can distinguish actual vs generated rows.
-
-#### Slice 3. Introduce `etf_proxy_map` as the Extension Point
-
-Goal: stop editing `backfill_engine.py` for every new ETF family.
-
-Tasks:
-
-- Create `etf_proxy_map`.
-- Seed only reviewed core families at first:
-  - S&P 500
-  - Nasdaq-100
-  - KOSPI200
-  - KOSDAQ150
-  - Dow Jones U.S. Dividend 100
-  - major physical gold products if proxy data is sufficient
-- Import old `INDEX_MAP` and `US_CATEGORY_MAP` only as low-confidence fallback or diagnostic seed rows.
-- Add `review_status`.
-
-Acceptance:
-
-- `BackfillEngine` reads `etf_proxy_map` first.
-- Hard-coded maps are fallback only.
-- A bad mapping can be rejected by DB row, not by code change.
-
-#### Slice 4. Add Explicit Reject Policies
-
-Goal: prevent known-bad automatic backfills.
-
-Tasks:
-
-- Mark covered call, buffer/defined-outcome, unknown crypto futures, unknown thematic, and missing-underlying leveraged products as `proxy_level = none` or `needs_review`.
-- Add user-facing status strings explaining why a product was not backfilled.
-- Add tests that reject covered call ETFs without an option model.
-
-Acceptance:
-
-- JEPI/JEPQ-like products do not silently receive S&P 500 histories.
-- TSLA/AI/thematic names do not automatically map to TSLA, QQQ, or S&P 500.
-
-#### Slice 5. Implement Daily-Reset Leverage for Reviewed Underlyings
-
-Goal: support broad-index and single-stock leveraged products only after the underlying is known.
-
-Tasks:
-
-- Store `underlying_symbol`, `leverage`, fee/financing assumptions, and confidence in `etf_proxy_map`.
-- Load underlying stock/index histories from the correct source.
-- Apply daily-reset compounding.
-- Validate against actual overlap when available.
-
-Acceptance:
-
-- KOSPI200/Nasdaq-100 leveraged products can be C/B-grade after validation.
-- Single-stock leveraged products are C-grade max and rejected if underlying is missing.
-
-#### Slice 6. Add Holdings and Regression Only for Selected Families
-
-Goal: support thematic/active ETFs without pretending weak proxies are factual.
-
-Tasks:
-
-- Start with a small reviewed ETF set.
-- Store holdings snapshots where available.
-- Build candidate factor returns.
-- Fit and validate regression models.
-- Store coefficients and validation summary.
-
-Acceptance:
-
-- A thematic ETF explains why a proxy was accepted or rejected.
-- Weak models remain C/D/F and are not shown as high-confidence long histories.
-
-#### Slice 7. Covered Call and Bond Models Later
-
-Goal: defer complex models until the core provenance and mapping system is stable.
-
-Tasks:
-
-- Bond duration/spread model after total-return bond index options are exhausted.
-- Covered call option-income model only after the simulator can represent capped upside, option premium, distribution policy, and fees.
-
-Acceptance:
-
-- Bond ETFs no longer use raw yield levels as price histories.
-- Covered call ETFs are not backfilled automatically unless a tested model exists.
-
-### Implementation Priority
-
-The next practical implementation target should be:
-
-1. Diagnostics.
-2. Provenance tables.
-3. Minimal `etf_proxy_map`.
-4. `BackfillEngine` reads `etf_proxy_map` first.
-5. Explicit rejects for covered call, unknown thematic, and missing-underlying leveraged products.
-
-This is intentionally smaller than full BackfillEngine V2. It creates the control surface needed for safe automation before adding more modeling complexity.
+Do not skip to broad expansion before provenance exists.
 
 _검토/추가: Codex, 2026-05-28_
 
 ## Suggested First Implementation Slice
 
-Start small:
+> **현황 (2026-05-28):** 3~8번은 Track A에서 완료. 1~2번이 다음 목표.
 
-1. Add diagnostics report.
-2. Add provenance tables.
-3. Fix `_fetch_fred()`.
-4. Fix `KOSDAQ150 -> KQ150`.
-5. Repair `DJUSDIV100`.
-6. Create `etf_proxy_map` with only these families:
+1. ⏳ Add diagnostics report. → Track B 선행 조건
+2. ⏳ Add provenance tables. → Track C 선행 조건
+3. ✅ Fix `_fetch_fred()`. (e1a4d6e)
+4. ✅ Fix `KOSDAQ150 -> KQ150`. (40696f5)
+5. ✅ Repair `DJUSDIV100` → DJUSDIV_PROXY chain. (7b1dc6f)
+6. ⏳ Create `etf_proxy_map` with only these families: → Track C
    - S&P500
    - Nasdaq100
    - KOSPI200
    - KOSDAQ150
    - Dow Jones U.S. Dividend 100
-7. Refactor `BackfillEngine` just enough to read `etf_proxy_map` first.
-8. Rebuild SCHD and Korean U.S. Dividend Dow Jones histories.
+7. ⏳ Refactor `BackfillEngine` just enough to read `etf_proxy_map` first. → Track C
+8. ⏳ Rebuild SCHD and Korean U.S. Dividend Dow Jones histories. → Track C
 
-This slice should solve the current dividend simulator discrepancy without trying to solve every ETF type at once.
+Items 3–5 resolved the dividend simulator discrepancy (SCHD vs TIGER price_return_mean 9.61~9.63% 수렴 확인). Items 6–8 remain for Track C after provenance is in place.
 
 ## Long-Term Definition of Done
 

@@ -3,6 +3,14 @@ scenario_data_preparer.py
 ─────────────────────────────────────────────────────────────────────────────
 공통 시나리오 데이터 준비 facade.
 
+아키텍처 노트:
+  - DividendSimulator (modules/dividend_simulator.py)는 이 facade를 경유하지 않음.
+    배당 목표 역산용 in-memory 합성 케이스는 구조가 달라 별도 유지됨.
+    (SYNTHETIC_DATA_INTEGRATION_PLAN.md Phase 7 참조)
+  - 합성 데이터 confidence는 현재 Grade D 고정.
+    DB provenance (backfill_runs 등) 구축 후 upgrade 예정.
+    (ETF_BACKFILL_ARCHITECTURE_PLAN.md Phase 2 / SYNTHETIC_DATA_INTEGRATION_PLAN.md Phase 8 참조)
+
 목적:
   - 투자계산기 / 백테스트 / 은퇴 등 모든 탭에서 단일 진입점을 통해 데이터 준비.
   - allow_synthetic=False(기본) 시 가상 데이터 생성 없이 실제/백필 범위만 반환.

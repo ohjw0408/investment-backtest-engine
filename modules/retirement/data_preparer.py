@@ -243,6 +243,9 @@ class DataPreparer:
                     "date_from":     gen_result["date_from"],
                     "date_to":       gen_result["date_to"],
                     "stats_basis":   f"{stats['data_start']} ~ {stats['data_end']}",
+                    "confidence":    "D",           # Phase 8: provenance 전까지 D 고정
+                    "source_type":   "synthetic",
+                    "method":        "synthetic_gbm_v1",
                 }
                 if self.verbose:
                     div_str = f" | 배당 {div_rows}건" if div_rows > 0 else ""

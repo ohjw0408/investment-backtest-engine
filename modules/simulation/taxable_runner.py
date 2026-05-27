@@ -30,6 +30,7 @@ class TaxableSimulationRunner:
         tax_engine=None,
         gain_harvesting: bool = False,
         progress_callback=None,
+        isa_years_held: int = 3,
     ) -> RunResult:
         from modules.core.portfolio                  import Portfolio
         from modules.execution.order_executor        import OrderExecutor
@@ -91,6 +92,7 @@ class TaxableSimulationRunner:
                 total_contribution=total_invested,
                 ytd_us_realized_gains=ytd_us_gains,
                 age=user_settings.get('age', 40),
+                isa_years_held=isa_years_held,
             )
             # KR_FOREIGN 미실현 이익 집계 (Phase 2e 분할매도 절세 패널용)
             if account_type == "위탁" and hasattr(portfolio, 'positions'):

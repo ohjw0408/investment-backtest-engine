@@ -192,18 +192,21 @@ class AccumulationAnalyzer:
         total_years: int,
     ) -> float:
         """
-        ISA 3년마다 해지·재가입 시뮬레이션.
-        각 3년 주기마다 ISA 세금 적용 후 재투자.
+        ISA 3년마다 해지·재가입 시뮬레이션 — TaxableSimulationRunner 기반 (Phase 3).
+        각 3년 사이클: Runner(account_type="ISA", isa_years_held=3) → end_value가 세후값.
+        나머지 기간: Runner(isa_years_held=remainder) → 중도해지세 반영.
         """
+        from modules.simulation.taxable_runner import TaxableSimulationRunner
+        from modules.config.simulation_config   import SimulationConfig
+
+        runner          = TaxableSimulationRunner()
         current_capital = self.initial_capital
         current_start   = start
-
         n_full    = total_years // 3
         remainder = total_years % 3
 
-        for cycle in range(n_full):
+        for _cycle in range(n_full):
             cycle_end = current_start + relativedelta(years=3)
-            # 데이터 범위 체크
             if cycle_end > self.data_end:
                 cycle_end = self.data_end
             if current_start >= cycle_end:
@@ -211,54 +214,76 @@ class AccumulationAnalyzer:
 
             strategy = self.strategy_factory()
             try:
-                result = self.portfolio_engine.run_simulation(
-                    tickers              = self.tickers,
+                price_data, dates = self.portfolio_engine.price_loader.load(
+                    self.tickers,
+                    current_start.strftime("%Y-%m-%d"),
+                    cycle_end.strftime("%Y-%m-%d"),
+                )
+                config = SimulationConfig(
                     start_date           = current_start.strftime("%Y-%m-%d"),
                     end_date             = cycle_end.strftime("%Y-%m-%d"),
+                    tickers              = self.tickers,
+                    target_weights       = getattr(strategy, 'target_weights',
+                                                   {t: 1.0/len(self.tickers) for t in self.tickers}),
                     initial_capital      = current_capital,
                     monthly_contribution = self.monthly_contribution,
-                    strategy             = strategy,
+                    withdrawal_amount    = 0,
                     dividend_mode        = self.dividend_mode,
+                    rebalance_frequency  = getattr(strategy, 'rebalance_frequency', None),
+                    inflation            = 0.0,
                 )
-                history = result.get("history")
-                if history is None or len(history) == 0:
-                    break
-                cycle_final = result["final_value"]
+                run_result = runner.run(
+                    config          = config,
+                    price_data      = price_data,
+                    dates           = dates,
+                    strategy        = strategy,
+                    tax_enabled     = True,
+                    account_type    = "ISA",
+                    tax_engine      = self.tax_engine,
+                    isa_years_held  = 3,
+                )
+                current_capital = run_result.end_value  # 이미 after_tax_withdrawal 적용됨
             except Exception:
                 break
+            current_start = cycle_end
 
-            cycle_contrib   = current_capital + self.monthly_contribution * 36
-            cycle_after_tax = self.tax_engine.after_tax_withdrawal(
-                cycle_final, "ISA", cycle_contrib
-            )
-            current_capital = cycle_after_tax
-            current_start   = cycle_end
-
-        # 나머지 기간 처리
+        # 나머지 기간 처리 (3년 미만 → 중도해지세 적용)
         if remainder > 0 and current_start < self.data_end:
-            rem_end  = current_start + relativedelta(years=remainder)
+            rem_end = current_start + relativedelta(years=remainder)
             if rem_end > self.data_end:
                 rem_end = self.data_end
             if current_start < rem_end:
                 strategy = self.strategy_factory()
                 try:
-                    result = self.portfolio_engine.run_simulation(
-                        tickers              = self.tickers,
+                    price_data, dates = self.portfolio_engine.price_loader.load(
+                        self.tickers,
+                        current_start.strftime("%Y-%m-%d"),
+                        rem_end.strftime("%Y-%m-%d"),
+                    )
+                    config = SimulationConfig(
                         start_date           = current_start.strftime("%Y-%m-%d"),
                         end_date             = rem_end.strftime("%Y-%m-%d"),
+                        tickers              = self.tickers,
+                        target_weights       = getattr(strategy, 'target_weights',
+                                                       {t: 1.0/len(self.tickers) for t in self.tickers}),
                         initial_capital      = current_capital,
                         monthly_contribution = self.monthly_contribution,
-                        strategy             = strategy,
+                        withdrawal_amount    = 0,
                         dividend_mode        = self.dividend_mode,
+                        rebalance_frequency  = getattr(strategy, 'rebalance_frequency', None),
+                        inflation            = 0.0,
                     )
-                    history = result.get("history")
-                    if history is not None and len(history) > 0:
-                        rem_final   = result["final_value"]
-                        rem_contrib = current_capital + self.monthly_contribution * remainder * 12
-                        current_capital = self.tax_engine.after_tax_withdrawal(
-                            rem_final, "ISA", rem_contrib,
-                            isa_years_held=remainder,  # 3년 미만이면 중도해지세(16.5%) 적용
-                        )
+                    run_result = runner.run(
+                        config         = config,
+                        price_data     = price_data,
+                        dates          = dates,
+                        strategy       = strategy,
+                        tax_enabled    = True,
+                        account_type   = "ISA",
+                        tax_engine     = self.tax_engine,
+                        isa_years_held = remainder,  # 중도해지세(16.5%) 반영
+                    )
+                    current_capital = run_result.end_value
                 except Exception:
                     pass
 

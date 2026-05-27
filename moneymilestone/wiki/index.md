@@ -10,6 +10,7 @@
 | [[dev/phases]] | Phase별 세부 진행 (세금 리팩, 백필, 합성 데이터) |
 | [[dev/bugs]] | 활성 버그 + 수정 완료 버그 + 기술 부채 |
 | [[dev/ideas]] | 기능 아이디어 + 미결 결정 사항 |
+| [[dev/manual-test-guide]] | 수동 테스트 가이드 — 미검증 4개 항목 (T1~T4) |
 
 ## 제품 (Product)
 

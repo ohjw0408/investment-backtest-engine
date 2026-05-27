@@ -485,6 +485,8 @@ class DividendSimulator:
                     real_results.append(val)
 
         # 케이스 부족 시 가상 데이터로 보충
+        # [SYNTHETIC_PATH: In-Memory] DividendSimulator._run_synthetic_rolling
+        # 롤링 케이스 < MIN_CASES 시 자동 발동. DB 기록 없음. ScenarioDataPreparer 경유 불필요.
         if len(real_results) >= self.MIN_CASES:
             results = real_results
         else:

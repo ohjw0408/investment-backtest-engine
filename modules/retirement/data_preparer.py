@@ -154,6 +154,8 @@ class DataPreparer:
                 continue
 
             # ── 3b. 백필 불가 → 가상 데이터 생성 ─────────
+            # [SYNTHETIC_PATH: DB-Level] DataPreparer -> SyntheticPriceGenerator
+            # 허용 조건: allow_synthetic=True (기본값). 향후 ScenarioDataPreparer 경유 시 제어됨.
             if self.verbose:
                 print(f"  [{code}] 백필 불가 ({result['status']}) → 가상 데이터 생성")
 

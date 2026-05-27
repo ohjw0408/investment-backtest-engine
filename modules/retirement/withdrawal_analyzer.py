@@ -260,6 +260,8 @@ class WithdrawalAnalyzer:
                       f"  종료자산: {metrics['end_value']:,.0f}")
 
         # 6. 합성 보충
+        # [SYNTHETIC_PATH: In-Memory] WithdrawalAnalyzer._run_synthetic_cases (GBM + Student-t)
+        # 롤링 케이스 < MIN_CASES 시 자동 발동. DB 기록 없음. is_synthetic=True 마킹됨.
         n_real   = len(cases)
         n_needed = max(0, MIN_CASES - n_real)
         if n_needed > 0:

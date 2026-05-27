@@ -1,0 +1,208 @@
+{
+  "main": {
+    "id": "62c7cd865d573a8e",
+    "type": "split",
+    "children": [
+      {
+        "id": "1ffde8a75e7f761a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "010bb05abbb4029f",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "새 탭"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "b7d0d1c43f0351c5",
+    "type": "split",
+    "children": [
+      {
+        "id": "ade2402fe9da33bf",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ffcc737bacd494ba",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "파일 탐색기"
+            }
+          },
+          {
+            "id": "db97e7b5bff0df48",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "검색"
+            }
+          },
+          {
+            "id": "01f7167c17dc726f",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "북마크"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "403c5f57839ea0ea",
+    "type": "split",
+    "children": [
+      {
+        "id": "9b66f15745829ed5",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "24438a68316fd436",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "백링크"
+            }
+          },
+          {
+            "id": "91fb7b2f0f8e7812",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "나가는 링크"
+            }
+          },
+          {
+            "id": "873dcad9f311f066",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "태그"
+            }
+          },
+          {
+            "id": "b9e1330252088f93",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "모든 속성"
+            }
+          },
+          {
+            "id": "90e6183ea4854bb5",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "개요"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:빠른 전환기 열기": false,
+      "graph:그래프 뷰 열기": false,
+      "canvas:새 캔버스 만들기": false,
+      "daily-notes:오늘의 일일 노트 열기": false,
+      "templates:템플릿 삽입": false,
+      "command-palette:명령어 팔레트 열기": false,
+      "bases:새 베이스 생성하기": false
+    }
+  },
+  "active": "010bb05abbb4029f",
+  "lastOpenFiles": [
+    "README.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "wiki/dev/phases.md",
+    "wiki/dev/ideas.md",
+    "wiki/dev/bugs.md",
+    "wiki/dev/status.md",
+    "wiki/dev",
+    "AGENTS.md.tmp.25252.73626e4f29fe",
+    "wiki/business/revenue-model.md",
+    "wiki/business/target-users.md",
+    "wiki/business/competitors.md",
+    "wiki/business/competitors.md.tmp.25252.6a29396dc74a",
+    "wiki/business",
+    "wiki/product/dev-status.md",
+    "wiki/product/dev-status.md.tmp.25252.0a621ab33dd8",
+    "wiki/product/features.md",
+    "wiki/product",
+    "wiki/overview.md",
+    "wiki/log.md",
+    "wiki/index.md",
+    "wiki",
+    "CLAUDE.md.tmp.25252.18fc683aaf8c",
+    "무제.base",
+    "무제.canvas",
+    "환영합니다!.md"
+  ]
+}

@@ -1,0 +1,144 @@
+# Money Milestone — Wiki 운영 매뉴얼
+
+**모든 AI 에이전트 (Claude, Codex, 기타)가 이 파일을 먼저 읽을 것.**
+
+---
+
+## 이 vault가 하는 일
+
+Money Milestone 프로젝트(자산배분 투자 계산기 앱)의 **지식베이스 + 개발 상태 추적 시스템**.
+
+- AI 에이전트들이 공동으로 읽고 쓰는 단일 진실 공급원(single source of truth)
+- 개발 진행 상황, 버그, 아이디어, 결정 기록
+- 사업 기획 + 경쟁사 + 유저 분석 (참고용)
+
+오너(비개발자)는 읽기만 함. 쓰기는 AI 에이전트가 함.
+
+---
+
+## 핵심 소스 파일 경로
+
+```
+창업계획서:
+  C:\Users\ohjw4812\Documents\카카오톡 받은 파일\창업계획서.pdf
+
+개발 계획서 (코드 repo):
+  C:\Users\ohjw4812\Documents\investment_projects\investment-backtest-engine\
+    PROJECT_MASTER_ROADMAP.md          ← 전체 조율 문서, 먼저 읽을 것
+    PHASE4_PLAN.md                     ← 제품 기능 로드맵
+    세금에서시작된완전리팩토링계획.plan.md  ← 세금/시뮬 리팩토링
+    ETF_BACKFILL_ARCHITECTURE_PLAN.md  ← ETF 데이터 아키텍처
+    SYNTHETIC_DATA_INTEGRATION_PLAN.md ← 합성 데이터 통합
+
+코드베이스 (이 vault의 상위 폴더 = ../):
+  C:\Users\ohjw4812\Documents\investment_projects\investment-backtest-engine\
+```
+
+---
+
+## Wiki 폴더 구조
+
+```
+moneymilestone/
+├── README.md         ← 이 파일. 에이전트 운영 매뉴얼.
+├── CLAUDE.md         ← Claude Code용 alias (README 읽을 것)
+├── AGENTS.md         ← Codex용 alias (README 읽을 것)
+├── raw/              ← 소스 문서 참조 목록 (원본 변경 금지)
+└── wiki/
+    ├── index.md      ← 전체 페이지 카탈로그 (항상 최신 유지)
+    ├── log.md        ← 연대순 기록 (append-only, 절대 삭제 금지)
+    ├── dev/          ← 개발 상태 (가장 중요)
+    │   ├── status.md     현재 완료/진행/블로커 한눈에
+    │   ├── phases.md     Phase별 세부 진행 상황
+    │   ├── bugs.md       알려진 버그 목록
+    │   └── ideas.md      기능 아이디어 + 미결 결정
+    ├── product/      ← 기능 명세
+    │   └── features.md
+    ├── business/     ← 경쟁사, 유저, 수익 모델
+    └── overview.md
+```
+
+---
+
+## 에이전트 행동 규칙
+
+### 파일 수정 / 인코딩 규칙
+
+- 모든 markdown 파일은 반드시 UTF-8 인코딩을 유지한다.
+- 파일 전체를 덮어쓰기 전에 반드시 기존 내용을 UTF-8로 읽고, 필요한 부분만 최소 수정한다.
+- `wiki/log.md`는 append-only다. 기존 항목을 삭제하거나 재작성하지 말고 새 항목만 추가한다.
+- 한글이 깨져 보이면 바로 수정하지 말고, 먼저 터미널/도구의 출력 인코딩 문제인지 확인한다.
+- 인코딩이 불확실한 상태에서는 파일 저장을 중단하고 사용자에게 확인한다.
+
+### 세션 시작 시 반드시
+
+1. 이 `README.md` 읽기
+2. `wiki/index.md` 읽기 → 관련 페이지 파악
+3. `wiki/log.md` 최근 3~5개 항목 읽기 → 최근 맥락 파악
+4. 작업 관련 wiki 페이지 읽기
+
+### 코드 작업 완료 후 반드시
+
+1. `wiki/dev/status.md` 업데이트 (완료된 항목 ✅ 표시)
+2. `wiki/dev/bugs.md` 업데이트 (새 버그 발견 or 수정된 버그)
+3. `wiki/log.md`에 항목 추가
+4. `wiki/index.md` 업데이트 (새 페이지 생성했을 경우)
+
+### 새 소스 ingest 시
+
+1. 소스 읽기
+2. 관련 wiki 페이지 업데이트 또는 신규 생성
+3. `wiki/index.md` 갱신
+4. `wiki/log.md` 항목 추가: `## [YYYY-MM-DD] ingest | 소스명`
+
+### 아이디어/결정 발생 시
+
+- `wiki/dev/ideas.md`에 바로 기록
+- 채팅에서 논의한 내용이 사라지면 손실 → wiki가 기억
+
+---
+
+## 페이지 포맷
+
+### 상태 표시
+- ✅ 완료
+- ⏳ 진행 중 / 대기
+- ❌ 블로커 / 차단됨
+- 💡 아이디어 / 미검증
+- ⚠️ 주의 필요 / 버그
+
+### YAML 프론트매터 (선택)
+```yaml
+---
+updated: YYYY-MM-DD
+sources: [파일명]
+tags: [dev, product, business, bug, idea]
+---
+```
+
+### 크로스 링크
+`[[페이지명]]` 형식. Obsidian 그래프 뷰에서 시각화됨.
+
+### log.md 항목 형식
+```
+## [YYYY-MM-DD] <타입> | <제목>
+타입: ingest | bugfix | feature | decision | idea
+```
+
+---
+
+## 현재 프로젝트 컨텍스트 (2026-05-27)
+
+**앱**: Flask 웹앱 + Celery 비동기 계산 + Redis + SQLite × 4개 DB.  
+**배포**: Hetzner VPS Ubuntu, SSH키 `~/.ssh/hetzner_ed25519`, IP `5.78.209.211`.  
+**언어**: Python (백엔드) + HTML/JS (프론트, 프레임워크 없음).
+
+**현재 블로커**:
+- SCHD vs TIGER 미국배당다우존스 배당 시뮬 결과 불일치
+- DJUSDIV100 인덱스 데이터 부족
+- → `wiki/dev/status.md` 참고
+
+**다음 액션**:
+```
+마스터 로드맵의 Immediate Track A 진행해줘
+```

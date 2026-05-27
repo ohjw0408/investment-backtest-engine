@@ -11,7 +11,17 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> Track A 전 단계 완료 (Step 1~9). DJUSDIV_PROXY 체인, KQ150, _fetch_fred 수정, 백필 실패처리, 충분성체크, 미완료연도제외. Phase 2c Gate 재검증 준비 완료.
+> Track A + Track B 완료. Gate 2c PASSED (SCHD tax OFF 3750만 vs tax ON 7125만, 458730 OFF 4125만 vs ON 7500만). 다음: Track C (합성 데이터 facade) 또는 Track D (세금 Phase 2d).
+
+---
+
+## 최근 완료된 작업 (Claude 세션 2026-05-28 Track B)
+
+- ✅ Track B: Phase 2c Gate 재검증 — G5/G6 전 케이스 PASS (커밋 781f89a)
+  - SCHD 위탁: tax OFF 3,750만 / tax ON 7,125만 (+90%) [PASS]
+  - 458730(TIGER) 위탁: tax OFF 4,125만 / tax ON 7,500만 (+81.8%) [PASS]
+  - SCHD 종합과세 경계: tax OFF 9,375만 / tax ON 16,875만 (+80%) [PASS]
+  - SCHD vs TIGER 차이: ~10% (Track A 이전 대비 대폭 수렴)
 
 ---
 
@@ -49,12 +59,14 @@ tags: [dev]
 
 ## 현재 블로커 ❌
 
-| 블로커 | 원인 | 관련 파일 |
-|---|---|---|
-| SCHD vs TIGER 배당 결과 불일치 | DJUSDIV100 인덱스 데이터 부족 | `backfill_engine.py`, `index_loader_develop.py` |
-| Phase 2c Gate 미통과 | 위 블로커 해결 전까지 | `dividend_logic.py`, `dividend_simulator.py` |
-| `_fetch_fred()` 메서드 없음 | `index_loader_develop.py` 버그 | `modules/index_loader_develop.py` |
-| 백필 실패 코드가 완료 처리됨 | `PriceLoader._backfilled_codes` | `modules/price_loader.py` |
+> 현재 블로커 없음. Track A/B 완료로 기존 블로커 전부 해소.
+
+| 블로커 | 상태 |
+|---|---|
+| SCHD vs TIGER 배당 결과 불일치 | ✅ DJUSDIV_PROXY 체인으로 해결 |
+| Phase 2c Gate 미통과 | ✅ Gate 2c PASSED (2026-05-28) |
+| `_fetch_fred()` 메서드 없음 | ✅ def 선언 추가 (e1a4d6e) |
+| 백필 실패 코드가 완료 처리됨 | ✅ _backfill_skip_codes 분리 (a761750) |
 
 ---
 

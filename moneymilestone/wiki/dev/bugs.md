@@ -13,6 +13,8 @@ tags: [dev, bug]
 
 ## 활성 버그 목록
 
+> 현재 활성 버그 없음 (2026-05-28 기준).
+
 | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|
 | DJUSDIV100 데이터 부족 | SCHD vs TIGER 미국배당다우존스 결과 불일치 | `modules/backfill_engine.py`, `data/meta/index_master.db` | ✅ DJUSDIV_PROXY 체인으로 해결 (7b1dc6f) |

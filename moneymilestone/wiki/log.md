@@ -14,6 +14,20 @@ _작성: Claude_
 
 ---
 
+## [2026-05-28] feature | Track B 완료 — Gate 2c PASSED
+
+- Gate 2c 검증 스크립트 작성: `tests/gate_2c_verify.py` (781f89a)
+- G5/G6 전 케이스 로컬 실행 PASS:
+  - SCHD 위탁: tax OFF 3,750만 / tax ON 7,125만 (+90%)
+  - 458730(TIGER) 위탁: tax OFF 4,125만 / tax ON 7,500만 (+81.8%)
+  - SCHD 종합과세 경계: tax OFF 9,375만 / tax ON 16,875만 (+80%)
+- SCHD vs TIGER 차이: ~10% (Track A 이전 대비 대폭 수렴)
+- 블로커 전부 해소. 다음: Track C 또는 Track D
+
+_작성: Claude_
+
+---
+
 ## [2026-05-28] plan | ETF_BACKFILL_ARCHITECTURE_PLAN 단일종목 레버리지/규제완화 대응 추가
 
 - `### Leveraged / Inverse ETFs` 섹션 확장: 광지수/단일종목/인버스 별 policy + 등급 명시

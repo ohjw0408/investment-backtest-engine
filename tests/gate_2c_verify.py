@@ -14,8 +14,8 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from dividend_logic import run_dividend_scenario_logic
 
-PASS = "✅ PASS"
-FAIL = "❌ FAIL"
+PASS = "[PASS]"
+FAIL = "[FAIL]"
 
 
 def _solved_seed(body: dict) -> float:
@@ -113,9 +113,9 @@ def main():
 
     print()
     if all_pass:
-        print("Gate 2c: ✅ PASSED")
+        print("Gate 2c: [PASSED]")
     else:
-        print("Gate 2c: ❌ FAILED — 위 실패 항목 확인 필요")
+        print("Gate 2c: [FAILED] -- 위 실패 항목 확인 필요")
     return 0 if all_pass else 1
 
 

@@ -179,6 +179,17 @@
       </div>
     </div>
 
+    <!-- 가상 데이터 옵트인 -->
+    <div class="calc-section" id="syntheticSection" style="padding:10px 12px;background:#FFF8E1;border-radius:8px;border:1px solid #FFE082;">
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:0.82rem;">
+        <input type="checkbox" id="useSyntheticCheck" style="width:14px;height:14px;margin-top:2px;flex-shrink:0;">
+        <div>
+          <span style="font-weight:600;color:#5C4400;">가상 데이터 사용</span><br>
+          <span style="color:#7B5E00;">실제 데이터가 부족한 경우에만 선택하세요. 통계적으로 생성된 데이터가 포함되어 결과 정확도가 낮아질 수 있습니다.</span>
+        </div>
+      </label>
+    </div>
+
     <button class="calc-run-btn" id="runBtn" onclick="runCalculator()">
       <span id="runBtnText">시뮬레이션 실행</span>
       <span id="runBtnSpinner" class="btn-spinner" style="display:none">⏳</span>
@@ -210,6 +221,12 @@
           </div>
           <div class="share-url-box" id="calcShareUrlBox"></div>
         </div>
+      </div>
+
+      <!-- 가상 데이터 경고 배너 -->
+      <div id="synthWarningBanner" style="display:none;background:#FFF8E1;border:1px solid #F9A825;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:#795548;">
+        <strong>⚠ 가상 데이터 포함</strong> — 실측 데이터가 부족해 통계적으로 추정된 가격이 포함됩니다. 결과 참고용으로만 사용하세요.
+        <div id="synthWarningDetail" style="margin-top:5px;line-height:1.6;"></div>
       </div>
 
       <!-- 자산 분포 카드 -->

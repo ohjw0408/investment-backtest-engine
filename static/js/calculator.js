@@ -291,6 +291,7 @@ async function runCalculator() {
     account_type:         accountType,
     isa_renewal:          taxEnabled && (document.getElementById('isaRenewalCheck')?.checked ?? false),
     gain_harvesting:      taxEnabled && (window.taxAccounts||[]).some(a => a.type === '위탁') && (document.getElementById('gainHarvestingCheck')?.checked ?? false),
+    use_synthetic:        document.getElementById('useSyntheticCheck')?.checked ?? false,
     user_settings: taxEnabled ? {
       earned_income: Number(document.getElementById('taxEarnedIncome')?.value || 50000000),
       age:           Number(document.getElementById('taxAge')?.value || 40),
@@ -485,6 +486,23 @@ function renderResult(data, payload) {
 
   document.getElementById('resultPeriodLabel').textContent =
     `${payload.years}년 | ${data.cases_count}개 롤링 케이스`;
+
+  // 가상 데이터 경고 배너
+  const synthBanner = document.getElementById('synthWarningBanner');
+  const synthDetail = document.getElementById('synthWarningDetail');
+  if (synthBanner && synthDetail) {
+    const si = data.synthetic_info || {};
+    const keys = Object.keys(si);
+    if (data.used_synthetic && keys.length > 0) {
+      synthDetail.innerHTML = keys.map(code => {
+        const info = si[code];
+        return `${code}: ${info.date_from || '?'} ~ ${info.date_to || '?'} (${info.rows_added || 0}행 추정)`;
+      }).join('<br>');
+      synthBanner.style.display = 'block';
+    } else {
+      synthBanner.style.display = 'none';
+    }
+  }
 
   // 상단 카드
   document.getElementById('distP10').textContent = fmtKRW(dist.end_value.p10);

@@ -33,6 +33,16 @@ tags: [dev, bug]
 | 0046Y0 留됰Т媛???ㅻ쪟 | pykrx ?ы븿 臾몄젣, ?⑥닚 踰꾧렇 ?섏젙 | ~2026-05 | cfeb217 |
 
 
+## 2026-05-27~28 세션 수정 (Claude)
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| OAuth MismatchingStateError | 브라우저 전환(카카오톡→삼성인터넷→크롬) 중 state 불일치 → 500 에러 | `google_callback`에서 Exception catch → `/auth/google` redirect | `b23e04e` | ✅ 완료 |
+| KRX 금현물 시세 오래된 데이터 | `fetch_krx_gold.py` 수동 실행만 지원, 자동 갱신 없음 | Celery Beat 태스크 추가, 평일 16:30 KST 자동 실행 | `d56c5ee` | ✅ 완료 |
+| 시장 지수 thundering herd | 캐시 만료 시 동시 요청이 모두 yfinance 호출 | Redis SETNX 락으로 1개 요청만 fetch, 나머지 stale 반환 | `d56c5ee` | ✅ 완료 |
+
+---
+
 ### 2026-05-27 세션 상세 기록
 | 버그 | 증상 | 원인 | 수정 요약 | 커밋 | 상태 |
 |---|---|---|---|---|---|

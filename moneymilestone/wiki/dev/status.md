@@ -1,5 +1,5 @@
 ---
-updated: 2026-05-27
+updated: 2026-05-28
 tags: [dev]
 ---
 
@@ -14,6 +14,15 @@ tags: [dev]
 > 배당 계산기 세금 연동(Phase 2c) 구현 완료. 단, ETF 데이터 불일치로 검증 게이트 블로킹. 데이터 안정화(Track A)가 지금 1순위.
 
 ---
+
+## 최근 완료된 작업 (Claude 세션 2026-05-27~28)
+
+- ✅ 홈화면 시장 지수: Redis SETNX 락으로 thundering herd 방지 (동시 yfinance 중복 호출 차단)
+- ✅ KRX 금현물 자동 갱신: Celery Beat 태스크 추가 (평일 16:30 KST 자동 실행)
+- ✅ Celery Beat 서비스: `deploy/domino-celery-beat.service` 추가, deploy.yml에서 자동 등록/재시작
+- ✅ OAuth MismatchingStateError: 에러 catch → 로그인 재시도 redirect (500 대신)
+- ✅ SESSION_COOKIE_SAMESITE=Lax 명시 (cross-site OAuth redirect 쿠키 안정성)
+- ✅ wiki 시스템 초기화: AGENTS.md, CLAUDE.md, moneymilestone/ vault 구축 및 GitHub 커밋
 
 ## 최근 완료된 작업 (Codex 세션 2026-05-27)
 

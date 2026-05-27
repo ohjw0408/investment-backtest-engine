@@ -169,7 +169,7 @@ def inject_quarterly_dividends(
             records.append((code, ex_date.strftime("%Y-%m-%d"), round(div, 6), 1.0))
 
     if not records:
-        return 0
+        return 0, []
 
     price_conn.executemany(
         "INSERT OR IGNORE INTO corporate_actions (code, date, dividend, split) "
@@ -177,7 +177,7 @@ def inject_quarterly_dividends(
         records,
     )
     price_conn.commit()
-    return len(records)
+    return len(records), [r[1] for r in records]
 
 
 class BackfillEngine:
@@ -190,6 +190,8 @@ class BackfillEngine:
         self._usdkrw_cache      = None
         self._etf_meta          = self._load_etf_meta()
         self._ensure_corporate_actions_table()
+        from modules.provenance import ensure_provenance_tables
+        ensure_provenance_tables(self.price_conn)
 
     def __del__(self):
         try: self.index_conn.close()
@@ -518,12 +520,13 @@ class BackfillEngine:
 
         # ── 배당 주입 ─────────────────────────────────────
         div_rows = 0
+        div_dates: list[str] = []
         if leverage == 1.0 and index_code not in _NO_DIVIDEND_INDICES:
             yield_table = self._load_div_yield_table(index_code)
 
             if yield_table:
                 # Tier 1+2: DB에 연도별 배당수익률 존재
-                div_rows = inject_quarterly_dividends(
+                div_rows, div_dates = inject_quarterly_dividends(
                     price_conn=self.price_conn,
                     code=code,
                     price_series=scaled,
@@ -534,7 +537,7 @@ class BackfillEngine:
                 # Tier 3: ETF 자신의 실측 corporate_actions에서 mu/sigma 계산
                 actual = self._load_etf_actual_div_yield(code)
                 if actual:
-                    div_rows = inject_quarterly_dividends(
+                    div_rows, div_dates = inject_quarterly_dividends(
                         price_conn=self.price_conn,
                         code=code,
                         price_series=scaled,
@@ -543,9 +546,55 @@ class BackfillEngine:
                     )
                 # actual이 None이면 배당 없음 (비배당 ETF) → div_rows = 0
 
+        # ── Provenance 기록 ───────────────────────────────
+        from modules.provenance import (
+            new_run_id, write_backfill_run, write_price_source,
+            write_action_source, MODEL_VERSION_BACKFILL,
+        )
+        run_id     = new_run_id()
+        confidence = "C" if leverage != 1.0 else "B"
+        write_price_source(
+            conn=self.price_conn,
+            run_id=run_id,
+            code=code,
+            dates=df["date"].tolist(),
+            source_type="backfill",
+            source_code=index_code,
+            model_version=MODEL_VERSION_BACKFILL,
+            confidence=confidence,
+        )
+        if div_dates:
+            write_action_source(
+                conn=self.price_conn,
+                run_id=run_id,
+                code=code,
+                dates=div_dates,
+                source_type="backfill",
+                source_code=index_code,
+                model_version=MODEL_VERSION_BACKFILL,
+                confidence=confidence,
+            )
+        write_backfill_run(
+            conn=self.price_conn,
+            run_id=run_id,
+            code=code,
+            status="ok",
+            method="index_proxy",
+            model_version=MODEL_VERSION_BACKFILL,
+            proxy_code=index_code,
+            confidence=confidence,
+            date_from=df["date"].min(),
+            date_to=df["date"].max(),
+            rows_written=len(df),
+            div_rows_written=div_rows,
+            fx_applied=fx_applied,
+            leverage=leverage,
+        )
+
         result = {
             "code":       code,
             "status":     "ok",
+            "run_id":     run_id,
             "rows_added": len(df),
             "div_rows":   div_rows,
             "date_from":  df["date"].min(),

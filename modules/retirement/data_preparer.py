@@ -216,6 +216,7 @@ class DataPreparer:
                 div_yield_sigma = stats.get("div_yield_sigma")
                 div_rows = 0
 
+                div_dates: list[str] = []
                 if div_yield_mu and div_yield_mu > 0:
                     synth_px = pd.read_sql(
                         "SELECT date, close FROM price_daily "
@@ -227,13 +228,52 @@ class DataPreparer:
                         synth_px["date"] = pd.to_datetime(synth_px["date"])
                         price_series = synth_px.set_index("date")["close"]
                         from modules.backfill_engine import inject_quarterly_dividends
-                        div_rows = inject_quarterly_dividends(
+                        div_rows, div_dates = inject_quarterly_dividends(
                             price_conn=self.price_conn,
                             code=code,
                             price_series=price_series,
                             annual_yield_src=("musigma", div_yield_mu, div_yield_sigma),
                             seed=abs(hash(code)) % 2**31,
                         )
+
+                # ── Provenance 기록 (synthetic) ───────────
+                from modules.provenance import (
+                    new_run_id, write_backfill_run, write_price_source,
+                    write_action_source, MODEL_VERSION_SYNTHETIC,
+                )
+                synth_run_id = new_run_id()
+                write_price_source(
+                    conn=self.price_conn,
+                    run_id=synth_run_id,
+                    code=code,
+                    dates=gen_result.get("dates", []),
+                    source_type="synthetic",
+                    model_version=MODEL_VERSION_SYNTHETIC,
+                    confidence="D",
+                )
+                if div_dates:
+                    write_action_source(
+                        conn=self.price_conn,
+                        run_id=synth_run_id,
+                        code=code,
+                        dates=div_dates,
+                        source_type="synthetic",
+                        model_version=MODEL_VERSION_SYNTHETIC,
+                        confidence="D",
+                    )
+                write_backfill_run(
+                    conn=self.price_conn,
+                    run_id=synth_run_id,
+                    code=code,
+                    status="ok",
+                    method="synthetic_gbm_v1",
+                    model_version=MODEL_VERSION_SYNTHETIC,
+                    confidence="D",
+                    date_from=gen_result["date_from"],
+                    date_to=gen_result["date_to"],
+                    rows_written=gen_result["rows"],
+                    div_rows_written=div_rows,
+                )
 
                 synthetic_info[code] = {
                     "mu_monthly":    stats["mu_monthly"],

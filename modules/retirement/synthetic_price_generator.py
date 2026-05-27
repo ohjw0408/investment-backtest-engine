@@ -111,4 +111,5 @@ def generate_and_save(
         "date_from":  bdays[0].strftime("%Y-%m-%d"),
         "date_to":    bdays[-1].strftime("%Y-%m-%d"),
         "anchor":     anchor_price,
+        "dates":      [r[1] for r in rows],
     }

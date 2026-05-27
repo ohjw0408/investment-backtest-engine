@@ -126,6 +126,27 @@ tags: [dev, product, business, bug, idea]
 타입: ingest | bugfix | feature | decision | idea
 ```
 
+### 작성자 서명 규칙 (**필수**)
+
+**모든 wiki 항목에는 작성자를 명시한다.** 에이전트/사람 구분 없이 적용.
+
+`log.md` 항목 끝에 한 줄 추가:
+```
+_작성: Claude_ 또는 _작성: Codex_ 또는 _작성: 오너_
+```
+
+`status.md`, `bugs.md` 등 테이블 업데이트 시에는 셀 안에 `(Claude)` / `(Codex)` 괄호 표기:
+```
+| ✅ 수정 완료 (Claude) |
+```
+
+계획 문서(`ETF_BACKFILL_ARCHITECTURE_PLAN.md` 등) 섹션 추가 시에는 섹션 하단에:
+```
+_검토/추가: Codex, 2026-05-28_
+```
+
+**서명 없는 항목은 나중에 누가 썼는지 알 수 없다. 반드시 남길 것.**
+
 ---
 
 ## 현재 프로젝트 컨텍스트 (2026-05-27)

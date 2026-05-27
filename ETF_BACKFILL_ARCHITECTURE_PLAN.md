@@ -601,6 +601,8 @@ Korean financial regulators relaxed ETF rules in 2025, enabling a wave of new pr
 
 **Key principle:** A surge of new ETFs must not require a developer to touch `backfill_engine.py` for each one. The `etf_proxy_map` table is the extension point. Adding a new ETF = inserting a row in `etf_proxy_map`, not changing code.
 
+_추가: Claude, 2026-05-28_
+
 ## Validation Gates
 
 Generated backfill should be rejected unless validation passes where actual overlap exists.
@@ -938,6 +940,8 @@ Handle via `etf_proxy_map` rows; no code change per ETF.
 
 All: Grade C, daily reset model, store `leverage` and `underlying_symbol`.
 
+_추가: Claude, 2026-05-28_
+
 ### U.S. Dividend
 
 - SCHD
@@ -1241,6 +1245,8 @@ The next practical implementation target should be:
 5. Explicit rejects for covered call, unknown thematic, and missing-underlying leveraged products.
 
 This is intentionally smaller than full BackfillEngine V2. It creates the control surface needed for safe automation before adding more modeling complexity.
+
+_검토/추가: Codex, 2026-05-28_
 
 ## Suggested First Implementation Slice
 

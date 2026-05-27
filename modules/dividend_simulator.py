@@ -240,29 +240,31 @@ class DividendSimulator:
 
             # 연간 DPS 합계로 성장률 계산 (첫 해/현재 연도 제외)
             div_df["year"] = div_df.index.year
-            annual = div_df.groupby("year")["dividend"].sum()
             current_year = pd.Timestamp.today().year
+            annual = div_df.groupby("year")["dividend"].sum()
             annual = annual.iloc[1:]
             if len(annual) > 0 and annual.index[-1] == current_year:
                 annual = annual.iloc[:-1]
             growth = annual.pct_change().dropna()
             growth = growth[growth.abs() < 2.0]
 
-            # 연평균 주가 수익률 계산 (배당 제외, 순수 가격 상승)
+            # 연평균 주가 수익률 계산 (배당 제외, 순수 가격 상승, 미완료 연도 제외)
             annual_prices = df["close"].resample("YE").last().dropna()
-            annual_prices = annual_prices[annual_prices.index.year < pd.Timestamp.today().year]
+            annual_prices = annual_prices[annual_prices.index.year < current_year]
             if len(annual_prices) > 2:
                 price_returns = annual_prices.pct_change().dropna()
                 # 극단값 제거
                 price_returns = price_returns[price_returns.abs() < 1.0]
-                # 배당수익률 제외한 순수 가격 상승률
                 mean_price_return = float(price_returns.mean())
             else:
                 mean_price_return = 0.07  # fallback: 연 7%
 
             # 최근 3년 데이터로 div_freq/div_yield 계산 (백필 오염 레코드 제거)
-            recent_cutoff = div_df.index.max() - pd.DateOffset(years=3)
-            freq_df = div_df[div_df.index >= recent_cutoff]
+            # 완성된 연도 우선 사용 → 현재 연도 부분 데이터로 인한 통계 왜곡 방지
+            complete_div = div_df[div_df.index.year < current_year]
+            freq_base = complete_div if len(complete_div) >= 4 else div_df
+            recent_cutoff = freq_base.index.max() - pd.DateOffset(years=3)
+            freq_df = freq_base[freq_base.index >= recent_cutoff]
             if len(freq_df) >= 4:
                 freq_years = max(0.25, (freq_df.index[-1] - freq_df.index[0]).days / 365)
                 div_freq   = int(round(len(freq_df) / freq_years))

@@ -74,18 +74,23 @@ class DataPreparer:
 
     def prepare(
         self,
-        tickers:    List[str],
-        sim_years:  int,
-        data_end:   str,
-        step_months: int = 3,
+        tickers:         List[str],
+        sim_years:       int,
+        data_end:        str,
+        step_months:     int  = 3,
+        allow_backfill:  bool = True,
+        allow_synthetic: bool = True,
     ) -> dict:
         """
         Parameters
         ----------
-        tickers     : 포트폴리오 종목 리스트
-        sim_years   : 시뮬레이션 기간 (년)
-        data_end    : 데이터 끝 날짜
-        step_months : 롤링 스텝 (월)
+        tickers          : 포트폴리오 종목 리스트
+        sim_years        : 시뮬레이션 기간 (년)
+        data_end         : 데이터 끝 날짜
+        step_months      : 롤링 스텝 (월)
+        allow_backfill   : BackfillEngine 호출 허용 여부. 기본 True.
+        allow_synthetic  : SyntheticPriceGenerator 호출 허용 여부. 기본 True.
+                           False 시 가상 데이터 DB 기록 없음.
 
         Returns
         -------
@@ -94,9 +99,12 @@ class DataPreparer:
             n_cases         : 롤링 케이스 수
             synthetic_info  : 가상 데이터 생성 종목 정보
             backfilled      : 백필 처리된 종목 리스트
+            used_synthetic  : 가상 데이터 생성 여부 (bool)
+            warnings        : 데이터 부족 경고 목록 (list[str])
         """
         synthetic_info = {}
         backfilled     = []
+        warnings: List[str] = []
 
         # ── 1단계: 현재 데이터 범위 확인 ─────────────────
         starts = {}
@@ -128,6 +136,8 @@ class DataPreparer:
                 "n_cases":        n_cases,
                 "synthetic_info": synthetic_info,
                 "backfilled":     backfilled,
+                "used_synthetic": False,
+                "warnings":       warnings,
             }
 
         # ── 3단계: 종목별 보완 ────────────────────────────
@@ -142,6 +152,12 @@ class DataPreparer:
                 print(f"  [{code}] 데이터 부족 → 보완 시도")
 
             # ── 3a. 백필 시도 ─────────────────────────────
+            if not allow_backfill:
+                if self.verbose:
+                    print(f"  [{code}] 백필 비허용 (allow_backfill=False) → 스킵")
+                warnings.append(f"{code}: backfill skipped (allow_backfill=False).")
+                continue
+
             be     = self._get_backfill_engine()
             result = be.backfill(code)
 
@@ -155,7 +171,16 @@ class DataPreparer:
 
             # ── 3b. 백필 불가 → 가상 데이터 생성 ─────────
             # [SYNTHETIC_PATH: DB-Level] DataPreparer -> SyntheticPriceGenerator
-            # 허용 조건: allow_synthetic=True (기본값). 향후 ScenarioDataPreparer 경유 시 제어됨.
+            # 허용 조건: allow_synthetic=True (기본값). ScenarioDataPreparer가 이 플래그로 제어.
+            if not allow_synthetic:
+                if self.verbose:
+                    print(f"  [{code}] 가상 데이터 비허용 (allow_synthetic=False) → 스킵")
+                warnings.append(
+                    f"{code}: backfill failed ({result['status']}) and synthetic disabled. "
+                    f"Enable synthetic data to fill the gap."
+                )
+                continue
+
             if self.verbose:
                 print(f"  [{code}] 백필 불가 ({result['status']}) → 가상 데이터 생성")
 
@@ -245,6 +270,8 @@ class DataPreparer:
             "n_cases":        n_cases,
             "synthetic_info": synthetic_info,
             "backfilled":     backfilled,
+            "used_synthetic": bool(synthetic_info),
+            "warnings":       warnings,
         }
 
     def close(self):

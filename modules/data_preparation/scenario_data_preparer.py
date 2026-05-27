@@ -113,16 +113,18 @@ def prepare_scenario_data(
         from modules.retirement.data_preparer import DataPreparer
         dp     = DataPreparer(price_db_path=db_path, verbose=verbose)
         result = dp.prepare(
-            tickers     = tickers,
-            sim_years   = required_years,
-            data_end    = data_end,
-            step_months = step_months,
+            tickers          = tickers,
+            sim_years        = required_years,
+            data_end         = data_end,
+            step_months      = step_months,
+            allow_backfill   = allow_backfill,
+            allow_synthetic  = True,
         )
         dp.close()
 
-        backfilled    = result.get("backfilled", [])
+        backfilled     = result.get("backfilled", [])
         synthetic_info = result.get("synthetic_info", {})
-        warnings = []
+        warnings       = list(result.get("warnings", []))
         for code, info in synthetic_info.items():
             warnings.append(
                 f"Synthetic data used for {code}: "

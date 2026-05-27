@@ -271,7 +271,7 @@ class IndexLoader:
             alt = {"KS200": "^KS200", "KQ150": "^KQ150"}
             return self._fetch_yfinance(alt.get(code, code), start, end)
 
-
+    def _fetch_fred(self, code: str, start: str, end: str) -> pd.DataFrame:
         """FRED에서 금리 데이터 다운로드 (requests 사용)"""
         import requests
         url = (

@@ -105,6 +105,7 @@ INDEX_MAP = {
     "KOSPI200":            "KS200",
     "KOSPI":               "KS200",
     "KRX300":              "KS200",
+    "KOSDAQ150":           "KQ150",   # KODEX229200<-^KQ11 chain
     "DJ_US_DIVIDEND":      "DJUSDIV_PROXY",  # SCHD<-SDY<-DVY<-^GSPC chain
     "PHLX_SEMICONDUCTOR":  "^SOX",
     "US_TREASURY_30Y":     "DGS30",

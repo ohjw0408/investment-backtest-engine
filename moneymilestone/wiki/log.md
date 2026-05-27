@@ -4,6 +4,17 @@
 
 ---
 
+## [2026-05-28] plan | ETF_BACKFILL_ARCHITECTURE_PLAN 단일종목 레버리지/규제완화 대응 추가
+
+- `### Leveraged / Inverse ETFs` 섹션 확장: 광지수/단일종목/인버스 별 policy + 등급 명시
+- 신규 섹션 `### Regulatory Expansion ETFs (2025~ Korean Market)` 추가
+  - 트리거: 신규 ETF → `etf_proxy_map` 조회 → 없으면 `needs_review` (코드 수정 불필요)
+  - 단일종목 레버리지(삼성/SK하이닉스/TSLA 2X 등), 테마, 커버드콜, 버퍼형 등 분류표
+  - 핵심 원칙: 새 ETF 추가 = `etf_proxy_map` 행 삽입, `backfill_engine.py` 수정 금지
+- `Priority ETF Families`에 Korean Single-Stock Leveraged/Inverse 패밀리 추가
+
+---
+
 ## [2026-05-27] ingest | 창업계획서.pdf + 5개 개발 계획서
 
 **소스:**

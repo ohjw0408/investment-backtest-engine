@@ -544,12 +544,62 @@ Policy:
 - Use daily reset model.
 - Do not scale a long-term index directly by leverage over the full period.
 
+**Broad-index leveraged/inverse (e.g., KODEX 200 선물 2X, TIGER 미국나스닥100 2X):**
+
+- Underlying = known index (KOSPI200, NDX). Grade B/C after validation.
+- Apply daily compounding: `r_lev[t] = leverage * r_index[t] - daily_fee`.
+- Include volatility drag; long-term CAGR will diverge from `leverage * index_CAGR`.
+- Validate correlation and max drawdown difference against actual overlap.
+
+**Single-stock leveraged (e.g., 삼성전자 2X, TSLA 2X):**
+
+- Underlying = single stock price from yfinance or KRX.
+- Same daily reset formula; same volatility drag.
+- Grade C max due to concentration and path dependency.
+- If underlying stock data is unavailable pre-listing, Grade D or no-backfill.
+- Korean regulatory expansion (2025~) will produce many of these; each must register underlying in `etf_proxy_map` individually.
+
+**Inverse ETFs:**
+
+- `r_inv[t] = -1 * r_index[t] - daily_fee`; same daily reset rule.
+- Grade B/C if underlying is exact.
+
+**All leveraged/inverse:**
+
+- Never use monthly or annual scaling as substitute for daily reset.
+- Store `leverage` coefficient and `underlying_symbol` in `etf_proxy_map`.
+- Confidence F if underlying cannot be identified.
+
 ### Covered Call / Income Option ETFs
 
 Policy:
 
 - No automatic high-confidence backfill.
 - Require option-income model or parent fund history.
+
+### Regulatory Expansion ETFs (2025~ Korean Market)
+
+Korean financial regulators relaxed ETF rules in 2025, enabling a wave of new product types. The backfill system must handle each category on arrival without manual per-ETF coding.
+
+**Trigger:** When a new ETF appears in `symbol_master.db` with no `etf_proxy_map` entry, the system must:
+
+1. Classify product type from ETF name + category metadata.
+2. Look up `etf_proxy_map` for a matching proxy rule.
+3. If no rule: assign `status = needs_review`, no backfill, no simulation blocker.
+4. Alert operations queue for manual proxy assignment.
+
+**Product types expected from Korean regulatory expansion:**
+
+| Type | Example | Approach | Grade |
+|---|---|---|---|
+| Single-stock leveraged | 삼성전자 2X, SK하이닉스 2X | Method 7, underlying = KRX stock | C |
+| Single-stock inverse | 삼성전자 -1X | Method 7, leverage = -1 | C |
+| U.S. single-stock leveraged | TSLA 2X, NVDA 2X | Method 7, underlying = yfinance | C |
+| Thematic active | 테슬라 밸류체인, AI반도체 | Method 9 regression or holdings | C/D/F |
+| Covered call (KR) | KOSPI200 커버드콜 | Method 8, no auto high-confidence | D/F |
+| Buffer/defined-outcome | 원금보장형 | No method yet; F until model exists | F |
+
+**Key principle:** A surge of new ETFs must not require a developer to touch `backfill_engine.py` for each one. The `etf_proxy_map` table is the extension point. Adding a new ETF = inserting a row in `etf_proxy_map`, not changing code.
 
 ## Validation Gates
 
@@ -876,6 +926,17 @@ Start with these because they have high user impact and clear proxies.
 - TIGER/KODEX/ACE/SOL/RISE Nasdaq100
 - Hedged variants
 - Leveraged/inverse variants only after leverage model exists
+
+### Korean Single-Stock Leveraged/Inverse (Regulatory Expansion 2025~)
+
+Handle via `etf_proxy_map` rows; no code change per ETF.
+
+- 삼성전자 2X / -1X → underlying: 005930.KS
+- SK하이닉스 2X / -1X → underlying: 000660.KS
+- 현대차, LG에너지솔루션, POSCO 등 → each registered as separate `etf_proxy_map` entry
+- U.S. single-stock KR-listed (TSLA 2X, NVDA 2X, PLTR 2X 등) → underlying via yfinance
+
+All: Grade C, daily reset model, store `leverage` and `underlying_symbol`.
 
 ### U.S. Dividend
 

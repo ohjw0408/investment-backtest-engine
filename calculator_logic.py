@@ -170,18 +170,25 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
             'start':     c['start'],
             'end':       c['end'],
             'end_value': round(c['end_value']),
+            'end_value_early_cancel': round(c['end_value_early_cancel'])
+                if 'end_value_early_cancel' in c else None,
             'cagr':      round(c['cagr'], 4),
             'mdd':       round(c['mdd'], 4),
         }
         for c in result['cases']
     ]
 
+    has_partial_isa = result.get('distribution_early_cancel') is not None
+
     return {
-        'cases':          cases_summary,
-        'cases_count':    len(cases_summary),
-        'distribution':   result['distribution'],
-        'used_synthetic': _prep_meta.get('used_synthetic', False),
-        'synthetic_info': _prep_meta.get('synthetic_info', {}),
-        'backfilled':     _prep_meta.get('backfilled', []),
-        'warnings':       _prep_meta.get('warnings', []),
+        'cases':                    cases_summary,
+        'cases_count':              len(cases_summary),
+        'distribution':             result['distribution'],
+        'distribution_early_cancel': result.get('distribution_early_cancel'),
+        'isa_partial_cycle':        has_partial_isa,
+        'isa_remainder_years':      years % 3 if has_partial_isa else 0,
+        'used_synthetic':           _prep_meta.get('used_synthetic', False),
+        'synthetic_info':           _prep_meta.get('synthetic_info', {}),
+        'backfilled':               _prep_meta.get('backfilled', []),
+        'warnings':                 _prep_meta.get('warnings', []),
     }

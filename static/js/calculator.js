@@ -477,10 +477,45 @@ function hideProgressUI() {
   if (empty) empty.style.display = 'none';
 }
 
+// ── ISA 중도해지 토글 ──
+let _lastCalcResult = null;
+
+function toggleIsaEarlyCancel(checked) {
+  if (!_lastCalcResult) return;
+  const data = _lastCalcResult;
+  const earlyDist = data.distribution_early_cancel;
+  if (!earlyDist) return;
+
+  const ev = checked ? earlyDist : data.distribution.end_value;
+  document.getElementById('distP10').textContent = fmtKRW(ev.p10);
+  document.getElementById('distP50').textContent = fmtKRW(ev.p50);
+  document.getElementById('distP90').textContent = fmtKRW(ev.p90);
+
+  // 히스토그램 end_value 재렌더
+  const vals = checked
+    ? earlyDist.values
+    : data.distribution.end_value.values;
+  renderHistogram('histEndValue', vals, fmtKRW, '#1976D2');
+
+  // 롤링 차트: end_value 컬럼 교체
+  const cases = data.cases.map(c => ({
+    ...c,
+    end_value: checked && c.end_value_early_cancel != null
+      ? c.end_value_early_cancel
+      : c.end_value,
+  }));
+  renderRollingChart(cases);
+}
+
 // ── 결과 렌더링 ──
 function renderResult(data, payload) {
   document.getElementById('resultEmpty').style.display   = 'none';
   document.getElementById('resultContent').style.display = 'block';
+  _lastCalcResult = data;
+
+  // ISA 중도해지 체크박스 초기화
+  const isaCheck = document.getElementById('isaEarlyCancelCheck');
+  if (isaCheck) isaCheck.checked = false;
 
   const dist = data.distribution;
 
@@ -501,6 +536,17 @@ function renderResult(data, payload) {
       synthBanner.style.display = 'block';
     } else {
       synthBanner.style.display = 'none';
+    }
+  }
+
+  // ISA 중도해지 경고 배너
+  const isaPartialBanner = document.getElementById('isaPartialCycleBanner');
+  if (isaPartialBanner) {
+    if (data.isa_partial_cycle) {
+      document.getElementById('isaPartialYearsText').textContent = data.isa_remainder_years || '?';
+      isaPartialBanner.style.display = 'block';
+    } else {
+      isaPartialBanner.style.display = 'none';
     }
   }
 

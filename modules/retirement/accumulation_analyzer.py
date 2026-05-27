@@ -71,7 +71,25 @@ class AccumulationAnalyzer:
             print(f"[AccumulationAnalyzer] {len(cases)}개 케이스 완료")
             print(f"  종료자산 중앙값: {distribution['end_value']['p50']:,.0f}")
             print(f"  CAGR 중앙값:    {distribution['cagr']['p50']:.2%}")
-        return {"cases": cases, "distribution": distribution}
+
+        result = {"cases": cases, "distribution": distribution}
+
+        # ISA 풍차돌리기 + 3의 배수가 아닌 시뮬 기간 → 중도해지 가정 분포 추가
+        if self.isa_renewal and self.accumulation_years % 3 != 0:
+            early_vals = np.array([
+                c.get("end_value_early_cancel", c["end_value"]) for c in cases
+            ], dtype=float)
+            result["distribution_early_cancel"] = {
+                "p10": float(np.percentile(early_vals, 10)),
+                "p25": float(np.percentile(early_vals, 25)),
+                "p50": float(np.percentile(early_vals, 50)),
+                "p75": float(np.percentile(early_vals, 75)),
+                "p90": float(np.percentile(early_vals, 90)),
+                "mean": float(np.mean(early_vals)),
+                "values": early_vals.tolist(),
+            }
+
+        return result
 
     def _run_rolling(self) -> List[dict]:
         import time
@@ -91,7 +109,8 @@ class AccumulationAnalyzer:
 
             # ── ISA 풍차돌리기 (특수 경로 — 주기별 수동 청산·재가입) ────
             if self.isa_renewal and self.tax_engine:
-                final_value = self._run_isa_renewal_cycle(cur, self.accumulation_years)
+                _maturity, _early = self._run_isa_renewal_cycle(cur, self.accumulation_years)
+                final_value = _maturity
                 # 지표 계산용 무세금 시뮬 (history만 필요)
                 isa_result = self.portfolio_engine.run_simulation(
                     tickers              = self.tickers,
@@ -107,6 +126,7 @@ class AccumulationAnalyzer:
 
             # ── 일반 경로 — Runner ───────────────────────────────────
             else:
+                _early = None
                 try:
                     price_data, dates = self.portfolio_engine.price_loader.load(
                         self.tickers,
@@ -159,6 +179,8 @@ class AccumulationAnalyzer:
             metrics["start"]     = cur.strftime("%Y-%m-%d")
             metrics["end"]       = end.strftime("%Y-%m-%d")
             metrics["end_value"] = final_value
+            if self.isa_renewal and self.tax_engine and _early is not None:
+                metrics["end_value_early_cancel"] = _early
 
             # 청산세 적용으로 end_value가 세전 history와 달라진 경우 → CAGR 재계산
             if final_value != raw_final:
@@ -190,11 +212,17 @@ class AccumulationAnalyzer:
         self,
         start: "pd.Timestamp",
         total_years: int,
-    ) -> float:
+    ) -> tuple:
         """
         ISA 3년마다 해지·재가입 시뮬레이션 — TaxableSimulationRunner 기반 (Phase 3).
         각 3년 사이클: Runner(account_type="ISA", isa_years_held=3) → end_value가 세후값.
-        나머지 기간: Runner(isa_years_held=remainder) → 중도해지세 반영.
+        나머지 기간(remainder > 0): 만기 가정(isa_years_held=3)으로 기본 계산.
+          → 중도해지 가정값도 추가 계산해서 함께 반환 (프론트 체크박스 토글용).
+
+        Returns
+        -------
+        (end_value_maturity, end_value_early_cancel)
+          end_value_early_cancel: remainder==0이면 None
         """
         from modules.simulation.taxable_runner import TaxableSimulationRunner
         from modules.config.simulation_config   import SimulationConfig
@@ -247,47 +275,68 @@ class AccumulationAnalyzer:
                 break
             current_start = cycle_end
 
-        # 나머지 기간 처리 (3년 미만 → 중도해지세 적용)
-        if remainder > 0 and current_start < self.data_end:
-            rem_end = current_start + relativedelta(years=remainder)
-            if rem_end > self.data_end:
-                rem_end = self.data_end
-            if current_start < rem_end:
-                strategy = self.strategy_factory()
-                try:
-                    price_data, dates = self.portfolio_engine.price_loader.load(
-                        self.tickers,
-                        current_start.strftime("%Y-%m-%d"),
-                        rem_end.strftime("%Y-%m-%d"),
-                    )
-                    config = SimulationConfig(
-                        start_date           = current_start.strftime("%Y-%m-%d"),
-                        end_date             = rem_end.strftime("%Y-%m-%d"),
-                        tickers              = self.tickers,
-                        target_weights       = getattr(strategy, 'target_weights',
-                                                       {t: 1.0/len(self.tickers) for t in self.tickers}),
-                        initial_capital      = current_capital,
-                        monthly_contribution = self.monthly_contribution,
-                        withdrawal_amount    = 0,
-                        dividend_mode        = self.dividend_mode,
-                        rebalance_frequency  = getattr(strategy, 'rebalance_frequency', None),
-                        inflation            = 0.0,
-                    )
-                    run_result = runner.run(
-                        config         = config,
-                        price_data     = price_data,
-                        dates          = dates,
-                        strategy       = strategy,
-                        tax_enabled    = True,
-                        account_type   = "ISA",
-                        tax_engine     = self.tax_engine,
-                        isa_years_held = remainder,  # 중도해지세(16.5%) 반영
-                    )
-                    current_capital = run_result.end_value
-                except Exception:
-                    pass
+        # 나머지 기간 없으면 early_cancel 없음
+        if remainder == 0 or current_start >= self.data_end:
+            return current_capital, None
 
-        return current_capital
+        # 나머지 기간 처리: 만기 가정(기본) + 중도해지 가정(체크박스) 둘 다 계산
+        rem_end = current_start + relativedelta(years=remainder)
+        if rem_end > self.data_end:
+            rem_end = self.data_end
+
+        end_value_maturity    = current_capital
+        end_value_early_cancel = current_capital
+
+        if current_start < rem_end:
+            strategy = self.strategy_factory()
+            try:
+                price_data, dates = self.portfolio_engine.price_loader.load(
+                    self.tickers,
+                    current_start.strftime("%Y-%m-%d"),
+                    rem_end.strftime("%Y-%m-%d"),
+                )
+                config = SimulationConfig(
+                    start_date           = current_start.strftime("%Y-%m-%d"),
+                    end_date             = rem_end.strftime("%Y-%m-%d"),
+                    tickers              = self.tickers,
+                    target_weights       = getattr(strategy, 'target_weights',
+                                                   {t: 1.0/len(self.tickers) for t in self.tickers}),
+                    initial_capital      = current_capital,
+                    monthly_contribution = self.monthly_contribution,
+                    withdrawal_amount    = 0,
+                    dividend_mode        = self.dividend_mode,
+                    rebalance_frequency  = getattr(strategy, 'rebalance_frequency', None),
+                    inflation            = 0.0,
+                )
+                # 만기 가정: isa_years_held=3 (기본 표시값)
+                run_maturity = runner.run(
+                    config         = config,
+                    price_data     = price_data,
+                    dates          = dates,
+                    strategy       = strategy,
+                    tax_enabled    = True,
+                    account_type   = "ISA",
+                    tax_engine     = self.tax_engine,
+                    isa_years_held = 3,
+                )
+                end_value_maturity = run_maturity.end_value
+
+                # 중도해지 가정: isa_years_held=remainder (체크박스 토글용)
+                run_early = runner.run(
+                    config         = config,
+                    price_data     = price_data,
+                    dates          = dates,
+                    strategy       = strategy,
+                    tax_enabled    = True,
+                    account_type   = "ISA",
+                    tax_engine     = self.tax_engine,
+                    isa_years_held = remainder,
+                )
+                end_value_early_cancel = run_early.end_value
+            except Exception:
+                pass
+
+        return end_value_maturity, end_value_early_cancel
 
     def _calc_metrics(self, history: pd.DataFrame, years: int) -> dict:
         pv = history["portfolio_value"]

@@ -229,6 +229,19 @@
         <div id="synthWarningDetail" style="margin-top:5px;line-height:1.6;"></div>
       </div>
 
+      <!-- ISA 중도해지 경고 배너 -->
+      <div id="isaPartialCycleBanner" style="display:none;background:#FFF3E0;border:1px solid #FB8C00;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:#6D4C41;">
+        <strong>⚠ ISA 시뮬 기간이 3의 배수가 아닙니다</strong>
+        — 기본값은 마지막 <span id="isaPartialYearsText">?</span>년을 <b>만기 해지(9.9%)</b>로 가정합니다.
+        3년 이전 중도 해지 시 추가 세금이 발생할 수 있습니다.
+        <div style="margin-top:8px;">
+          <label style="cursor:pointer;">
+            <input type="checkbox" id="isaEarlyCancelCheck" onchange="toggleIsaEarlyCancel(this.checked)" style="margin-right:5px;">
+            중도 해지 시 세금으로 다시 보기 (15.4%)
+          </label>
+        </div>
+      </div>
+
       <!-- 자산 분포 카드 -->
       <div class="dist-cards">
         <div class="dist-card pessimistic">

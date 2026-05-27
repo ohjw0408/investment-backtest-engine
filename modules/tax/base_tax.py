@@ -328,7 +328,7 @@ class TaxEngine:
             return end_value  # 손실이면 세금 없음
 
         if is_early_cancel:
-            # 중도해지: 순이익 전체에 16.5% 기타소득세
+            # 중도해지: 순이익 전체에 15.4% 배당소득세 (세제혜택 취소)
             tax = net_profit * self.ISA_CANCEL_RATE
             return end_value - tax
 

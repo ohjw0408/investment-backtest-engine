@@ -243,6 +243,17 @@ DB 스키마: `asset_groups`, `holdings` 테이블 이미 있음
 - 매일 1회 cron 또는 로그인 시 갱신
 - 30일/90일 자산 추이 차트 → 자산현황 탭 하단 추가
 
+**B2-c: 내 자산 현재가 캐싱 최적화** ⚠️ 현재 느림
+- **현황**: `/api/myassets/data` 매 요청마다 `yf.Ticker(code).history()` 개별 호출, 캐시 없음
+  - 보유 종목 5개 = yfinance 5회 개별 호출 = 약 5~10초 응답 지연
+- **개선안**: `market_quote_service`와 동일한 패턴으로 Redis 캐시 적용
+  - ticker 단위 Redis 키 `asset_px:{code}` TTL 15분 (장중) / 4시간 (장 외)
+  - US 종목: `yf.download([code1, code2, ...])` 배치 호출로 단일 네트워크 요청
+  - KR 종목: KRX API 배치 호출 그대로 유지 (이미 일괄 조회)
+  - KRX_GOLD: index_master.db 조회 유지 (이미 빠름)
+- **선행 조건**: 없음 (독립적, 지금 바로 구현 가능)
+- **난이도**: 낮음 (0.5일) — market_quote_service 캐시 패턴 복붙 수준
+
 **난이도:** 낮음~중간 (1~2일) — 핵심 기능 대부분 구현됨, 홈 토글 + 스냅샷만 추가
 
 ---

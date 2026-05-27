@@ -28,10 +28,12 @@ import numpy as np
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 # 배당 없는 지수 — 배당 주입 제외
+# DJUSDIV_PROXY: adj close chain (SCHD/SDY/DVY/^GSPC) - dividends already embedded
 _NO_DIVIDEND_INDICES: set[str] = {
     "DGS30", "DGS10", "DGS3MO",
     "GC=F", "SI=F", "CL=F", "HG=F",
     "USD/KRW", "USD/JPY",
+    "DJUSDIV_PROXY",
 }
 
 BASE_DIR      = Path(__file__).resolve().parent.parent
@@ -53,8 +55,8 @@ US_CATEGORY_MAP = {
     "US Equity - Small Cap Blend":      "^RUT",
     "US Equity - Small Cap Growth":     "^RUT",
     "US Equity - Small Cap Value":      "^RUT",
-    "US Equity - Dividend":             "DJUSDIV100",
-    "US Equity - Dividend Growth":      "DJUSDIV100",
+    "US Equity - Dividend":             "DJUSDIV_PROXY",  # SCHD<-SDY<-DVY<-^GSPC chain
+    "US Equity - Dividend Growth":      "DJUSDIV_PROXY",  # SCHD<-SDY<-DVY<-^GSPC chain
     "US Equity - Factor":               "^GSPC",
     "US Bond - Long Treasury":          "DGS30",
     "US Bond - Intermediate Treasury":  "DGS10",
@@ -103,7 +105,7 @@ INDEX_MAP = {
     "KOSPI200":            "KS200",
     "KOSPI":               "KS200",
     "KRX300":              "KS200",
-    "DJ_US_DIVIDEND":      "DJUSDIV100",
+    "DJ_US_DIVIDEND":      "DJUSDIV_PROXY",  # SCHD<-SDY<-DVY<-^GSPC chain
     "PHLX_SEMICONDUCTOR":  "^SOX",
     "US_TREASURY_30Y":     "DGS30",
     "US_TREASURY_10Y":     "DGS10",

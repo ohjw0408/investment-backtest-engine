@@ -118,7 +118,7 @@ def compute_split_sale_plan(
 
     # 일괄 청산 세금
     lump_sum_tax   = _year_tax(kr_foreign_gain, other_financial_income, earned_income)
-    over_threshold = (kr_foreign_gain + other_financial_income) > _DIVIDEND_THRESHOLD
+    over_threshold = bool((kr_foreign_gain + other_financial_income) > _DIVIDEND_THRESHOLD)
 
     # 1~20년 분할 시나리오
     plan_by_year: dict[str, int] = {}
@@ -138,5 +138,5 @@ def compute_split_sale_plan(
         "optimal_years": int(optimal_years),
         "optimal_tax":   optimal_tax,
         "plan_by_year":  plan_by_year,
-        "over_threshold": over_threshold,
+        "over_threshold": bool(over_threshold),
     }

@@ -1,5 +1,17 @@
 # Log
 
+## [2026-05-29] close | 세금설정 통일 세션 마감 상태
+
+- 최종 코드/문서 HEAD: `c12ca1e 금융소득 자동산출 계획 정본화`.
+- 서버 repo도 `c12ca1e`로 fast-forward 완료. 마지막 코드 배포(`192693c`) 후 `domino`, `domino-celery` active 및 주요 5개 화면 HTTP 200 확인.
+- 오늘 완료: T2 JSON 직렬화 수정, 분할매도 세후금액/근로소득 반영 확인, 세금설정 프로필 입력원 통일, 금융소득 수동 입력 제거, 금융소득 자동 산출 계획 정본화.
+- 다음 작업 후보: `세금에서시작된완전리팩토링계획.plan.md` Phase 2e의 금융소득 자동 산출 구현. 백테스트부터 직전 완료년도 gross 배당·이자 집계 → `other_financial_income` 런타임 주입 순서로 진행.
+- 로컬에 남은 uncommitted 항목은 이번 Codex 코드 변경이 아님: `data/meta/index_master.db`, `moneymilestone/.obsidian/graph.json`, `moneymilestone/.obsidian/workspace.json`, `4testguide.md`.
+
+_작성: Codex_
+
+---
+
 ## [2026-05-29] feature | 세금 설정 프로필 입력 통일 + 금융소득 자동 산출 계획
 
 - 사용자 요청: 각 계산기 탭에 흩어진 나이/연간 근로소득 입력칸을 제거하고 세금 설정탭 값을 공통으로 사용. 금융소득은 세금설정에서 묻지 말고 계산 결과에서 자동 산출할 수 있는지 계획만 수립.

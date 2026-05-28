@@ -156,12 +156,32 @@ class DataPreparer:
             print(f"  포트폴리오 유효 시작일: {effective_start}  롤링 케이스: {n_cases}개")
 
         if n_cases >= MIN_CASES:
+            # price_daily_synthetic에 실제 데이터 있으면 used_synthetic=True
+            _used_synth = False
+            for _code in tickers:
+                try:
+                    _r = self.price_conn.execute(
+                        "SELECT 1 FROM price_daily_synthetic WHERE code=? LIMIT 1", (_code,)
+                    ).fetchone()
+                    if _r:
+                        _used_synth = True
+                        if _code not in synthetic_info:
+                            _row = self.price_conn.execute(
+                                "SELECT MIN(date), MAX(date), COUNT(*) FROM price_daily_synthetic WHERE code=?",
+                                (_code,)
+                            ).fetchone()
+                            synthetic_info[_code] = {
+                                "date_from": _row[0], "date_to": _row[1],
+                                "rows_added": _row[2], "source": "pre-existing",
+                            }
+                except Exception:
+                    pass
             return {
                 "data_start":     effective_start,
                 "n_cases":        n_cases,
                 "synthetic_info": synthetic_info,
                 "backfilled":     backfilled,
-                "used_synthetic": False,
+                "used_synthetic": _used_synth,
                 "warnings":       warnings,
             }
 

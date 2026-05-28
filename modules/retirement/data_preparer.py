@@ -188,6 +188,9 @@ class DataPreparer:
             if stats is None:
                 if self.verbose:
                     print(f"  [{code}] ⚠️  실제 데이터 부족으로 통계 계산 불가 → 스킵")
+                warnings.append(
+                    f"{code}: 실제 데이터가 너무 적어 가상 데이터를 생성할 수 없습니다 (최소 1년 필요)."
+                )
                 continue
 
             if self.verbose:

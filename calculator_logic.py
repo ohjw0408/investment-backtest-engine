@@ -112,6 +112,16 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
             purpose        = "calculator",
         )
         data_start = _prep_meta["effective_start"]
+        # 가상 데이터 생성 시도했는데도 케이스 0 → 통계 계산 불가 (상장 너무 짧음)
+        if (_prep_meta.get("n_cases") or 0) == 0:
+            actual_starts = [_get_price_start(portfolio_engine, t) for t in ticker_codes]
+            actual_starts = [d for d in actual_starts if d]
+            oldest = min(actual_starts) if actual_starts else "알 수 없음"
+            raise ValueError(
+                f"가상 데이터 생성 불가: {ticker_codes}의 실제 데이터가 너무 적습니다 "
+                f"({oldest}부터 시작, 최소 1년 이상 필요). "
+                f"더 긴 상장 역사를 가진 ETF를 사용하세요."
+            )
     # ── 데이터 부족 검사 (use_synthetic=False 시 기존 동작 유지) ───────
     else:
         start_dt  = datetime.datetime.strptime(data_start, '%Y-%m-%d').date()

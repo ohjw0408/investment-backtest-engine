@@ -4,6 +4,22 @@
 
 ---
 
+## [2026-05-28] bugfix | KRX 금현물 stale 가격 및 지수 최신화 로직 보강
+
+- 원인: 서버에 `data/meta/krx_api_key.txt`가 없어 Celery Beat `tasks.refresh_krx_gold`가 07:30 UTC 실행 후 실패했고, Redis `mq:krx_gold`에는 2026-03-31 가격 캐시가 남아 홈 화면이 stale 값을 표시함.
+- 서버 조치: `ecos_api_key.txt`, `fred_api_key.txt`, `krx_api_key.txt` 업로드 및 `chmod 600`.
+- 코드 조치:
+  - `refresh_krx_gold`: 최근 15일 fallback, 저장 성공 시 Redis `mq:krx_gold` 삭제, 오류는 Celery 실패로 드러나게 변경.
+  - `celery_app.py`: KRX 금현물 Beat를 16:40 / 18:30 / 22:30 / 다음날 08:30 KST 다회 재시도로 변경.
+  - `KRXClient`: 환경변수 키 지원 및 날짜 미지정 시 최근 15일 fallback.
+  - `IndexLoader.download_all()`: 기존 “DB에 있으면 스킵” 제거, `get()` 기반으로 누락 앞/뒤 구간 fetch.
+- 서버 상태: `KRX_GOLD` 전체 재수집을 백그라운드로 진행 중. 날짜별 API 호출이라 장시간 소요.
+- 검증: `py_compile` PASS, 임시 DB 테스트에서 `download_all()`이 누락 구간 fetch 호출 확인.
+
+_작성: Codex_
+
+---
+
 ## [2026-05-28] bugfix | ISA 풍차돌리기 잔여 사이클 세율 수정
 
 - 문제: 시뮬 기간이 3의 배수 아닐 때 잔여 사이클에 중도해지세 강제 적용 → 의도와 다른 결과

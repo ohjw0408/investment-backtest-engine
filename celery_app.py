@@ -19,11 +19,23 @@ celery.conf.update(
 )
 import tasks  # noqa
 
-# Beat 스케줄 — 평일 16:30 KST (= 07:30 UTC)
+# Beat 스케줄 — KRX 금현물은 당일 API 반영 시간이 일정하지 않아 여러 번 재시도
 celery.conf.timezone = 'UTC'
 celery.conf.beat_schedule = {
-    'refresh-krx-gold-daily': {
+    'refresh-krx-gold-after-close': {
         'task': 'tasks.refresh_krx_gold',
-        'schedule': crontab(hour=7, minute=30, day_of_week='mon-fri'),
+        'schedule': crontab(hour=7, minute=40, day_of_week='mon-fri'),   # 16:40 KST
+    },
+    'refresh-krx-gold-evening': {
+        'task': 'tasks.refresh_krx_gold',
+        'schedule': crontab(hour=9, minute=30, day_of_week='mon-fri'),   # 18:30 KST
+    },
+    'refresh-krx-gold-night': {
+        'task': 'tasks.refresh_krx_gold',
+        'schedule': crontab(hour=13, minute=30, day_of_week='mon-fri'),  # 22:30 KST
+    },
+    'refresh-krx-gold-next-morning': {
+        'task': 'tasks.refresh_krx_gold',
+        'schedule': crontab(hour=23, minute=30, day_of_week='mon-fri'),  # 08:30 KST next day
     },
 }

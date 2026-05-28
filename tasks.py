@@ -248,25 +248,39 @@ def refresh_krx_gold():
     """매 평일 16:30 KST Celery Beat 자동 실행 — KRX 금현물 당일 종가 저장."""
     from datetime import datetime, timedelta
     from modules.krx.fetch_krx_gold import KRXClient, init_db, save
+
+    def invalidate_market_cache():
+        try:
+            redis.Redis(host='localhost', port=6379, db=1).delete("mq:krx_gold")
+        except Exception as e:
+            print(f"[refresh_krx_gold] 캐시 무효화 실패: {e}")
+
+    conn = None
     try:
         client = KRXClient()
         conn = init_db()
         today = datetime.today()
-        # 오늘부터 최대 3일 전까지 시도 (주말/공휴일 대비)
+        # 오늘부터 최대 15일 전까지 시도 (주말/공휴일/긴 연휴 대비)
         saved = False
-        for delta in range(3):
+        for delta in range(15):
             d = (today - timedelta(days=delta)).strftime("%Y%m%d")
             try:
                 df = client.get_gold(d)
                 if not df.empty:
                     n = save(conn, df)
+                    invalidate_market_cache()
                     print(f"[refresh_krx_gold] {d} → {n}개 저장")
                     saved = True
-                    break
-            except Exception:
+                    return {"status": "ok", "date": d, "rows": n}
+            except Exception as e:
+                print(f"[refresh_krx_gold] {d} 조회 실패: {e}")
                 continue
-        conn.close()
         if not saved:
             print("[refresh_krx_gold] 데이터 없음 (공휴일?)")
+            return {"status": "no_data"}
     except Exception as e:
         print(f"[refresh_krx_gold] 오류: {e}")
+        raise
+    finally:
+        if conn:
+            conn.close()

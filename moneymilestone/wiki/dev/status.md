@@ -11,7 +11,19 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> 세금 리팩토링 Phase 1~3 전부 완료. SYNTHETIC_DATA_INTEGRATION_PLAN 완료. Gate 2a/2b/2c/2d PASS (28/28). ETF_BACKFILL Phase 2 (Provenance 스키마 + 통합) 완료. 다음: ETF_BACKFILL Phase 3 (Universe 확장) 또는 PHASE4 기능 잔여.
+> 세금 리팩토링 Phase 1~3 전부 완료. SYNTHETIC_DATA_INTEGRATION_PLAN 완료. Gate 2a/2b/2c/2d PASS (28/28). ETF_BACKFILL Phase 2 완료. KRX 금현물 자동 갱신 보강 및 지수 download_all 누락구간 보강 로직 수정 완료. 다음: 수동 테스트 T1~T4 또는 PHASE4 기능 잔여.
+
+---
+
+## 최근 완료된 작업 (Codex 세션 2026-05-28 KRX/Index 데이터 갱신 안정화)
+
+- ✅ 서버 KRX API 키 누락 확인 및 `ecos/fred/krx_api_key.txt` 서버 업로드 (`chmod 600`)
+- ✅ `refresh_krx_gold`: KRX 금현물 조회 범위 3일 → 15일, 저장 성공 시 Redis `mq:krx_gold` 캐시 삭제
+- ✅ Celery Beat 금현물 갱신: 16:40 / 18:30 / 22:30 / 다음날 08:30 KST 다회 재시도
+- ✅ `KRXClient`: API 키 환경변수(`KRX_API_KEY`, `KRX_AUTH_KEY`) 지원, 날짜 미지정 시 최근 15일 fallback
+- ✅ `IndexLoader.download_all()`: 기존 “있으면 스킵” 제거, `get()` 기반으로 누락 앞/뒤 구간 보강
+- ✅ 서버 `KRX_GOLD` 전체 재수집 진행 중: 2014-03-24부터 순차 복구 (긴 날짜별 API 호출)
+- 검증: `py_compile` PASS, 임시 DB에서 `download_all()` 누락 구간 fetch 호출 확인 (Codex)
 
 ---
 

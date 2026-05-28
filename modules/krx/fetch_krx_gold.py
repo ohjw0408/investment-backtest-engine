@@ -1,5 +1,6 @@
 import sqlite3
 import argparse
+import os
 import requests
 import pandas as pd
 from pathlib import Path
@@ -24,6 +25,9 @@ class KRXClient:
         self.debug = debug
 
     def _load_key(self):
+        env_key = os.environ.get("KRX_API_KEY") or os.environ.get("KRX_AUTH_KEY")
+        if env_key:
+            return env_key.strip()
         if not KEY_PATH.exists():
             raise FileNotFoundError(f"API 키 없음: {KEY_PATH}")
         return KEY_PATH.read_text().strip()
@@ -127,7 +131,7 @@ def collect_all(client, conn):
     reset_gold_data(conn)
 
     start = datetime(2014, 3, 24)
-    end   = datetime.today() - timedelta(days=1)
+    end   = datetime.today()
 
     print(f"🚀 전체 재수집: {start.strftime('%Y-%m-%d')} ~ {end.strftime('%Y-%m-%d')}")
 

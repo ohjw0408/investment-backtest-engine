@@ -153,33 +153,29 @@ class IndexLoader:
     # ── 전체 지수 다운로드 ─────────────────────────────────
     def download_all(self, force: bool = False):
         """
-        INDEX_META에 정의된 모든 지수 다운로드.
-        force=True면 이미 있어도 다시 다운로드.
+        INDEX_META에 정의된 모든 지수의 누락 구간을 보강.
+        force=True면 해당 지수 기존 행을 삭제한 뒤 다시 다운로드.
         """
         print(f"총 {len(INDEX_META)}개 지수 다운로드 시작")
         print("=" * 60)
 
-        success, skipped, failed = 0, 0, []
+        success, failed = 0, []
 
         for code, source, desc, start in INDEX_META:
             try:
-                db_min, db_max = self.get_date_range(code)
-
-                if not force and db_min is not None:
-                    print(f"  ✅ 스킵: {code:12s} ({db_min}~{db_max})")
-                    skipped += 1
-                    continue
+                if force:
+                    self.conn.execute("DELETE FROM index_daily WHERE code=?", (code,))
+                    self.conn.commit()
 
                 end = datetime.today().strftime("%Y-%m-%d")
-                df = self._fetch(code, source, start, end)
+                df = self.get(code, start, end)
 
                 if df is None or df.empty:
                     print(f"  ⚠️  데이터 없음: {code}")
                     failed.append(code)
                 else:
-                    self._save(code, df)
                     db_min, db_max = self.get_date_range(code)
-                    print(f"  ✅ {code:12s} {desc:40s} ({db_min}~{db_max}, {len(df)}행)")
+                    print(f"  ✅ {code:12s} {desc:40s} ({db_min}~{db_max}, 조회 {len(df)}행)")
                     success += 1
 
                 # meta 업데이트
@@ -197,7 +193,7 @@ class IndexLoader:
                 time.sleep(0.3)
 
         print("\n" + "=" * 60)
-        print(f"완료: {success}개 성공 / {skipped}개 스킵 / {len(failed)}개 실패")
+        print(f"완료: {success}개 성공 / {len(failed)}개 실패")
         if failed:
             print(f"실패 목록: {failed}")
 

@@ -1,3 +1,6 @@
+from datetime import datetime, timedelta
+import os
+
 import requests
 import pandas as pd
 from pathlib import Path
@@ -14,6 +17,9 @@ class KRXClient:
         self.debug = debug
 
     def _load_key(self) -> str:
+        env_key = os.environ.get("KRX_API_KEY") or os.environ.get("KRX_AUTH_KEY")
+        if env_key:
+            return env_key.strip()
         if KRX_KEY_PATH.exists():
             return KRX_KEY_PATH.read_text().strip()
         raise FileNotFoundError(f"KRX API 키 없음: {KRX_KEY_PATH}")
@@ -57,46 +63,57 @@ class KRXClient:
             return 0.0
 
     # 🔥 금현물 (금 1kg ONLY)
-    def get_gold_price(self, bas_dd: str) -> pd.DataFrame:
+    def get_gold_price(self, bas_dd: str = None) -> pd.DataFrame:
+        if bas_dd is None:
+            dates = [
+                (datetime.today() - timedelta(days=delta)).strftime("%Y%m%d")
+                for delta in range(15)
+            ]
+        else:
+            dates = [bas_dd]
         urls = [
             "https://data-dbg.krx.co.kr/svc/apis/gen/gold_bydd_trd",
         ]
 
-        for url in urls:
-            try:
-                data = self._get(url, {"basDd": bas_dd})
-                rows = self._extract_rows(data)
+        for date in dates:
+            for url in urls:
+                try:
+                    data = self._get(url, {"basDd": date})
+                    rows = self._extract_rows(data)
 
-                if not rows:
-                    print(f"⚠️ rows 없음 ({url})")
-                    continue
-
-                records = []
-                for r in rows:
-
-                    # 🔥 핵심: 금 1kg만 필터
-                    if r.get("ISU_CD") != "04020000":
+                    if not rows:
+                        if self.debug:
+                            print(f"[KRX] rows 없음 ({date}, {url})")
                         continue
 
-                    records.append({
-                        "date":   r.get("BAS_DD", bas_dd),
-                        "open":   self._to_float(r.get("TDD_OPNPRC", 0)),
-                        "high":   self._to_float(r.get("TDD_HGPRC",  0)),
-                        "low":    self._to_float(r.get("TDD_LWPRC",  0)),
-                        "close":  self._to_float(r.get("TDD_CLSPRC", 0)),
-                        "volume": self._to_float(r.get("ACC_TRDVOL", 0)),
-                    })
+                    records = []
+                    for r in rows:
 
-                df = pd.DataFrame(records)
+                        # 금 1kg만 필터
+                        if r.get("ISU_CD") != "04020000":
+                            continue
 
-                if not df.empty:
-                    print(f"✅ 금(1kg) 데이터 수신: {len(df)}개")
-                    return df
+                        records.append({
+                            "date":   r.get("BAS_DD", date),
+                            "open":   self._to_float(r.get("TDD_OPNPRC", 0)),
+                            "high":   self._to_float(r.get("TDD_HGPRC",  0)),
+                            "low":    self._to_float(r.get("TDD_LWPRC",  0)),
+                            "close":  self._to_float(r.get("TDD_CLSPRC", 0)),
+                            "volume": self._to_float(r.get("ACC_TRDVOL", 0)),
+                        })
 
-            except Exception as e:
-                print(f"❌ 금 API 실패: {url} / {e}")
+                    df = pd.DataFrame(records)
 
-        print("🚨 금 데이터 완전 실패")
+                    if not df.empty:
+                        if self.debug:
+                            print(f"[KRX] 금(1kg) 데이터 수신: {date}, {len(df)}개")
+                        return df
+
+                except Exception as e:
+                    print(f"[KRX] 금 API 실패: {date}, {url} / {e}")
+
+        if self.debug:
+            print("[KRX] 금 데이터 없음")
         return pd.DataFrame()
     def get_current_prices_kr(self, codes: list, bas_dd: str = None) -> dict:
         """

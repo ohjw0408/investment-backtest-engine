@@ -10,7 +10,7 @@
       <div>
         <div class="card-label">내 포트폴리오</div>
         <div class="portfolio-amount">
-          <span id="portfolioValue">₩15,870,200</span>
+          <span id="portfolioValue">***,***,***원</span>
           <span class="portfolio-change up" id="portfolioChange">(+1.8%)</span>
         </div>
       </div>
@@ -64,6 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
   loadMarket();
   loadAssets();
   setInterval(loadMarket, 5 * 60 * 1000);
+  setInterval(() => {
+    loadPortfolio(_homePortfolioPeriod);
+    loadAssets();
+  }, 60 * 1000);
 
   document.querySelectorAll('.period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -77,12 +81,20 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── 포트폴리오 차트 ──
 let portfolioChart = null;
 let _portfolioData = null;
+let _homeHideAmounts = true;
+let _homePortfolioPeriod = '1m';
+
+function fmtMaskedKRW(v) {
+  if (_homeHideAmounts) return '***,***,***원';
+  return '₩' + Math.round(v || 0).toLocaleString();
+}
+
 async function loadPortfolio(period = '1m') {
-  if (!_portfolioData) {
-    const res = await fetch('/api/portfolio/history');
-    _portfolioData = await res.json();
-  }
+  _homePortfolioPeriod = period;
+  const res = await fetch('/api/portfolio/history', { cache: 'no-store' });
+  _portfolioData = await res.json();
   const data = _portfolioData;
+  _homeHideAmounts = data.hide_amounts !== false;
 
   if (data.empty) {
     document.getElementById('portfolioValue').textContent = '—';
@@ -103,7 +115,7 @@ async function loadPortfolio(period = '1m') {
   const slicedLabels = labels.slice(-n);
   const slicedValues = values.slice(-n);
 
-  document.getElementById('portfolioValue').textContent = '₩' + (slicedValues[slicedValues.length - 1] || 0).toLocaleString();
+  document.getElementById('portfolioValue').textContent = fmtMaskedKRW(slicedValues[slicedValues.length - 1] || 0);
   const periodChange = slicedValues.length > 1
     ? ((slicedValues[slicedValues.length - 1] - slicedValues[0]) / slicedValues[0] * 100).toFixed(2)
     : null;
@@ -144,7 +156,7 @@ async function loadPortfolio(period = '1m') {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: c => '₩' + c.raw.toLocaleString() } }
+        tooltip: { callbacks: { label: c => fmtMaskedKRW(c.raw) } }
       },
       scales: {
         x: {
@@ -157,7 +169,7 @@ async function loadPortfolio(period = '1m') {
           ticks: {
             font: { family: 'DM Mono', size: 10 },
             color: '#90A4AE',
-            callback: v => '₩' + (v / 1000000).toFixed(1) + 'M'
+            callback: v => _homeHideAmounts ? '***' : '₩' + (v / 1000000).toFixed(1) + 'M'
           },
           grid: { color: 'rgba(0,0,0,0.04)' }
         }

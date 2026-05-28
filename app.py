@@ -169,6 +169,69 @@ def save_tax_settings():
     return jsonify({'ok': True})
 
 
+def _hide_amounts_for_user(user_id):
+    return bool(get_settings(user_id).get("hide_amounts", True))
+
+
+def _get_current_asset_prices(codes):
+    """Return latest asset prices in KRW for holdings/home views."""
+    from pathlib import Path as _P
+    import sqlite3 as _sq
+    import yfinance as _yf
+    from modules.krx.krx_client import KRXClient as _KRXC
+
+    codes = list({c for c in codes if c})
+    prices = {}
+    if not codes:
+        return prices
+
+    try:
+        idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
+        ic = _sq.connect(str(idx_db))
+        row = ic.execute("SELECT close FROM index_daily WHERE code='USD/KRW' ORDER BY date DESC LIMIT 1").fetchone()
+        ic.close()
+        usdkrw = float(row[0]) if row else 1300.0
+    except Exception:
+        usdkrw = 1300.0
+
+    kr_codes = [c for c in codes if c != 'KRX_GOLD' and portfolio_engine.loader.is_kr_etf(c)]
+    us_codes = [c for c in codes if c != 'KRX_GOLD' and not portfolio_engine.loader.is_kr_etf(c)]
+
+    if kr_codes:
+        try:
+            krx = _KRXC(debug=False)
+            prices.update(krx.get_current_prices_kr(kr_codes))
+        except Exception:
+            pass
+        for code in kr_codes:
+            if prices.get(code, 0) == 0:
+                try:
+                    hist = _yf.Ticker(f"{code}.KS").history(period="2d")
+                    if not hist.empty:
+                        prices[code] = float(hist["Close"].iloc[-1])
+                except Exception:
+                    prices[code] = 0
+
+    for code in us_codes:
+        try:
+            hist = _yf.Ticker(code).history(period="2d")
+            prices[code] = float(hist["Close"].iloc[-1]) * usdkrw if not hist.empty else 0
+        except Exception:
+            prices[code] = 0
+
+    if 'KRX_GOLD' in codes:
+        try:
+            idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
+            ic = _sq.connect(str(idx_db))
+            row = ic.execute("SELECT close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date DESC LIMIT 1").fetchone()
+            ic.close()
+            prices['KRX_GOLD'] = round(float(row[0])) if row else 0
+        except Exception:
+            prices['KRX_GOLD'] = 0
+
+    return prices
+
+
 # -----------------------------------------------
 # 페이지 라우트
 # -----------------------------------------------
@@ -652,12 +715,12 @@ def portfolio_history():
 
     uid = session.get('user_id')
     if not uid:
-        return jsonify({"empty": True, "labels": [], "values": []})
+        return jsonify({"empty": True, "labels": [], "values": [], "hide_amounts": True})
 
     holdings = get_holdings(uid)
     valid = [(h['code'], float(h['quantity'])) for h in holdings if h.get('quantity') and h['quantity'] > 0]
     if not valid:
-        return jsonify({"empty": True, "labels": [], "values": []})
+        return jsonify({"empty": True, "labels": [], "values": [], "hide_amounts": _hide_amounts_for_user(uid)})
 
     # USD/KRW 환율
     try:
@@ -738,7 +801,7 @@ def portfolio_history():
     pc.close()
 
     if not price_map:
-        return jsonify({"empty": True, "labels": [], "values": []})
+        return jsonify({"empty": True, "labels": [], "values": [], "hide_amounts": _hide_amounts_for_user(uid)})
 
     # 전체 날짜 합집합 정렬
     all_dates = sorted(set().union(*[set(v.keys()) for v in price_map.values()]))
@@ -762,11 +825,27 @@ def portfolio_history():
             values.append(round(total))
 
     if not values:
-        return jsonify({"empty": True, "labels": [], "values": []})
+        return jsonify({"empty": True, "labels": [], "values": [], "hide_amounts": _hide_amounts_for_user(uid)})
+
+    current_prices = _get_current_asset_prices(codes)
+    current_total = sum(qty * current_prices.get(code, 0) for code, qty in valid)
+    if current_total > 0:
+        today = datetime.now().strftime('%Y-%m-%d')
+        if labels and labels[-1] == today:
+            values[-1] = round(current_total)
+        else:
+            labels.append(today)
+            values.append(round(current_total))
 
     current = values[-1]
     change = round((values[-1] / values[0] - 1) * 100, 2) if values[0] else 0
-    return jsonify({"labels": labels, "values": values, "current": current, "change": change})
+    return jsonify({
+        "labels": labels,
+        "values": values,
+        "current": current,
+        "change": change,
+        "hide_amounts": _hide_amounts_for_user(uid),
+    })
 
 
 # -----------------------------------------------
@@ -1205,7 +1284,24 @@ def myassets_data():
         except Exception:
             prices['KRX_GOLD'] = 0
 
-    return jsonify({'holdings': holdings, 'groups': groups, 'prices': prices})
+    return jsonify({
+        'holdings': holdings,
+        'groups': groups,
+        'prices': prices,
+        'hide_amounts': _hide_amounts_for_user(uid),
+    })
+
+
+@app.route('/api/myassets/settings', methods=['POST'])
+def myassets_save_settings():
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    uid = session['user_id']
+    body = request.get_json(silent=True) or {}
+    settings = get_settings(uid)
+    settings['hide_amounts'] = bool(body.get('hide_amounts', True))
+    save_settings(uid, settings)
+    return jsonify({'ok': True, 'hide_amounts': settings['hide_amounts']})
 
 
 @app.route('/api/myassets/holding', methods=['POST'])
@@ -1297,9 +1393,30 @@ def symbol_api(code):
 def assets():
     if not session.get('user_id'):
         return jsonify([])
-    groups = get_groups(session['user_id'])
+    uid = session['user_id']
+    groups = get_groups(uid)
     if not groups:
         return jsonify([])
+    holdings = get_holdings(uid)
+    prices = _get_current_asset_prices([h['code'] for h in holdings])
+    group_values = {}
+    for h in holdings:
+        gid = h.get('group_id')
+        if not gid:
+            continue
+        group_values[gid] = group_values.get(gid, 0) + prices.get(h['code'], 0) * float(h.get('quantity') or 0)
+
+    total_value = sum(group_values.values())
+    if total_value > 0:
+        return jsonify([
+            {
+                "name":  g['name'],
+                "color": g['color'],
+                "pct":   group_values.get(g['id'], 0) / total_value,
+            }
+            for g in groups if group_values.get(g['id'], 0) > 0
+        ])
+
     total_target = sum(g['target_pct'] for g in groups) or 100
     return jsonify([
         {

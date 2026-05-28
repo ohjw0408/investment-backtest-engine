@@ -89,6 +89,10 @@ def get_settings(user_id):
 def save_settings(user_id, tax):
     now = datetime.now().isoformat()
     c   = _get_conn()
+    tax = dict(tax or {})
+    existing = get_settings(user_id)
+    if "hide_amounts" in existing and "hide_amounts" not in tax:
+        tax["hide_amounts"] = existing["hide_amounts"]
     c.execute(
         "INSERT INTO user_settings (user_id, tax, updated_at) VALUES (?,?,?) "
         "ON CONFLICT(user_id) DO UPDATE SET tax=excluded.tax, updated_at=excluded.updated_at",

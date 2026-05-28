@@ -80,6 +80,17 @@
 
   <!-- 자산 현황 탭 -->
   <div id="tab-overview">
+    <div class="ma-card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div>
+        <div style="font-size:0.9rem;font-weight:800;">금액 가리기</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:3px;">홈 화면과 내 자산 금액을 별표로 표시합니다.</div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap;">
+        <input type="checkbox" id="hideAmountToggle" checked onchange="savePrivacySetting()">
+        <span>가리기</span>
+      </label>
+    </div>
+
     <div class="ma-card">
       <div class="ma-card-title">
         💼 보유 종목
@@ -233,8 +244,10 @@ let holdings = [];
 let groups   = [];
 let prices   = {};
 let weightChart = null;
+let hideAmounts = true;
 
 function fmtKRW(v) {
+  if (hideAmounts) return '***,***,***원';
   if (!v && v !== 0) return '—';
   return (v < 0 ? '-' : '') + '₩' + Math.abs(Math.round(v)).toLocaleString();
 }
@@ -259,9 +272,25 @@ async function loadAll() {
   holdings   = data.holdings || [];
   groups     = data.groups   || [];
   prices     = data.prices   || {};
+  hideAmounts = data.hide_amounts !== false;
+  const toggle = document.getElementById('hideAmountToggle');
+  if (toggle) toggle.checked = hideAmounts;
   renderHoldings();
   renderSummary();
   renderGroupOptions();
+}
+
+async function savePrivacySetting() {
+  const toggle = document.getElementById('hideAmountToggle');
+  hideAmounts = !!toggle.checked;
+  renderHoldings();
+  renderSummary();
+  if (document.getElementById('tab-rebalance').style.display !== 'none') renderRebalance();
+  await fetch('/api/myassets/settings', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ hide_amounts: hideAmounts }),
+  });
 }
 
 // ── 보유 종목 테이블 ──

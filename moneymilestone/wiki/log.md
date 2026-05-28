@@ -1,5 +1,25 @@
 # Log
 
+## [2026-05-28] feature | 금액가리기+내자산연동 정상화
+
+- 홈 포트폴리오 카드:
+  - `/api/portfolio/history`가 기존 DB 히스토리 뒤에 내자산 현재가 기반 평가액을 오늘 날짜로 반영.
+  - 프론트에서 `_portfolioData` 1회 캐시를 제거하고 60초마다 포트폴리오/자산군 데이터를 재조회.
+- 홈 자산군 비교:
+  - `/api/assets`가 그룹 목표비중 대신 실제 보유자산 그룹별 현재 평가액 비중을 우선 반환.
+  - 실제 평가액이 없으면 기존처럼 목표비중 fallback.
+- 금액 가리기:
+  - 내자산 탭 상단에 `금액 가리기` 체크박스 추가.
+  - 기본값은 가리기(`hide_amounts=True`).
+  - 가리기 ON이면 홈/내자산 금액 표시와 차트 tooltip/y축 금액을 `***,***,***원` 또는 `***`로 표시.
+  - 설정은 `user_settings.tax` JSON의 `hide_amounts`에 보존. 세금 설정 저장 시 기존 `hide_amounts`를 유지하도록 `save_settings()` 보강.
+- 검증:
+  - `.\venv\Scripts\python.exe -m py_compile app.py modules\auth_manager.py` PASS.
+  - `.\venv\Scripts\python.exe app.py` 기동 후 `/`, `/myassets` HTTP 200 확인.
+- 작성: Codex
+
+---
+
 ## [2026-05-28] decision | 가격 데이터 저장 정책 문서화
 
 - 사용자 질문: 즐겨찾기/검색/계산 종목을 전부 서버에 쌓으면 용량이 터질 수 있는데, 데이터를 사용자 폰/컴퓨터에 저장하는 발상 전환이 맞는지 검토.

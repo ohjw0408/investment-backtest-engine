@@ -114,7 +114,7 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         split_sale_plan = compute_split_sale_plan(
             kr_foreign_gain        = kr_foreign_unrealized_gain,
             earned_income          = user_settings.get("earned_income", 0),
-            other_financial_income = 0.0,
+            other_financial_income = user_settings.get("other_financial_income", 0),
         )
 
     pv             = history_df['portfolio_value']

@@ -109,34 +109,55 @@ def compute_split_sale_plan(
         plan_by_year    : dict[str, int] — {n: total_tax} n=1..20
         over_threshold  : bool — 일괄 시 2천만 초과 여부
     """
+    kr_foreign_gain = float(kr_foreign_gain or 0.0)
+    earned_income = float(earned_income or 0.0)
+    other_financial_income = float(other_financial_income or 0.0)
+    split_years = int(split_years or 5)
+
     if kr_foreign_gain <= 0:
         return {
             "lump_sum_tax": 0, "split_tax": 0, "saving": 0,
             "optimal_years": 1, "optimal_tax": 0,
-            "plan_by_year": {}, "over_threshold": False,
+            "plan_by_year": {}, "after_tax_by_year": {},
+            "lump_sum_after_tax": 0, "split_after_tax": 0,
+            "optimal_after_tax": 0, "gain": 0,
+            "earned_income": round(earned_income),
+            "other_financial_income": round(other_financial_income),
+            "over_threshold": False,
         }
 
     # 일괄 청산 세금
     lump_sum_tax   = _year_tax(kr_foreign_gain, other_financial_income, earned_income)
+    lump_sum_tax_i = round(lump_sum_tax)
     over_threshold = bool((kr_foreign_gain + other_financial_income) > _DIVIDEND_THRESHOLD)
 
     # 1~20년 분할 시나리오
     plan_by_year: dict[str, int] = {}
+    after_tax_by_year: dict[str, int] = {}
     for n in range(1, 21):
         gain_per_year   = kr_foreign_gain / n
         tax_per_year    = _year_tax(gain_per_year, other_financial_income, earned_income)
-        plan_by_year[str(n)] = round(tax_per_year * n)
+        tax_total = round(tax_per_year * n)
+        plan_by_year[str(n)] = tax_total
+        after_tax_by_year[str(n)] = round(kr_foreign_gain - tax_total)
 
     optimal_years = min(plan_by_year, key=lambda k: plan_by_year[k])
     optimal_tax   = plan_by_year[optimal_years]
-    split_tax     = plan_by_year.get(str(split_years), round(lump_sum_tax))
+    split_tax     = plan_by_year.get(str(split_years), lump_sum_tax_i)
 
     return {
-        "lump_sum_tax":  round(lump_sum_tax),
+        "gain":          round(kr_foreign_gain),
+        "lump_sum_tax":  lump_sum_tax_i,
         "split_tax":     split_tax,
-        "saving":        round(lump_sum_tax) - split_tax,
+        "saving":        lump_sum_tax_i - split_tax,
+        "lump_sum_after_tax": round(kr_foreign_gain - lump_sum_tax_i),
+        "split_after_tax":    round(kr_foreign_gain - split_tax),
         "optimal_years": int(optimal_years),
         "optimal_tax":   optimal_tax,
+        "optimal_after_tax": round(kr_foreign_gain - optimal_tax),
         "plan_by_year":  plan_by_year,
+        "after_tax_by_year": after_tax_by_year,
+        "earned_income": round(earned_income),
+        "other_financial_income": round(other_financial_income),
         "over_threshold": bool(over_threshold),
     }

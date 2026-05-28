@@ -244,6 +244,14 @@
             <span style="font-size:0.75rem;color:var(--text-muted);">원</span>
           </div>
         </div>
+        <div style="margin-bottom:8px;">
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">기존 연간 금융소득</div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <input type="number" id="btTaxOtherFinancialIncome" value="0" min="0" step="1000000"
+              style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;min-width:0;">
+            <span style="font-size:0.75rem;color:var(--text-muted);">원</span>
+          </div>
+        </div>
         <div id="btGainHarvesting" style="display:block;padding:8px 10px;background:#E3F2FD;border-radius:8px;margin-bottom:8px;font-size:0.8rem;border:1px solid #90CAF9;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="btGainHarvestingCheck" style="width:14px;height:14px;">
@@ -488,7 +496,33 @@ function toggleBtTax() {
   document.getElementById('btTaxLabel').textContent     = on ? 'ON' : 'OFF';
   document.getElementById('btTaxLabel').style.color     = on ? 'var(--blue)' : 'var(--text-muted)';
   document.getElementById('btTaxPanel').style.display   = on ? 'block' : 'none';
-  if (on) updateBtTaxAccount();
+  if (on) {
+    updateBtTaxAccount();
+    loadBtTaxProfile();
+  }
+}
+
+async function loadBtTaxProfile() {
+  let settings = null;
+  try {
+    const me = await fetch('/api/me').then(r => r.json());
+    if (me.logged_in) {
+      const res = await fetch('/api/settings/tax');
+      if (res.ok) settings = await res.json();
+    }
+  } catch(e) {}
+  if (!settings || Object.keys(settings).length === 0) {
+    try { settings = JSON.parse(localStorage.getItem('domino_tax_settings') || '{}'); } catch(e) { settings = {}; }
+  }
+  if (settings.earned_income != null) {
+    document.getElementById('btTaxEarnedIncome').value = settings.earned_income;
+  }
+  if (settings.other_financial_income != null) {
+    document.getElementById('btTaxOtherFinancialIncome').value = settings.other_financial_income;
+  }
+  if (settings.age != null) {
+    document.getElementById('btTaxAge').value = settings.age;
+  }
 }
 
 function updateBtTaxAccount() {
@@ -535,6 +569,7 @@ async function runBacktest() {
         user_settings: (window.btTaxEnabled) ? {
           age:           parseInt(document.getElementById('btTaxAge')?.value || 40),
           earned_income: parseInt(document.getElementById('btTaxEarnedIncome')?.value || 50000000),
+          other_financial_income: parseInt(document.getElementById('btTaxOtherFinancialIncome')?.value || 0),
         } : {},
       }),
     });
@@ -1069,18 +1104,24 @@ function btUpdateSplitPlan(years) {
   if (!plan) return;
 
   const byYear = plan.plan_by_year || {};
+  const afterTaxByYear = plan.after_tax_by_year || {};
   const splitTax = byYear[String(years)] ?? plan.lump_sum_tax;
+  const splitAfterTax = afterTaxByYear[String(years)] ?? (plan.gain - splitTax);
+  const lumpAfterTax = plan.lump_sum_after_tax ?? (plan.gain - plan.lump_sum_tax);
   const saving   = plan.lump_sum_tax - splitTax;
   const optYears = plan.optimal_years;
   const optTax   = plan.optimal_tax;
+  const optAfterTax = plan.optimal_after_tax ?? (plan.gain - optTax);
 
   const el = document.getElementById('btSplitMetrics');
   if (!el) return;
   el.innerHTML = [
     { label: '일괄 청산 세금',     value: fmtKRW(plan.lump_sum_tax), cls: 'down' },
     { label: years + '년 분할 세금', value: fmtKRW(splitTax),          cls: '' },
+    { label: '일괄 세후 이익',     value: fmtKRW(lumpAfterTax), cls: '' },
+    { label: years + '년 세후 이익', value: fmtKRW(splitAfterTax),       cls: 'up' },
     { label: '절감액',             value: fmtKRW(saving),             cls: saving > 0 ? 'up' : '' },
-    { label: '최적 연수',          value: optYears + '년 (' + fmtKRW(optTax) + ')', cls: '' },
+    { label: '최적 연수',          value: optYears + '년 (' + fmtKRW(optTax) + ' / 세후 ' + fmtKRW(optAfterTax) + ')', cls: '' },
   ].map(item => `
     <div class="metric-item">
       <div class="metric-label">${item.label}</div>

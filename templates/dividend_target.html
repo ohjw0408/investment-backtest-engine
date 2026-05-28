@@ -412,6 +412,7 @@ document.getElementById('dtProbSlider').addEventListener('input', function() {
 
 // ── 세금 토글 ──
 let dtTaxOn = false;
+window.dtTaxProfile = {};
 function toggleTax() {
   dtTaxOn = !dtTaxOn;
   const btn   = document.getElementById('dtTaxToggle');
@@ -426,14 +427,27 @@ function toggleTax() {
   if (dtTaxOn) loadTaxProfile();
 }
 
-function loadTaxProfile() {
-  const raw = localStorage.getItem('domino_tax_settings');
+async function loadTaxProfile() {
+  let settings = {};
   const info = document.getElementById('dtTaxProfileInfo');
-  if (!raw) {
+  try {
+    const me = await fetch('/api/me').then(r => r.json());
+    if (me.logged_in) {
+      const res = await fetch('/api/settings/tax');
+      if (res.ok) settings = await res.json();
+    }
+  } catch(e) {}
+  if (!settings || Object.keys(settings).length === 0) {
+    try { settings = JSON.parse(localStorage.getItem('domino_tax_settings') || '{}'); } catch(e) { settings = {}; }
+  }
+  window.dtTaxProfile = settings || {};
+
+  const hasProfile = window.dtTaxProfile.earned_income != null || window.dtTaxProfile.age != null;
+  if (!hasProfile) {
     info.innerHTML = '⚠ 세금 프로필이 없습니다. <a href="/tax-settings" style="color:var(--blue);">세금 설정 →</a>';
     return;
   }
-  const s = JSON.parse(raw);
+  const s = window.dtTaxProfile;
   info.innerHTML = `연소득 ${fmtKRW(s.earned_income||0)} · 나이 ${s.age||40}세`;
 }
 
@@ -557,8 +571,10 @@ async function runDividendTarget() {
     };
   };
 
-  const taxRaw = localStorage.getItem('domino_tax_settings');
-  const taxProfile = taxRaw ? JSON.parse(taxRaw) : {};
+  if (dtTaxOn && (!window.dtTaxProfile || Object.keys(window.dtTaxProfile).length === 0)) {
+    await loadTaxProfile();
+  }
+  const taxProfile = window.dtTaxProfile || {};
   const accountType = dtTaxOn
     ? (document.querySelector('input[name="dtAccount"]:checked')?.value || 'general')
     : 'none';

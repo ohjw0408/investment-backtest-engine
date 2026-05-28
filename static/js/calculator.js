@@ -267,6 +267,10 @@ async function runCalculator() {
 
   const taxEnabled  = window.taxEnabled || false;
   const taxAccounts = window.taxAccounts || [];
+  if (taxEnabled && (!window.taxProfile || Object.keys(window.taxProfile).length === 0)) {
+    await loadTaxProfileForCalculator();
+  }
+  const taxProfile  = window.taxProfile || {};
   const isSingle    = taxAccounts.length <= 1;
   const totalInit   = Number(document.getElementById('initialCapital').value);
   const totalMon    = Number(document.getElementById('monthlyContrib').value);
@@ -293,9 +297,10 @@ async function runCalculator() {
     gain_harvesting:      taxEnabled && (window.taxAccounts||[]).some(a => a.type === '위탁') && (document.getElementById('gainHarvestingCheck')?.checked ?? false),
     use_synthetic:        document.getElementById('useSyntheticCheck')?.checked ?? false,
     user_settings: taxEnabled ? {
-      earned_income: Number(document.getElementById('taxEarnedIncome')?.value || 50000000),
-      age:           Number(document.getElementById('taxAge')?.value || 40),
-      isa_type:      'general',
+      earned_income: Number(taxProfile.earned_income || 0),
+      age:           Number(taxProfile.age || 40),
+      isa_type:      taxProfile.isa_type || 'general',
+      pension_age:   Number(taxProfile.pension_age || 65),
     } : {},
   };
 
@@ -764,6 +769,7 @@ function fmtPct(v) {
 
 window.taxEnabled  = false;
 window.taxAccounts = [];
+window.taxProfile  = {};
 const ACCOUNT_TYPES = ['위탁', 'ISA', '연금저축', 'IRP'];
 
 function toggleTax() {
@@ -777,7 +783,34 @@ function toggleTax() {
   label.textContent     = window.taxEnabled ? 'ON'  : 'OFF';
   label.style.color     = window.taxEnabled ? 'var(--blue)' : 'var(--text-muted)';
   panel.style.display   = window.taxEnabled ? 'block' : 'none';
-  if (window.taxEnabled && window.taxAccounts.length === 0) addTaxAccount();
+  if (window.taxEnabled) {
+    loadTaxProfileForCalculator();
+    if (window.taxAccounts.length === 0) addTaxAccount();
+  }
+}
+
+async function loadTaxProfileForCalculator() {
+  let settings = {};
+  try {
+    const me = await fetch('/api/me').then(r => r.json());
+    if (me.logged_in) {
+      const res = await fetch('/api/settings/tax');
+      if (res.ok) settings = await res.json();
+    }
+  } catch(e) {}
+  if (!settings || Object.keys(settings).length === 0) {
+    try { settings = JSON.parse(localStorage.getItem('domino_tax_settings') || '{}'); } catch(e) { settings = {}; }
+  }
+
+  window.taxProfile = settings || {};
+  const info = document.getElementById('taxProfileInfo');
+  if (!info) return;
+  const hasProfile = window.taxProfile.earned_income != null || window.taxProfile.age != null;
+  if (!hasProfile) {
+    info.innerHTML = '저장된 세금 설정이 없습니다. <a href="/tax-settings" style="color:var(--blue);">세금 설정</a>에서 입력하세요.';
+    return;
+  }
+  info.innerHTML = `연소득 ${fmtTaxKRW(window.taxProfile.earned_income || 0)} · 나이 ${window.taxProfile.age || 40}세 <a href="/tax-settings" style="color:var(--blue);margin-left:6px;">수정</a>`;
 }
 
 function addTaxAccount() {

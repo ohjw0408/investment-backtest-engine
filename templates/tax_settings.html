@@ -102,7 +102,6 @@
     <div class="summary-row" id="summaryRow">
       <div class="summary-item"><span class="summary-label">나이</span><span class="summary-value" id="sum-age">-</span></div>
       <div class="summary-item"><span class="summary-label">연소득</span><span class="summary-value" id="sum-income">-</span></div>
-      <div class="summary-item"><span class="summary-label">금융소득</span><span class="summary-value" id="sum-financial-income">-</span></div>
       <div class="summary-item"><span class="summary-label">ISA</span><span class="summary-value" id="sum-isa">-</span></div>
       <div class="summary-item"><span class="summary-label">연금계좌</span><span class="summary-value" id="sum-pension">—</span></div>
       <div class="summary-item"><span class="summary-label">절세매매</span><span class="summary-value" id="sum-harvest">—</span></div>
@@ -126,14 +125,6 @@
           <span class="unit">원</span>
         </div>
         <div class="input-hint" id="earnedIncomeHint"></div>
-      </div>
-      <div class="input-row" style="margin-bottom:12px;">
-        <label>기존 연간 금융소득</label>
-        <div class="input-group">
-          <input type="number" id="otherFinancialIncome" class="calc-input" placeholder="예: 15000000" min="0" step="1000000">
-          <span class="unit">원</span>
-        </div>
-        <div class="input-hint" id="otherFinancialIncomeHint"></div>
       </div>
       <div class="input-row">
         <label>나이 <span style="font-size:11px;color:var(--text-muted);">(연금 수령 세율 계산용)</span></label>
@@ -257,7 +248,6 @@ function toggleAccount(name) {
 async function saveSettings() {
   const settings = {
     earned_income: parseFloat(document.getElementById('earnedIncome').value) || 0,
-    other_financial_income: parseFloat(document.getElementById('otherFinancialIncome').value) || 0,
     age:           parseInt(document.getElementById('userAge').value) || 40,
     pension_age:   parseInt(document.getElementById('pensionAge').value) || 65,
     isa_type:      document.querySelector('input[name="isaType"]:checked')?.value || 'none',
@@ -285,11 +275,9 @@ const ISA_LABELS = { none: '미가입', general: '일반형', preferential: '서
 function updateSummary() {
   const age    = parseInt(document.getElementById('userAge').value) || null;
   const income = parseFloat(document.getElementById('earnedIncome').value) || 0;
-  const finIncome = parseFloat(document.getElementById('otherFinancialIncome').value) || 0;
   const isa    = document.querySelector('input[name="isaType"]:checked')?.value || 'none';
   document.getElementById('sum-age').textContent     = age ? age + '세' : '미입력';
   document.getElementById('sum-income').textContent  = income ? fmtKRW(income) : '미입력';
-  document.getElementById('sum-financial-income').textContent = finIncome ? fmtKRW(finIncome) : '미입력';
   document.getElementById('sum-isa').textContent     = ISA_LABELS[isa] || '미가입';
   document.getElementById('sum-pension').textContent = state.pension ? '사용' : '미사용';
   document.getElementById('sum-harvest').textContent = state.harvest ? '사용' : '미사용';
@@ -297,7 +285,6 @@ function updateSummary() {
 
 function applySettings(s) {
   if (s.earned_income != null) document.getElementById('earnedIncome').value = s.earned_income;
-  if (s.other_financial_income != null) document.getElementById('otherFinancialIncome').value = s.other_financial_income;
   if (s.age)           document.getElementById('userAge').value = s.age;
   if (s.pension_age)   document.getElementById('pensionAge').value = s.pension_age;
   const isaVal = s.isa_type || 'none';
@@ -309,7 +296,6 @@ function applySettings(s) {
     });
   }
   document.getElementById('earnedIncomeHint').textContent = s.earned_income ? fmtKRW(s.earned_income) : '';
-  document.getElementById('otherFinancialIncomeHint').textContent = s.other_financial_income ? fmtKRW(s.other_financial_income) : '';
   updateSummary();
 }
 
@@ -334,9 +320,6 @@ async function loadSettings() {
 
 document.getElementById('earnedIncome').addEventListener('input', function() {
   document.getElementById('earnedIncomeHint').textContent = fmtKRW(parseFloat(this.value)||0);
-});
-document.getElementById('otherFinancialIncome').addEventListener('input', function() {
-  document.getElementById('otherFinancialIncomeHint').textContent = fmtKRW(parseFloat(this.value)||0);
 });
 
 loadSettings();

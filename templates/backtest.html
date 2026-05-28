@@ -216,41 +216,19 @@
         </label>
       </div>
       <div id="btTaxPanel" style="display:none;margin-top:10px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-          <div>
-            <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">나이</div>
-            <div style="display:flex;align-items:center;gap:4px;">
-              <input type="number" id="btTaxAge" value="40" min="18" max="90"
-                style="width:60px;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;">
-              <span style="font-size:0.75rem;color:var(--text-muted);">세</span>
-            </div>
-          </div>
-          <div>
-            <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">계좌 유형</div>
-            <select id="btTaxAccount" onchange="updateBtTaxAccount()"
-              style="width:100%;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;background:white;">
-              <option value="위탁">위탁</option>
-              <option value="ISA">ISA</option>
-              <option value="연금저축">연금저축</option>
-              <option value="IRP">IRP</option>
-            </select>
-          </div>
+        <div style="background:var(--bg);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:0.76rem;color:var(--text-muted);line-height:1.5;">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:4px;">세금 설정 프로필</div>
+          <div id="btTaxProfileInfo">세금 설정에서 불러옵니다.</div>
         </div>
         <div style="margin-bottom:8px;">
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">연간 근로소득</div>
-          <div style="display:flex;align-items:center;gap:4px;">
-            <input type="number" id="btTaxEarnedIncome" value="50000000" min="0" step="1000000"
-              style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;min-width:0;">
-            <span style="font-size:0.75rem;color:var(--text-muted);">원</span>
-          </div>
-        </div>
-        <div style="margin-bottom:8px;">
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">기존 연간 금융소득</div>
-          <div style="display:flex;align-items:center;gap:4px;">
-            <input type="number" id="btTaxOtherFinancialIncome" value="0" min="0" step="1000000"
-              style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;min-width:0;">
-            <span style="font-size:0.75rem;color:var(--text-muted);">원</span>
-          </div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">계좌 유형</div>
+          <select id="btTaxAccount" onchange="updateBtTaxAccount()"
+            style="width:100%;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;background:white;">
+            <option value="위탁">위탁</option>
+            <option value="ISA">ISA</option>
+            <option value="연금저축">연금저축</option>
+            <option value="IRP">IRP</option>
+          </select>
         </div>
         <div id="btGainHarvesting" style="display:block;padding:8px 10px;background:#E3F2FD;border-radius:8px;margin-bottom:8px;font-size:0.8rem;border:1px solid #90CAF9;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -488,6 +466,7 @@ document.getElementById('btMonthly').addEventListener('input', function() {
 
 // ── 세금 토글 ──
 window.btTaxEnabled = false;
+window.btTaxProfile = {};
 function toggleBtTax() {
   window.btTaxEnabled = !window.btTaxEnabled;
   const on = window.btTaxEnabled;
@@ -503,7 +482,7 @@ function toggleBtTax() {
 }
 
 async function loadBtTaxProfile() {
-  let settings = null;
+  let settings = {};
   try {
     const me = await fetch('/api/me').then(r => r.json());
     if (me.logged_in) {
@@ -514,15 +493,15 @@ async function loadBtTaxProfile() {
   if (!settings || Object.keys(settings).length === 0) {
     try { settings = JSON.parse(localStorage.getItem('domino_tax_settings') || '{}'); } catch(e) { settings = {}; }
   }
-  if (settings.earned_income != null) {
-    document.getElementById('btTaxEarnedIncome').value = settings.earned_income;
+  window.btTaxProfile = settings || {};
+  const info = document.getElementById('btTaxProfileInfo');
+  if (!info) return;
+  const hasProfile = window.btTaxProfile.earned_income != null || window.btTaxProfile.age != null;
+  if (!hasProfile) {
+    info.innerHTML = '저장된 세금 설정이 없습니다. <a href="/tax-settings" style="color:var(--blue);">세금 설정</a>에서 입력하세요.';
+    return;
   }
-  if (settings.other_financial_income != null) {
-    document.getElementById('btTaxOtherFinancialIncome').value = settings.other_financial_income;
-  }
-  if (settings.age != null) {
-    document.getElementById('btTaxAge').value = settings.age;
-  }
+  info.innerHTML = `연소득 ${fmtKRW(window.btTaxProfile.earned_income || 0)} · 나이 ${window.btTaxProfile.age || 40}세 <a href="/tax-settings" style="color:var(--blue);margin-left:6px;">수정</a>`;
 }
 
 function updateBtTaxAccount() {
@@ -547,6 +526,10 @@ async function runBacktest() {
   btShowProgressUI();
 
   try {
+    if (window.btTaxEnabled && (!window.btTaxProfile || Object.keys(window.btTaxProfile).length === 0)) {
+      await loadBtTaxProfile();
+    }
+    const taxProfile = window.btTaxProfile || {};
     window._btLastBody = {
       tickers:              btTickers.map(t => ({ code: t.code, name: t.name, weight: t.weight })),
       start_date:           startDate,
@@ -567,9 +550,10 @@ async function runBacktest() {
         account_type:         document.getElementById('btTaxAccount')?.value || '위탁',
         gain_harvesting: window.btTaxEnabled && document.getElementById('btTaxAccount')?.value === '위탁' && (document.getElementById('btGainHarvestingCheck')?.checked ?? false),
         user_settings: (window.btTaxEnabled) ? {
-          age:           parseInt(document.getElementById('btTaxAge')?.value || 40),
-          earned_income: parseInt(document.getElementById('btTaxEarnedIncome')?.value || 50000000),
-          other_financial_income: parseInt(document.getElementById('btTaxOtherFinancialIncome')?.value || 0),
+          age:           parseInt(taxProfile.age || 40),
+          earned_income: parseInt(taxProfile.earned_income || 0),
+          isa_type:      taxProfile.isa_type || 'general',
+          pension_age:   parseInt(taxProfile.pension_age || 65),
         } : {},
       }),
     });

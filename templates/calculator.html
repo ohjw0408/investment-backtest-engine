@@ -116,24 +116,9 @@
 
       <div id="taxPanel" style="display:none;margin-top:12px;">
         <div style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;">
-          <div style="font-size:0.8rem;font-weight:700;margin-bottom:8px;">소득 정보</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div>
-              <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">연간 근로소득</div>
-              <div style="display:flex;align-items:center;gap:4px;">
-                <input type="number" id="taxEarnedIncome" value="50000000" min="0" step="1000000"
-                  style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;min-width:0;">
-                <span style="font-size:0.75rem;color:var(--text-muted);">원</span>
-              </div>
-            </div>
-            <div>
-              <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">나이</div>
-              <div style="display:flex;align-items:center;gap:4px;">
-                <input type="number" id="taxAge" value="40" min="18" max="90"
-                  style="width:60px;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;">
-                <span style="font-size:0.75rem;color:var(--text-muted);">세</span>
-              </div>
-            </div>
+          <div style="font-size:0.8rem;font-weight:700;margin-bottom:6px;">세금 설정 프로필</div>
+          <div id="taxProfileInfo" style="font-size:0.76rem;color:var(--text-muted);line-height:1.5;">
+            세금 설정에서 불러옵니다.
           </div>
         </div>
 

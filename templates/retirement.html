@@ -361,28 +361,11 @@
       </div>
 
       <div id="retTaxPanel" style="display:none;margin-top:12px;">
-        <!-- 소득 정보 -->
+        <!-- 세금 설정 프로필 -->
         <div style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:10px;">
-          <div style="font-size:0.8rem;font-weight:700;margin-bottom:8px;">소득 정보</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div>
-              <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">현재 나이</div>
-              <div style="display:flex;align-items:center;gap:4px;">
-                <input type="number" id="retTaxAge" value="40" min="18" max="80"
-                  style="width:60px;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;"
-                  oninput="updateRetTaxInfo()">
-                <span style="font-size:0.75rem;color:var(--text-muted);">세</span>
-              </div>
-            </div>
-            <div>
-              <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">연간 근로소득</div>
-              <div style="display:flex;align-items:center;gap:4px;">
-                <input type="number" id="retTaxIncome" value="50000000" min="0" step="1000000"
-                  style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;min-width:0;"
-                  oninput="updateRetTaxInfo()">
-                <span style="font-size:0.75rem;color:var(--text-muted);">원</span>
-              </div>
-            </div>
+          <div style="font-size:0.8rem;font-weight:700;margin-bottom:6px;">세금 설정 프로필</div>
+          <div id="retTaxProfileInfo" style="font-size:0.76rem;color:var(--text-muted);line-height:1.5;">
+            세금 설정에서 불러옵니다.
           </div>
         </div>
 
@@ -691,7 +674,11 @@ async function runRetirement() {
 
   if (retMode === 'sim') {
     const retTaxOn  = window.retTaxEnabled || false;
-    const retAge    = parseInt(document.getElementById('retTaxAge')?.value || 40);
+    if (retTaxOn && (!window.retTaxProfile || Object.keys(window.retTaxProfile).length === 0)) {
+      await loadRetTaxProfile();
+    }
+    const taxProfile = window.retTaxProfile || {};
+    const retAge    = parseInt(taxProfile.age || 40);
     const retAccYrs = parseInt(document.getElementById('simAccYears').value) || 20;
     body = {
       tickers:              retTickers.map(t => ({ code: t.code, name: t.name, weight: t.weight })),
@@ -711,8 +698,9 @@ async function runRetirement() {
       gain_harvesting:      retTaxOn && document.getElementById('retTaxAccount')?.value === '위탁' && (document.getElementById('retGainHarvestingCheck')?.checked ?? false),
       user_settings: retTaxOn ? {
         age:           retAge,
-        earned_income: parseFloat(document.getElementById('retTaxIncome')?.value || 50000000),
-        isa_type:      'general',
+        earned_income: parseFloat(taxProfile.earned_income || 0),
+        isa_type:      taxProfile.isa_type || 'general',
+        pension_age:   parseInt(taxProfile.pension_age || 65),
       } : {},
     };
   } else {
@@ -948,6 +936,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ── 세금 토글 ──────────────────────────────────────────
 window.retTaxEnabled = false;
+window.retTaxProfile = {};
 
 function toggleRetTax() {
   window.retTaxEnabled = !window.retTaxEnabled;
@@ -957,11 +946,36 @@ function toggleRetTax() {
   document.getElementById('retTaxLabel').textContent     = on ? 'ON' : 'OFF';
   document.getElementById('retTaxLabel').style.color     = on ? 'var(--blue)' : 'var(--text-muted)';
   document.getElementById('retTaxPanel').style.display   = on ? 'block' : 'none';
-  if (on) updateRetTaxInfo();
+  if (on) loadRetTaxProfile();
+}
+
+async function loadRetTaxProfile() {
+  let settings = {};
+  try {
+    const me = await fetch('/api/me').then(r => r.json());
+    if (me.logged_in) {
+      const res = await fetch('/api/settings/tax');
+      if (res.ok) settings = await res.json();
+    }
+  } catch(e) {}
+  if (!settings || Object.keys(settings).length === 0) {
+    try { settings = JSON.parse(localStorage.getItem('domino_tax_settings') || '{}'); } catch(e) { settings = {}; }
+  }
+
+  window.retTaxProfile = settings || {};
+  const profileInfo = document.getElementById('retTaxProfileInfo');
+  if (profileInfo) {
+    const hasProfile = window.retTaxProfile.earned_income != null || window.retTaxProfile.age != null;
+    profileInfo.innerHTML = hasProfile
+      ? `연소득 ${fmtKRW(window.retTaxProfile.earned_income || 0)} · 나이 ${window.retTaxProfile.age || 40}세 <a href="/tax-settings" style="color:var(--blue);margin-left:6px;">수정</a>`
+      : '저장된 세금 설정이 없습니다. <a href="/tax-settings" style="color:var(--blue);">세금 설정</a>에서 입력하세요.';
+  }
+  updateRetTaxInfo();
 }
 
 function updateRetTaxInfo() {
-  const age     = parseInt(document.getElementById('retTaxAge')?.value || 40);
+  const taxProfile = window.retTaxProfile || {};
+  const age     = parseInt(taxProfile.age || 40);
   const accYrs  = parseInt(document.getElementById('simAccYears')?.value || 20);
   const monthly = parseFloat(document.getElementById('simWithdraw')?.value || 0);
   const account = document.getElementById('retTaxAccount')?.value || '위탁';

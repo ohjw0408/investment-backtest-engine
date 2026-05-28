@@ -1,5 +1,21 @@
 # Log
 
+## [2026-05-29] feature | 세금 설정 프로필 입력 통일 + 금융소득 자동 산출 계획
+
+- 사용자 요청: 각 계산기 탭에 흩어진 나이/연간 근로소득 입력칸을 제거하고 세금 설정탭 값을 공통으로 사용. 금융소득은 세금설정에서 묻지 말고 계산 결과에서 자동 산출할 수 있는지 계획만 수립.
+- 수정:
+  - `templates/calculator.html`, `static/js/calculator.js`: 투자계산기 세금 패널에서 나이/연소득 입력 제거. 세금 ON 시 `/api/settings/tax` 우선, localStorage fallback으로 프로필 로드 후 `user_settings`에 주입.
+  - `templates/backtest.html`: 백테스트 세금 패널에서 나이/연소득/기존 금융소득 입력 제거. 계좌 유형만 남기고 세금 프로필을 표시.
+  - `templates/retirement.html`: 연금 시뮬레이션 세금 패널에서 나이/연소득 입력 제거. 세금 프로필의 나이로 수령 시작 나이/세금 안내 계산.
+  - `templates/dividend_target.html`: 배당금 계산기도 localStorage만 보던 로직을 서버 세금설정 API 우선 로드로 변경.
+  - `templates/tax_settings.html`: `기존 연간 금융소득` 수동 입력/요약/저장 제거.
+- 계획 문서화: `moneymilestone/wiki/dev/ideas.md`에 금융소득 자동 산출 설계 추가. 핵심은 계산기별 시뮬레이션에서 직전/최근 완료년도 세전 gross 배당·이자 흐름을 집계해 `other_financial_income`으로 세금 엔진에 넘기는 것.
+- 주의: `backtest_logic.py`와 `split_sale_planner.py`의 `other_financial_income` 파라미터는 유지. UI 수동 입력만 제거했고, 향후 자동 산출값 주입 지점으로 사용한다.
+
+_작성: Codex_
+
+---
+
 ## [2026-05-29] feature/fix | 분할매도 최적연수 기준 명확화 + 세후금액/기존 금융소득 반영
 
 - 사용자 질문: 분할매도 패널의 `최적 연수` 기준, 근로소득/금융소득 반영 여부, 세후 금액 표시 필요.

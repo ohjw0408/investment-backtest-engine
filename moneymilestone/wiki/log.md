@@ -1,5 +1,21 @@
 # Log
 
+## [2026-05-29] bugfix | T2 split_sale_plan JSON 직렬화 오류 수정
+
+- 증상: T2 금융소득종합과세/분할매도 패널 테스트 중 백테스트가 `TypeError('Object of type bool is not JSON serializable')`로 실패.
+- 원인: `modules/tax/split_sale_planner.py`의 `over_threshold`가 `numpy.float64` 비교 결과인 `numpy.bool_`로 반환됨. 서버 Python에서는 클래스명이 `bool`로 표시되어 Celery/Kombu JSON serializer가 결과 저장 중 실패.
+- 수정: `over_threshold = bool(...)`로 명시 변환하고 반환 dict에서도 `bool(over_threshold)`로 보강. 커밋 `f64846c`.
+- 구현 상태: 금융소득종합과세/분할매도 계산 자체는 동작 중이었고, 이번 문제는 결과 payload 타입 정리 누락이었다.
+- 서버 배포: `git pull --ff-only`, `systemctl restart domino domino-celery`.
+- 검증:
+  - 서버 단위 확인: `compute_split_sale_plan(np.float64(...))` 결과가 `json.dumps()` 통과.
+  - 실제 `/api/backtest/submit` T2 유사 payload(458730, 과세 ON, 위탁, 초기 5억원, 2015-01-01~2026-05-28) 성공.
+  - 결과: `status=SUCCESS`, `split_sale_plan.over_threshold=True`, `kr_foreign_unrealized_gain=1,203,859,330`, 분할매도 패널용 `plan_by_year` 반환 확인.
+
+_작성: Codex_
+
+---
+
 ## [2026-05-29] ops/bugfix | 479080 T1 float(None) 재현 원인 확인 및 서버 worker 정리
 
 - 증상: 투자 계산기 T1 검증 중 479080(머니마켓/CD 계열 ETF) + 가상 데이터 ON 실행 시 프런트에 `float() argument must be a string or a real number, not 'NoneType'` 표시.

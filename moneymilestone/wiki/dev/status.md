@@ -5,6 +5,8 @@ tags: [dev]
 
 > 2026-05-29 업데이트: T1 검증 중 479080(머니마켓/CD ETF) `float(None)` 오류를 서버에서 확인. 479080에는 2025-11-13 배당 이벤트 row의 `close=NULL`이 있으나 현재 코드의 NULL 필터는 정상 동작함. 실제 운영 리스크는 systemd worker 외 수동 Celery worker가 함께 떠서 stale worker가 큐를 소비할 수 있던 상태였음. 수동 worker 종료 후 `/api/calculator/submit` 479080 synthetic ON 검증 PASS(`cases_count=61`, `used_synthetic=True`).
 
+> 2026-05-29 추가 업데이트: T2 금융소득종합과세/분할매도 패널 테스트 중 `Object of type bool is not JSON serializable` 오류 수정. 원인은 `split_sale_plan.over_threshold`가 `numpy.bool_`로 반환된 것. `bool(...)` 캐스팅 후 서버 배포 및 `/api/backtest/submit` 458730 과세 ON 검증 PASS(`split_sale_plan` 반환).
+
 # 현재 개발 상태
 
 **에이전트: 코드 작업 완료 후 이 파일 반드시 업데이트.**

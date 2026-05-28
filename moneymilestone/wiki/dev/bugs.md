@@ -39,6 +39,7 @@ tags: [dev, bug]
 | KRX 금현물 홈 가격 stale | 서버 API 키 누락 + Redis `mq:krx_gold` 캐시 미무효화. 키 업로드, 15일 fallback, 다회 Beat, 저장 후 캐시 삭제로 보강 | 2026-05-28 | ✅ 진행/배포 대기 (Codex) |
 | 지수 `download_all()` stale | 기존 행이 하나라도 있으면 최신 누락 구간을 스킵 | 2026-05-28 | ✅ `get()` 기반 누락 구간 보강으로 수정 (Codex) |
 | 투자 계산기 T1 — 479080 `float(None)` | 서버 DB에 2025-11-13 배당 이벤트 row(`close=NULL`) 존재. 현재 코드는 NULL 필터가 있어 정상이나, systemd worker 외 수동 Celery worker가 함께 떠 stale worker가 큐를 소비할 수 있던 상태 | 2026-05-29 | ✅ 수동 worker 종료, 479080 `/api/calculator/submit` synthetic ON PASS (`cases_count=61`) |
+| 백테스트 T2 — `Object of type bool is not JSON serializable` | `split_sale_plan.over_threshold`가 `numpy.float64` 비교 결과인 `numpy.bool_`로 반환되어 Celery 결과 JSON 저장 실패 | 2026-05-29 | ✅ `bool(...)` 캐스팅, 서버 배포, 458730 `/api/backtest/submit` 과세 ON PASS |
 
 ---
 

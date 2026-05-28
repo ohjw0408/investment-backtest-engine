@@ -31,6 +31,7 @@ BASE_DIR      = Path(__file__).resolve().parent.parent.parent
 PRICE_DB_PATH = BASE_DIR / "data" / "price_cache" / "price_daily.db"
 USD_KRW_START = "1964-05-04"   # 환율 데이터 시작일 = 유효 최대 시작일
 MIN_CASES     = 30
+TARGET_CASES  = 60             # 가상 데이터 생성 시 목표 롤링 케이스 수
 
 
 def _get_ticker_data_start(price_conn: sqlite3.Connection, code: str) -> str | None:
@@ -211,13 +212,24 @@ class DataPreparer:
                       f"sigma={stats['sigma_monthly']:.4f}/월  "
                       f"기준기간: {stats['data_start']} ~ {stats['data_end']}")
 
-            # 가상 데이터: USD_KRW_START ~ 실제 첫 날짜
+            # 가상 데이터: 필요한 케이스 수만큼만 생성 (TARGET_CASES 기준)
+            # target_start = data_end - sim_years - (TARGET_CASES × step_months)
+            # → USD_KRW_START보다 이르면 USD_KRW_START로 캡
+            from dateutil.relativedelta import relativedelta as _rd
+            _extra_months = TARGET_CASES * step_months
+            _min_target   = (
+                pd.Timestamp(data_end)
+                - _rd(years=sim_years)
+                - _rd(months=_extra_months)
+            ).strftime("%Y-%m-%d")
+            _target_start = max(_min_target, USD_KRW_START)
+
             actual_start = current_start or stats["data_start"]
             gen_result   = generate_and_save(
                 code          = code,
                 mu_monthly    = stats["mu_monthly"],
                 sigma_monthly = stats["sigma_monthly"],
-                target_start  = USD_KRW_START,
+                target_start  = _target_start,
                 actual_start  = actual_start,
                 price_conn    = self.price_conn,
                 seed          = abs(hash(code)) % 100000,
@@ -326,6 +338,19 @@ class DataPreparer:
         # USD_KRW_START보다 앞으로는 의미없음
         if effective_start < USD_KRW_START:
             effective_start = USD_KRW_START
+
+        # 가상 데이터 사용 시 TARGET_CASES 케이스 이상은 불필요 → 캡 적용
+        # 기존 synthetic 데이터가 더 오래됐더라도 effective_start를 앞당기지 않음
+        if synthetic_info:
+            from dateutil.relativedelta import relativedelta as _rd2
+            _extra_months   = TARGET_CASES * step_months
+            _max_start      = (
+                pd.Timestamp(data_end)
+                - _rd2(years=sim_years)
+                - _rd2(months=_extra_months)
+            ).strftime("%Y-%m-%d")
+            if effective_start < _max_start:
+                effective_start = _max_start
 
         n_cases = _calc_rolling_cases(effective_start, data_end, sim_years, step_months)
 

@@ -7,6 +7,8 @@ tags: [dev]
 
 > 2026-05-29 추가 업데이트: T2 금융소득종합과세/분할매도 패널 테스트 중 `Object of type bool is not JSON serializable` 오류 수정. 원인은 `split_sale_plan.over_threshold`가 `numpy.bool_`로 반환된 것. `bool(...)` 캐스팅 후 서버 배포 및 `/api/backtest/submit` 458730 과세 ON 검증 PASS(`split_sale_plan` 반환).
 
+> 2026-05-29 추가 업데이트 2: 분할매도 `최적 연수` 기준은 1~20년 균등분할 중 총 세금 최소 연수로 확정. 백테스트가 기존 금융소득(`other_financial_income`)도 반영하도록 수정하고, 세금 설정/백테스트 패널에 기존 연간 금융소득 입력 추가. 분할매도 패널에 일괄/분할/최적 세후 이익 표시. 서버 검증 PASS.
+
 # 현재 개발 상태
 
 **에이전트: 코드 작업 완료 후 이 파일 반드시 업데이트.**

@@ -1,5 +1,24 @@
 # Log
 
+## [2026-05-29] feature/fix | 분할매도 최적연수 기준 명확화 + 세후금액/기존 금융소득 반영
+
+- 사용자 질문: 분할매도 패널의 `최적 연수` 기준, 근로소득/금융소득 반영 여부, 세후 금액 표시 필요.
+- 현재 기준 확인: `optimal_years`는 1~20년 균등분할 시나리오의 총 세금(`plan_by_year`)이 최소인 연수. 동률이면 가장 먼저 나온 작은 연수가 선택됨.
+- 기존 상태: 근로/사업소득(`earned_income`)은 종합과세 누진세 계산에 반영되고 있었으나, 백테스트에서 기존 금융소득(`other_financial_income`)은 `0.0`으로 고정되어 있었다.
+- 수정:
+  - `backtest_logic.py`: `user_settings.other_financial_income`을 `compute_split_sale_plan()`에 전달.
+  - `split_sale_planner.py`: `gain`, `lump_sum_after_tax`, `split_after_tax`, `optimal_after_tax`, `after_tax_by_year`, 입력 소득값(`earned_income`, `other_financial_income`) 반환.
+  - `templates/tax_settings.html`: 세금 설정에 `기존 연간 금융소득` 입력/저장/요약 추가.
+  - `templates/backtest.html`: 세금 ON 시 저장된 세금 설정을 로드하고, 백테스트 세금 패널에 `기존 연간 금융소득` 입력 추가. 분할매도 패널에 일괄/분할 세후 이익과 최적 세후 이익 표시.
+- 검증:
+  - 로컬 단위: 같은 1억 KR_FOREIGN 이익에서 소득 0/0 vs 근로 5천만+금융 1,500만의 일괄세금/최적연수가 달라짐. JSON 직렬화 통과.
+  - 서버 배포: 커밋 `c519620`, `git fetch origin main && git merge --ff-only origin/main`, `systemctl restart domino domino-celery`.
+  - 서버 `/api/backtest/submit`: 458730, 과세 ON, 위탁, 근로소득 5천만, 기존 금융소득 1,500만 검증 PASS. `split_sale_plan`에 `lump_sum_after_tax=664,301,962`, `split_after_tax=746,736,130`, `optimal_after_tax=855,433,488` 반환 확인.
+
+_작성: Codex_
+
+---
+
 ## [2026-05-29] bugfix | T2 split_sale_plan JSON 직렬화 오류 수정
 
 - 증상: T2 금융소득종합과세/분할매도 패널 테스트 중 백테스트가 `TypeError('Object of type bool is not JSON serializable')`로 실패.

@@ -84,6 +84,7 @@ class TickerStatsCache:
             (code,)
         ).fetchall()
 
+        rows = [(r[0], r[1]) for r in rows if r[1] is not None]
         if not rows or len(rows) < TRADING_DAYS_PER_MONTH * 12:
             return None
 

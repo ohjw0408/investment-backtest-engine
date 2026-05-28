@@ -181,7 +181,7 @@ class DataPreparer:
                                     "SELECT close FROM price_daily WHERE code=? AND date>=? ORDER BY date LIMIT 1",
                                     (_code, _actual_start)
                                 ).fetchone()
-                                _anchor_price = float(_ap_row[0]) if _ap_row else None
+                                _anchor_price = float(_ap_row[0]) if (_ap_row and _ap_row[0] is not None) else None
                             _stats = self.stats_cache.get_or_compute(_code)
                             synthetic_info[_code] = {
                                 "date_from":     _row[0],
@@ -280,7 +280,7 @@ class DataPreparer:
                 "SELECT close FROM price_daily WHERE code=? AND date>=? ORDER BY date LIMIT 1",
                 (code, actual_start)
             ).fetchone()
-            _anchor_price = float(_ap_row[0]) if _ap_row else None
+            _anchor_price = float(_ap_row[0]) if (_ap_row and _ap_row[0] is not None) else None
 
             gen_result   = generate_and_save(
                 code          = code,

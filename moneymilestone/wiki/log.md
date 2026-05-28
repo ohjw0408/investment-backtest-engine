@@ -1,5 +1,22 @@
 # Log
 
+## [2026-05-29] ops/bugfix | 479080 T1 float(None) 재현 원인 확인 및 서버 worker 정리
+
+- 증상: 투자 계산기 T1 검증 중 479080(머니마켓/CD 계열 ETF) + 가상 데이터 ON 실행 시 프런트에 `float() argument must be a string or a real number, not 'NoneType'` 표시.
+- 서버 로그 위치: `tasks.run_simulation_task -> calculator_logic.run_calculator_logic -> prepare_scenario_data -> DataPreparer.prepare -> TickerStatsCache.get_or_compute`.
+- 서버 DB 확인: `price_daily`의 479080 실제 가격은 2024-04-02~2026-05-27 518행, 그중 2025-11-13 row는 배당 이벤트만 있고 `open/high/low/close=NULL`, `volume=0`, `corporate_actions.dividend=455`.
+- 현재 배포 코드(`ff43956`)의 `TickerStatsCache`에는 NULL close 필터가 이미 있어 단독 `get_or_compute('479080')`는 정상 성공. 이후 stats cache 생성됨.
+- 추가 원인: 서버에 Celery worker가 두 벌 떠 있었음. systemd worker 외에 과거 수동 실행 worker가 큐를 같이 소비해 stale worker가 작업을 잡을 수 있는 상태였다.
+- 조치: 수동 Celery worker(PID 67797 계열) 종료. systemd `domino-celery` worker와 `domino-celery-beat`만 active 상태로 정리.
+- 검증:
+  - `DataPreparer.prepare(['479080'], sim_years=20, allow_synthetic=True)` 정상: `n_cases=61`, `used_synthetic=True`, `anchor_price=50020.0`.
+  - 실제 프런트와 동일한 `/api/calculator/submit` 경로로 479080 20년 synthetic ON 실행 성공: `status=SUCCESS`, `cases_count=61`, `used_synthetic=True`, `synthetic_info.479080` 생성.
+- 부작용/상태: 검증 과정에서 서버 DB에 479080 synthetic rows 8,570개(1991-05-28~2024-04-01)와 `ticker_return_stats` cache가 생성됨. 이는 T1 검증용 정상 데이터.
+
+_작성: Codex_
+
+---
+
 ## [2026-05-28] bugfix | 가상 데이터 시뮬 2차 — 배너·2007이상치·float크래시 수정
 
 - **버그 1**: `used_synthetic` 배너 미표시

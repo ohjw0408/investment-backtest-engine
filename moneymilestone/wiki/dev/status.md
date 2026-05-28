@@ -1,7 +1,9 @@
 ---
-updated: 2026-05-28
+updated: 2026-05-29
 tags: [dev]
 ---
+
+> 2026-05-29 업데이트: T1 검증 중 479080(머니마켓/CD ETF) `float(None)` 오류를 서버에서 확인. 479080에는 2025-11-13 배당 이벤트 row의 `close=NULL`이 있으나 현재 코드의 NULL 필터는 정상 동작함. 실제 운영 리스크는 systemd worker 외 수동 Celery worker가 함께 떠서 stale worker가 큐를 소비할 수 있던 상태였음. 수동 worker 종료 후 `/api/calculator/submit` 479080 synthetic ON 검증 PASS(`cases_count=61`, `used_synthetic=True`).
 
 # 현재 개발 상태
 

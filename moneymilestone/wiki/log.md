@@ -1,5 +1,23 @@
 # Log
 
+## [2026-05-28] decision | 가격 데이터 저장 정책 문서화
+
+- 사용자 질문: 즐겨찾기/검색/계산 종목을 전부 서버에 쌓으면 용량이 터질 수 있는데, 데이터를 사용자 폰/컴퓨터에 저장하는 발상 전환이 맞는지 검토.
+- 결론: 서버 DB가 canonical price history를 유지한다. 클라이언트 IndexedDB/모바일 SQLite는 나중에 chart/search UX cache로만 사용한다.
+- 이유:
+  - 서버가 시뮬레이션 입력, API 키 보안, actual/backfilled/synthetic provenance, confidence, 재생성/삭제 정책을 책임져야 함.
+  - 클라이언트는 기기 변경/캐시 삭제/다중 기기/stale 데이터 위험이 있어 정본 저장소로 부적합.
+  - 서버 용량 문제는 `price_cache_meta` + core/protected/user_requested/generated/transient 등급 + dry-run cleanup으로 관리 가능.
+- 문서 반영:
+  - `ETF_BACKFILL_ARCHITECTURE_PLAN.md`: `Price Cache Metadata`, `Price Data Retention And Client Cache Policy` 추가.
+  - `PHASE4_PLAN.md`: E4 `서버 가격 데이터 보존 정책 (core + user-requested TTL/LRU)` 추가.
+  - `PROJECT_MASTER_ROADMAP.md`: `Data Storage Policy Decision` 및 Do Not Do Yet 보강.
+  - `wiki/dev/status.md`, `wiki/dev/ideas.md` 최신화.
+- 구현 순서 메모: 먼저 diagnostics → `price_cache_meta` → core registry → access tracking → protected resolver → dry-run cleanup → 제한적 cleanup → 이후 client UX cache.
+- 작성: Codex
+
+---
+
 연대순 기록. Append-only. 삭제하지 말 것.
 
 ---

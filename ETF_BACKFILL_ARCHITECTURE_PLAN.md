@@ -222,6 +222,39 @@ confidence TEXT
 PRIMARY KEY (code, date, action_type)
 ```
 
+### 6. Price Cache Metadata
+
+Suggested table: `price_cache_meta`
+
+This table is not a replacement for `price_daily_source`. It tracks why a code exists on the server and whether it may be deleted by a storage cleanup job.
+
+```text
+code TEXT PRIMARY KEY
+cache_class TEXT              -- core_permanent, protected_user_asset, user_requested_cache, generated_history, transient_quote
+first_cached_at TEXT
+last_accessed_at TEXT
+access_count INTEGER DEFAULT 0
+protected_reason TEXT         -- core_registry, holding, saved_portfolio, home_watchlist, favorite, active_preset, null
+last_full_refresh_at TEXT
+last_actual_date TEXT
+storage_notes TEXT
+```
+
+Optional table: `price_cache_refs`
+
+Use this only if deriving references from existing user tables becomes too slow or ambiguous.
+
+```text
+code TEXT
+ref_type TEXT                 -- holding, saved_portfolio, watchlist, favorite, active_preset
+ref_id TEXT
+user_id INTEGER
+created_at TEXT
+PRIMARY KEY (code, ref_type, ref_id, user_id)
+```
+
+The protected set may also be derived directly from `holdings`, `saved_portfolios`, home watchlists, and active calculation presets. Do not duplicate reference state unless a cleanup report needs it.
+
 ## Data Sources
 
 ### U.S. ETF Universe
@@ -1064,6 +1097,121 @@ Keep small expected outputs for:
 - KODEX/TIGER KOSPI200 proxy alignment.
 - Nasdaq100 Korean wrapper alignment.
 
+## Price Data Retention And Client Cache Policy
+
+This section records the storage decision made on 2026-05-28 after discussing whether price data should live on the server, user phones/computers, or both.
+
+### Decision
+
+The server remains the canonical price-history store.
+
+Client-side storage may be added later as an edge cache for faster chart/search UX, but it must not become the authoritative historical database. The server still owns simulation inputs, provenance, API-key safety, refresh policy, and generated/backfilled history.
+
+Why:
+
+- Simulations run on the server and need one consistent view of actual, backfilled, and synthetic rows.
+- API keys must stay server-side.
+- Provenance, confidence grade, and regeneration/deletion by `run_id` are server responsibilities.
+- Client devices are unreliable for canonical history: users change phones, clear browser storage, use multiple devices, and may have stale local data.
+- Server-side retention can be bounded with a small metadata table and cleanup policy before storage becomes a real problem.
+
+### Cache Classes
+
+Use these classes consistently in `price_cache_meta.cache_class`.
+
+| Class | Meaning | Automatic deletion |
+|---|---|---:|
+| `core_permanent` | Product-critical data: market indices, FX, KRX gold, core benchmark ETFs/stocks, examples used by the app, and manually curated high-demand symbols | No |
+| `protected_user_asset` | Codes referenced by holdings, saved portfolios, home watchlists, favorites, or active saved calculation presets | No while referenced |
+| `user_requested_cache` | Codes fetched because a user searched, opened a symbol page, ran a backtest/calculator, or temporarily inspected a product | Yes after inactivity |
+| `generated_history` | Backfilled or synthetic rows whose deletion must be controlled by provenance, model version, confidence, or `run_id` | Not by blunt TTL |
+| `transient_quote` | Redis/in-memory current quote cache, intraday chart snippets, or temporary API responses | Yes by short TTL |
+
+Core permanent examples should include at least:
+
+- Major indices and rates: `^GSPC`, `^IXIC`, `^KS11`, `KQ150`, `USD/KRW`, major FRED/ECOS rate series used by simulations.
+- KRX gold: `KRX_GOLD`.
+- Core U.S. ETFs: `SPY`, `VOO`, `IVV`, `QQQ`, `QQQM`, `VTI`, `SCHD`, `TLT`, `IEF`, `SHY`, `GLD`.
+- Core Korean benchmark ETF families used by the app or examples, including KOSPI200, KOSDAQ150, U.S. S&P500, Nasdaq100, and U.S. Dividend Dow Jones wrappers.
+
+### User-Requested Retention
+
+Default retention target:
+
+- Keep `user_requested_cache` for 180 days after `last_accessed_at`.
+- Under storage pressure, allow a 90-day inactive threshold, but only after a dry-run report.
+- Increment `access_count` and update `last_accessed_at` when a code is used by search, symbol detail, calculator, backtest, my-assets, watchlist, or portfolio workflows.
+
+Automatic cleanup candidates:
+
+1. `cache_class = user_requested_cache`
+2. `last_accessed_at < now - retention_window`
+3. not in the core registry
+4. not referenced by holdings, saved portfolios, home watchlists, favorites, or active presets
+5. no active backfill/synthetic provenance dependency that would make deletion ambiguous
+
+Cleanup must delete related rows coherently:
+
+- `price_daily`
+- corporate actions / dividend rows for that code where safe
+- ticker statistics cache rows
+- generated provenance rows only when their `run_id` or model ownership is clear
+
+Do not delete index data from `index_master.db` through the user-requested cleanup job. Indexes, FX, rates, and KRX gold follow the core data refresh policy, not user cache eviction.
+
+### Generated And Backfilled Rows
+
+Do not use simple inactivity TTL for generated/backfilled history.
+
+Rules:
+
+- Actual rows may be evicted only by code-level cache policy and only when the code is not protected.
+- Generated rows must be removable by `run_id`, `model_version`, `source_type`, or confidence grade.
+- A code may contain both actual and generated rows; deletion tools must preserve actual rows unless the whole unprotected code cache is intentionally evicted.
+- Synthetic rows remain D-grade unless a later model explicitly promotes confidence through validation.
+- `TickerStatsCache` should eventually exclude generated rows using `price_daily_source`.
+
+### Client-Side Cache Scope
+
+Client storage is allowed only as a UX cache.
+
+Allowed:
+
+- Browser IndexedDB or mobile SQLite cache for chart API responses, symbol lookup results, and recently viewed market summaries.
+- Cache entries versioned with `code`, `date_range`, `as_of`, `source`, `last_date`, and server response version.
+- Server-first refresh when the client cache is stale or when the user runs a calculation.
+
+Forbidden:
+
+- Storing external API keys on client devices.
+- Treating client-cached history as canonical simulation input.
+- Letting one user's device become the only source of a price history.
+- Hiding whether data came from actual, backfilled, or synthetic rows.
+
+### Implementation Order
+
+1. Add diagnostics first:
+   - DB size by table.
+   - row count by code.
+   - date range by code.
+   - estimated cache class if metadata does not exist yet.
+   - symbols referenced by holdings, saved portfolios, home watchlists, favorites, and active presets.
+2. Add `price_cache_meta`.
+3. Define a small core registry and seed `core_permanent` rows.
+4. Mark access in `PriceLoader.get_price()`, symbol detail, search, calculator, backtest, and my-assets routes.
+5. Add a protected-code resolver that derives current references from user data.
+6. Add a dry-run cleanup command that prints candidate codes, rows, date ranges, and estimated freed space.
+7. After at least one reviewed dry run, add limited-batch cleanup.
+8. Only after server policy is stable, add client IndexedDB chart/search cache.
+
+### First Cleanup Guardrails
+
+- First implementation must be dry-run only.
+- No automatic deletion of `core_permanent` or currently protected symbols.
+- No automatic deletion of `generated_history` without provenance-based targeting.
+- No cleanup job should run while a full refresh/backfill job is active for the same code.
+- Log every deletion candidate and final deletion count.
+
 ## Operational Rules
 
 - Backfill must be idempotent by model version.
@@ -1072,6 +1220,10 @@ Keep small expected outputs for:
 - Backfill must not turn low-confidence data into high-confidence simulation output.
 - Backfill must be explainable in the UI/API.
 - Any automated mapping from name or category should default to `needs_review`.
+- Server price history is canonical; client-side storage is a UX cache only.
+- API keys must never be moved to client devices.
+- User-requested symbol history may be evicted only after metadata, protected-reference checks, and a dry-run cleanup report exist.
+- Core indices, FX, KRX gold, and manually curated benchmark ETFs must not be evicted by the user-requested cache cleanup job.
 
 ## Codex Review Notes: Automation Risks and Practical Rollout
 

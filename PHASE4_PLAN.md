@@ -802,6 +802,48 @@ UI:
 
 ---
 
+### E4. 서버 가격 데이터 보존 정책 (core + user-requested TTL/LRU)
+
+**결정 (2026-05-28):**
+- 가격 히스토리의 정본은 서버 DB에 둔다.
+- 사용자 폰/컴퓨터의 IndexedDB 또는 모바일 SQLite는 나중에 차트/검색 UX 캐시로만 쓴다.
+- API 키, 백필/합성 provenance, 시뮬레이션 입력 정합성은 서버 책임이다.
+
+**문제 의식:**
+- 사용자가 검색하거나 계산한 모든 종목/지수를 영구 저장하면 서버 용량이 장기적으로 무한히 늘 수 있다.
+- 반대로 데이터를 전부 클라이언트에 저장하면 기기 변경, 브라우저 캐시 삭제, 다중 기기, stale 데이터 때문에 시뮬레이션 정합성이 깨진다.
+- 따라서 서버 정본 + 서버 TTL/LRU + 선택적 클라이언트 UX 캐시가 목표 구조다.
+
+**데이터 등급:**
+- `core_permanent`: 지수, FX, KRX_GOLD, 핵심 벤치마크 ETF/주식, 앱 예시 종목. 자동 삭제 금지.
+- `protected_user_asset`: 보유자산, 저장 포트폴리오, 홈 watchlist, 즐겨찾기, 활성 프리셋이 참조하는 종목. 참조 중 자동 삭제 금지.
+- `user_requested_cache`: 검색, 종목상세, 계산기, 백테스트, myassets 진입으로 임시 fetch된 종목. 마지막 접근 후 기본 180일 보존, 용량 압박 시 dry-run 검토 후 90일 가능.
+- `generated_history`: 백필/합성 데이터. 단순 TTL 삭제 금지. `run_id`, `model_version`, `source_type`, confidence 기반으로만 정리.
+- `transient_quote`: Redis/in-memory 현재가/장중 캐시. 분~시간 단위 TTL.
+
+**구현 범위:**
+- `price_cache_meta` 테이블 추가: `code`, `cache_class`, `first_cached_at`, `last_accessed_at`, `access_count`, `protected_reason`, `last_full_refresh_at`, `last_actual_date`, `storage_notes`.
+- core registry 추가: 최소 `^GSPC`, `^IXIC`, `^KS11`, `KQ150`, USD/KRW, KRX_GOLD, SPY/VOO/IVV/QQQ/SCHD/TLT/GLD, 주요 한국 S&P500/Nasdaq100/배당/금 ETF군.
+- 접근 기록 갱신 위치: `PriceLoader.get_price()`, search, symbol detail, calculator, backtest, myassets, watchlist/portfolio 저장 API.
+- protected resolver: holdings, saved_portfolios, home_watchlist, favorites, active presets에서 현재 보호 종목 산출.
+- cleanup command: 첫 버전은 dry-run only. 후보 code, row count, date range, 예상 절감 용량, 보호 사유를 출력.
+
+**삭제 규칙:**
+1. `user_requested_cache`이고 마지막 접근이 retention window 밖인 code만 후보.
+2. core registry 또는 protected resolver에 잡히면 제외.
+3. `index_master.db`의 지수/FX/금 데이터는 이 cleanup job에서 삭제하지 않는다.
+4. 백필/합성 row는 provenance 없이 삭제하지 않는다.
+5. 같은 code에 full refresh/backfill 작업이 실행 중이면 삭제하지 않는다.
+
+**클라이언트 캐시 규칙:**
+- 허용: 최근 차트 응답, 종목 검색 결과, market summary를 `as_of`, `last_date`, `source`, response version과 함께 캐시.
+- 금지: API 키 저장, 클라이언트 캐시를 시뮬레이션 정본으로 사용, actual/backfilled/synthetic 구분 숨김.
+
+**선행 조건:** `ETF_BACKFILL_ARCHITECTURE_PLAN.md`의 `Price Data Retention And Client Cache Policy`를 먼저 읽고 구현.
+**난이도:** 중간 (진단/메타데이터/드라이런까지 1~2일, 실제 cleanup 자동화는 별도 검증 후)
+
+---
+
 ### E2. 코드 속도 최적화
 
 **현재 병목 분석 필요 항목:**
@@ -886,6 +928,7 @@ UI:
   E1 모바일 반응형            (5~7일)
   E2 코드 최적화              (프로파일링 후 결정)
   E3 캐시 TTL+LRU             (0.5~1일, 트래픽 늘면 우선순위 올릴 것)
+  E4 서버 가격 데이터 보존 정책 (1~2일 dry-run 먼저, 용량 정책 필요 시 우선)
   D6 합성 데이터 백테스트     (1~2일, 수요 확인 후)
   한국 ETF 실보수             (데이터 전략 결정 후)
 ```

@@ -1,6 +1,6 @@
 # Project Master Roadmap
 
-Last updated: 2026-05-24
+Last updated: 2026-05-28
 
 ## Purpose
 
@@ -12,9 +12,9 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 
 | File | Role | Status |
 |---|---|---|
-| `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea | Partially completed |
+| `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed |
 | `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 2c implemented, Gate blocked by data/backfill issue |
-| `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill and data provenance architecture | New architecture plan, not implemented |
+| `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | New architecture plan, not implemented |
 | `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | New integration plan, not implemented |
 
 ## Current Situation
@@ -54,6 +54,29 @@ Instead:
 2. Use this master roadmap to coordinate priority and dependencies.
 3. Update this file when a track changes status or the next action changes.
 4. Update the owning detailed plan when implementing work inside that domain.
+
+## Data Storage Policy Decision
+
+Decision recorded on 2026-05-28:
+
+- Server-side price history remains canonical.
+- Client-side storage may be added later only as a UX edge cache for charts, search, and recently viewed market summaries.
+- Do not move API keys, canonical historical prices, backfill provenance, or synthetic-data confidence decisions to user devices.
+- Long-term server storage should be bounded by a metadata-driven retention policy:
+  - `core_permanent`: indices, FX, KRX gold, core benchmark ETFs/stocks, app examples.
+  - `protected_user_asset`: holdings, saved portfolios, home watchlists, favorites, active presets.
+  - `user_requested_cache`: search/detail/calculator/backtest/myassets fetches, kept by last access and evicted only after dry-run review.
+  - `generated_history`: backfilled/synthetic rows, deleted only through provenance such as `run_id`, `model_version`, `source_type`, or confidence.
+  - `transient_quote`: Redis/in-memory quote cache with short TTL.
+
+Owner plans:
+
+- Full architecture and deletion guardrails: `ETF_BACKFILL_ARCHITECTURE_PLAN.md` → `Price Data Retention And Client Cache Policy`.
+- Product/infrastructure task: `PHASE4_PLAN.md` → `E4. 서버 가격 데이터 보존 정책`.
+
+Implementation rule:
+
+Do not implement client-canonical storage. First implement server diagnostics, `price_cache_meta`, protected-code resolution, and dry-run cleanup. Add client IndexedDB/mobile cache only after the server policy is stable.
 
 ## Dependency Order
 
@@ -239,6 +262,8 @@ Do not do these until the immediate blocker is resolved:
 - Do not implement full U.S. ETF universe ingestion yet.
 - Do not rewrite all synthetic logic in one pass.
 - Do not delete legacy `volume = 0` rows without a migration/provenance plan.
+- Do not make client devices the canonical price-history store. Client storage is allowed only as a cache after server retention metadata and dry-run cleanup exist.
+- Do not add automatic server price-history deletion before `price_cache_meta`, protected-code resolution, and a reviewed dry-run report exist.
 - Do not continue tax Phase 2d assuming Phase 2c Gate is clean.
 - Do not treat synthetic data as factual historical data in UI.
 

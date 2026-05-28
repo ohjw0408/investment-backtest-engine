@@ -27,6 +27,17 @@ tags: [dev]
 
 ---
 
+## 최근 완료된 작업 (Codex 세션 2026-05-28 가격 데이터 저장 정책 문서화)
+
+- ✅ 모든 계획 파일 확인: `PROJECT_MASTER_ROADMAP.md`, `PHASE1_PLAN.md`, `PHASE3_PLAN.md`, `PHASE4_PLAN.md`, `ETF_BACKFILL_ARCHITECTURE_PLAN.md`, `SYNTHETIC_DATA_INTEGRATION_PLAN.md`, `세금에서시작된완전리팩토링계획.plan.md`
+- ✅ 결정 기록: 가격 히스토리 정본은 서버 DB, 클라이언트 IndexedDB/모바일 SQLite는 나중에 UX 캐시로만 사용
+- ✅ `ETF_BACKFILL_ARCHITECTURE_PLAN.md`: `Price Cache Metadata`, `Price Data Retention And Client Cache Policy` 추가
+- ✅ `PHASE4_PLAN.md`: E4 `서버 가격 데이터 보존 정책 (core + user-requested TTL/LRU)` 추가
+- ✅ `PROJECT_MASTER_ROADMAP.md`: `Data Storage Policy Decision` 추가 및 금지사항 보강
+- 핵심 원칙: `core_permanent`/`protected_user_asset`는 자동 삭제 금지, `user_requested_cache`는 180일 기본 보존 후 dry-run 검토, `generated_history`는 provenance 기반으로만 정리
+
+---
+
 ## 최근 완료된 작업 (Claude 세션 2026-05-28 ETF_BACKFILL Phase 2)
 
 - ✅ modules/provenance.py 신규 생성

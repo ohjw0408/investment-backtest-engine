@@ -33,6 +33,7 @@ class AccumulationAnalyzer:
         gain_harvesting:      bool          = False,
         progress_callback                   = None,
         use_synthetic:          bool        = False,
+        synthetic_params:       dict        = None,
     ):
         self.portfolio_engine      = portfolio_engine
         self.tickers               = tickers
@@ -52,6 +53,8 @@ class AccumulationAnalyzer:
         self.gain_harvesting       = gain_harvesting and account_type == "위탁"
         self.progress_callback     = progress_callback
         self.use_synthetic         = use_synthetic
+        # code -> {mu_monthly, sigma_monthly, actual_start, anchor_price}
+        self.synthetic_params      = synthetic_params or {}
 
     def _estimate_total_cases(self) -> int:
         cur = self.data_start
@@ -130,12 +133,15 @@ class AccumulationAnalyzer:
             else:
                 _early = None
                 try:
-                    price_data, dates = self.portfolio_engine.price_loader.load(
-                        self.tickers,
-                        cur.strftime("%Y-%m-%d"),
-                        end.strftime("%Y-%m-%d"),
-                        allow_synthetic=self.use_synthetic,
-                    )
+                    if self.use_synthetic and self.synthetic_params:
+                        price_data, dates = self._load_with_per_window_synthetic(cur, end)
+                    else:
+                        price_data, dates = self.portfolio_engine.price_loader.load(
+                            self.tickers,
+                            cur.strftime("%Y-%m-%d"),
+                            end.strftime("%Y-%m-%d"),
+                            allow_synthetic=self.use_synthetic,
+                        )
                 except Exception:
                     cur    += relativedelta(months=self.step_months)
                     run_id += 1
@@ -245,12 +251,15 @@ class AccumulationAnalyzer:
 
             strategy = self.strategy_factory()
             try:
-                price_data, dates = self.portfolio_engine.price_loader.load(
-                    self.tickers,
-                    current_start.strftime("%Y-%m-%d"),
-                    cycle_end.strftime("%Y-%m-%d"),
-                    allow_synthetic=self.use_synthetic,
-                )
+                if self.use_synthetic and self.synthetic_params:
+                    price_data, dates = self._load_with_per_window_synthetic(current_start, cycle_end)
+                else:
+                    price_data, dates = self.portfolio_engine.price_loader.load(
+                        self.tickers,
+                        current_start.strftime("%Y-%m-%d"),
+                        cycle_end.strftime("%Y-%m-%d"),
+                        allow_synthetic=self.use_synthetic,
+                    )
                 config = SimulationConfig(
                     start_date           = current_start.strftime("%Y-%m-%d"),
                     end_date             = cycle_end.strftime("%Y-%m-%d"),
@@ -294,12 +303,15 @@ class AccumulationAnalyzer:
         if current_start < rem_end:
             strategy = self.strategy_factory()
             try:
-                price_data, dates = self.portfolio_engine.price_loader.load(
-                    self.tickers,
-                    current_start.strftime("%Y-%m-%d"),
-                    rem_end.strftime("%Y-%m-%d"),
-                    allow_synthetic=self.use_synthetic,
-                )
+                if self.use_synthetic and self.synthetic_params:
+                    price_data, dates = self._load_with_per_window_synthetic(current_start, rem_end)
+                else:
+                    price_data, dates = self.portfolio_engine.price_loader.load(
+                        self.tickers,
+                        current_start.strftime("%Y-%m-%d"),
+                        rem_end.strftime("%Y-%m-%d"),
+                        allow_synthetic=self.use_synthetic,
+                    )
                 config = SimulationConfig(
                     start_date           = current_start.strftime("%Y-%m-%d"),
                     end_date             = rem_end.strftime("%Y-%m-%d"),
@@ -342,6 +354,123 @@ class AccumulationAnalyzer:
                 pass
 
         return end_value_maturity, end_value_early_cancel
+
+    def _load_with_per_window_synthetic(
+        self, window_start: pd.Timestamp, window_end: pd.Timestamp
+    ) -> tuple:
+        """Per-window independent GBM paths — avoids single-path slice artifact."""
+        import numpy as np
+        from modules.retirement.synthetic_price_generator import (
+            SYNTHETIC_DF, T_SCALE, TRADING_DAYS_PER_MONTH,
+        )
+
+        raw_loader = self.portfolio_engine.price_loader.loader
+        combined: dict = {}
+        all_dates_set: set = set()
+
+        for code in self.tickers:
+            params = self.synthetic_params.get(code)
+            window_start_str = window_start.strftime("%Y-%m-%d")
+            window_end_str   = window_end.strftime("%Y-%m-%d")
+
+            if (
+                params is None
+                or params.get("mu_monthly") is None
+                or params.get("anchor_price") is None
+                or params.get("actual_start") is None
+            ):
+                # No synthetic params: load real (or DB synthetic) data
+                df = raw_loader.get_price(code, window_start_str, window_end_str,
+                                          allow_synthetic=bool(params))
+                df["date"] = pd.to_datetime(df["date"])
+                df = df.set_index("date")
+                combined[code] = df
+                all_dates_set.update(df.index)
+                continue
+
+            actual_start_str = params["actual_start"]
+            actual_start_dt  = pd.Timestamp(actual_start_str)
+            mu_monthly       = float(params["mu_monthly"])
+            sigma_monthly    = float(params["sigma_monthly"])
+            anchor_price     = float(params["anchor_price"])
+
+            if window_start >= actual_start_dt:
+                # Window fully in real range
+                df = raw_loader.get_price(code, window_start_str, window_end_str,
+                                          allow_synthetic=False)
+                df["date"] = pd.to_datetime(df["date"])
+                df = df.set_index("date")
+                combined[code] = df
+                all_dates_set.update(df.index)
+                continue
+
+            # Need synthetic prefix: [window_start, min(actual_start-1, window_end)]
+            synth_end_dt = min(actual_start_dt - pd.Timedelta(days=1), window_end)
+            bdays = pd.bdate_range(start=window_start, end=synth_end_dt)
+
+            if len(bdays) > 0:
+                seed   = abs(hash(code + window_start_str)) % (2 ** 31)
+                n      = len(bdays)
+                mu_d   = mu_monthly / TRADING_DAYS_PER_MONTH
+                sig_d  = sigma_monthly / np.sqrt(TRADING_DAYS_PER_MONTH)
+                rng    = np.random.default_rng(seed=seed)
+                raw    = rng.standard_t(df=SYNTHETIC_DF, size=n)
+                rets   = (raw / T_SCALE) * sig_d + mu_d
+                prices = np.empty(n)
+                prices[-1] = anchor_price / (1.0 + rets[-1])
+                for i in range(n - 2, -1, -1):
+                    prices[i] = prices[i + 1] / (1.0 + rets[i])
+                    if prices[i] <= 0:
+                        prices[i] = prices[i + 1] * 0.99
+                synth_df = pd.DataFrame(
+                    {"open": prices, "high": prices, "low": prices,
+                     "close": prices, "volume": np.zeros(n),
+                     "dividend": np.zeros(n), "split": np.ones(n)},
+                    index=pd.DatetimeIndex(bdays),
+                )
+                synth_df.index.name = "date"
+            else:
+                synth_df = None
+
+            if window_end >= actual_start_dt:
+                real_df = raw_loader.get_price(code, actual_start_str, window_end_str,
+                                               allow_synthetic=False)
+                real_df["date"] = pd.to_datetime(real_df["date"])
+                real_df = real_df.set_index("date")
+                for col in ["open", "high", "low", "close", "volume", "dividend", "split"]:
+                    if col not in real_df.columns:
+                        real_df[col] = 0.0 if col != "split" else 1.0
+                if synth_df is not None and not synth_df.empty:
+                    df = pd.concat([synth_df, real_df], axis=0)
+                    df = df[~df.index.duplicated(keep="last")].sort_index()
+                else:
+                    df = real_df
+            else:
+                df = synth_df if synth_df is not None else pd.DataFrame()
+
+            if df is not None and not df.empty:
+                combined[code] = df
+                all_dates_set.update(df.index)
+
+        if not combined:
+            return {}, []
+
+        dates      = sorted(all_dates_set)
+        full_index = pd.DatetimeIndex(dates)
+        for code in self.tickers:
+            if code not in combined:
+                continue
+            df = combined[code].reindex(full_index)
+            df[["open", "high", "low", "close", "volume"]] = (
+                df[["open", "high", "low", "close", "volume"]].ffill()
+            )
+            if "dividend" in df.columns:
+                df["dividend"] = df["dividend"].fillna(0)
+            if "split" in df.columns:
+                df["split"] = df["split"].fillna(1)
+            combined[code] = df
+
+        return combined, dates
 
     def _calc_metrics(self, history: pd.DataFrame, years: int) -> dict:
         pv = history["portfolio_value"]

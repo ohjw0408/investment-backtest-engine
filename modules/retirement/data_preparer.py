@@ -170,9 +170,28 @@ class DataPreparer:
                                 "SELECT MIN(date), MAX(date), COUNT(*) FROM price_daily_synthetic WHERE code=?",
                                 (_code,)
                             ).fetchone()
+                            # actual_start, anchor_price, mu/sigma for per-window generation
+                            _real_row = self.price_conn.execute(
+                                "SELECT MIN(date) FROM price_daily WHERE code=?", (_code,)
+                            ).fetchone()
+                            _actual_start = _real_row[0] if _real_row and _real_row[0] else None
+                            _anchor_price = None
+                            if _actual_start:
+                                _ap_row = self.price_conn.execute(
+                                    "SELECT close FROM price_daily WHERE code=? AND date>=? ORDER BY date LIMIT 1",
+                                    (_code, _actual_start)
+                                ).fetchone()
+                                _anchor_price = float(_ap_row[0]) if _ap_row else None
+                            _stats = self.stats_cache.get_or_compute(_code)
                             synthetic_info[_code] = {
-                                "date_from": _row[0], "date_to": _row[1],
-                                "rows_added": _row[2], "source": "pre-existing",
+                                "date_from":     _row[0],
+                                "date_to":       _row[1],
+                                "rows_added":    _row[2],
+                                "source":        "pre-existing",
+                                "actual_start":  _actual_start,
+                                "anchor_price":  _anchor_price,
+                                "mu_monthly":    _stats["mu_monthly"] if _stats else None,
+                                "sigma_monthly": _stats["sigma_monthly"] if _stats else None,
                             }
                 except Exception:
                     pass
@@ -256,6 +275,13 @@ class DataPreparer:
             _target_start = max(_min_target, USD_KRW_START)
 
             actual_start = current_start or stats["data_start"]
+            # anchor price for per-window generation
+            _ap_row = self.price_conn.execute(
+                "SELECT close FROM price_daily WHERE code=? AND date>=? ORDER BY date LIMIT 1",
+                (code, actual_start)
+            ).fetchone()
+            _anchor_price = float(_ap_row[0]) if _ap_row else None
+
             gen_result   = generate_and_save(
                 code          = code,
                 mu_monthly    = stats["mu_monthly"],
@@ -345,6 +371,8 @@ class DataPreparer:
                 synthetic_info[code] = {
                     "mu_monthly":    stats["mu_monthly"],
                     "sigma_monthly": stats["sigma_monthly"],
+                    "actual_start":  actual_start,
+                    "anchor_price":  _anchor_price,
                     "rows_added":    gen_result["rows"],
                     "div_rows":      div_rows,
                     "date_from":     gen_result["date_from"],

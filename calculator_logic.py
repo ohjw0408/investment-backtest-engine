@@ -165,6 +165,7 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
         gain_harvesting      = gain_harvesting,
         progress_callback    = progress_callback,
         use_synthetic        = use_synthetic,
+        synthetic_params     = _prep_meta.get("synthetic_info", {}) if use_synthetic else {},
     )
 
     result = analyzer.run()

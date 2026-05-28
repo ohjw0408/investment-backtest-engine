@@ -138,6 +138,7 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
         gain_harvesting      = gain_harvesting,
         progress_callback    = acc_progress,
         use_synthetic        = use_synthetic,
+        synthetic_params     = synthetic_info if use_synthetic else {},
     )
     acc_result = acc_analyzer.run()
 

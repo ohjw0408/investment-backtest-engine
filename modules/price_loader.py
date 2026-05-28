@@ -336,12 +336,29 @@ class PriceLoader:
         end_date   = datetime.strptime(end_date,   "%Y-%m-%d").date()
 
         # ── 캐시 체크 ────────────────────────────────────────
-        cache_key = f"{code}_{start_date}_{end_date}_{apply_fx}"
+        cache_key = f"{code}_{start_date}_{end_date}_{apply_fx}_{allow_synthetic}"
         if cache_key in self._price_cache:
             return self._price_cache[cache_key]
 
         # ── DB 범위 확인 및 API 호출 목록 생성 ───────────────
         db_min, db_max = self.get_date_range_in_db(code)
+
+        # allow_synthetic=True 시 price_daily_synthetic 범위도 합산
+        # → 가상 데이터로 이미 채워진 구간에 대해 yfinance API 호출하지 않음
+        if allow_synthetic:
+            try:
+                row2 = self.conn.execute(
+                    "SELECT MIN(date), MAX(date) FROM price_daily_synthetic WHERE code=?", (code,)
+                ).fetchone()
+                if row2 and row2[0]:
+                    if db_min is None:
+                        db_min, db_max = row2[0], row2[1]
+                    else:
+                        db_min = min(db_min, row2[0])
+                        db_max = max(db_max, row2[1])
+            except Exception:
+                pass
+
         api_calls = []
         if db_min is None:
             api_calls.append((start_date, end_date))

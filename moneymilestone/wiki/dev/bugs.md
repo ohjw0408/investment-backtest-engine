@@ -62,6 +62,21 @@ tags: [dev, bug]
 
 ---
 
+## 2026-05-28 세션 수정 (Claude)
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| 투자 계산기 — 가상 데이터 ON 시 "롤링 케이스가 0개" 에러 | 상장 1년 미만 ETF: TickerStatsCache None → 가상 데이터 스킵 → effective_start 최근일 → 롤링 0 | `calculator_logic.py`: n_cases=0 시 "가상 데이터 생성 불가" 명확한 에러. `data_preparer.py`: warnings에 이유 추가 | 2151db1 | ✅ |
+| 투자 계산기 — 종목 첫 실행 시 "준비 중" 장시간 | BackfillEngine이 PriceLoader(get_price)와 DataPreparer 두 곳에서 중복 실행. 준비 단계 동안 진행률 업데이트 없음 | `backfill_engine.py`: volume=0 행 있으면 즉시 ok 반환(재계산 스킵). `tasks.py`: 준비 시작 시 PROGRESS 전송. `calculator.js`: "데이터 준비 중" 표시 | 90afb15 | ✅ |
+
+**중복 백필 fix(90afb15)는 BackfillEngine 자체 수정이므로 백테스트/은퇴 탭도 자동 적용됨.**
+
+**미해결 — "데이터 준비 중" UI가 백테스트/은퇴/배당금 계산기에는 미적용.** 백테스트·은퇴는 단발성 시뮬이라 체감 덜함. 필요 시 `tasks.py`의 `run_backtest_task` / `run_retirement_task`에 동일하게 preparing 상태 전송 추가하면 됨.
+
+**새 종목 첫 실행은 yfinance 다운로드가 불가피** (어떤 탭이든). 최초 1회 후 캐시되어 빠름.
+
+---
+
 ## 미결 이슈 (버그는 아니지만 확인 필요)
 
 | 이슈 | 상태 | 비고 |

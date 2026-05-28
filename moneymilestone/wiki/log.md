@@ -1,5 +1,21 @@
 # Log
 
+## [2026-05-28] bugfix | 투자 계산기 — 가상 데이터 관련 버그 2건 수정
+
+- **버그 1**: 상장 1년 미만 ETF(예: 0103T0) + 가상 데이터 ON → "롤링 케이스가 0개입니다" 에러
+  - 원인: TickerStatsCache가 데이터 부족으로 None 반환 → DataPreparer가 가상 데이터 스킵 → effective_start 최근일 유지 → 롤링 0
+  - 수정: calculator_logic.py에서 n_cases=0 시 "가상 데이터 생성 불가" 명확한 에러. data_preparer.py warnings 추가.
+  - 커밋: 2151db1
+- **버그 2**: 새 종목 첫 실행 시 "준비 중" 장시간 (495330 등)
+  - 원인: BackfillEngine이 PriceLoader(get_price)와 DataPreparer 두 곳에서 중복 실행. 준비 단계 동안 진행률 없음.
+  - 수정: backfill_engine.py volume=0 행 있으면 즉시 ok 반환(중복 계산 스킵). tasks.py preparing PROGRESS 전송. calculator.js "데이터 준비 중" 표시.
+  - 커밋: 90afb15
+  - 영향 범위: BackfillEngine fix는 백테스트/은퇴 탭도 자동 적용. "데이터 준비 중" UI는 투자 계산기만.
+
+_작성: Claude_
+
+---
+
 ## [2026-05-28] feature | 금액가리기+내자산연동 정상화
 
 - 홈 포트폴리오 카드:

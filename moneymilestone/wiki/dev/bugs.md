@@ -57,6 +57,7 @@ tags: [dev, bug]
 | 버그 | 원인 | 수정 | 커밋 | 상태 |
 |---|---|---|---|---|
 | OAuth MismatchingStateError | 브라우저 전환(카카오톡→삼성인터넷→크롬) 중 state 불일치 → 500 에러 | `google_callback`에서 Exception catch → `/auth/google` redirect | `b23e04e` | ✅ |
+| **가상 데이터 DB 오염 (중대 버그)** | `SyntheticPriceGenerator.generate_and_save()`가 `price_daily`(실데이터 테이블)에 직접 저장. `retirement_logic.py`에서 `allow_synthetic=True` 하드코딩 → 유저 옵트인 없이도 가상 데이터 생성·저장됨 | 별도 테이블 `price_daily_synthetic` / `corporate_actions_synthetic` 신설. `allow_synthetic` 플래그를 전체 콜체인에 전파. 기존 오염 199,581행 서버에서 수동 클린업 스크립트 실행 제거. | `374f0a5` | ✅ |
 | KRX 금현물 시세 오래된 데이터 | 자동 갱신 없음, 수동 실행만 지원 | Celery Beat 태스크 추가, 평일 16:30 KST 자동 실행 | `d56c5ee` | ✅ |
 | 시장 지수 thundering herd | 캐시 만료 시 동시 요청이 모두 yfinance 호출 | Redis SETNX 락으로 1개 요청만 fetch | `d56c5ee` | ✅ |
 

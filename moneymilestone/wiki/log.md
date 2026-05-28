@@ -1,5 +1,17 @@
 # Log
 
+## [2026-05-28] bugfix | 가상 데이터 DB 오염 — 중대 아키텍처 버그 수정 + 서버 클린업
+
+- **버그**: `SyntheticPriceGenerator`가 `price_daily` 실데이터 테이블에 가상 데이터 직접 기록. `retirement_logic.py` `allow_synthetic=True` 하드코딩으로 유저 옵트인 없이도 오염됨
+- **수정**: `price_daily_synthetic` / `corporate_actions_synthetic` 별도 테이블 신설. `allow_synthetic` 플래그를 `PriceLoader → PriceDataLoader → AccumulationAnalyzer` 전체 콜체인에 전파
+- **서버 클린업**: `scripts/cleanup_synthetic_contamination.py` 실행 → `price_daily` 199,581행 / `corporate_actions` 2,585행 제거. 정상 백필 4개 종목 복원(069500, 133690, 446720, 458730)
+- **수정 파일**: `synthetic_price_generator.py`, `price_loader.py`, `price_data_loader.py`, `accumulation_analyzer.py`, `retirement_logic.py`, `data_preparer.py`, `backfill_engine.py`
+- 커밋: `374f0a5`
+
+_작성: Claude_
+
+---
+
 ## [2026-05-28] bugfix | 투자 계산기 — 가상 데이터 관련 버그 2건 수정
 
 - **버그 1**: 상장 1년 미만 ETF(예: 0103T0) + 가상 데이터 ON → "롤링 케이스가 0개입니다" 에러

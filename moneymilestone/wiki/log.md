@@ -1,5 +1,25 @@
 # Log
 
+## [2026-05-28] bugfix | 가상 데이터 시뮬레이션 무한대기 3연속 버그 수정
+
+- **버그 1**: `get_price(allow_synthetic=True)` 롤링 168창마다 yfinance API 호출
+  - 원인: `get_date_range_in_db()`이 `price_daily`만 확인 → synthetic 구간을 갭으로 인식 → API 시도
+  - 수정: `allow_synthetic=True`시 `price_daily_synthetic` 범위도 합산 → API 호출 0회
+  - 커밋: `0a90252`
+- **버그 2**: TARGET_CASES 캡이 `if synthetic_info:` 조건에 막혀 미적용
+  - 원인: synthetic 데이터 이미 존재 시 `synthetic_info={}` → 캡 블록 미실행 → 169 창
+  - 수정: 조건 제거, 항상 적용
+  - 커밋: `d8133f5`
+- **버그 3 (진짜 원인)**: DataPreparer step 2 early return이 cap보다 먼저 실행
+  - 원인: `n_cases=169 >= MIN_CASES(30)` → step 2에서 즉시 return → step 4 cap 미도달
+  - 수정: cap을 early return 전으로 이동
+  - 커밋: `86ac13d`
+- **결과**: 495330 20년 가상 데이터 시뮬 → 169창 → 61창, ~30초 완료
+
+_작성: Claude_
+
+---
+
 ## [2026-05-28] bugfix | 가상 데이터 DB 오염 — 중대 아키텍처 버그 수정 + 서버 클린업
 
 - **버그**: `SyntheticPriceGenerator`가 `price_daily` 실데이터 테이블에 가상 데이터 직접 기록. `retirement_logic.py` `allow_synthetic=True` 하드코딩으로 유저 옵트인 없이도 오염됨

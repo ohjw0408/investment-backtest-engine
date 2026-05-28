@@ -362,7 +362,7 @@ async function pollTask(taskId, maxWait = 600000) {
 
     } else if (data.status === 'PROGRESS') {
       updateProgressUI({
-        phase:   '계산 중',
+        phase:   data.phase === 'preparing' ? '데이터 준비 중' : '계산 중',
         percent: data.percent,
         current: data.current,
         total:   data.total,

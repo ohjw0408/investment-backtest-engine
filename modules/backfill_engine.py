@@ -448,6 +448,17 @@ class BackfillEngine:
 
         etf_start = pd.Timestamp(etf_min)
 
+        # 이미 백필된 경우 스킵 (volume=0인 상장 이전 데이터 존재)
+        already = self.price_conn.execute(
+            "SELECT COUNT(*) FROM price_daily WHERE code=? AND volume=0 AND date < ?",
+            (code, etf_min)
+        ).fetchone()[0]
+        if already > 0:
+            if self.verbose:
+                print(f"[BackfillEngine] {code} 이미 백필됨 ({already:,}행) → 스킵")
+            return {"code": code, "status": "ok", "rows_added": 0,
+                    "date_from": None, "date_to": None, "div_rows_written": 0}
+
         # 지수 데이터 로드
         index_series = self._load_index(index_code)
         if index_series is None:

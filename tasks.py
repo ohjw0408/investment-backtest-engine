@@ -109,6 +109,10 @@ def run_simulation_task(self, payload: dict) -> dict:
         )
 
     try:
+        self.update_state(state='PROGRESS', meta={
+            'current': 0, 'total': 100, 'percent': 1,
+            'elapsed': 0, 'eta': None, 'phase': 'preparing',
+        })
         from calculator_logic import run_calculator_logic
         result = run_calculator_logic(payload, progress_callback=progress_callback)
         record_task_duration(time.time() - start_time)

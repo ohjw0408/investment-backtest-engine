@@ -90,7 +90,16 @@ def generate_and_save(
         if prices[i] <= 0:
             prices[i] = prices[i + 1] * 0.99  # 음수 방지
 
-    # ── DB 저장 ───────────────────────────────────────────
+    # ── 합성 전용 테이블 생성 (없으면) ────────────────────
+    price_conn.execute("""
+        CREATE TABLE IF NOT EXISTS price_daily_synthetic (
+            code TEXT, date TEXT, open REAL, high REAL,
+            low REAL, close REAL, volume REAL,
+            PRIMARY KEY (code, date)
+        )
+    """)
+
+    # ── DB 저장 (price_daily_synthetic 에만 기록) ─────────
     rows = [
         (code, bdays[i].strftime("%Y-%m-%d"),
          float(prices[i]), float(prices[i]), float(prices[i]), float(prices[i]), 0.0)
@@ -98,7 +107,7 @@ def generate_and_save(
     ]
 
     price_conn.executemany(
-        "INSERT OR IGNORE INTO price_daily (code, date, open, high, low, close, volume) "
+        "INSERT OR IGNORE INTO price_daily_synthetic (code, date, open, high, low, close, volume) "
         "VALUES (?,?,?,?,?,?,?)",
         rows
     )

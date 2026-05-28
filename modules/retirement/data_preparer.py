@@ -34,11 +34,24 @@ MIN_CASES     = 30
 
 
 def _get_ticker_data_start(price_conn: sqlite3.Connection, code: str) -> str | None:
-    """price_daily.db에서 종목 최초 날짜 조회."""
+    """price_daily + price_daily_synthetic 양쪽에서 종목 최초 날짜 조회."""
     row = price_conn.execute(
         "SELECT MIN(date) FROM price_daily WHERE code=?", (code,)
     ).fetchone()
-    return row[0] if row and row[0] else None
+    real_start = row[0] if row and row[0] else None
+
+    # synthetic 테이블 존재 시 같이 확인
+    try:
+        row2 = price_conn.execute(
+            "SELECT MIN(date) FROM price_daily_synthetic WHERE code=?", (code,)
+        ).fetchone()
+        synth_start = row2[0] if row2 and row2[0] else None
+    except Exception:
+        synth_start = None
+
+    if real_start and synth_start:
+        return min(real_start, synth_start)
+    return real_start or synth_start
 
 
 def _calc_rolling_cases(data_start: str, data_end: str, sim_years: int, step_months: int = 3) -> int:
@@ -222,7 +235,7 @@ class DataPreparer:
                 div_dates: list[str] = []
                 if div_yield_mu and div_yield_mu > 0:
                     synth_px = pd.read_sql(
-                        "SELECT date, close FROM price_daily "
+                        "SELECT date, close FROM price_daily_synthetic "
                         "WHERE code=? AND date BETWEEN ? AND ? ORDER BY date",
                         self.price_conn,
                         params=(code, gen_result["date_from"], gen_result["date_to"]),
@@ -231,12 +244,20 @@ class DataPreparer:
                         synth_px["date"] = pd.to_datetime(synth_px["date"])
                         price_series = synth_px.set_index("date")["close"]
                         from modules.backfill_engine import inject_quarterly_dividends
+                        # synthetic 배당은 corporate_actions_synthetic 에만 기록
+                        self.price_conn.execute("""
+                            CREATE TABLE IF NOT EXISTS corporate_actions_synthetic (
+                                code TEXT, date TEXT, dividend REAL, split REAL,
+                                PRIMARY KEY (code, date)
+                            )
+                        """)
                         div_rows, div_dates = inject_quarterly_dividends(
                             price_conn=self.price_conn,
                             code=code,
                             price_series=price_series,
                             annual_yield_src=("musigma", div_yield_mu, div_yield_sigma),
                             seed=abs(hash(code)) % 2**31,
+                            table_name="corporate_actions_synthetic",
                         )
 
                 # ── Provenance 기록 (synthetic) ───────────

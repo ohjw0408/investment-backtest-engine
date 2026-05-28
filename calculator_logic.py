@@ -164,6 +164,7 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
         isa_renewal          = isa_renewal,
         gain_harvesting      = gain_harvesting,
         progress_callback    = progress_callback,
+        use_synthetic        = use_synthetic,
     )
 
     result = analyzer.run()

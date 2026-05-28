@@ -6,7 +6,7 @@ class PriceDataLoader:
     def __init__(self, loader):
         self.loader = loader
 
-    def load(self, tickers, start_date, end_date):
+    def load(self, tickers, start_date, end_date, allow_synthetic: bool = False):
 
         price_data = {}
 
@@ -15,7 +15,8 @@ class PriceDataLoader:
             df = self.loader.get_price(
                 ticker,
                 start_date,
-                end_date
+                end_date,
+                allow_synthetic=allow_synthetic,
             )
 
             df["date"] = pd.to_datetime(df["date"])

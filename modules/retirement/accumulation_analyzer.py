@@ -32,6 +32,7 @@ class AccumulationAnalyzer:
         isa_renewal:          bool          = False,
         gain_harvesting:      bool          = False,
         progress_callback                   = None,
+        use_synthetic:          bool        = False,
     ):
         self.portfolio_engine      = portfolio_engine
         self.tickers               = tickers
@@ -50,6 +51,7 @@ class AccumulationAnalyzer:
         self.isa_renewal           = isa_renewal and account_type == "ISA"
         self.gain_harvesting       = gain_harvesting and account_type == "위탁"
         self.progress_callback     = progress_callback
+        self.use_synthetic         = use_synthetic
 
     def _estimate_total_cases(self) -> int:
         cur = self.data_start
@@ -132,6 +134,7 @@ class AccumulationAnalyzer:
                         self.tickers,
                         cur.strftime("%Y-%m-%d"),
                         end.strftime("%Y-%m-%d"),
+                        allow_synthetic=self.use_synthetic,
                     )
                 except Exception:
                     cur    += relativedelta(months=self.step_months)
@@ -246,6 +249,7 @@ class AccumulationAnalyzer:
                     self.tickers,
                     current_start.strftime("%Y-%m-%d"),
                     cycle_end.strftime("%Y-%m-%d"),
+                    allow_synthetic=self.use_synthetic,
                 )
                 config = SimulationConfig(
                     start_date           = current_start.strftime("%Y-%m-%d"),
@@ -294,6 +298,7 @@ class AccumulationAnalyzer:
                     self.tickers,
                     current_start.strftime("%Y-%m-%d"),
                     rem_end.strftime("%Y-%m-%d"),
+                    allow_synthetic=self.use_synthetic,
                 )
                 config = SimulationConfig(
                     start_date           = current_start.strftime("%Y-%m-%d"),

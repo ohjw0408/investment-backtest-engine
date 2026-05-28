@@ -189,6 +189,19 @@ class PriceLoader:
                 PRIMARY KEY (code, date)
             )
         """)
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS price_daily_synthetic (
+                code TEXT, date TEXT, open REAL, high REAL,
+                low REAL, close REAL, volume REAL,
+                PRIMARY KEY (code, date)
+            )
+        """)
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS corporate_actions_synthetic (
+                code TEXT, date TEXT, dividend REAL, split REAL,
+                PRIMARY KEY (code, date)
+            )
+        """)
         self.conn.commit()
 
     # -------------------------------------------------
@@ -310,7 +323,7 @@ class PriceLoader:
     # 핵심 함수
     # -------------------------------------------------
 
-    def get_price(self, code, start_date, end_date, apply_fx: bool = True):
+    def get_price(self, code, start_date, end_date, apply_fx: bool = True, allow_synthetic: bool = False):
         """
         가격 데이터 반환
         - 한국 ETF (6자리): .KS 붙여서 다운로드 + 자동 백필링
@@ -378,16 +391,38 @@ class PriceLoader:
                 pass
 
         # ── DB 조회 ───────────────────────────────────────────
-        price_df = pd.read_sql(
-            "SELECT date, open, high, low, close, volume FROM price_daily "
-            "WHERE code = ? AND date BETWEEN ? AND ?",
-            self.conn, params=(code, start_date, end_date)
-        )
-        action_df = pd.read_sql(
-            "SELECT date, dividend, split FROM corporate_actions "
-            "WHERE code = ? AND date BETWEEN ? AND ?",
-            self.conn, params=(code, start_date, end_date)
-        )
+        if allow_synthetic:
+            price_df = pd.read_sql(
+                "SELECT date, open, high, low, close, volume FROM price_daily "
+                "WHERE code = ? AND date BETWEEN ? AND ? "
+                "UNION ALL "
+                "SELECT date, open, high, low, close, volume FROM price_daily_synthetic "
+                "WHERE code = ? AND date BETWEEN ? AND ? "
+                "ORDER BY date",
+                self.conn,
+                params=(code, start_date, end_date, code, start_date, end_date),
+            )
+            action_df = pd.read_sql(
+                "SELECT date, dividend, split FROM corporate_actions "
+                "WHERE code = ? AND date BETWEEN ? AND ? "
+                "UNION ALL "
+                "SELECT date, dividend, split FROM corporate_actions_synthetic "
+                "WHERE code = ? AND date BETWEEN ? AND ? "
+                "ORDER BY date",
+                self.conn,
+                params=(code, start_date, end_date, code, start_date, end_date),
+            )
+        else:
+            price_df = pd.read_sql(
+                "SELECT date, open, high, low, close, volume FROM price_daily "
+                "WHERE code = ? AND date BETWEEN ? AND ?",
+                self.conn, params=(code, start_date, end_date)
+            )
+            action_df = pd.read_sql(
+                "SELECT date, dividend, split FROM corporate_actions "
+                "WHERE code = ? AND date BETWEEN ? AND ?",
+                self.conn, params=(code, start_date, end_date)
+            )
         action_df = action_df.groupby("date", as_index=False).agg({
             "dividend": "sum", "split": "prod"
         })

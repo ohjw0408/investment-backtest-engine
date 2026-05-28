@@ -78,13 +78,14 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     strategy_factory = _make_strategy_factory(target_weights, rebal_mode)
     data_end         = datetime.date.today().strftime('%Y-%m-%d')
 
+    use_synthetic = bool(body.get('use_synthetic', False))
     prep = prepare_scenario_data(
         tickers          = ticker_codes,
         required_years   = accumulation_years,
         data_end         = data_end,
         step_months      = 3,
         allow_backfill   = True,
-        allow_synthetic  = True,
+        allow_synthetic  = use_synthetic,
         purpose          = "retirement",
         price_db_path    = PRICE_DB_PATH,
     )
@@ -136,6 +137,7 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
         isa_renewal          = isa_renewal,
         gain_harvesting      = gain_harvesting,
         progress_callback    = acc_progress,
+        use_synthetic        = use_synthetic,
     )
     acc_result = acc_analyzer.run()
 

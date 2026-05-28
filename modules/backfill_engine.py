@@ -134,6 +134,7 @@ def inject_quarterly_dividends(
     price_series: pd.Series,
     annual_yield_src: tuple,
     seed: int = 0,
+    table_name: str = "corporate_actions",
 ) -> int:
     """
     분기말(3,6,9,12월 마지막 거래일)에 배당 레코드를 corporate_actions에 삽입.
@@ -172,8 +173,7 @@ def inject_quarterly_dividends(
         return 0, []
 
     price_conn.executemany(
-        "INSERT OR IGNORE INTO corporate_actions (code, date, dividend, split) "
-        "VALUES (?,?,?,?)",
+        f"INSERT OR IGNORE INTO {table_name} (code, date, dividend, split) VALUES (?,?,?,?)",
         records,
     )
     price_conn.commit()

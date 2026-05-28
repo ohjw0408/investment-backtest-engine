@@ -12,6 +12,7 @@
 - 계획 문서화: `moneymilestone/wiki/dev/ideas.md`에 금융소득 자동 산출 설계 추가. 핵심은 계산기별 시뮬레이션에서 직전/최근 완료년도 세전 gross 배당·이자 흐름을 집계해 `other_financial_income`으로 세금 엔진에 넘기는 것.
 - 주의: `backtest_logic.py`와 `split_sale_planner.py`의 `other_financial_income` 파라미터는 유지. UI 수동 입력만 제거했고, 향후 자동 산출값 주입 지점으로 사용한다.
 - 검증/배포: 로컬 `py_compile`, `node --check`, `git diff --check` PASS. Flask test client와 브라우저 토글 확인에서 5개 화면(`/calculator`, `/backtest`, `/retirement`, `/dividend-target`, `/tax-settings`) PASS. 서버 `192693c` 배포 후 gunicorn 5000 포트 기준 5개 화면 HTTP 200 확인.
+- 정정: 금융소득 자동 산출 상세 계획의 정본 위치를 `moneymilestone/wiki/dev/ideas.md`가 아니라 `세금에서시작된완전리팩토링계획.plan.md` Phase 2e로 이동. `ideas.md`에는 포인터만 남김.
 
 _작성: Codex_
 

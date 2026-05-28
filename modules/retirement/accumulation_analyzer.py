@@ -376,12 +376,13 @@ class AccumulationAnalyzer:
             if (
                 params is None
                 or params.get("mu_monthly") is None
+                or params.get("sigma_monthly") is None
                 or params.get("anchor_price") is None
                 or params.get("actual_start") is None
             ):
-                # No synthetic params: load real (or DB synthetic) data
+                # No usable synthetic params: fall back to DB path
                 df = raw_loader.get_price(code, window_start_str, window_end_str,
-                                          allow_synthetic=bool(params))
+                                          allow_synthetic=True)
                 df["date"] = pd.to_datetime(df["date"])
                 df = df.set_index("date")
                 combined[code] = df

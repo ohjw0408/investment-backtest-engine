@@ -11,7 +11,19 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> 세금 리팩토링 Phase 1~3 전부 완료. SYNTHETIC_DATA_INTEGRATION_PLAN 완료. Gate 2a/2b/2c/2d PASS (28/28). ETF_BACKFILL Phase 2 완료. KRX 금현물 자동 갱신 보강 및 지수 download_all 누락구간 보강 로직 수정 완료. 다음: 수동 테스트 T1~T4 또는 PHASE4 기능 잔여.
+> 세금 리팩토링 Phase 1~3 완료. SYNTHETIC_DATA_INTEGRATION_PLAN 완료. 가상 데이터 시뮬 버그 5종 수정 (DB오염·무한대기·배너누락·2007이상치·float크래시). 다음: 수동 테스트 T1/T2/T4 브라우저 직접 확인 후 PHASE4 잔여.
+
+---
+
+## 최근 완료된 작업 (Claude 세션 2026-05-28 가상 데이터 시뮬 버그 2차 수정)
+
+- ✅ `used_synthetic=False` 버그: DataPreparer early return 시 항상 False → `price_daily_synthetic` 존재 쿼리로 정상화 (3a190b5)
+- ✅ 2007 이상치 버그: 단일 GBM 경로 슬라이싱 → 60개 윈도우 상관관계. `AccumulationAnalyzer._load_with_per_window_synthetic()` 신설로 윈도우별 독립 경로 생성 (cccda40)
+- ✅ `float(None)` 크래시 (sigma_monthly 미체크): 가드 조건 누락 수정 (86d6a39)
+- ✅ `float(None)` 크래시 (KOFR 등 flat ETF): `TickerStatsCache` NULL close 행 필터, `DataPreparer` anchor_price NULL 처리 (786831f)
+- ✅ `DataPreparer.prepare()` early return 경로에 `actual_start`, `anchor_price`, mu/sigma 포함 — 윈도우별 생성에 필요한 파라미터 전달
+- ✅ `data_preparer.py` `synthetic_info`에 `actual_start`, `anchor_price` 추가 (normal path)
+- ✅ `calculator_logic.py` / `retirement_logic.py`: `synthetic_params` 전달
 
 ---
 

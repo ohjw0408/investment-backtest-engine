@@ -1,5 +1,25 @@
 # Log
 
+## [2026-05-28] bugfix | 가상 데이터 시뮬 2차 — 배너·2007이상치·float크래시 수정
+
+- **버그 1**: `used_synthetic` 배너 미표시
+  - 원인: DataPreparer n_cases≥30 early return 시 `used_synthetic=False` 하드코딩
+  - 수정: early return 전 `price_daily_synthetic` 존재 쿼리, 커밋 `3a190b5`
+- **버그 2**: 가상 데이터 차트에서 2007 시작이 항상 최고 수익
+  - 원인: `seed=hash(code)` → 단일 결정론적 GBM 경로를 60개 윈도우가 공유. 경로 저점에 걸린 윈도우가 항상 높은 CAGR
+  - 수정: `AccumulationAnalyzer._load_with_per_window_synthetic()` 신설 — 윈도우별 `seed=hash(code+start_date)` 독립 경로. DB 저장 경로는 배너 감지용으로만 유지. 커밋 `cccda40`
+- **버그 3**: `float() argument must be a string or a real number, not 'NoneType'` — sigma_monthly
+  - 원인: `_load_with_per_window_synthetic()` None 가드에 `sigma_monthly` 누락
+  - 수정: 가드 조건 추가, 커밋 `86d6a39`
+- **버그 4**: 동일 에러 — KOFR 등 flat ETF
+  - 원인: `TickerStatsCache` `float(r[1])` NULL close 행 비필터링. `DataPreparer` anchor_price에 NULL close 미처리
+  - 수정: NULL 행 사전 필터 + `is not None` 체크, 커밋 `786831f`
+- **T1~T4 수동 테스트**: 코드 수정 완료, 브라우저 직접 확인 대기 중
+
+_작성: Claude_
+
+---
+
 ## [2026-05-28] bugfix | 가상 데이터 시뮬레이션 무한대기 3연속 버그 수정
 
 - **버그 1**: `get_price(allow_synthetic=True)` 롤링 168창마다 yfinance API 호출

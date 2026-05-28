@@ -78,13 +78,23 @@ tags: [dev, bug]
 
 ---
 
+## 2026-05-28 세션 수정 2차 (Claude)
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| 투자 계산기 — `used_synthetic=False` early return 시 항상 False | DataPreparer n_cases≥MIN_CASES early return이 `_used_synth=False` 하드코딩 | early return 전 `price_daily_synthetic` 존재 확인 후 반환 | `3a190b5` | ✅ |
+| 가상 데이터 차트 — 2007 시작이 항상 최고 수익 | `seed=hash(code)` 단일 결정론적 경로를 60개 윈도우가 공유 → 경로 저점에 걸린 윈도우 항상 높은 수익 | `AccumulationAnalyzer._load_with_per_window_synthetic()` 추가 — 윈도우별 `seed=hash(code+start_date)` 독립 경로 생성 | `cccda40` | ✅ |
+| 가상 데이터 시뮬 — `float() argument must be a string or a real number, not 'NoneType'` | `_load_with_per_window_synthetic()`에서 `sigma_monthly` None 체크 누락 | None 가드에 `sigma_monthly` 추가, fallback `allow_synthetic=True` | `86d6a39` | ✅ |
+| 가상 데이터 시뮬 — `float()` NoneType (KOFR 등 flat ETF) | `TickerStatsCache` `closes = np.array([float(r[1]) for r in rows])` — close NULL 행 필터 없음. `DataPreparer` `_anchor_price = float(_ap_row[0])` — NULL close 미처리 | `TickerStatsCache`: NULL close 행 사전 필터링. `DataPreparer`: `_ap_row[0] is not None` 체크 추가 | `786831f` | ✅ |
+
+---
+
 ## 미결 이슈 (버그는 아니지만 확인 필요)
 
 | 이슈 | 상태 | 비고 |
 |---|---|---|
 | `volume=0`으로 백필/가격 오류 | ⚠️ 미확인 | 일부 종목에서 가격 대신 배당 표시 가능성 |
 | provenance 테이블 없음 | ⚠️ 미확인 | 합성 데이터 출처 적재 제거됨 |
-| ISA 계산기 Runner 통일 | ⏳ 미완료 | Phase 3에서 처리 |
 | `TaxedDividendEngine._ytd_income` 초기값 0 | ⏳ 미완료 | `other_financial_income` 연동 필요 |
 | `modules/sim/tax_engine.py` 덮어씀 | ⏳ 미완료 | Phase 2c 이후 정리 예정 |
-| 은퇴 시뮬에도 짧은 히스토리 문제 있는지 | ⚠️ 확인 필요 | 배당 계산기와 동일 구조일 수 있음 |
+| T1~T4 수동 테스트 미완료 | ⚠️ 미확인 | T1 배너, T2 종합과세 패널, T4 ISA 풍차 체크박스 — 브라우저 직접 확인 필요 |

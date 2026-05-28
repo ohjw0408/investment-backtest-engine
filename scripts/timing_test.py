@@ -16,6 +16,21 @@ from modules.portfolio_engine import PortfolioEngine
 pe = PortfolioEngine()
 print(f"PortfolioEngine 초기화: {time.time()-t0:.2f}s")
 
+# 0. prepare_scenario_data 타이밍
+import datetime
+t_prep = time.time()
+from modules.data_preparation.scenario_data_preparer import prepare_scenario_data
+result = prepare_scenario_data(
+    tickers=['495330'],
+    required_years=20,
+    data_end=datetime.date.today().isoformat(),
+    step_months=3,
+    allow_backfill=True,
+    allow_synthetic=True,
+    purpose='calculator',
+)
+print(f"prepare_scenario_data(): {time.time()-t_prep:.2f}s  effective_start={result['effective_start']}  n_cases={result['n_cases']}")
+
 # 1. 데이터 로드 타이밍
 t1 = time.time()
 data, dates = pe.price_loader.load(

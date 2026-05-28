@@ -339,18 +339,17 @@ class DataPreparer:
         if effective_start < USD_KRW_START:
             effective_start = USD_KRW_START
 
-        # 가상 데이터 사용 시 TARGET_CASES 케이스 이상은 불필요 → 캡 적용
-        # 기존 synthetic 데이터가 더 오래됐더라도 effective_start를 앞당기지 않음
-        if synthetic_info:
-            from dateutil.relativedelta import relativedelta as _rd2
-            _extra_months   = TARGET_CASES * step_months
-            _max_start      = (
-                pd.Timestamp(data_end)
-                - _rd2(years=sim_years)
-                - _rd2(months=_extra_months)
-            ).strftime("%Y-%m-%d")
-            if effective_start < _max_start:
-                effective_start = _max_start
+        # TARGET_CASES 초과 케이스는 통계적 의미 없음 → effective_start 캡 적용
+        # synthetic_info 유무 관계없이 적용 (기존 synthetic 데이터가 1964까지 있어도 캡)
+        from dateutil.relativedelta import relativedelta as _rd2
+        _extra_months = TARGET_CASES * step_months
+        _max_start    = (
+            pd.Timestamp(data_end)
+            - _rd2(years=sim_years)
+            - _rd2(months=_extra_months)
+        ).strftime("%Y-%m-%d")
+        if effective_start < _max_start:
+            effective_start = _max_start
 
         n_cases = _calc_rolling_cases(effective_start, data_end, sim_years, step_months)
 

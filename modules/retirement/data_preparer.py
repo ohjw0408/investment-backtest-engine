@@ -139,6 +139,17 @@ class DataPreparer:
         if effective_start < USD_KRW_START:
             effective_start = USD_KRW_START
 
+        # TARGET_CASES 초과는 통계적 의미 없음 → 항상 캡 (early return 전에 적용)
+        from dateutil.relativedelta import relativedelta as _rd_cap
+        _extra_months = TARGET_CASES * step_months
+        _max_start    = (
+            pd.Timestamp(data_end)
+            - _rd_cap(years=sim_years)
+            - _rd_cap(months=_extra_months)
+        ).strftime("%Y-%m-%d")
+        if effective_start < _max_start:
+            effective_start = _max_start
+
         n_cases = _calc_rolling_cases(effective_start, data_end, sim_years, step_months)
 
         if self.verbose:

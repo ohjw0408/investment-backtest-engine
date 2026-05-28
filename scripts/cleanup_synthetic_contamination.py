@@ -31,7 +31,13 @@ if not candidates:
     conn.close()
     sys.exit(0)
 
-print(f"volume=0 행 보유 종목 {len(candidates)}개:")
+# FX/지수 티커는 volume=0이 정상 → 제외
+EXCLUDE = {c for c in candidates if c.startswith("^") or c.endswith("=X") or "/" in c}
+candidates = [c for c in candidates if c not in EXCLUDE]
+if EXCLUDE:
+    print(f"제외 (FX/지수, volume=0 정상): {sorted(EXCLUDE)}")
+
+print(f"\nvolume=0 행 보유 종목 {len(candidates)}개:")
 for code in candidates:
     cnt = conn.execute(
         "SELECT COUNT(*) FROM price_daily WHERE code=? AND volume=0", (code,)

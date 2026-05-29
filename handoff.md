@@ -137,6 +137,134 @@ T-D5: PASS / FAIL
 
 ---
 
+## ISA 1억 캡 로직 재설계 계획 (BUG-2 연장선)
+
+### 현재 동작 (틀림)
+총 계획 납입액 > 1억 → 월 납입금을 전 기간 균등하게 낮춤 (예: 50만 → 40만).
+
+### 원하는 동작
+월 납입금 유지하다가 1억 한도에 도달하는 순간부터 납입 중단(월 납입 0원).
+
+**예시:** 초기 500만 + 월 50만 × 20년
+- 납입 가능 개월: floor((1억 - 500만) / 50만) = floor(9500만 / 50만) = **190개월 (15년 10개월)**
+- 190개월까지: 월 50만 납입 → 누적 500만 + 50만×190 = **1억** 딱 달성
+- 191~240개월: **월 납입 0원**, 기존 자산만 복리 운용
+
+### 왜 중요한가
+이 로직이 맞아야 향후 "파이어 시나리오" 계산이 가능:
+> "10년간 월 50만 적립 후 파이어 → 그 후 15년간 자산 추이는?"
+= 납입 기간 10년(120개월) 후 납입 0원, 총 25년 시뮬
+
+### 수정 계획
+
+#### 1. `AccumulationAnalyzer` — `contribution_end_months` 파라미터 추가
+**파일:** `modules/retirement/accumulation_analyzer.py`
+
+```python
+# 기존
+monthly_contribution: float
+
+# 추가 파라미터
+contribution_end_months: int | None = None
+# None이면 전 기간 납입. N이면 N개월 이후 납입 0원.
+```
+
+시뮬 루프 내 월별 납입 처리:
+```python
+# 기존
+deposit = monthly_contribution
+
+# 변경
+month_idx = ...  # 현재 시뮬 내 경과 개월
+deposit = monthly_contribution if (contribution_end_months is None or month_idx < contribution_end_months) else 0.0
+```
+
+#### 2. `calculator_logic.py` + `retirement_logic.py` — cap 계산 로직 교체
+
+```python
+# 기존 (틀림): 월 납입금 균등 축소
+monthly_contrib = _remaining / (years * 12)
+
+# 교체: 납입 중단 시점 계산
+if monthly_contrib > 0:
+    _stop_months = int((_ISA_TOTAL_LIMIT - initial_capital) / monthly_contrib)
+else:
+    _stop_months = years * 12  # monthly 0이면 cap 없음
+
+_isa_cap_info = {
+    'capped': True,
+    'original_total': round(_planned_total),
+    'capped_total': _ISA_TOTAL_LIMIT,
+    'original_monthly': round(monthly_contrib),  # 변경 없음
+    'stop_months': _stop_months,                 # 신규
+    'stop_years': _stop_months // 12,            # 신규 (배너 표시용)
+    'stop_months_remainder': _stop_months % 12,  # 신규
+}
+# monthly_contrib 수정 안 함 — AccumulationAnalyzer에 contribution_end_months로 전달
+```
+
+AccumulationAnalyzer 호출 시:
+```python
+analyzer = AccumulationAnalyzer(
+    ...
+    monthly_contribution = monthly_contrib,
+    contribution_end_months = _isa_cap_info['stop_months'] if _isa_cap_info else None,
+)
+```
+
+#### 3. `calculator.js` — cap 배너 텍스트 교체
+```javascript
+// 기존
+`월 납입금: <strong>${origM}만원</strong> → <strong>${adjM}만원</strong>으로 조정`
+
+// 교체
+const stopY = capInfo.stop_years;
+const stopM = capInfo.stop_months_remainder;
+const stopStr = stopM > 0 ? `${stopY}년 ${stopM}개월` : `${stopY}년`;
+`월 ${origM}만원씩 <strong>${stopStr}</strong> 납입 후 자동 중단 (ISA 1억 한도 도달)`
+```
+
+#### 4. `dividend_logic.py` — ISA 1억 캡 추가
+배당 계산기는 `DividendSimulator` (별도 analyzer) 사용. `AccumulationAnalyzer`와 별개로 처리 필요.
+
+```python
+# validate_isa_contribution 이후에 추가
+if tax_enabled and account_type == 'ISA':
+    _ISA_TOTAL_LIMIT = 100_000_000
+    _seed = float((body.get('seed') or {}).get('center', 0))
+    _mon  = float((body.get('monthly') or {}).get('center', 0))
+    _yrs  = int((body.get('years') or {}).get('center', 20))
+    _planned = _seed + _mon * 12 * _yrs
+    if _planned > _ISA_TOTAL_LIMIT and _mon > 0:
+        _stop_months = int((_ISA_TOTAL_LIMIT - _seed) / _mon)
+        _isa_cap_info = {
+            'capped': True,
+            'original_total': round(_planned),
+            'capped_total': _ISA_TOTAL_LIMIT,
+            'original_monthly': round(_mon),
+            'stop_months': _stop_months,
+            'stop_years': _stop_months // 12,
+            'stop_months_remainder': _stop_months % 12,
+        }
+```
+
+`DividendSimulator` 에도 `contribution_end_months` 지원 추가 필요 (AccumulationAnalyzer와 동일 패턴).
+결과에 `isa_cap_info` 포함해 프론트에 전달.
+
+#### 수정 파일 목록
+| 파일 | 변경 |
+|------|------|
+| `modules/retirement/accumulation_analyzer.py` | `contribution_end_months` 파라미터 추가, 루프 내 조건부 납입 |
+| `modules/analyzer/dividend_projection_analyzer.py` 또는 `DividendSimulator` | 동일 패턴 |
+| `calculator_logic.py` | cap 계산 → stop_months 방식으로 교체 |
+| `retirement_logic.py` | 동일 |
+| `dividend_logic.py` | ISA 1억 캡 계산 추가, DividendSimulator에 stop_months 전달 |
+| `static/js/calculator.js` | cap 배너 텍스트 교체 |
+
+retirement.js / dividend.js 는 추후 (해당 html에 배너 추가 시 함께).
+
+---
+
 ## 다음 작업 후보
 
 1. **BUG-1/2/3/6/7 수정** — 위 버그들 차례로 fix

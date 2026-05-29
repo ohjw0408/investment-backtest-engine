@@ -13,14 +13,24 @@ tags: [dev, bug]
 
 ## 활성 버그 목록
 
-> 현재 활성 버그 없음 (2026-05-28 기준).
+> updated: 2026-05-29
 
-| 버그 | 원인 | 파일 | 상태 |
-|---|---|---|---|
-| DJUSDIV100 데이터 부족 | SCHD vs TIGER 미국배당다우존스 결과 불일치 | `modules/backfill_engine.py`, `data/meta/index_master.db` | ✅ DJUSDIV_PROXY 체인으로 해결 (7b1dc6f) |
-| `_fetch_fred()` 미정의 | index_loader에서 FRED 데이터 로드 실패 | `modules/index_loader_develop.py` | ✅ def 선언 추가 (e1a4d6e) |
-| 백필 실패 코드가 완료 처리됨 | 실패한 ETF가 캐시에서 완료로 표시됨 | `modules/price_loader.py` | ✅ _backfill_skip_codes 분리 (a761750) |
-| 배당 시뮬 미완료 연도 포함 | 현재 연도(작년~현재) 통계를 끝난 것처럼 포함 | `modules/dividend_simulator.py` | ✅ complete_div 필터 추가 (ec56455) |
+| # | 버그 | 원인 | 파일 | 상태 |
+|---|---|---|---|---|
+| BUG-1 | TF1/TF6/TF7 — 에러가 인라인 배너 대신 alert() 팝업으로 표시 | `pollTask` FAILURE 시 `_e._data` 미설정 or null → catch에서 `_handled=false` → `alert()` fallback | `static/js/calculator.js` (pollTask), `retirement.html` 에러 핸들링 없음 | ❌ 미해결 |
+| BUG-2 | retirement.html — 에러/캡 배너 3종 미존재 | TF6/TF7(retirement 페이지) 에러가 모두 팝업으로 표시됨. ISA 캡 경고도 없음 | `templates/retirement.html`, 대응 JS | ❌ 미해결 |
+| BUG-3 | 연금 수령 시작 나이 입력 불가 | 은퇴 계산기에 "연금 수령 시작 나이" 입력칸 없음. `user_settings.age`(현재 나이) 사용 중 | `templates/retirement.html`, `retirement_logic.py`, `modules/tax/liquidation.py` | ❌ 미해결 |
+| BUG-4 | ISA 1억 캡 로직 오류 — 월 납입금 균등 축소 | 전 기간 월납입을 줄이는 방식. 올바른 동작: 납입 지속 → 1억 도달 시점부터 납입 0원 | `calculator_logic.py`, `retirement_logic.py`, `modules/retirement/accumulation_analyzer.py`, `static/js/calculator.js` | ❌ 미해결 (handoff.md에 재설계 계획 있음) |
+| BUG-5 | 밴드 슬라이더 숫자 직접 입력 불가 | 슬라이더만 있고 0.5% 단위 정밀 입력 불가 | `templates/myassets.html` | ❌ 미해결 |
+
+**이전 "활성"에서 해결된 항목들:**
+
+| 버그 | 상태 |
+|---|---|
+| DJUSDIV100 데이터 부족 | ✅ DJUSDIV_PROXY 체인으로 해결 (7b1dc6f) |
+| `_fetch_fred()` 미정의 | ✅ def 선언 추가 (e1a4d6e) |
+| 백필 실패 코드가 완료 처리됨 | ✅ _backfill_skip_codes 분리 (a761750) |
+| 배당 시뮬 미완료 연도 포함 | ✅ complete_div 필터 추가 (ec56455) |
 
 ---
 

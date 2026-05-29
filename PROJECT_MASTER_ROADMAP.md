@@ -16,7 +16,7 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 | `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | ✅ Phase 1~3 + 2d/2e all complete. All Gates passed. |
 | `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | Phase 0~2 complete. Phase 3+ (etf_master, etf_proxy_map, full US ETF universe, confidence grading) — planned after Track G. |
 | `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | ✅ Complete (Phase 1~10, all screens). |
-| `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | **Not started. Next action.** |
+| `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | **Backend complete (e8b7c1e). Frontend partially done. BUG-1~5 remain.** |
 | `PHASE4_PLAN.md § 4G` | Multi-account simulation engine + real ISA windmill (sequential/conditional flow). Requires Track F first. Key constraint: percentiles must be computed after per-scenario sum, not by summing individual percentiles. | Not started. Requires Track F first. |
 
 ## Current Situation
@@ -146,45 +146,35 @@ Completed 2026-05-28:
 
 ### Track F. ISA/Account Regulatory Compliance
 
-Owner plan:
+Owner plan: `isafix.md`
 
-- `isafix.md`
+**Status: Backend complete, frontend partially done. Remaining: BUG-1~5.**
 
-Scope:
+Completed (e8b7c1e, 2026-05-29):
+- ✅ `COMMODITY_ETF` classification in `base_tax.py`
+- ✅ IRP COMMODITY_ETF block in `account_tax.py`
+- ✅ `validate_isa_contribution()` in `account_tax.py`
+- ✅ Full validation in `calculator_logic.py`, `retirement_logic.py`, `dividend_logic.py`
+- ✅ Error banners in `calculator.html` + `calculator.js`
 
-- Enforce Korean financial regulation rules: account-type investment restrictions and ISA contribution limits.
-- Independent of Tracks A~E. Can run in parallel with Track A.
+Remaining (BUG-1~5 in bugs.md):
+- ❌ BUG-1: TF1 계열 — 에러가 배너 대신 alert() 팝업으로 표시
+- ❌ BUG-2: `retirement.html` 배너 3종 없음 (TF6/TF7 팝업)
+- ❌ BUG-3: 은퇴 계산기 연금 수령 시작 나이 입력 불가
+- ❌ BUG-4: ISA 1억 캡 로직 오류 — 월 납입 균등 축소 대신 납입 중단 방식으로 재설계 필요 (handoff.md 계획 있음)
+- ❌ BUG-5: 밴드 슬라이더 숫자 직접 입력 불가
 
-Problem:
-
-- Investment calculator, retirement simulator, and dividend calculator allow invalid combinations (e.g., SPY + ISA, commodity ETFs + IRP) with no error.
-- ISA windmill (`isa_renewal=True`) allows unlimited contributions ignoring the 2,000만원/year and 1억원 total cap.
-- Backend already enforces restrictions in `backtest_logic.py` — this track extends that to all other simulators.
-
-Tasks:
-
-1. Add `COMMODITY_ETF` classification to `base_tax.py:classify_instrument_type()` (keyword-based).
-2. Split 연금저축/IRP validation blocks in `account_tax.py:validate_account_portfolio()`. Add COMMODITY_ETF block for IRP only.
-3. Add `validate_isa_contribution(initial, monthly)` to `account_tax.py`. Formula: `monthly ≤ (2,000만 − initial) / 12`.
-4. Add validation to `calculator_logic.py`: account restrictions + ISA windmill hard block + ISA contribution limits + 1억 total cap with soft warning.
-5. Add same validation to `retirement_logic.py`.
-6. Add same validation to `dividend_logic.py`.
-7. Add frontend error/warning banners to `calculator.html`, `retirement.html` and corresponding JS.
-
-Exit criteria:
-
-- ISA + SPY → hard error in calculator/retirement/dividend (not just backtest).
-- IRP + commodity ETF → hard error.
-- 연금저축 + commodity ETF → passes (연금저축 allows it).
-- ISA + initial > 2,000만 → hard error.
-- ISA + `monthly > (2,000만 − initial) / 12` → hard error.
-- ISA + windmill → hard error with explanation.
-- ISA total > 1억 → simulation runs with capped monthly, prominent orange warning banner in results.
+Exit criteria (original — partially met):
+- ISA + SPY → hard error ✅
+- IRP + commodity ETF → hard error ✅
+- 연금저축 + commodity ETF → passes ✅
+- ISA contribution limits → hard error ✅
+- ISA windmill → hard error ✅
+- ISA total > 1억 → orange banner ⚠️ (캡 로직 재설계 필요, BUG-4)
 
 Suggested command phrase:
-
 ```text
-isafix.md 계획대로 구현해줘
+BUG-1,2,3,4,5 수정해줘
 ```
 
 ### Track E. PHASE4 Product Work (진행 중)
@@ -295,11 +285,11 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-**[1] 지금 — Track F:**
+**[1] 지금 — Track F 마무리 (BUG-1~5):**
 ```text
-isafix.md 계획대로 구현해줘
+BUG-1,2,3,4,5 수정해줘
 ```
-규제 정합성. 모든 시뮬에서 ISA+SPY 차단. Track G의 선행 조건.
+TF1 팝업→배너, retirement.html 배너, ISA 캡 재설계, 슬라이더 입력. Track G 선행 조건.
 
 **[1] 병렬 가능 — PHASE4 빠른 항목:**
 ```text

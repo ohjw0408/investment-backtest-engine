@@ -19,7 +19,16 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> Track F + PHASE4 빠른 항목(F1/B2-b/B2-c/B3/D5) 구현 완료, GitHub push 완료. Hetzner 배포 필요(SSH 타임아웃). 브라우저 테스트 후 다음: D4(거래수수료) 또는 D1/D2(TDF/연금).
+> Track F 백엔드 구현 완료, 프론트 부분 미완 (TF1 팝업 버그, retirement.html 배너 없음). ISA 1억 캡 로직 재설계 필요(handoff.md). 다음: BUG-1~5 수정 또는 Track G.
+
+---
+
+## 최근 완료된 작업 (Claude 세션 2026-05-29 UI 버그 수정 + 문서 정비)
+
+- ✅ BUG-6 (리밸런싱 행 폭 변동): `.rebal-action` min-width:145px + flex-shrink:0, ₩amount min-width:100px 고정. 커밋 671b28b
+- ✅ TF5 (ISA 캡 배너 미표시): calculator.js 버전 문자열 20250523c5→20260529 갱신, 브라우저 캐시 강제 무효화. 커밋 e734b4a
+- ✅ `handoff.md` ISA 1억 캡 재설계 계획 추가: 월 납입금 균등 축소 → 납입 지속 후 한도 도달 시 중단 방식으로 변경. AccumulationAnalyzer `contribution_end_months` 파라미터 추가 설계.
+- ✅ 위키/플랜 파일 현황 반영 업데이트: phases.md (Track A/B/C/D + Phase 2c~3 완료), bugs.md (활성 BUG-1~5 추가), status.md (PHASE4 체크리스트 갱신), PROJECT_MASTER_ROADMAP.md (Track F 상태 수정)
 
 ---
 
@@ -211,8 +220,8 @@ tags: [dev]
 
 | 트랙 | 내용 | 선행 조건 | 실행 명령어 |
 |---|---|---|---|
-| **Track F** | ISA/계좌 규제 정합성 (`isafix.md`) | 없음 | `isafix.md 계획대로 구현해줘` |
-| Track F 병렬 | PHASE4 빠른 항목 (F1/B2-c/D4/D5/B2/B3) | 없음 | `PHASE4 다음 안전한 항목 진행해줘` |
+| **Track F** | ISA/계좌 규제 정합성 — 백엔드 ✅, 프론트 미완 (BUG-1/2/3/4/5 해결 필요) | 없음 | `BUG-1,2,3,4,5 수정해줘` |
+| Track F 병렬 | PHASE4 빠른 항목: D4 남음 (F1/B2-c/D5/B2-b/B3 완료) | 없음 | `PHASE4 다음 안전한 항목 진행해줘` |
 | Track G | 다중 계좌 시뮬 엔진 (`PHASE4_PLAN.md § 4G`) | Track F 완료 | `PHASE4_PLAN.md § 4G G1부터 구현해줘` |
 | ETF_BACKFILL V2 Ph.3+ | etf_master/etf_proxy_map 정밀 매핑, confidence A~F | Track G 시작 후 병렬 가능 | `ETF_BACKFILL_ARCHITECTURE_PLAN.md Phase 3부터 진행해줘` |
 | PHASE4 핵심 | D1/D2/B1/A4/C1/C2/B4 | Track G 이후 또는 병렬 | `PHASE4 다음 안전한 항목 진행해줘` |
@@ -226,14 +235,15 @@ tags: [dev]
 
 **중단기 (세금/데이터 독립적 → 병렬 가능):**
 - [ ] D4 거래수수료 설정 (1~2일) — Runner 안정 후
-- [ ] D5 인플레이션 검증 + 실질 생활비 표시 (2~3일)
+- [x] D5 인플레이션 검증 + 실질 생활비 표시 ✅ 7182ad1
 - [ ] A4 종목 상세 개선 + 시간봉 차트 (3~4일)
 - [ ] B1 포트폴리오 즐겨찾기/저장 (2~3일)
-- [ ] B2 자산 추이 스냅샷 + 홈 토글 (1~2일)
-- [ ] B3 리밸런싱 경고 밴드 (1일, B2 선행)
+- [x] B2-b 자산 추이 차트 (myassets 하단) ✅ 02cb3e8
+- [x] B2-c 내자산 현재가 Redis 캐싱 ✅ 1c5db23
+- [x] B3 리밸런싱 경고 밴드 ✅ 02cb3e8
 - [ ] C1 홈 화면 watchlist (2~3일)
 - [ ] C2 자산군별 수익률 비교 (2~3일)
-- [ ] F1 대기 순위 UX 수정 (0.5일)
+- [x] F1 대기 순위 UX 수정 ✅ 1c5db23
 
 **복잡한 기능 (순서 중요):**
 - [ ] B4 거래 트래킹 + 추가매수 고도화 (3~4일, B2/B3 선행)

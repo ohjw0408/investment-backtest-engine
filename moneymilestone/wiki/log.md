@@ -1,5 +1,18 @@
 # Log
 
+## [2026-05-29] fix+planning | UI 버그 수정 + ISA 캡 재설계 계획 + 문서 전면 정비
+
+- **커밋:** `671b28b` (rebal-action 폭 고정), `e734b4a` (calculator.js 캐시 무효화)
+- **BUG-6 수정:** 리밸런싱 행 `.rebal-action` min-width:145px/flex-shrink:0 추가, ₩amount min-width:100px. 메시지 길이 달라도 열 폭 고정.
+- **TF5 수정:** calculator.js 버전 문자열 `20250523c5→20260529`. 브라우저 캐시에서 구버전 JS 제공하던 문제 해결.
+- **ISA 1억 캡 재설계 계획** (`handoff.md` 추가): 현재 방식(월 납입 균등 축소) → 올바른 방식(납입 지속하다 1억 도달 시 납입 중단). AccumulationAnalyzer에 `contribution_end_months` 파라미터 추가 설계. 파이어 시나리오("N년 적립 후 코스팅") 범용 기능으로 확장 가능.
+- **문서 전면 정비:** phases.md (Track A/B/C/D + Phase 2c~3 ✅), bugs.md (활성 BUG-1~5 신규 기재), status.md (PHASE4 체크리스트 갱신 + 한 줄 요약 수정), PROJECT_MASTER_ROADMAP.md (Track F "Not started"→"Backend complete, BUG-1~5 remaining").
+- **미완료:** BUG-1(TF1 팝업), BUG-2(retirement.html 배너), BUG-3(연금 나이 입력), BUG-4(ISA 캡 재설계 구현), BUG-5(슬라이더 입력).
+
+_작성: Claude_
+
+---
+
 ## [2026-05-29] feature | PHASE4 빠른 항목들 — F1/B2-b/B2-c/B3/D5 구현
 
 - **커밋:** `1c5db23` (F1+B2-c), `02cb3e8` (B2-b+B3), `7182ad1` (D5) — GitHub push 완료. Hetzner 배포 필요.

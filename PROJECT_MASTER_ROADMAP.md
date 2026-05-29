@@ -1,6 +1,6 @@
 # Project Master Roadmap
 
-Last updated: 2026-05-28
+Last updated: 2026-05-29 (full priority rewrite)
 
 ## Purpose
 
@@ -12,37 +12,27 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 
 | File | Role | Status |
 |---|---|---|
-| `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed |
-| `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 2c implemented, Gate blocked by data/backfill issue |
-| `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | New architecture plan, not implemented |
-| `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | New integration plan, not implemented |
+| `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed (A1/A2/A3/A5/A6/B5/C3/C5/D3 done) |
+| `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | ✅ Phase 1~3 + 2d/2e all complete. All Gates passed. |
+| `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | Phase 0~2 complete. Phase 3+ (etf_master, etf_proxy_map, full US ETF universe, confidence grading) — planned after Track G. |
+| `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | ✅ Complete (Phase 1~10, all screens). |
+| `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | **Not started. Next action.** |
+| `PHASE4_PLAN.md § 4G` | Multi-account simulation engine + real ISA windmill (sequential/conditional flow). Requires Track F first. Key constraint: percentiles must be computed after per-scenario sum, not by summing individual percentiles. | Not started. Requires Track F first. |
 
 ## Current Situation
 
-The project was moving through PHASE4 product work and then shifted into a tax/simulation correctness refactor.
+All originally-blocking tracks are complete. No current blockers.
 
-Completed or mostly completed:
+Completed (as of 2026-05-29):
 
-- PHASE4 search/symbol UI items such as A1, A2, A3, A5.
-- PHASE4 A6 crypto data addition.
-- PHASE4 B2 my-assets basics, plus B5 rebalancing validation.
-- PHASE4 C3 market-index chart linkage and C5 sharing.
-- PHASE4 D3 tax settings UI.
-- Tax Phase 1 common tax core and liquidation correctness.
-- Tax Phase 2a TaxableSimulationRunner for backtest.
-- Tax Phase 2b AccumulationAnalyzer/calculator accumulation runner migration.
-- Tax Phase 2c dividend reverse-calculation runner migration appears implemented.
+- ✅ Tax Phase 1~3, Phase 2a/2b/2c/2d/2e — all Gates passed.
+- ✅ Track A: DJUSDIV_PROXY chain built, KQ150 mapping added, div_stats incomplete-year fix, PriceLoader backfill-failure bug fixed, index sufficiency check. SCHD vs TIGER now converge.
+- ✅ Track B: Phase 2c Gate revalidated and passed.
+- ✅ Track C: Synthetic data integration complete across all screens (Phases 1~10).
+- ✅ ETF_BACKFILL Phase 0~2: provenance DB (backfill_runs, price_daily_source, corporate_action_source), BackfillEngine integration.
+- ✅ PHASE4: A1/A2/A3/A5/A6/B5/C3/C5/D3 done.
 
-Current blocker:
-
-- During Phase 2c verification, `SCHD` and `TIGER 미국배당다우존스(458730)` produced materially different dividend-target results under same assumptions.
-- Investigation indicates this is primarily a data/backfill/synthetic-stats issue, not a tax-runner issue.
-- Main causes:
-  - `DJUSDIV100` index daily data is incomplete or too short.
-  - Korean U.S. Dividend Dow Jones ETFs have short actual histories and fall into synthetic assumptions too quickly.
-  - `DividendSimulator._calc_div_stats()` includes current incomplete year in price-return statistics.
-  - Backfilled and synthetic rows both rely on weak `volume = 0` identification.
-  - There is no provenance table for generated rows.
+Current blocker: **None.**
 
 ## Decision
 
@@ -80,173 +70,160 @@ Do not implement client-canonical storage. First implement server diagnostics, `
 
 ## Dependency Order
 
-High-level order:
-
 ```text
-Tax Phase 2c implemented
-  -> Backfill/data issue discovered
-  -> Backfill Phase 0~1 stabilization
-  -> Dividend stats short-history fix
-  -> Phase 2c Gate revalidation
-  -> Synthetic Data Integration facade/checkboxes
-  -> Tax Phase 2d withdrawal tax
-  -> Remaining PHASE4 advanced calculator items
-  -> Backfill V2 long-term architecture
+✅ Tax Phase 1~3 + 2a/2b/2c/2d/2e (전 Gate 통과)
+✅ Track A: backfill 안정화 (DJUSDIV_PROXY, KQ150, div_stats fix)
+✅ Track B: Phase 2c Gate 통과
+✅ Track C: Synthetic data 전 화면 완료
+✅ Track D: Tax 2d/2e/3 완료
+✅ PHASE4 부분 완료: A1/A2/A3/A5/A6/B5/C3/C5/D3
+
+현재 위치 ↓
+
+[1] Track F: ISA 규제 정합성 (isafix.md)
+    ├─ [PARALLEL] PHASE4 빠른 항목들 (F1/B2-c/D4/D5/B2/B3)
+
+[2] Track G: 다중 계좌 시뮬 엔진 (Track F 완료 후)
+    → G1 rolling engine (시나리오별 합산 → 퍼센타일)
+    → G2 ISA 풍차돌리기 (만기→2000만 재납입 + 나머지→위탁)
+    → G3 ISA→연금 이전 옵션 (선택)
+
+[3] ETF_BACKFILL V2 Phase 3+: 전체 아키텍처
+    → etf_master 테이블, etf_proxy_map 정밀 매핑
+    → confidence A~F 자동 분류
+    → 전체 미국 ETF 유니버스 수집
+    → 기존 volume=0 rows 마이그레이션
+    (Track G와 병렬 진행 가능 — 데이터 품질 기반 시뮬 신뢰도 향상)
+
+[4] PHASE4 핵심 기능: D1/D2/B1/A4/C1/C2/B4
+
+[5] E1 모바일 반응형
+
+[6] E2/E3/E4 최적화/캐시/데이터 보존
+
+[7] C4 온보딩 (전체 기능 안정화 후 마지막)
 ```
 
-Rationale:
-
-- Phase 2c cannot be trusted until SCHD/TIGER data differences are understood and bounded.
-- Synthetic checkbox work depends on having a clean common data-preparation entry point.
-- Backfill V2 is important but too large to block every other feature. Only its Phase 0~1 stabilization should be immediate.
+**핵심 규칙:**
+- Track G 퍼센타일: 시나리오 i마다 `combined_i = Σ account_i` → 그 분포에서 p10/p50/p90. 계좌별 퍼센타일 덧셈 금지.
+- ISA + US_DIRECT 조합: Track F 완료 후 모든 시뮬에서 hard error.
+- ETF_BACKFILL V2: 블로킹 아님이지만 영구 보류도 아님 — Track G 이후 병행 진행.
 
 ## Immediate Tracks
 
-### Track A. Data/Backfill Stabilization For Phase 2c Gate
+### Track A. Data/Backfill Stabilization ✅ COMPLETE
+
+Owner plan: `ETF_BACKFILL_ARCHITECTURE_PLAN.md`
+
+Completed 2026-05-28: DJUSDIV_PROXY chain, KQ150 mapping, _fetch_fred() fix, PriceLoader backfill-failure bug, index sufficiency check, div_stats incomplete-year fix. SCHD vs TIGER now converge.
+
+---
+
+### Track B. Phase 2c Gate Revalidation ✅ COMPLETE
+
+Owner plan: `세금에서시작된완전리팩토링계획.plan.md`
+
+Completed 2026-05-28: Gate 2c passed. G5/G6 all cases PASS.
+
+---
+
+### Track C. Synthetic Data Common Entry Point ✅ COMPLETE
+
+Owner plan: `SYNTHETIC_DATA_INTEGRATION_PLAN.md`
+
+Completed 2026-05-28: All phases 1~10 done. Synthetic checkbox + warning banners on all screens.
+
+---
+
+### Track D. Tax Phase 2d And Later ✅ COMPLETE
+
+Owner plan: `세금에서시작된완전리팩토링계획.plan.md`
+
+Completed 2026-05-28:
+- Phase 2d (withdrawal tax injection): Gate 2d PASSED 5/5.
+- Phase 2e (comprehensive tax warning + split-sale panel): done.
+- Phase 3 (ISA runner unification): done.
+
+### Track F. ISA/Account Regulatory Compliance
 
 Owner plan:
 
-- `ETF_BACKFILL_ARCHITECTURE_PLAN.md`
+- `isafix.md`
 
 Scope:
 
-- Only Phase 0~1 and the immediately listed code issues.
-- Do not start full U.S. ETF universe ingestion yet.
-- Do not implement the full Backfill Engine V2 dispatcher yet.
+- Enforce Korean financial regulation rules: account-type investment restrictions and ISA contribution limits.
+- Independent of Tracks A~E. Can run in parallel with Track A.
+
+Problem:
+
+- Investment calculator, retirement simulator, and dividend calculator allow invalid combinations (e.g., SPY + ISA, commodity ETFs + IRP) with no error.
+- ISA windmill (`isa_renewal=True`) allows unlimited contributions ignoring the 2,000만원/year and 1억원 total cap.
+- Backend already enforces restrictions in `backtest_logic.py` — this track extends that to all other simulators.
 
 Tasks:
 
-1. Add or run a diagnostic report for current backfill state.
-2. Confirm `DJUSDIV100` index daily range and source.
-3. Repair/populate `DJUSDIV100` if a reliable source is available.
-4. Add `KOSDAQ150 -> KQ150` mapping if still missing.
-5. Fix `index_loader_develop.py` so `_fetch_fred()` is a real method.
-6. Change `PriceLoader` so failed backfill attempts are not marked as completed in-session.
-7. Add index sufficiency checks before backfill accepts a proxy.
-8. Fix `dividend_simulator._calc_div_stats()` to exclude the current incomplete year from price-return statistics.
-9. Re-run SCHD vs TIGER 미국배당다우존스 comparison.
+1. Add `COMMODITY_ETF` classification to `base_tax.py:classify_instrument_type()` (keyword-based).
+2. Split 연금저축/IRP validation blocks in `account_tax.py:validate_account_portfolio()`. Add COMMODITY_ETF block for IRP only.
+3. Add `validate_isa_contribution(initial, monthly)` to `account_tax.py`. Formula: `monthly ≤ (2,000만 − initial) / 12`.
+4. Add validation to `calculator_logic.py`: account restrictions + ISA windmill hard block + ISA contribution limits + 1억 total cap with soft warning.
+5. Add same validation to `retirement_logic.py`.
+6. Add same validation to `dividend_logic.py`.
+7. Add frontend error/warning banners to `calculator.html`, `retirement.html` and corresponding JS.
 
 Exit criteria:
 
-- SCHD and Korean U.S. Dividend Dow Jones ETF no longer diverge merely because one has short actual history.
-- If they still differ, the difference is explainable by fees, currency, dividend schedule, tax, or confidence grade.
-- Phase 2c Gate can be evaluated without known bad data assumptions.
+- ISA + SPY → hard error in calculator/retirement/dividend (not just backtest).
+- IRP + commodity ETF → hard error.
+- 연금저축 + commodity ETF → passes (연금저축 allows it).
+- ISA + initial > 2,000만 → hard error.
+- ISA + `monthly > (2,000만 − initial) / 12` → hard error.
+- ISA + windmill → hard error with explanation.
+- ISA total > 1억 → simulation runs with capped monthly, prominent orange warning banner in results.
 
 Suggested command phrase:
 
 ```text
-마스터 로드맵의 Immediate Track A 진행해줘
+isafix.md 계획대로 구현해줘
 ```
 
-### Track B. Phase 2c Gate Revalidation
+### Track E. PHASE4 Product Work (진행 중)
 
-Owner plan:
+Owner plan: `PHASE4_PLAN.md`
 
-- `세금에서시작된완전리팩토링계획.plan.md`
+**완료:** A1/A2/A3/A5/A6/B5/C3/C5/D3
 
-Scope:
+**Track F와 병렬 가능 (의존성 없는 항목):**
 
-- Validate the already-implemented dividend reverse-calculation runner migration after Track A.
-- Do not add new product features here.
+| 항목 | 난이도 | 선행 조건 |
+|------|--------|-----------|
+| F1 대기 순위 UX 수정 | 0.5일 | 없음 |
+| B2-c 내자산 현재가 캐싱 | 0.5일 | 없음 |
+| D4 거래수수료 설정 | 1~2일 | 없음 |
+| D5 인플레이션 검증 + 실질생활비 | 2~3일 | 없음 |
+| B2 자산 추이 + 홈 토글 | 1~2일 | 없음 |
+| B3 리밸런싱 경고 밴드 | 1일 | B2 |
+| D6 합성 데이터 백테스트 체크박스 | 1~2일 | Track C ✅ |
 
-Tasks:
+**Track G 이후 또는 병렬 가능:**
 
-1. Re-run Gate 2c cases.
-2. Confirm tax ON produces lower net dividend outcome than tax OFF.
-3. Confirm tax OFF behavior is reasonably close to pre-Phase-2c output after data fixes.
-4. Confirm performance/caching has not regressed materially.
-5. Update tax plan status from "Gate revalidation blocked" to "Gate 2c passed" if successful.
+| 항목 | 난이도 | 선행 조건 |
+|------|--------|-----------|
+| B1 포트폴리오 즐겨찾기/저장 | 2~3일 | 없음 |
+| A4 종목 상세 개선 + 캔들차트 | 3~4일 | 없음 |
+| D1 TDF 기능 | 3~4일 | Tax 2d ✅ |
+| D2 연금 통합 계산기 | 4~5일 | Tax 2d ✅ |
+| C1 홈 화면 watchlist | 2~3일 | 없음 |
+| C2 자산군별 수익률 비교 | 2~3일 | 없음 |
 
-Exit criteria:
+**나중에 (선행 의존성 있는 것들):**
 
-- Gate 2c passes and is documented.
-- If it fails, the cause is categorized as tax logic, data logic, or performance.
-
-Suggested command phrase:
-
-```text
-Phase 2c Gate 재검증해줘
-```
-
-### Track C. Synthetic Data Common Entry Point
-
-Owner plan:
-
-- `SYNTHETIC_DATA_INTEGRATION_PLAN.md`
-
-Scope:
-
-- Implement common facade and opt-in checkbox for investment calculator and backtest/portfolio analysis.
-- Do not rewrite `DividendSimulator` synthetic logic yet.
-- Do not rewrite withdrawal in-memory synthetic cases yet.
-
-Tasks:
-
-1. Add `modules/data_preparation/scenario_data_preparer.py`.
-2. Add `allow_backfill` and `allow_synthetic` flags to existing `DataPreparer`.
-3. Integrate investment calculator backend with `use_synthetic`.
-4. Add calculator UI checkbox and result warning.
-5. Integrate backtest backend with `use_synthetic`.
-6. Add backtest UI checkbox and result warning.
-7. Refactor retirement logic to call facade while preserving behavior.
-
-Exit criteria:
-
-- Synthetic data is off by default in new tabs.
-- Results clearly warn when synthetic data was used.
-- Retirement behavior remains stable.
-- API responses expose `used_synthetic`, `synthetic_info`, `backfilled`, and `warnings`.
-
-Suggested command phrase:
-
-```text
-SYNTHETIC_DATA_INTEGRATION_PLAN Phase 1부터 진행해줘
-```
-
-### Track D. Tax Phase 2d And Later
-
-Owner plan:
-
-- `세금에서시작된완전리팩토링계획.plan.md`
-
-Scope:
-
-- Continue tax runner migration after Phase 2c Gate passes.
-
-Tasks:
-
-1. Phase 2d: withdrawal tax injection.
-2. Phase 2e: financial-income comprehensive tax warning and split-sale planner.
-3. Phase 3: cleanup, ISA runner unification, docs.
-
-Exit criteria:
-
-- Gate 2d and Gate 5 pass.
-- Tax behavior is unified across screens.
-
-Suggested command phrase:
-
-```text
-세금 Phase 2d 진행해줘
-```
-
-### Track E. PHASE4 Product Work
-
-Owner plan:
-
-- `PHASE4_PLAN.md`
-
-Scope:
-
-- Product UX and feature backlog.
-- Avoid simulation-core changes unless they are coordinated through the tax/data tracks.
-
-Recommended next PHASE4 items after data/tax unblock:
-
-- D6 synthetic data checkbox work should follow Track C.
-- D4 fee/slippage should wait until runner pipeline is stable.
-- D1/D2 retirement extensions should wait until Phase 2d withdrawal tax is done.
-- C4 onboarding should remain late-stage, after major feature surfaces stabilize.
+| 항목 | 난이도 | 선행 조건 |
+|------|--------|-----------|
+| B4 거래트래킹 + 추가매수 고도화 | 3~4일 | B2/B3 |
+| E1 모바일 반응형 | 5~7일 | 전체 기능 안정화 후 |
+| C4 온보딩 튜토리얼 | 1~2주 | B4 + 전체 |
+| E2/E3/E4 최적화/캐시 | 1~3일 | 트래픽 확인 후 |
 
 Suggested command phrase:
 
@@ -256,16 +233,13 @@ PHASE4 다음 안전한 항목 진행해줘
 
 ## Do Not Do Yet
 
-Do not do these until the immediate blocker is resolved:
-
-- Do not merge the four plan files into one large document.
-- Do not implement full U.S. ETF universe ingestion yet.
-- Do not rewrite all synthetic logic in one pass.
-- Do not delete legacy `volume = 0` rows without a migration/provenance plan.
-- Do not make client devices the canonical price-history store. Client storage is allowed only as a cache after server retention metadata and dry-run cleanup exist.
-- Do not add automatic server price-history deletion before `price_cache_meta`, protected-code resolution, and a reviewed dry-run report exist.
-- Do not continue tax Phase 2d assuming Phase 2c Gate is clean.
+- Do not merge the plan files into one large document.
+- Do not delete legacy `volume = 0` rows without provenance (`run_id`/`model_version`) — 마이그레이션 계획 없이 삭제 금지.
+- Do not make client devices the canonical price-history store. `price_cache_meta` + dry-run cleanup 구현 전까지 클라이언트는 캐시 전용.
+- Do not add automatic server price-history deletion before dry-run report reviewed.
 - Do not treat synthetic data as factual historical data in UI.
+- Do not start Track G before Track F is complete.
+- Do not sum percentiles across accounts in Track G — sum per-scenario first, then compute percentiles on the combined distribution.
 
 ## Status Update Rules
 
@@ -321,17 +295,31 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-Proceed with Track A.
-
-Reason:
-
-- It directly addresses the SCHD/TIGER dividend discrepancy.
-- It unblocks Phase 2c Gate revalidation.
-- It is smaller than full Backfill V2.
-- It reduces risk before adding synthetic-data checkboxes to more tabs.
-
-Next prompt to use:
-
+**[1] 지금 — Track F:**
 ```text
-마스터 로드맵의 Immediate Track A 진행해줘
+isafix.md 계획대로 구현해줘
 ```
+규제 정합성. 모든 시뮬에서 ISA+SPY 차단. Track G의 선행 조건.
+
+**[1] 병렬 가능 — PHASE4 빠른 항목:**
+```text
+PHASE4 다음 안전한 항목 진행해줘
+```
+
+**[2] Track F 완료 후 — Track G:**
+```text
+PHASE4_PLAN.md § 4G G1부터 구현해줘
+```
+다중 계좌 롤링 엔진. 퍼센타일 단순 덧셈 금지.
+
+**[3] Track G와 병렬 — ETF_BACKFILL V2 Phase 3+:**
+```text
+ETF_BACKFILL_ARCHITECTURE_PLAN.md Phase 3부터 진행해줘
+```
+etf_master/etf_proxy_map 정밀 매핑, confidence A~F, 전체 미국 ETF 유니버스. 시뮬 데이터 신뢰도 근본적 개선.
+
+**[4] 이후 — PHASE4 핵심/복잡한 기능:**
+D1/D2/B1/A4/C1/C2/B4
+
+**[5] 마지막 — 인프라/UX 마감:**
+E1 모바일, E2/E3/E4 최적화, C4 온보딩

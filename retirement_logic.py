@@ -108,6 +108,44 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
         from modules.tax.base_tax import TaxEngine
         ret_tax_engine = TaxEngine(user_settings)
 
+    # ── 계좌 유형 규제 검증 ─────────────────────────────────────────
+    import json as _json
+    if tax_enabled and account_type != '위탁':
+        from modules.tax.account_tax import validate_account_portfolio
+        _te = ret_tax_engine or __import__('modules.tax.base_tax', fromlist=['TaxEngine']).TaxEngine(user_settings)
+        _check = validate_account_portfolio(account_type, ticker_codes, target_weights, _te)
+        if not _check['valid']:
+            raise ValueError(_json.dumps({
+                'error': 'account_restrictions',
+                'violations': _check['violations'],
+                'disclaimer': _check.get('disclaimer'),
+            }, ensure_ascii=False))
+
+    if tax_enabled and account_type == 'ISA':
+        if isa_renewal:
+            raise ValueError(_json.dumps({
+                'error': 'isa_windmill_disabled',
+                'violations': [
+                    "ISA 풍차돌리기를 지원하지 않습니다. "
+                    "ISA 만기 후 수령액은 연간 납입 한도(2,000만원)를 대부분 초과하여 "
+                    "재납입이 불가합니다. ISA 계좌를 일반 모드로 선택하거나 위탁 계좌를 이용하세요."
+                ],
+            }, ensure_ascii=False))
+
+        from modules.tax.account_tax import validate_isa_contribution
+        _isa_errors = validate_isa_contribution(initial_capital, monthly_contribution)
+        if _isa_errors:
+            raise ValueError(_json.dumps({
+                'error': 'isa_contribution_limit',
+                'violations': _isa_errors,
+            }, ensure_ascii=False))
+
+        _ISA_TOTAL_LIMIT = 100_000_000
+        _planned_total = initial_capital + monthly_contribution * 12 * accumulation_years
+        if _planned_total > _ISA_TOTAL_LIMIT:
+            _remaining = max(0.0, _ISA_TOTAL_LIMIT - initial_capital)
+            monthly_contribution = _remaining / (accumulation_years * 12) if accumulation_years > 0 else 0.0
+
     # AccumulationAnalyzer 진행률 0→50% 스케일링
     _acc_start = time.time()
     def acc_progress(current, total, elapsed):

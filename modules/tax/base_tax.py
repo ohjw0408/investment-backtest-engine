@@ -23,6 +23,13 @@ import sqlite3
 _KR_ETF_LOOKUP: dict | None = None   # code → {name, index, leverage}
 _US_ETF_SET:    set   | None = None   # 미국 상장 ETF 코드 집합
 
+# ── 원자재 ETF 이름 키워드 (IRP 투자 불가) ──────────────────
+_COMMODITY_KEYWORDS = (
+    "금선물", "골드선물", "원유선물", "원자재", "귀금속", "천연가스", "구리선물",
+    "농산물", "WTI", "GOLD", "OIL", "CRUDE", "SILVER", "COMMODITY", "COMMODIT",
+    "NATURAL GAS", "COPPER", "WHEAT", "CORN",
+)
+
 _KR_LISTED_SET: set | None = None
 
 
@@ -623,6 +630,7 @@ class TaxEngine:
         'ETF'           일반 ETF
         'LEVERAGED_ETF' 레버리지 ETF
         'INVERSE_ETF'   인버스 ETF
+        'COMMODITY_ETF' 원자재 ETF (금선물·원유·원자재 등) — IRP 투자 불가
         'STOCK'         개별주식
         'UNKNOWN'       판별 불가
         """
@@ -652,6 +660,9 @@ class TaxEngine:
                         return "LEVERAGED_ETF"
                     if any(k in name for k in ["인버스", "INVERSE", "-1X", "-2X"]):
                         return "INVERSE_ETF"
+                    name_upper = name.upper()
+                    if any(k.upper() in name_upper for k in _COMMODITY_KEYWORDS):
+                        return "COMMODITY_ETF"
                     return "ETF"
         except Exception:
             pass
@@ -665,6 +676,9 @@ class TaxEngine:
                     return "LEVERAGED_ETF"
                 if lev < 0:
                     return "INVERSE_ETF"
+                combined = (info["name"] + " " + info["index"]).upper()
+                if any(k.upper() in combined for k in _COMMODITY_KEYWORDS):
+                    return "COMMODITY_ETF"
                 return "ETF"
 
         # 3. us_etf_list.csv 조회 (알파벳 US 코드)

@@ -465,6 +465,16 @@
             <div class="survival-bar-fill" id="retSurvivalBar" style="width:0%"></div>
           </div>
         </div>
+        <!-- 계좌 종목 제한 에러 배너 -->
+        <div id="retAccountRestrictBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
+          <strong>⛔ 계좌 유형 제한 위반</strong>
+          <div id="retAccountRestrictDetail" style="margin-top:6px;line-height:1.7;"></div>
+        </div>
+        <!-- ISA 납입 한도 초과 에러 배너 -->
+        <div id="retIsaLimitErrorBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
+          <strong>⛔ ISA 납입 한도 초과</strong>
+          <div id="retIsaLimitErrorDetail" style="margin-top:6px;line-height:1.7;"></div>
+        </div>
         <div class="ret-msg-box" id="retMsgBox"></div>
       </div>
 
@@ -736,7 +746,32 @@ async function runRetirement() {
       try { localStorage.setItem('mm_result_retirement', JSON.stringify({result: data, body, ts: Date.now()})); } catch(e) {}
     }
   } catch(e) {
-    if (e.message !== 'CANCELLED') alert('오류가 발생했습니다: ' + e.message);
+    if (e.message !== 'CANCELLED') {
+      let _handled = false;
+      try {
+        const _errData = JSON.parse(e.message);
+        const _errType = _errData.error;
+        if (_errType === 'account_restrictions' || _errType === 'isa_windmill_disabled') {
+          const banner = document.getElementById('retAccountRestrictBanner');
+          const detail = document.getElementById('retAccountRestrictDetail');
+          if (banner && detail) {
+            detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
+            if (_errData.disclaimer) detail.innerHTML += `<div style="margin-top:6px;font-style:italic;">${_errData.disclaimer}</div>`;
+            banner.style.display = 'block';
+            _handled = true;
+          }
+        } else if (_errType === 'isa_contribution_limit') {
+          const banner = document.getElementById('retIsaLimitErrorBanner');
+          const detail = document.getElementById('retIsaLimitErrorDetail');
+          if (banner && detail) {
+            detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
+            banner.style.display = 'block';
+            _handled = true;
+          }
+        }
+      } catch(_) {}
+      if (!_handled) alert('오류가 발생했습니다: ' + e.message);
+    }
   } finally {
     localStorage.removeItem('mm_task_retirement');
     _retTaskId = null;

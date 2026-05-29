@@ -45,6 +45,30 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
     }
     tax_engine = TaxEngine(user_settings) if tax_enabled else None
 
+    # ── 계좌 유형 규제 검증 ─────────────────────────────────────────
+    import json as _json
+    if tax_enabled and account_type != '위탁':
+        from modules.tax.account_tax import validate_account_portfolio
+        _te = tax_engine or TaxEngine(user_settings)
+        _check = validate_account_portfolio(account_type, ticker_codes, target_weights, _te)
+        if not _check['valid']:
+            raise ValueError(_json.dumps({
+                'error': 'account_restrictions',
+                'violations': _check['violations'],
+                'disclaimer': _check.get('disclaimer'),
+            }, ensure_ascii=False))
+
+    if tax_enabled and account_type == 'ISA':
+        from modules.tax.account_tax import validate_isa_contribution
+        _seed_initial  = float((body.get('seed') or {}).get('center', 0))
+        _monthly_val   = float((body.get('monthly') or {}).get('center', 0))
+        _isa_errors = validate_isa_contribution(_seed_initial, _monthly_val)
+        if _isa_errors:
+            raise ValueError(_json.dumps({
+                'error': 'isa_contribution_limit',
+                'violations': _isa_errors,
+            }, ensure_ascii=False))
+
     sim = DividendSimulator(
         loader       = portfolio_engine.loader,
         tickers      = ticker_codes,

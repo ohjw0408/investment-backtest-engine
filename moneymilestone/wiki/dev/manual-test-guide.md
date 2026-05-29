@@ -1,9 +1,15 @@
 ---
-updated: 2026-05-28
+updated: 2026-05-29
 tags: [dev, test]
 ---
 
-# 수동 테스트 가이드 — 미검증 4개 항목
+# 수동 테스트 가이드
+
+**2026-05-29 현재 상태:**
+- T1: ✅ PASS (가상 데이터 배너 — 479080 synthetic ON 검증)
+- T2: ✅ PASS (종합과세 경고 + 분할매도 패널 — 458730 위탁 검증)
+- T3: ✅ PASS (ETF 백필 provenance DB 존재 확인)
+- T4: ⛔ 무효 — Track F(isafix) 구현 시 ISA 풍차돌리기 자체가 hard block됨. Track G(G2) 완료 후 재작성 필요.
 
 서버 배포 후 직접 눌러서 확인할 것. 결과를 Claude에게 알려주면 버그 수정 진행.
 

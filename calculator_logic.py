@@ -146,6 +146,58 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
         from modules.tax.base_tax import TaxEngine
         tax_engine = TaxEngine(user_settings)
 
+    # ── 계좌 유형 규제 검증 ─────────────────────────────────────────
+    import json as _json
+    if tax_enabled and account_type != '위탁':
+        from modules.tax.account_tax import validate_account_portfolio
+        _te = tax_engine or __import__('modules.tax.base_tax', fromlist=['TaxEngine']).TaxEngine(user_settings)
+        _check = validate_account_portfolio(account_type, ticker_codes, target_weights, _te)
+        if not _check['valid']:
+            raise ValueError(_json.dumps({
+                'error': 'account_restrictions',
+                'violations': _check['violations'],
+                'disclaimer': _check.get('disclaimer'),
+            }, ensure_ascii=False))
+
+    if tax_enabled and account_type == 'ISA':
+        # ISA 풍차돌리기 차단 (만기 수령액이 연간 납입 한도 초과 → 재납입 불가)
+        if isa_renewal:
+            raise ValueError(_json.dumps({
+                'error': 'isa_windmill_disabled',
+                'violations': [
+                    "ISA 풍차돌리기를 지원하지 않습니다. "
+                    "ISA 만기 후 수령액은 연간 납입 한도(2,000만원)를 대부분 초과하여 "
+                    "재납입이 불가합니다. ISA 계좌를 일반 모드로 선택하거나 위탁 계좌를 이용하세요."
+                ],
+            }, ensure_ascii=False))
+
+        # ISA 납입 한도 하드 체크
+        from modules.tax.account_tax import validate_isa_contribution
+        _isa_errors = validate_isa_contribution(initial_capital, monthly_contrib)
+        if _isa_errors:
+            raise ValueError(_json.dumps({
+                'error': 'isa_contribution_limit',
+                'violations': _isa_errors,
+            }, ensure_ascii=False))
+
+        # ISA 총 납입 1억 캡
+        _ISA_TOTAL_LIMIT = 100_000_000
+        _planned_total = initial_capital + monthly_contrib * 12 * years
+        _isa_cap_info = None
+        if _planned_total > _ISA_TOTAL_LIMIT:
+            _remaining = max(0.0, _ISA_TOTAL_LIMIT - initial_capital)
+            _orig_monthly = monthly_contrib
+            monthly_contrib = _remaining / (years * 12) if years > 0 else 0.0
+            _isa_cap_info = {
+                'capped': True,
+                'original_total': round(_planned_total),
+                'capped_total': _ISA_TOTAL_LIMIT,
+                'original_monthly': round(_orig_monthly),
+                'adjusted_monthly': round(monthly_contrib),
+            }
+    else:
+        _isa_cap_info = None
+
     analyzer = AccumulationAnalyzer(
         portfolio_engine     = portfolio_engine,
         tickers              = ticker_codes,
@@ -199,6 +251,7 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
         'distribution_early_cancel': result.get('distribution_early_cancel'),
         'isa_partial_cycle':        has_partial_isa,
         'isa_remainder_years':      years % 3 if has_partial_isa else 0,
+        'isa_cap_info':             _isa_cap_info,
         'used_synthetic':           _prep_meta.get('used_synthetic', False),
         'synthetic_info':           _prep_meta.get('synthetic_info', {}),
         'backfilled':               _prep_meta.get('backfilled', []),

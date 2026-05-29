@@ -19,7 +19,7 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> 세금 리팩토링 Phase 1~3 완료. SYNTHETIC_DATA_INTEGRATION_PLAN 완료. 가상 데이터 시뮬 버그 5종 수정 (DB오염·무한대기·배너누락·2007이상치·float크래시). 다음: 수동 테스트 T1/T2/T4 브라우저 직접 확인 후 PHASE4 잔여.
+> Track A/B/C/D + 세금 Phase 1~3 전부 완료. 수동 테스트 T1~T4 완료(T4는 Track F 이후 무효). 다음: Track F(ISA 규제 정합성 isafix.md) → Track G(다중 계좌 시뮬) → ETF_BACKFILL V2 Phase 3+.
 
 ---
 
@@ -211,12 +211,13 @@ tags: [dev]
 
 | 트랙 | 내용 | 선행 조건 | 실행 명령어 |
 |---|---|---|---|
-| **Track A** | ETF 데이터/백필 안정화 | 없음 (지금 시작) | `마스터 로드맵의 Immediate Track A 진행해줘` |
-| Track B | Phase 2c Gate 재검증 | Track A 완료 | `Phase 2c Gate 재검증해줘` |
-| Track C | 합성 데이터 공통 facade | Track B 완료 | `SYNTHETIC_DATA_INTEGRATION_PLAN Phase 1부터 진행해줘` |
-| Track D | 세금 Phase 2d (은퇴 인출 세금) | Track B 완료 | `세금 Phase 2d 진행해줘` |
-| Track D | 세금 Phase 2e (종합과세 경고 패널) | Phase 2d 완료 | — |
-| Track D | 세금 Phase 3 (정리·ISA Runner 통일) | Phase 2d+e 완료 | — |
+| **Track F** | ISA/계좌 규제 정합성 (`isafix.md`) | 없음 | `isafix.md 계획대로 구현해줘` |
+| Track F 병렬 | PHASE4 빠른 항목 (F1/B2-c/D4/D5/B2/B3) | 없음 | `PHASE4 다음 안전한 항목 진행해줘` |
+| Track G | 다중 계좌 시뮬 엔진 (`PHASE4_PLAN.md § 4G`) | Track F 완료 | `PHASE4_PLAN.md § 4G G1부터 구현해줘` |
+| ETF_BACKFILL V2 Ph.3+ | etf_master/etf_proxy_map 정밀 매핑, confidence A~F | Track G 시작 후 병렬 가능 | `ETF_BACKFILL_ARCHITECTURE_PLAN.md Phase 3부터 진행해줘` |
+| PHASE4 핵심 | D1/D2/B1/A4/C1/C2/B4 | Track G 이후 또는 병렬 | `PHASE4 다음 안전한 항목 진행해줘` |
+| E1 모바일 | 반응형 디자인 | 전체 기능 안정화 후 | — |
+| C4 온보딩 | 튜토리얼 | B4 + 전체 | — |
 | Track E | PHASE4 잔여 기능 | Track A 완료 후 안전한 것부터 | `PHASE4 다음 안전한 항목 진행해줘` |
 
 ---

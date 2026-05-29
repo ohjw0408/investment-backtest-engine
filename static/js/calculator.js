@@ -329,7 +329,34 @@ async function runCalculator() {
   } catch (err) {
     if (err.message !== 'CANCELLED') {
       hideProgressUI();
-      alert('오류: ' + err.message);
+      let _handled = false;
+      try {
+        const _errData = JSON.parse(err.message);
+        const _errType = _errData.error;
+        if (_errType === 'account_restrictions' || _errType === 'isa_windmill_disabled') {
+          const banner = document.getElementById('accountRestrictBanner');
+          const detail = document.getElementById('accountRestrictDetail');
+          if (banner && detail) {
+            detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
+            if (_errData.disclaimer) detail.innerHTML += `<div style="margin-top:6px;font-style:italic;">${_errData.disclaimer}</div>`;
+            banner.style.display = 'block';
+            document.getElementById('resultContent').style.display = 'block';
+            document.getElementById('resultEmpty').style.display = 'none';
+            _handled = true;
+          }
+        } else if (_errType === 'isa_contribution_limit') {
+          const banner = document.getElementById('isaLimitErrorBanner');
+          const detail = document.getElementById('isaLimitErrorDetail');
+          if (banner && detail) {
+            detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
+            banner.style.display = 'block';
+            document.getElementById('resultContent').style.display = 'block';
+            document.getElementById('resultEmpty').style.display = 'none';
+            _handled = true;
+          }
+        }
+      } catch (_) {}
+      if (!_handled) alert('오류: ' + err.message);
     }
   } finally {
     localStorage.removeItem('mm_task_calculator');
@@ -517,6 +544,29 @@ function renderResult(data, payload) {
   document.getElementById('resultEmpty').style.display   = 'none';
   document.getElementById('resultContent').style.display = 'block';
   _lastCalcResult = data;
+
+  // 에러 배너 숨기기 (성공 결과 표시 시 초기화)
+  ['accountRestrictBanner', 'isaLimitErrorBanner', 'isaCapBanner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+
+  // ISA 총 납입 캡 경고
+  const capInfo = data.isa_cap_info;
+  if (capInfo && capInfo.capped) {
+    const capBanner = document.getElementById('isaCapBanner');
+    const capDetail = document.getElementById('isaCapDetail');
+    if (capBanner && capDetail) {
+      const orig  = Math.round(capInfo.original_total  / 10000).toLocaleString();
+      const origM = Math.round(capInfo.original_monthly / 10000).toLocaleString();
+      const adjM  = Math.round(capInfo.adjusted_monthly / 10000).toLocaleString();
+      capDetail.innerHTML =
+        `ISA 납입 한도(5년 총 1억원)를 초과하여 월 납입금이 자동 조정되었습니다.<br>` +
+        `계획 총 납입 <strong>${orig}만원</strong> → 시뮬레이션 적용 <strong>1억원</strong><br>` +
+        `월 납입금: <strong>${origM}만원</strong> → <strong>${adjM}만원</strong>으로 조정`;
+      capBanner.style.display = 'block';
+    }
+  }
 
   // ISA 중도해지 체크박스 초기화
   const isaCheck = document.getElementById('isaEarlyCancelCheck');

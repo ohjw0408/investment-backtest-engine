@@ -81,6 +81,38 @@ def check_contribution_limits(accounts: list[dict]) -> list[str]:
     return warnings
 
 
+_ISA_ANNUAL_LIMIT = 20_000_000
+
+
+def validate_isa_contribution(initial: float, monthly: float) -> list[str]:
+    """
+    ISA 납입 규칙 하드 체크.
+    - 초기 납입 > 2,000만 → 오류
+    - 월 납입 > (2,000만 - initial) / 12 → 오류
+    위반 시 오류 메시지 리스트 반환. 빈 리스트면 유효.
+    """
+    errors: list[str] = []
+    initial = float(initial or 0.0)
+    monthly = float(monthly or 0.0)
+
+    if initial > _ISA_ANNUAL_LIMIT:
+        errors.append(
+            f"ISA 초기 납입금 {initial:,.0f}원이 연간 납입 한도(2,000만원)를 초과합니다. "
+            f"ISA는 개설 후 연간 최대 2,000만원까지만 납입 가능합니다."
+        )
+        return errors
+
+    annual_remaining = _ISA_ANNUAL_LIMIT - initial
+    monthly_max = annual_remaining / 12
+    if monthly > monthly_max:
+        errors.append(
+            f"ISA 월 납입금 {monthly:,.0f}원이 가능한 한도({monthly_max:,.0f}원)를 초과합니다. "
+            f"연간 한도 2,000만원에서 초기 납입금 {initial:,.0f}원을 제외한 "
+            f"잔여 {annual_remaining:,.0f}원을 12개월로 나눈 값입니다."
+        )
+    return errors
+
+
 # ── 계좌별 투자 제약 검증 ────────────────────────────────────
 
 def validate_account_portfolio(
@@ -119,24 +151,47 @@ def validate_account_portfolio(
                     f"국내 상장 ETF(예: TIGER 미국S&P500)를 이용하세요."
                 )
 
-        elif account_type in ("연금저축", "IRP"):
+        elif account_type == "연금저축":
             if market == "US_DIRECT":
                 violations.append(
-                    f"{account_type} 계좌는 해외 직접 상장 종목({ticker})을 보유할 수 없습니다. "
+                    f"연금저축 계좌는 해외 직접 상장 종목({ticker})을 보유할 수 없습니다. "
                     f"국내 상장 ETF를 이용하세요."
                 )
             elif inst == "STOCK":
                 violations.append(
-                    f"{account_type} 계좌는 개별주식({ticker})을 보유할 수 없습니다. "
-                    f"ETF만 투자 가능합니다."
+                    f"연금저축 계좌는 개별주식({ticker})을 보유할 수 없습니다. ETF만 투자 가능합니다."
                 )
             elif inst == "LEVERAGED_ETF":
                 violations.append(
-                    f"{account_type} 계좌는 레버리지 ETF({ticker})를 보유할 수 없습니다."
+                    f"연금저축 계좌는 레버리지 ETF({ticker})를 보유할 수 없습니다."
                 )
             elif inst == "INVERSE_ETF":
                 violations.append(
-                    f"{account_type} 계좌는 인버스 ETF({ticker})를 보유할 수 없습니다."
+                    f"연금저축 계좌는 인버스 ETF({ticker})를 보유할 수 없습니다."
+                )
+
+        elif account_type == "IRP":
+            if market == "US_DIRECT":
+                violations.append(
+                    f"IRP 계좌는 해외 직접 상장 종목({ticker})을 보유할 수 없습니다. "
+                    f"국내 상장 ETF를 이용하세요."
+                )
+            elif inst == "STOCK":
+                violations.append(
+                    f"IRP 계좌는 개별주식({ticker})을 보유할 수 없습니다. ETF만 투자 가능합니다."
+                )
+            elif inst == "LEVERAGED_ETF":
+                violations.append(
+                    f"IRP 계좌는 레버리지 ETF({ticker})를 보유할 수 없습니다."
+                )
+            elif inst == "INVERSE_ETF":
+                violations.append(
+                    f"IRP 계좌는 인버스 ETF({ticker})를 보유할 수 없습니다."
+                )
+            elif inst == "COMMODITY_ETF":
+                violations.append(
+                    f"IRP 계좌는 원자재 ETF({ticker})를 보유할 수 없습니다. "
+                    f"주식형·채권형 ETF만 투자 가능합니다."
                 )
 
     # IRP 위험자산 70% 한도 추가 검증

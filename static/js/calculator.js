@@ -22,6 +22,21 @@ function calcRestoreForm(payload) {
   if (payload.years !== undefined) { set('yearsSlider', payload.years); document.getElementById('yearsLabel').textContent = payload.years + '년'; }
   if (payload.dividend_mode) { const el = document.querySelector(`input[name="dividend"][value="${payload.dividend_mode}"]`); if (el) el.checked = true; }
   if (payload.rebal_mode) { const el = document.querySelector(`input[name="rebal"][value="${payload.rebal_mode}"]`); if (el) el.checked = true; }
+  if (payload.accounts?.length > 1) {
+    if (!window.taxEnabled) toggleTax();
+    window.taxAccounts = payload.accounts.map((a, i) => ({
+      type: a.type || '위탁',
+      initial_capital: Number(a.initial_capital || 0),
+      monthly_contribution: Number(a.monthly_contribution || 0),
+      tickers: i === 0 ? [] : (a.tickers || []).map(t => ({
+        code: t.code,
+        name: t.name || t.code,
+        badge: t.badge || '',
+        weight: Math.round(Number(t.weight || 0) * 100),
+      })),
+    }));
+    renderTaxAccounts();
+  }
 }
 
 // ── 취소 ──
@@ -38,10 +53,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('initialCapital').addEventListener('input', e => {
     document.getElementById('initialHint').textContent = '₩' + Number(e.target.value).toLocaleString();
+    renderTaxAccounts();
   });
 
   document.getElementById('monthlyContrib').addEventListener('input', e => {
     document.getElementById('monthlyHint').textContent = '₩' + Number(e.target.value).toLocaleString();
+    renderTaxAccounts();
   });
 
   document.getElementById('yearsSlider').addEventListener('input', e => {
@@ -252,6 +269,45 @@ function updateWeightBar() {
   }
 }
 
+function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
+  const accs = window.taxAccounts || [];
+  if (accs.length <= 1) return null;
+
+  const primary = {
+    type: accs[0]?.type || '위탁',
+    initial_capital: Number(document.getElementById('initialCapital').value) || 0,
+    monthly_contribution: Number(document.getElementById('monthlyContrib').value) || 0,
+    tickers: tickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: t.weight / 100 })),
+    rebal_mode: rebalMode,
+    band_width: bandWidth,
+    dividend_mode: dividendMode,
+  };
+
+  const accounts = [primary];
+  for (let i = 1; i < accs.length; i++) {
+    const accTickers = ensureAccountTickers(i);
+    if (accTickers.length === 0) {
+      alert(`계좌 ${i + 1}에 종목을 최소 1개 이상 추가해주세요.`);
+      return false;
+    }
+    const totalWeight = accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0);
+    if (totalWeight > 100) {
+      alert(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`);
+      return false;
+    }
+    accounts.push({
+      type: accs[i].type || '위탁',
+      initial_capital: Number(accs[i].initial_capital || 0),
+      monthly_contribution: Number(accs[i].monthly_contribution || 0),
+      tickers: accTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: (Number(t.weight) || 0) / 100 })),
+      rebal_mode: rebalMode,
+      band_width: bandWidth,
+      dividend_mode: dividendMode,
+    });
+  }
+  return accounts;
+}
+
 // ── 시뮬레이션 실행 ──
 async function runCalculator() {
   if (tickers.length === 0) { alert('종목을 최소 1개 이상 추가해주세요.'); return; }
@@ -274,19 +330,17 @@ async function runCalculator() {
   const isSingle    = taxAccounts.length <= 1;
   const totalInit   = Number(document.getElementById('initialCapital').value);
   const totalMon    = Number(document.getElementById('monthlyContrib').value);
-
-  const accountType   = taxAccounts.length > 0 ? taxAccounts[0].type : '위탁';
-  const effectiveInit = taxAccounts.length > 0
-    ? taxAccounts.reduce((s,a) => s + (isSingle ? totalInit : Math.round(totalInit * a.pct/100)), 0)
-    : totalInit;
-  const effectiveMon = taxAccounts.length > 0
-    ? taxAccounts.reduce((s,a) => s + (isSingle ? totalMon : Math.round(totalMon * a.pct/100)), 0)
-    : totalMon;
+  const accountType = taxAccounts.length > 0 ? taxAccounts[0].type : '위탁';
+  const accountsPayload = taxEnabled ? buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) : null;
+  if (accountsPayload === false) {
+    btn.disabled = false;
+    return;
+  }
 
   const payload = {
     tickers:              tickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: t.weight / 100 })),
-    initial_capital:      isSingle ? totalInit : effectiveInit,
-    monthly_contribution: isSingle ? totalMon  : effectiveMon,
+    initial_capital:      totalInit,
+    monthly_contribution: totalMon,
     years:                Number(document.getElementById('yearsSlider').value),
     rebal_mode:           rebalMode,
     band_width:           bandWidth,
@@ -303,6 +357,9 @@ async function runCalculator() {
       pension_age:   Number(taxProfile.pension_age || 65),
     } : {},
   };
+  if (accountsPayload && accountsPayload.length > 1) {
+    payload.accounts = accountsPayload;
+  }
 
   showProgressUI();
 
@@ -542,6 +599,43 @@ function toggleIsaEarlyCancel(checked) {
   renderRollingChart(cases);
 }
 
+function renderMultiAccountSummary(multiAccount) {
+  const wrap = document.getElementById('multiAccountSummary');
+  if (!wrap) return;
+  if (!multiAccount || !multiAccount.enabled || !multiAccount.accounts?.length) {
+    wrap.style.display = 'none';
+    wrap.innerHTML = '';
+    return;
+  }
+
+  const warnings = (multiAccount.contribution_warnings || []).map(w =>
+    `<div style="font-size:0.76rem;color:#C62828;background:#FFEBEE;border-radius:6px;padding:6px 8px;margin-top:6px;">${w}</div>`
+  ).join('');
+  const rows = multiAccount.accounts.map((acc, i) => {
+    const d = acc.distribution?.end_value || {};
+    return `
+      <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;">
+          <div style="font-size:0.82rem;font-weight:800;color:var(--text);">계좌 ${i + 1}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">${acc.type || '위탁'}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+          <div><div style="font-size:0.68rem;color:var(--text-muted);">하위10%</div><div style="font-size:0.82rem;font-weight:800;">${fmtKRW(d.p10)}</div></div>
+          <div><div style="font-size:0.68rem;color:var(--text-muted);">중앙값</div><div style="font-size:0.82rem;font-weight:800;">${fmtKRW(d.p50)}</div></div>
+          <div><div style="font-size:0.68rem;color:var(--text-muted);">상위10%</div><div style="font-size:0.82rem;font-weight:800;">${fmtKRW(d.p90)}</div></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="result-card" style="margin-bottom:0;">
+      <div class="result-card-title">계좌별 종료 자산</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">${rows}</div>
+      ${warnings}
+    </div>`;
+  wrap.style.display = 'block';
+}
+
 // ── 결과 렌더링 ──
 function renderResult(data, payload) {
   document.getElementById('resultEmpty').style.display   = 'none';
@@ -563,15 +657,26 @@ function renderResult(data, payload) {
     const capBanner = document.getElementById('isaCapBanner');
     const capDetail = document.getElementById('isaCapDetail');
     if (capBanner && capDetail) {
-      const orig  = Math.round(capInfo.original_total  / 10000).toLocaleString();
-      const origM = Math.round(capInfo.original_monthly / 10000).toLocaleString();
-      const stopY = capInfo.stop_years ?? 0;
-      const stopMr = capInfo.stop_months_remainder ?? 0;
-      const stopStr = stopMr > 0 ? `${stopY}년 ${stopMr}개월` : `${stopY}년`;
-      capDetail.innerHTML =
-        `ISA 총 납입 한도(1억원)에 도달하여 납입이 자동 중단됩니다.<br>` +
-        `계획 총 납입 <strong>${orig}만원</strong> → 실제 적용 <strong>1억원</strong><br>` +
-        `월 <strong>${origM}만원</strong> × <strong>${stopStr}</strong> 납입 후 중단, 이후 자산만 복리 운용`;
+      if (Array.isArray(capInfo.accounts)) {
+        capDetail.innerHTML = capInfo.accounts.map(info => {
+          const orig  = Math.round(info.original_total  / 10000).toLocaleString();
+          const origM = Math.round(info.original_monthly / 10000).toLocaleString();
+          const stopY = info.stop_years ?? 0;
+          const stopMr = info.stop_months_remainder ?? 0;
+          const stopStr = stopMr > 0 ? `${stopY}년 ${stopMr}개월` : `${stopY}년`;
+          return `${info.account_label || 'ISA 계좌'}: 계획 총 납입 <strong>${orig}만원</strong> → <strong>1억원</strong>, 월 <strong>${origM}만원</strong> × <strong>${stopStr}</strong> 후 중단`;
+        }).join('<br>');
+      } else {
+        const orig  = Math.round(capInfo.original_total  / 10000).toLocaleString();
+        const origM = Math.round(capInfo.original_monthly / 10000).toLocaleString();
+        const stopY = capInfo.stop_years ?? 0;
+        const stopMr = capInfo.stop_months_remainder ?? 0;
+        const stopStr = stopMr > 0 ? `${stopY}년 ${stopMr}개월` : `${stopY}년`;
+        capDetail.innerHTML =
+          `ISA 총 납입 한도(1억원)에 도달하여 납입이 자동 중단됩니다.<br>` +
+          `계획 총 납입 <strong>${orig}만원</strong> → 실제 적용 <strong>1억원</strong><br>` +
+          `월 <strong>${origM}만원</strong> × <strong>${stopStr}</strong> 납입 후 중단, 이후 자산만 복리 운용`;
+      }
       capBanner.style.display = 'block';
     }
   }
@@ -617,6 +722,7 @@ function renderResult(data, payload) {
   document.getElementById('distP10').textContent = fmtKRW(dist.end_value.p10);
   document.getElementById('distP50').textContent = fmtKRW(dist.end_value.p50);
   document.getElementById('distP90').textContent = fmtKRW(dist.end_value.p90);
+  renderMultiAccountSummary(data.multi_account);
 
   // 롤링 케이스 차트
   renderRollingChart(data.cases);
@@ -685,7 +791,9 @@ function renderResult(data, payload) {
 
   // 공유 데이터 저장
   try {
-    const tickers = (payload.tickers || []).map(t => `${t.code} ${Math.round(t.weight*100)}%`).join('+');
+    const tickers = payload.accounts?.length > 1
+      ? payload.accounts.map((a, i) => `계좌${i+1}:${(a.tickers || []).map(t => `${t.code} ${Math.round(t.weight*100)}%`).join('+')}`).join(' / ')
+      : (payload.tickers || []).map(t => `${t.code} ${Math.round(t.weight*100)}%`).join('+');
     window._calcShareData = {
       t: 'calc',
       label: tickers,
@@ -872,14 +980,20 @@ async function loadTaxProfileForCalculator() {
 }
 
 function addTaxAccount() {
-  window.taxAccounts.push({ type: '위탁', pct: 100 });
-  rebalancePcts();
+  window.taxAccounts.push({
+    type: '위탁',
+    initial_capital: 0,
+    monthly_contribution: 0,
+    tickers: tickers.map(t => ({...t})),
+  });
   renderTaxAccounts();
 }
 
 function removeTaxAccount(idx) {
   window.taxAccounts.splice(idx, 1);
-  if (window.taxAccounts.length > 0) rebalancePcts();
+  if (window.taxAccounts.length === 0 && window.taxEnabled) {
+    window.taxAccounts.push({ type: '위탁', initial_capital: 0, monthly_contribution: 0, tickers: [] });
+  }
   renderTaxAccounts();
 }
 
@@ -888,21 +1002,104 @@ function updateTaxAccountType(idx, type) {
   renderTaxAccounts();
 }
 
-function updateTaxAccountPct(idx, val) {
-  window.taxAccounts[idx].pct = Math.max(0, Math.min(100, Number(val) || 0));
-  if (idx < window.taxAccounts.length - 1) {
-    const used = window.taxAccounts.slice(0, -1).reduce((s, a) => s + a.pct, 0);
-    window.taxAccounts[window.taxAccounts.length - 1].pct = Math.max(0, 100 - used);
-  }
+function updateTaxAccountAmount(idx, field, val) {
+  if (!window.taxAccounts[idx]) return;
+  window.taxAccounts[idx][field] = Math.max(0, Number(val) || 0);
   renderTaxAccounts();
 }
 
-function rebalancePcts() {
-  const n = window.taxAccounts.length;
+function ensureAccountTickers(idx) {
+  const acc = window.taxAccounts[idx];
+  if (!acc) return [];
+  if (!Array.isArray(acc.tickers)) acc.tickers = [];
+  return acc.tickers;
+}
+
+function redistributeAccountWeights(idx) {
+  const accTickers = ensureAccountTickers(idx);
+  const n = accTickers.length;
   if (!n) return;
   const base = Math.floor(100 / n);
-  const rem  = 100 - base * n;
-  window.taxAccounts.forEach((a, i) => { a.pct = base + (i === 0 ? rem : 0); });
+  accTickers.forEach((t, i) => {
+    t.weight = (i === n - 1) ? 100 - base * (n - 1) : base;
+  });
+}
+
+function addAccountTicker(idx, code, name, badge) {
+  const accTickers = ensureAccountTickers(idx);
+  if (accTickers.find(t => t.code === code)) return;
+  accTickers.push({ code, name, badge, weight: 0 });
+  redistributeAccountWeights(idx);
+  renderTaxAccounts();
+}
+
+function removeAccountTicker(idx, code) {
+  const accTickers = ensureAccountTickers(idx);
+  const pos = accTickers.findIndex(t => t.code === code);
+  if (pos === -1) return;
+  accTickers.splice(pos, 1);
+  if (accTickers.length > 0) redistributeAccountWeights(idx);
+  renderTaxAccounts();
+}
+
+function onAccountTickerWeightChange(idx, code, val) {
+  const accTickers = ensureAccountTickers(idx);
+  const ticker = accTickers.find(t => t.code === code);
+  if (!ticker) return;
+  ticker.weight = Math.max(0, Math.min(100, Number(val) || 0));
+  renderTaxAccounts();
+}
+
+async function onAccountTickerSearch(idx, q) {
+  const dropdown = document.getElementById(`accountTickerDropdown${idx}`);
+  if (!dropdown) return;
+  q = (q || '').trim();
+  if (!q) { dropdown.style.display = 'none'; return; }
+
+  try {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (!data.length) {
+      dropdown.innerHTML = '<div style="padding:10px;font-size:0.78rem;color:#90A4AE">검색 결과 없음</div>';
+    } else {
+      dropdown.innerHTML = data.map(item => `
+        <div class="ticker-drop-item"
+          onclick="addAccountTicker(${idx}, '${item.code}', '${item.name.replace(/'/g, "\\'")}', '${item.badge}')">
+          <span class="ticker-drop-badge"
+            style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
+          <div>
+            <div class="ticker-drop-code">${item.code}</div>
+            <div class="ticker-drop-name">${item.name}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    dropdown.style.display = 'block';
+  } catch(e) {
+    dropdown.style.display = 'none';
+  }
+}
+
+function renderAccountTickerList(idx) {
+  const accTickers = ensureAccountTickers(idx);
+  if (accTickers.length === 0) {
+    return '<div style="font-size:0.76rem;color:#90A4AE;padding:8px 0;">종목을 추가하세요</div>';
+  }
+  const total = accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0);
+  const warn = total > 100
+    ? '<div style="font-size:0.72rem;color:#C62828;margin-top:4px;">비중 합계가 100%를 초과했습니다.</div>'
+    : (total < 100 ? `<div style="font-size:0.72rem;color:#78909C;margin-top:4px;">나머지 ${100-total}%는 현금으로 유지됩니다.</div>` : '');
+  return accTickers.map(t => `
+    <div style="display:grid;grid-template-columns:70px 1fr 64px 24px;gap:6px;align-items:center;margin-top:6px;">
+      <div style="font-weight:800;font-size:0.78rem;color:var(--text);">${t.code}</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.name || t.code}</div>
+      <input type="number" value="${t.weight}" min="0" max="100" step="1"
+        oninput="onAccountTickerWeightChange(${idx}, '${t.code}', this.value)"
+        style="width:64px;border:1.5px solid var(--border);border-radius:6px;padding:4px;font-size:0.78rem;text-align:right;">
+      <button onclick="removeAccountTicker(${idx}, '${t.code}')"
+        style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.9rem;">✕</button>
+    </div>
+  `).join('') + warn;
 }
 
 function fmtTaxKRW(v) {
@@ -927,27 +1124,7 @@ function renderTaxAccounts() {
 
   const colors = { '위탁':'#1976D2','ISA':'#2E7D32','연금저축':'#7B1FA2','IRP':'#E65100' };
 
-  // 할당 바 (2개 이상)
-  let allocBar = '';
-  if (!isSingle) {
-    const segs = accs.map(a =>
-      `<div style="flex:${a.pct};background:${colors[a.type]||'#90A4AE'};height:100%;
-        display:flex;align-items:center;justify-content:center;
-        font-size:10px;color:white;font-weight:700;overflow:hidden;min-width:0;">
-        ${a.pct > 8 ? a.pct+'%' : ''}</div>`).join('');
-    const tot   = accs.reduce((s,a) => s+a.pct, 0);
-    const color = Math.abs(tot-100)<1 ? '#2E7D32' : '#C62828';
-    allocBar = `
-      <div style="margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">
-          <span>초기 ${fmtTaxKRW(totalI)} / 월 ${fmtTaxKRW(totalM)} 배분</span>
-          <span style="color:${color};font-weight:700;">합계 ${tot}%</span>
-        </div>
-        <div style="height:20px;border-radius:8px;overflow:hidden;display:flex;background:var(--border);">${segs}</div>
-      </div>`;
-  }
-
-  list.innerHTML = allocBar + accs.map((acc, i) => {
+  list.innerHTML = accs.map((acc, i) => {
     if (isSingle) return `
       <div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
         <select onchange="updateTaxAccountType(${i},this.value)"
@@ -958,26 +1135,52 @@ function renderTaxAccounts() {
         <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
       </div>`;
 
-    const initAmt = Math.round(totalI * acc.pct / 100);
-    const monAmt  = Math.round(totalM  * acc.pct / 100);
+    if (i === 0) {
+      return `
+        <div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:${colors[acc.type]||'#90A4AE'};flex-shrink:0;"></div>
+            <select onchange="updateTaxAccountType(${i},this.value)"
+              style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.85rem;background:white;">
+              ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
+            </select>
+            <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
+          </div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">
+            계좌 1은 상단 포트폴리오와 금액을 사용합니다. 초기 <b style="color:var(--text);">${fmtTaxKRW(totalI)}</b> · 월 <b style="color:var(--text);">${fmtTaxKRW(totalM)}</b>
+          </div>
+        </div>`;
+    }
+
     return `
-      <div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
           <div style="width:10px;height:10px;border-radius:50%;background:${colors[acc.type]||'#90A4AE'};flex-shrink:0;"></div>
           <select onchange="updateTaxAccountType(${i},this.value)"
             style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;background:white;">
             ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
           </select>
-          <input type="number" value="${acc.pct}" min="0" max="100" step="1"
-            onchange="updateTaxAccountPct(${i},this.value)"
-            style="width:50px;border:1.5px solid var(--border);border-radius:6px;padding:4px;font-size:0.82rem;text-align:center;">
-          <span style="font-size:0.78rem;color:var(--text-muted);">%</span>
           <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
         </div>
-        <div style="font-size:0.75rem;color:var(--text-muted);">
-          초기 <b style="color:var(--text);">${fmtTaxKRW(initAmt)}</b> &nbsp;
-          월 <b style="color:var(--text);">${fmtTaxKRW(monAmt)}</b>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <label style="font-size:0.72rem;color:var(--text-muted);">초기 투자금
+            <input type="number" value="${Number(acc.initial_capital || 0)}" min="0" step="1000000"
+              oninput="updateTaxAccountAmount(${i}, 'initial_capital', this.value)"
+              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
+          </label>
+          <label style="font-size:0.72rem;color:var(--text-muted);">월 적립액
+            <input type="number" value="${Number(acc.monthly_contribution || 0)}" min="0" step="100000"
+              oninput="updateTaxAccountAmount(${i}, 'monthly_contribution', this.value)"
+              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
+          </label>
         </div>
+        <div style="position:relative;margin-top:6px;">
+          <input type="text" id="accountTickerSearch${i}" placeholder="이 계좌 종목 검색"
+            oninput="onAccountTickerSearch(${i}, this.value)"
+            style="width:100%;border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;font-size:0.8rem;background:white;">
+          <div class="ticker-dropdown" id="accountTickerDropdown${i}" style="left:0;right:0;"></div>
+        </div>
+        ${renderAccountTickerList(i)}
       </div>`;
   }).join('');
 
@@ -1006,8 +1209,8 @@ function checkTaxLimits() {
   const warnings = [];
 
   let pensionAnn = 0, irpAnn = 0;
-  accs.forEach(a => {
-    const m = isSingle ? totalM : Math.round(totalM * a.pct / 100);
+  accs.forEach((a, i) => {
+    const m = isSingle || i === 0 ? totalM : Number(a.monthly_contribution || 0);
     if (a.type === '연금저축') pensionAnn += m * 12;
     if (a.type === 'IRP')     irpAnn     += m * 12;
   });

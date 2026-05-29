@@ -61,8 +61,267 @@ def _make_strategy_factory(target_weights, rebal_mode, band_width=0.05):
     return strategy_factory
 
 
+def _normalize_multi_accounts(body: dict) -> list[dict]:
+    accounts = []
+    for idx, raw in enumerate(body.get('accounts') or []):
+        tickers = raw.get('tickers') or []
+        if not tickers:
+            raise ValueError(f"계좌 {idx + 1}에 종목을 최소 1개 이상 추가해주세요.")
+
+        normalized_tickers = []
+        total_weight = 0.0
+        for ticker in tickers:
+            weight = float(ticker.get('weight', 0))
+            total_weight += weight
+            normalized_tickers.append({
+                'code':   ticker['code'],
+                'name':   ticker.get('name', ticker['code']),
+                'badge':  ticker.get('badge', ''),
+                'weight': weight,
+            })
+        if total_weight > 1.000001:
+            raise ValueError(f"계좌 {idx + 1}의 비중 합계가 100%를 초과했습니다.")
+
+        accounts.append({
+            'type':                 raw.get('type', '위탁'),
+            'initial_capital':      float(raw.get('initial_capital', 0) or 0),
+            'monthly_contribution': float(raw.get('monthly_contribution', 0) or 0),
+            'tickers':              normalized_tickers,
+            'rebal_mode':           raw.get('rebal_mode') or body.get('rebal_mode', 'monthly'),
+            'band_width':           float(raw.get('band_width', body.get('band_width', 0.05))),
+            'dividend_mode':        raw.get('dividend_mode') or body.get('dividend_mode', 'reinvest'),
+        })
+    return accounts
+
+
+def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> dict:
+    from modules.retirement.multi_account_analyzer import MultiAccountAnalyzer
+
+    portfolio_engine = _get_portfolio_engine()
+    accounts         = _normalize_multi_accounts(body)
+    years            = int(body['years'])
+    dividend_mode    = body['dividend_mode']
+    tax_enabled      = bool(body.get('tax_enabled', False))
+    user_settings    = body.get('user_settings', {})
+    gain_harvesting  = bool(body.get('gain_harvesting', False))
+
+    all_tickers = []
+    for account in accounts:
+        account['gain_harvesting'] = gain_harvesting and account['type'] == '위탁'
+        for ticker in account['tickers']:
+            code = ticker['code']
+            if code not in all_tickers:
+                all_tickers.append(code)
+
+    usdkrw_start = portfolio_engine.loader.USD_KRW_START
+    today = datetime.date.today().strftime('%Y-%m-%d')
+    for ticker in all_tickers:
+        try:
+            portfolio_engine.loader.get_price(ticker, usdkrw_start, today)
+        except Exception as e:
+            print(f"[calculator] {ticker} 데이터 로드 오류: {e}")
+
+    price_starts = [_get_price_start(portfolio_engine, t) for t in all_tickers]
+    price_starts = [d for d in price_starts if d]
+    data_start = max([usdkrw_start] + price_starts) if price_starts else usdkrw_start
+    data_end   = today
+
+    use_synthetic = bool(body.get('use_synthetic', False))
+    _prep_meta: dict = {}
+    if use_synthetic:
+        from modules.data_preparation import prepare_scenario_data
+        _prep_meta = prepare_scenario_data(
+            tickers          = all_tickers,
+            required_years   = years,
+            data_end         = data_end,
+            allow_backfill   = True,
+            allow_synthetic  = True,
+            purpose          = "calculator_multi_account",
+        )
+        data_start = _prep_meta["effective_start"]
+        if (_prep_meta.get("n_cases") or 0) == 0:
+            actual_starts = [_get_price_start(portfolio_engine, t) for t in all_tickers]
+            actual_starts = [d for d in actual_starts if d]
+            oldest = min(actual_starts) if actual_starts else "알 수 없음"
+            raise ValueError(
+                f"가상 데이터 생성 불가: {all_tickers}의 실제 데이터가 너무 적습니다 "
+                f"({oldest}부터 시작, 최소 1년 이상 필요). "
+                f"더 긴 상장 역사를 가진 ETF를 사용하세요."
+            )
+    else:
+        start_dt  = datetime.datetime.strptime(data_start, '%Y-%m-%d').date()
+        max_years = (datetime.date.today() - start_dt).days // 365
+        if years > max_years:
+            raise ValueError(
+                f"데이터 부족: {all_tickers}의 데이터는 {data_start}부터 있어서 "
+                f"최대 {max_years}년 시뮬레이션이 가능합니다."
+            )
+
+    div_starts = [_get_dividend_start(portfolio_engine, t) for t in all_tickers]
+    div_starts = [d for d in div_starts if d]
+    div_start  = max(div_starts) if div_starts else None
+
+    import json as _json
+    tax_engine = None
+    if tax_enabled:
+        from modules.tax.base_tax import TaxEngine
+        from modules.tax.account_tax import (
+            check_contribution_limits,
+            validate_account_portfolio,
+            validate_isa_contribution,
+        )
+        tax_engine = TaxEngine(user_settings)
+        for idx, account in enumerate(accounts):
+            account_type = account['type']
+            ticker_codes = [t['code'] for t in account['tickers']]
+            target_weights = {t['code']: t['weight'] for t in account['tickers']}
+            if account_type != '위탁':
+                _check = validate_account_portfolio(account_type, ticker_codes, target_weights, tax_engine)
+                if not _check['valid']:
+                    raise ValueError(_json.dumps({
+                        'error': 'account_restrictions',
+                        'violations': [f"계좌 {idx + 1}: {v}" for v in _check['violations']],
+                        'disclaimer': _check.get('disclaimer'),
+                    }, ensure_ascii=False))
+
+            if account_type == 'ISA':
+                if body.get('isa_renewal', False):
+                    raise ValueError(_json.dumps({
+                        'error': 'isa_windmill_disabled',
+                        'violations': [
+                            "ISA 풍차돌리기는 다중 계좌 G2/G3의 자금이동 정책에서 다시 연결됩니다. "
+                            "G1에서는 일반 ISA 계좌로 시뮬레이션하세요."
+                        ],
+                    }, ensure_ascii=False))
+                _isa_errors = validate_isa_contribution(
+                    account['initial_capital'],
+                    account['monthly_contribution'],
+                )
+                if _isa_errors:
+                    raise ValueError(_json.dumps({
+                        'error': 'isa_contribution_limit',
+                        'violations': [f"계좌 {idx + 1}: {v}" for v in _isa_errors],
+                    }, ensure_ascii=False))
+    else:
+        from modules.tax.account_tax import check_contribution_limits
+
+    isa_cap_accounts = []
+    _ISA_TOTAL_LIMIT = 100_000_000
+    for idx, account in enumerate(accounts):
+        if account['type'] != 'ISA':
+            continue
+        planned_total = (
+            account['initial_capital']
+            + account['monthly_contribution'] * 12 * years
+        )
+        if planned_total > _ISA_TOTAL_LIMIT:
+            remaining = max(0.0, _ISA_TOTAL_LIMIT - account['initial_capital'])
+            stop_months = (
+                int(remaining / account['monthly_contribution'])
+                if account['monthly_contribution'] > 0
+                else years * 12
+            )
+            account['contribution_end_months'] = stop_months
+            isa_cap_accounts.append({
+                'account_id': idx,
+                'account_label': f"계좌 {idx + 1}",
+                'capped': True,
+                'original_total': round(planned_total),
+                'capped_total': _ISA_TOTAL_LIMIT,
+                'original_monthly': round(account['monthly_contribution']),
+                'stop_months': stop_months,
+                'stop_years': stop_months // 12,
+                'stop_months_remainder': stop_months % 12,
+            })
+
+    contribution_warnings = check_contribution_limits([
+        {
+            'type': account['type'],
+            'monthly_contribution': account['monthly_contribution'],
+        }
+        for account in accounts
+    ])
+
+    analyzer = MultiAccountAnalyzer(
+        portfolio_engine      = portfolio_engine,
+        accounts              = accounts,
+        data_start            = data_start,
+        data_end              = data_end,
+        accumulation_years    = years,
+        dividend_mode         = dividend_mode,
+        step_months           = 3,
+        tax_enabled           = tax_enabled,
+        user_settings         = user_settings,
+        progress_callback     = progress_callback,
+        use_synthetic         = use_synthetic,
+        div_start             = div_start,
+    )
+    result = analyzer.run()
+    distribution = result['combined']['distribution']
+
+    if div_start:
+        distribution['div_data_start']  = div_start
+        distribution['div_cases_count'] = len(result['cases'])
+    else:
+        distribution['no_dividend'] = True
+
+    cases_summary = [
+        {
+            'run_id':    c['run_id'],
+            'start':     c['start'],
+            'end':       c['end'],
+            'end_value': round(c['end_value']),
+            'cagr':      round(c['cagr'], 4),
+            'mdd':       round(c['mdd'], 4),
+            'accounts': [
+                {
+                    'account_id': a['account_id'],
+                    'type':       a['type'],
+                    'end_value':  round(a['end_value']),
+                    'tax_paid':   round(a.get('tax_paid', 0)),
+                }
+                for a in c.get('accounts', [])
+            ],
+        }
+        for c in result['cases']
+    ]
+
+    if len(isa_cap_accounts) == 1:
+        isa_cap_info = isa_cap_accounts[0]
+    elif isa_cap_accounts:
+        isa_cap_info = {'capped': True, 'accounts': isa_cap_accounts}
+    else:
+        isa_cap_info = None
+
+    return {
+        'cases':              cases_summary,
+        'cases_count':        len(cases_summary),
+        'distribution':       distribution,
+        'multi_account':      {
+            'enabled': True,
+            'accounts': [
+                {
+                    'account_id': a['account_id'],
+                    'type':       a['type'],
+                    'distribution': a['distribution'],
+                }
+                for a in result['accounts']
+            ],
+            'contribution_warnings': contribution_warnings,
+        },
+        'isa_cap_info':       isa_cap_info,
+        'used_synthetic':     _prep_meta.get('used_synthetic', False),
+        'synthetic_info':     _prep_meta.get('synthetic_info', {}),
+        'backfilled':         _prep_meta.get('backfilled', []),
+        'warnings':           (_prep_meta.get('warnings', []) or []) + contribution_warnings,
+    }
+
+
 def run_calculator_logic(body: dict, progress_callback=None) -> dict:
     from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
+
+    if len(body.get('accounts') or []) > 1:
+        return _run_multi_account_calculator_logic(body, progress_callback)
 
     portfolio_engine = _get_portfolio_engine()
 

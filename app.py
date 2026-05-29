@@ -520,7 +520,8 @@ def _run_calculator_logic(body: dict, progress_callback=None) -> dict:
 def calculator_run():
     try:
         body   = request.get_json()
-        result = _run_calculator_logic(body)
+        from calculator_logic import run_calculator_logic
+        result = run_calculator_logic(body)
         return jsonify(result)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400

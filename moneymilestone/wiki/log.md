@@ -509,3 +509,15 @@ _작성: Claude_
   7. selected-family holdings/regression
   8. bond/covered-call models later
 - 서명: Codex가 이 부분을 검토하고 수정함.
+
+---
+
+## [2026-05-30] feature | Track G G1 투자계산기 다중 계좌 엔진 1차 구현
+
+- 신규 `modules/simulation/multi_account_loop.py`: `MultiAccountSimulationLoop` 추가. transfers OFF 상태에서 N개 계좌를 같은 날짜 루프로 운용하고 일별 합산 총액 기록.
+- 신규 `modules/retirement/multi_account_analyzer.py`: `MultiAccountAnalyzer` 추가. 공유 윈도우 기반 롤링 실행, 시나리오별 combined_i 합산 후 분포 계산, price_provider 주입 지원.
+- `calculator_logic.py`: `accounts` 배열이 2개 이상이면 다중 계좌 경로 사용. 계좌 1개는 기존 단일 경로 유지.
+- `templates/calculator.html` / `static/js/calculator.js`: 기존 taxAccounts %분할 UI를 계좌별 초기자본·월적립금·종목·비중·유형 독립 입력 UI로 교체. 배당금 탭은 미변경.
+- 테스트: `tests/test_track_g_multi_account.py` L0~L3 4/4 PASS, 기존 Gate 2a/2b/2c 12/12 PASS, JS syntax PASS, 브라우저 UI 스모크 PASS.
+
+_작성: Codex_

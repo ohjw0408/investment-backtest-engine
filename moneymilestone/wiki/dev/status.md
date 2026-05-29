@@ -1,5 +1,5 @@
 ---
-updated: 2026-05-29
+updated: 2026-05-30
 tags: [dev]
 ---
 
@@ -11,6 +11,8 @@ tags: [dev]
 
 > 2026-05-29 추가 업데이트 3: 세금 설정 프로필을 단일 입력원으로 통일. 투자계산기/백테스트/연금 탭의 나이·연간 근로소득 중복 입력칸 제거, 배당금 계산기도 서버 세금설정 API 우선 로드로 정리. 금융소득은 세금설정에서 묻지 않도록 UI 제거하고, 계산기별 자동 산출 계획을 `dev/ideas.md`에 기록. 서버 `192693c` 배포 및 주요 5개 화면 HTTP 200 확인.
 
+> 2026-05-30 업데이트: Track G G1(다중 계좌 시뮬레이션 엔진 — 자금이동 OFF) 투자계산기 탭 1차 구현 완료. `MultiAccountSimulationLoop`/`MultiAccountAnalyzer` 신규 추가, `calculator_logic.py` accounts 배열 분기 추가, 투자계산기 UI를 계좌별 독립 입력으로 변경. L0~L3 결정론적 테스트 4/4 PASS, 기존 Gate 2a/2b/2c 12/12 PASS, 브라우저 UI 스모크 확인. (Codex)
+
 # 현재 개발 상태
 
 **에이전트: 코드 작업 완료 후 이 파일 반드시 업데이트.**
@@ -19,7 +21,7 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> Track F 백엔드 구현 완료, 프론트 부분 미완 (TF1 팝업 버그, retirement.html 배너 없음). ISA 1억 캡 로직 재설계 필요(handoff.md). 다음: BUG-1~5 수정 또는 Track G.
+> Track G G1 투자계산기 탭 1차 구현 완료. 다음: G1 운영 검증/UX 보강 후 Track G 나머지 탭 확장 또는 G2 자금이동 정책 설계.
 
 ---
 
@@ -222,7 +224,7 @@ tags: [dev]
 |---|---|---|---|
 | **Track F** | ISA/계좌 규제 정합성 — 백엔드 ✅, 프론트 미완 (BUG-1/2/3/4/5 해결 필요) | 없음 | `BUG-1,2,3,4,5 수정해줘` |
 | Track F 병렬 | PHASE4 빠른 항목: D4 남음 (F1/B2-c/D5/B2-b/B3 완료) | 없음 | `PHASE4 다음 안전한 항목 진행해줘` |
-| Track G | 다중 계좌 시뮬 엔진 (`PHASE4_PLAN.md § 4G`) | Track F 완료 | `PHASE4_PLAN.md § 4G G1부터 구현해줘` |
+| Track G | 다중 계좌 시뮬 엔진 — G1 투자계산기 탭 1차 완료 ✅ (Codex), 은퇴/백테스트 확장 및 G2 자금이동 대기 | G1 운영 검증 | `Track G 다음 단계 진행해줘` |
 | ETF_BACKFILL V2 Ph.3+ | etf_master/etf_proxy_map 정밀 매핑, confidence A~F | Track G 시작 후 병렬 가능 | `ETF_BACKFILL_ARCHITECTURE_PLAN.md Phase 3부터 진행해줘` |
 | PHASE4 핵심 | D1/D2/B1/A4/C1/C2/B4 | Track G 이후 또는 병렬 | `PHASE4 다음 안전한 항목 진행해줘` |
 | E1 모바일 | 반응형 디자인 | 전체 기능 안정화 후 | — |

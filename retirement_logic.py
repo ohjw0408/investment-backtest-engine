@@ -78,6 +78,15 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     strategy_factory = _make_strategy_factory(target_weights, rebal_mode)
     data_end         = datetime.date.today().strftime('%Y-%m-%d')
 
+    # 신규 미조회 종목은 BackfillEngine 실행 전 실데이터 확보 필요
+    # (BackfillEngine은 실데이터가 이미 있는 ETF의 상장 이전 구간만 백필함)
+    _usdkrw_start = portfolio_engine.loader.USD_KRW_START
+    for _ticker in ticker_codes:
+        try:
+            portfolio_engine.loader.get_price(_ticker, _usdkrw_start, data_end)
+        except Exception as _e:
+            print(f"[retirement] {_ticker} 데이터 로드 오류: {_e}")
+
     use_synthetic = bool(body.get('use_synthetic', False))
     prep = prepare_scenario_data(
         tickers          = ticker_codes,

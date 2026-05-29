@@ -599,8 +599,12 @@ class PriceLoader:
             df = raw[["date", "close"]].copy()
             df["dividend"] = raw.get("dividend", 0)
 
+        # volume=0 행은 BackfillEngine이 생성한 프록시 추정 데이터 → 차트에서 제외
+        df_display = df[df["volume"] > 0] if "volume" in df.columns and not df.empty else df
+        if df_display.empty:
+            df_display = df  # 실데이터 없으면 전체 사용 (fallback)
         prices    = [{"date": row["date"], "close": round(float(row["close"]), 4)}
-                     for _, row in df.iterrows()]
+                     for _, row in df_display.iterrows()]
         cur_price = prices[-1]["close"]
         prev_price = prices[-2]["close"] if len(prices) > 1 else None
         last_date  = prices[-1]["date"]

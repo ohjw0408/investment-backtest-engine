@@ -1,5 +1,16 @@
 # Log
 
+## [2026-05-30] fix+bugfix | BUG-1 수정 + ISA 캡 구현 + 백필 데이터 노출 버그 수정
+
+- **커밋:** `f35a611` (BUG-1), `7dd75a4` (ISA 캡 재설계), `3e572b7` (백필 차트/신규종목)
+- **BUG-1 수정**: calculator.js + retirement.html catch 블록에서 `_errData` null 시 `err.message` JSON 파싱 fallback 추가 → ISA+SPY 등 계좌 제한 에러가 alert() 팝업 대신 인라인 배너로 표시됨
+- **ISA 1억 캡 로직 재설계**: 월 납입금 균등 축소 → 납입 지속 후 한도 도달 시 중단 방식으로 변경. `SimulationConfig.contribution_end_months`, `AccumulationAnalyzer`, `DividendSimulator.isa_total_limit` 추가
+- **백필 데이터 차트 노출 버그**: `get_symbol_data`에서 volume=0(BackfillEngine 추정 데이터) 행 차트 제외. 217770 같은 프록시 백필 ETF가 2000년부터 잘못된 데이터를 표시하던 문제 해결
+- **신규 종목 은퇴시뮬 실패 버그**: `retirement_logic.py`에 `prepare_scenario_data` 전 `get_price` pre-loading 추가. BackfillEngine은 실데이터 있는 ETF만 백필 가능 — 한 번도 조회 안 된 종목에서 "가격 데이터 없음" 오류 방지
+- **조사**: (H) 환헷지 백필 이미 올바르게 처리됨 (`hedge == "unhedged"` 조건). 인버스/레버리지 단순 배수 적용 확인, Phase 5에서 daily reset 모델 고도화 예정
+
+---
+
 ## [2026-05-29] fix+planning | UI 버그 수정 + ISA 캡 재설계 계획 + 문서 전면 정비
 
 - **커밋:** `671b28b` (rebal-action 폭 고정), `e734b4a` (calculator.js 캐시 무효화)

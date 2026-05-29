@@ -329,7 +329,8 @@ async function runCalculator() {
   } catch (err) {
     if (err.message !== 'CANCELLED') {
       hideProgressUI();
-      const _errData = err._data;
+      let _errData = err._data;
+      if (!_errData) { try { _errData = JSON.parse(err.message); } catch(_) {} }
       let _handled = false;
       if (_errData && _errData.error) {
         const _errType = _errData.error;

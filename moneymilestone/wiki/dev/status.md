@@ -19,7 +19,7 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> Track F(ISA 규제 정합성) 구현 완료, GitHub push 완료. Hetzner 배포 필요(SSH 타임아웃). 브라우저 T-F1~T-F8 직접 확인 후 다음: Track G(다중 계좌 시뮬) 또는 PHASE4 빠른 항목.
+> Track F + PHASE4 빠른 항목(F1/B2-b/B2-c/B3/D5) 구현 완료, GitHub push 완료. Hetzner 배포 필요(SSH 타임아웃). 브라우저 테스트 후 다음: D4(거래수수료) 또는 D1/D2(TDF/연금).
 
 ---
 

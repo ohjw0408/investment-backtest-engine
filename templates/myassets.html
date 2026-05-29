@@ -145,7 +145,7 @@
         ⚖️ 리밸런싱 계산
         <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">그룹별 목표 비중 기준</span>
       </div>
-      <div id="rebalStatus" style="min-height:52px;"></div>
+      <div id="rebalStatus" style="min-height:60px;margin-bottom:4px;"></div>
       <div id="rebalResult">
         <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;">
           그룹 탭에서 목표 비중을 설정하면 리밸런싱 계산이 표시됩니다
@@ -492,12 +492,13 @@ function renderRebalance() {
   }
 
   const alertCount = rows.filter(r => r.outOfBand).length;
+  const _bandPct = (_rebalBand * 100 % 1 === 0) ? Math.round(_rebalBand*100) : (_rebalBand*100).toFixed(1);
   const alertBanner = alertCount > 0
-    ? `<div style="background:#FFF3E0;border:1px solid #F57C00;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:#E65100;">
-        <strong>⚠ 리밸런싱 필요</strong> — ${alertCount}개 그룹이 목표 비중 ±${Math.round(_rebalBand*100)}% 밴드를 이탈했습니다.
+    ? `<div style="background:#FFF3E0;border:1px solid #F57C00;border-radius:6px;padding:10px 14px;font-size:0.83rem;color:#E65100;">
+        <strong>⚠ 리밸런싱 필요</strong> — ${alertCount}개 그룹이 목표 비중 ±${_bandPct}% 밴드를 이탈했습니다.
        </div>`
-    : `<div style="background:#E8F5E9;border:1px solid #66BB6A;border-radius:6px;padding:8px 14px;margin-bottom:12px;font-size:0.83rem;color:#2E7D32;">
-        ✅ 모든 그룹이 목표 비중 ±${Math.round(_rebalBand*100)}% 이내입니다.
+    : `<div style="background:#E8F5E9;border:1px solid #66BB6A;border-radius:6px;padding:10px 14px;font-size:0.83rem;color:#2E7D32;">
+        ✅ 모든 그룹이 목표 비중 ±${_bandPct}% 이내입니다.
        </div>`;
 
   document.getElementById('rebalStatus').innerHTML = alertBanner;

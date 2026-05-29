@@ -22,6 +22,8 @@ tags: [dev, bug]
 | BUG-3 | 연금 수령 시작 나이 입력 불가 | 은퇴 계산기에 "연금 수령 시작 나이" 입력칸 없음. `user_settings.age`(현재 나이) 사용 중 | `templates/retirement.html`, `retirement_logic.py`, `modules/tax/liquidation.py` | ✅ 수정 완료 |
 | BUG-4 | ISA 1억 캡 로직 오류 — 월 납입금 균등 축소 | 전 기간 월납입을 줄이는 방식. 올바른 동작: 납입 지속 → 1억 도달 시점부터 납입 0원 | `calculator_logic.py`, `retirement_logic.py`, `modules/retirement/accumulation_analyzer.py`, `static/js/calculator.js` | ✅ 수정 (7dd75a4) |
 | BUG-5 | 밴드 슬라이더 숫자 직접 입력 불가 | 슬라이더만 있고 0.5% 단위 정밀 입력 불가 | `templates/myassets.html` | ✅ 수정 완료 |
+| BUG-G1-1 | Track G 다중계좌 시 배당 지표 전부 0 | 총배당/마지막연도배당/배당CAGR/배당률분포가 다중계좌에서 0. 결과 합산 시 배당 분포 메트릭 미집계 추정. 단일계좌는 정상 | `modules/retirement/multi_account_analyzer.py`, `calculator_logic.py`, `static/js/calculator.js` | ❌ 미해결 (우선순위 높음, trackG plan 후속보완 1) |
+| BUG-G1-2 | Track G 다중계좌 2번째 계좌 입력 커서 사라짐 | 입력 중 `renderTaxAccounts()` 전체 재렌더 → 포커스 유실 (BUG-6 패턴) | `static/js/calculator.js` | ❌ 미해결 (중간) |
 
 **이전 "활성"에서 해결된 항목들:**
 

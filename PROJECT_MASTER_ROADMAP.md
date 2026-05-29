@@ -1,6 +1,6 @@
 # Project Master Roadmap
 
-Last updated: 2026-05-29 (full priority rewrite)
+Last updated: 2026-05-30 (Track G G1 구현·검증 완료, 후속 보완 대기)
 
 ## Purpose
 
@@ -285,22 +285,20 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-**[1] 지금 — Track G:**
+**[1] 지금 — Track G G1 후속 보완:**
 ```text
-PHASE4_PLAN.md § 4G G1부터 구현해줘
+trackG_multiaccount_plan.md "G1 후속 보완" 1번부터 수정해줘
 ```
-Track F 완전 완료 (2026-05-30). 다중 계좌 롤링 엔진 시작 가능.
+G1 투자계산기 탭 구현·검증·배포 완료 (2026-05-30, b14ed44). L0~L3 + Gate 회귀 PASS. 남은 보완(중요도순): ① 다중계좌 배당 지표 0 버그(높음) ② 계좌 입력 커서 유실(중간) ③ 계좌 카드 UI 통일(낮음).
 
-**[1] 병렬 가능 — PHASE4 빠른 항목:**
-```text
-PHASE4 다음 안전한 항목 진행해줘
-```
+**[2] G1 보완 후 — 나머지 탭 확장:**
+은퇴 → 백테스트 탭에 다중계좌 적용 (배당금 제외). 검증된 투자계산기 패턴 복제.
 
-**[2] Track F 완료 후 — Track G:**
+**[3] 그 다음 — Track G G2:**
 ```text
-PHASE4_PLAN.md § 4G G1부터 구현해줘
+PHASE4_PLAN.md § 4G / trackG_multiaccount_plan.md G2 설계 정밀화해줘
 ```
-다중 계좌 롤링 엔진. 퍼센타일 단순 덧셈 금지.
+자금이동 ON(분배 정책). G1 실제 코드 보고 시점별 트리거 설계 보강 후 착수. 퍼센타일 단순 덧셈 금지.
 
 **[3] Track G와 병렬 — ETF_BACKFILL V2 Phase 3+:**
 ```text

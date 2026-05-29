@@ -1,5 +1,21 @@
 # Log
 
+## [2026-05-30] feature+verify | Track G G1 구현(Codex) + 검증(Claude) + 브라우저 실검증
+
+- **커밋:** `b14ed44` (Codex G1 구현), `045d3a7` (divrefactoring.md 커밋). 자동 배포됨.
+- **G1 구현 (Codex):** `MultiAccountSimulationLoop`/`MultiAccountAnalyzer` 신규. `calculator_logic.py` accounts 배열 분기(2개↑ 다중, 1개 단일 유지). 투자계산기 UI 계좌별 독립 입력으로 교체. `tests/test_track_g_multi_account.py` L0~L3 추가.
+- **검증 (Claude):** L0~L3 4/4 PASS + 테스트 내용 직접 확인(형식적 아님). L1이 "시나리오 합산 ≠ 퍼센타일 덧셈" 정확히 증명. L3 세금 손계산값 일치. Gate 2a/2b/2c 12/12 PASS(단일계좌 회귀 안 깨짐).
+- **브라우저 실검증:** TIGER미국배당다우존스(ISA) + SPY(위탁) 다중계좌 실데이터 정상 작동. 시작시점 1964년은 정상(USD/KRW FX 바닥값, 단일계좌와 동일 동작).
+- **G1 후속 보완 항목** (trackG_multiaccount_plan.md에 기록, 중요도순):
+  1. [버그] 다중계좌 시 배당 지표 전부 0 (총배당/마지막연도/CAGR/배당률분포) — 결과 스키마에 배당 분포 메트릭 누락 추정. 우선순위 높음.
+  2. [UX] 2번째 계좌 입력 시 커서 사라짐 — 입력 중 전체 재렌더로 포커스 유실(BUG-6 패턴). 중간.
+  3. [미적] 계좌 카드 UI 통일성/위계. 낮음.
+- **다음:** G1 후속 보완(배당버그 우선) → 은퇴/백테스트 탭 확장 → G2.
+
+_작성: Claude (Opus 4.8) — 구현 Codex, 검증 Claude_
+
+---
+
 ## [2026-05-30] planning | Track G 다중 계좌 시뮬 상세 계획 작성 (trackG_multiaccount_plan.md)
 
 - **신규 파일:** `trackG_multiaccount_plan.md`. `PHASE4_PLAN.md § 4G`에서 링크.

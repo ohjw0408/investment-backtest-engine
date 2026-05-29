@@ -46,7 +46,7 @@
 /* 리밸런싱 */
 .rebal-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
 .rebal-row:last-child { border-bottom: none; }
-.rebal-action { font-weight: 700; padding: 3px 10px; border-radius: 6px; font-size: 0.78rem; }
+.rebal-action { font-weight: 700; padding: 3px 10px; border-radius: 6px; font-size: 0.78rem; min-width: 145px; text-align: center; flex-shrink: 0; }
 .rebal-buy   { background: #E8F5E9; color: #2E7D32; }
 .rebal-sell  { background: #FFEBEE; color: #C62828; }
 .rebal-ok    { background: #F5F5F5; color: #9E9E9E; }
@@ -521,7 +521,7 @@ function renderRebalance() {
           <div style="height:4px;width:${Math.min(100,r.curPct/Math.max(r.tgtPct,0.01)*100)}%;background:${barColor};border-radius:2px;transition:width 0.3s;"></div>
         </div>
       </span>
-      <span style="min-width:80px;">${fmtKRW(r.cur)}</span>
+      <span style="min-width:100px;flex-shrink:0;text-align:right;">${fmtKRW(r.cur)}</span>
       <span class="rebal-action ${actionCls}">${actionText}</span>
     </div>`;
   }).join('');

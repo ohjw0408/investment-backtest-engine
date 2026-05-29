@@ -157,12 +157,12 @@ Completed (e8b7c1e, 2026-05-29):
 - ✅ Full validation in `calculator_logic.py`, `retirement_logic.py`, `dividend_logic.py`
 - ✅ Error banners in `calculator.html` + `calculator.js`
 
-Remaining (BUG-1~5 in bugs.md):
-- ❌ BUG-1: TF1 계열 — 에러가 배너 대신 alert() 팝업으로 표시
-- ❌ BUG-2: `retirement.html` 배너 3종 없음 (TF6/TF7 팝업)
-- ❌ BUG-3: 은퇴 계산기 연금 수령 시작 나이 입력 불가
-- ❌ BUG-4: ISA 1억 캡 로직 오류 — 월 납입 균등 축소 대신 납입 중단 방식으로 재설계 필요 (handoff.md 계획 있음)
-- ❌ BUG-5: 밴드 슬라이더 숫자 직접 입력 불가
+All BUG-1~5 resolved (2026-05-30):
+- ✅ BUG-1: TF1 계열 popup → banner fix (f35a611)
+- ✅ BUG-2: retirement.html 배너 확인 — 이미 존재, BUG-1 fix로 해결
+- ✅ BUG-3: 은퇴 계산기 연금 수령 시작 나이 입력 추가
+- ✅ BUG-4: ISA 1억 캡 납입 중단 방식으로 재설계 (7dd75a4)
+- ✅ BUG-5: 밴드 슬라이더 숫자 직접 입력 추가
 
 Exit criteria (original — partially met):
 - ISA + SPY → hard error ✅
@@ -285,11 +285,11 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-**[1] 지금 — Track F 마무리 (BUG-1~5):**
+**[1] 지금 — Track G:**
 ```text
-BUG-1,2,3,4,5 수정해줘
+PHASE4_PLAN.md § 4G G1부터 구현해줘
 ```
-TF1 팝업→배너, retirement.html 배너, ISA 캡 재설계, 슬라이더 입력. Track G 선행 조건.
+Track F 완전 완료 (2026-05-30). 다중 계좌 롤링 엔진 시작 가능.
 
 **[1] 병렬 가능 — PHASE4 빠른 항목:**
 ```text

@@ -59,6 +59,7 @@ class DividendSimulator:
         tax_engine=None,
         fee_engine:   Optional[FeeEngine] = None,
         account_type: str   = "위탁",
+        isa_total_limit: Optional[float] = None,
     ):
         self.loader      = loader
         active_tickers = [
@@ -77,6 +78,7 @@ class DividendSimulator:
         self.tax_engine   = tax_engine
         self.fee_engine   = fee_engine
         self._account_type = account_type
+        self._isa_total_limit = isa_total_limit
         self._price_cache: Dict[str, pd.DataFrame] = {}
         self._sim_cache:   Dict[str, List[float]]   = {}
 
@@ -141,16 +143,22 @@ class DividendSimulator:
             div_df = df[df["dividend"] > 0]
             div_data[t] = list(div_df.itertuples())  # iterrows보다 3~5배 빠름
 
-        for month_end, month_start_d in zip(months, month_starts):
-            # 월 적립 매수 (기존 로직 그대로, loc 슬라이싱만 searchsorted로 교체)
-            if monthly > 0:
+        _contrib_end = None
+        if self._isa_total_limit and monthly > 0:
+            _remaining = max(0.0, self._isa_total_limit - seed)
+            _contrib_end = int(_remaining / monthly)
+
+        for month_idx, (month_end, month_start_d) in enumerate(zip(months, month_starts)):
+            _effective_monthly = monthly if (_contrib_end is None or month_idx < _contrib_end) else 0.0
+            # 월 적립 매수
+            if _effective_monthly > 0:
                 for t in self.tickers:
                     close_series = data[t]["close"]
                     idx = close_series.index.searchsorted(month_end, side='right') - 1
                     if idx >= 0:
                         price = float(close_series.iloc[idx])
                         if price > 0:
-                            amt = monthly * self.weights[t]
+                            amt = _effective_monthly * self.weights[t]
                             if self.fee_engine:
                                 amt -= self.fee_engine.calc_buy_fee(amt)
                             quantities[t] += amt / price
@@ -363,10 +371,16 @@ class DividendSimulator:
         synthetic_ytd: Dict[int, float] = {}
         rep_ticker = self.tickers[0] if self.tickers else "SPY"
 
+        _syn_contrib_end = None
+        if self._isa_total_limit and monthly > 0:
+            _remaining = max(0.0, self._isa_total_limit - seed)
+            _syn_contrib_end = int(_remaining / monthly)
+
         for m in range(years * 12):
             # 주가 상승 반영 (자산가치 증가)
             asset *= (1 + monthly_price_return)
-            asset += monthly
+            _eff_monthly = monthly if (_syn_contrib_end is None or m < _syn_contrib_end) else 0.0
+            asset += _eff_monthly
             q = m // 3
             yr = q // 4
 

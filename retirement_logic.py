@@ -147,9 +147,22 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
 
         _ISA_TOTAL_LIMIT = 100_000_000
         _planned_total = initial_capital + monthly_contribution * 12 * accumulation_years
+        _isa_cap_info = None
         if _planned_total > _ISA_TOTAL_LIMIT:
             _remaining = max(0.0, _ISA_TOTAL_LIMIT - initial_capital)
-            monthly_contribution = _remaining / (accumulation_years * 12) if accumulation_years > 0 else 0.0
+            _stop_months = int(_remaining / monthly_contribution) if monthly_contribution > 0 else accumulation_years * 12
+            _isa_cap_info = {
+                'capped': True,
+                'original_total': round(_planned_total),
+                'capped_total': _ISA_TOTAL_LIMIT,
+                'original_monthly': round(monthly_contribution),
+                'stop_months': _stop_months,
+                'stop_years': _stop_months // 12,
+                'stop_months_remainder': _stop_months % 12,
+            }
+            # monthly_contribution 변경 안 함 — AccumulationAnalyzer에 contribution_end_months로 전달
+    else:
+        _isa_cap_info = None
 
     # AccumulationAnalyzer 진행률 0→50% 스케일링
     _acc_start = time.time()
@@ -163,25 +176,26 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
             )
 
     acc_analyzer = AccumulationAnalyzer(
-        portfolio_engine     = portfolio_engine,
-        tickers              = ticker_codes,
-        strategy_factory     = strategy_factory,
-        data_start           = data_start,
-        data_end             = data_end,
-        accumulation_years   = accumulation_years,
-        monthly_contribution = monthly_contribution,
-        initial_capital      = initial_capital,
-        dividend_mode        = dividend_mode,
-        step_months          = 3,
-        verbose              = False,
-        div_start            = div_start,
-        tax_engine           = ret_tax_engine,
-        account_type         = account_type,
-        isa_renewal          = isa_renewal,
-        gain_harvesting      = gain_harvesting,
-        progress_callback    = acc_progress,
-        use_synthetic        = use_synthetic,
-        synthetic_params     = synthetic_info if use_synthetic else {},
+        portfolio_engine        = portfolio_engine,
+        tickers                 = ticker_codes,
+        strategy_factory        = strategy_factory,
+        data_start              = data_start,
+        data_end                = data_end,
+        accumulation_years      = accumulation_years,
+        monthly_contribution    = monthly_contribution,
+        initial_capital         = initial_capital,
+        dividend_mode           = dividend_mode,
+        step_months             = 3,
+        verbose                 = False,
+        div_start               = div_start,
+        tax_engine              = ret_tax_engine,
+        account_type            = account_type,
+        isa_renewal             = isa_renewal,
+        gain_harvesting         = gain_harvesting,
+        progress_callback       = acc_progress,
+        use_synthetic           = use_synthetic,
+        synthetic_params        = synthetic_info if use_synthetic else {},
+        contribution_end_months = _isa_cap_info['stop_months'] if _isa_cap_info else None,
     )
     acc_result = acc_analyzer.run()
 

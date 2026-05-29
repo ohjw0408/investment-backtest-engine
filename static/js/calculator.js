@@ -564,11 +564,13 @@ function renderResult(data, payload) {
     if (capBanner && capDetail) {
       const orig  = Math.round(capInfo.original_total  / 10000).toLocaleString();
       const origM = Math.round(capInfo.original_monthly / 10000).toLocaleString();
-      const adjM  = Math.round(capInfo.adjusted_monthly / 10000).toLocaleString();
+      const stopY = capInfo.stop_years ?? 0;
+      const stopMr = capInfo.stop_months_remainder ?? 0;
+      const stopStr = stopMr > 0 ? `${stopY}년 ${stopMr}개월` : `${stopY}년`;
       capDetail.innerHTML =
-        `ISA 납입 한도(5년 총 1억원)를 초과하여 월 납입금이 자동 조정되었습니다.<br>` +
-        `계획 총 납입 <strong>${orig}만원</strong> → 시뮬레이션 적용 <strong>1억원</strong><br>` +
-        `월 납입금: <strong>${origM}만원</strong> → <strong>${adjM}만원</strong>으로 조정`;
+        `ISA 총 납입 한도(1억원)에 도달하여 납입이 자동 중단됩니다.<br>` +
+        `계획 총 납입 <strong>${orig}만원</strong> → 실제 적용 <strong>1억원</strong><br>` +
+        `월 <strong>${origM}만원</strong> × <strong>${stopStr}</strong> 납입 후 중단, 이후 자산만 복리 운용`;
       capBanner.style.display = 'block';
     }
   }

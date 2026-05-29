@@ -69,16 +69,19 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
                 'violations': _isa_errors,
             }, ensure_ascii=False))
 
+    _isa_limit = 100_000_000 if (tax_enabled and account_type == 'ISA') else None
+
     sim = DividendSimulator(
-        loader       = portfolio_engine.loader,
-        tickers      = ticker_codes,
-        weights      = target_weights,
-        div_mode     = body.get('dividend_mode', 'reinvest'),
-        step_months  = 3,
-        rebal_mode   = body.get('rebal_mode', 'none'),
-        band_width   = float(body.get('band_width', 0.05)),
-        tax_engine   = tax_engine,
-        account_type = account_type,
+        loader           = portfolio_engine.loader,
+        tickers          = ticker_codes,
+        weights          = target_weights,
+        div_mode         = body.get('dividend_mode', 'reinvest'),
+        step_months      = 3,
+        rebal_mode       = body.get('rebal_mode', 'none'),
+        band_width       = float(body.get('band_width', 0.05)),
+        tax_engine       = tax_engine,
+        account_type     = account_type,
+        isa_total_limit  = _isa_limit,
     )
 
     seed_cfg    = body.get('seed',    {"center": 0,      "step": 0, "n": 0, "mode": "fixed"})

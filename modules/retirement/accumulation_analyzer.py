@@ -34,6 +34,7 @@ class AccumulationAnalyzer:
         progress_callback                   = None,
         use_synthetic:          bool        = False,
         synthetic_params:       dict        = None,
+        contribution_end_months: Optional[int] = None,
     ):
         self.portfolio_engine      = portfolio_engine
         self.tickers               = tickers
@@ -55,6 +56,7 @@ class AccumulationAnalyzer:
         self.use_synthetic         = use_synthetic
         # code -> {mu_monthly, sigma_monthly, actual_start, anchor_price}
         self.synthetic_params      = synthetic_params or {}
+        self.contribution_end_months = contribution_end_months
 
     def _estimate_total_cases(self) -> int:
         cur = self.data_start
@@ -152,16 +154,17 @@ class AccumulationAnalyzer:
                 rebal_freq     = getattr(strategy, 'rebalance_frequency', None)
 
                 config = SimulationConfig(
-                    start_date           = cur.strftime("%Y-%m-%d"),
-                    end_date             = end.strftime("%Y-%m-%d"),
-                    tickers              = self.tickers,
-                    target_weights       = target_weights,
-                    initial_capital      = self.initial_capital,
-                    monthly_contribution = self.monthly_contribution,
-                    withdrawal_amount    = 0,
-                    dividend_mode        = self.dividend_mode,
-                    rebalance_frequency  = rebal_freq,
-                    inflation            = 0.0,
+                    start_date              = cur.strftime("%Y-%m-%d"),
+                    end_date                = end.strftime("%Y-%m-%d"),
+                    tickers                 = self.tickers,
+                    target_weights          = target_weights,
+                    initial_capital         = self.initial_capital,
+                    monthly_contribution    = self.monthly_contribution,
+                    contribution_end_months = self.contribution_end_months,
+                    withdrawal_amount       = 0,
+                    dividend_mode           = self.dividend_mode,
+                    rebalance_frequency     = rebal_freq,
+                    inflation               = 0.0,
                 )
 
                 run_result  = runner.run(

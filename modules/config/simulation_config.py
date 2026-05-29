@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 
 @dataclass
@@ -26,6 +26,8 @@ class SimulationConfig:
     initial_capital: float
 
     monthly_contribution: float = 0
+
+    contribution_end_months: Optional[int] = None
 
     withdrawal_amount: float = 0
 

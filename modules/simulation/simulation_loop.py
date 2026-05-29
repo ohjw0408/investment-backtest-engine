@@ -101,15 +101,21 @@ class SimulationLoop:
                 portfolio.cash -= dividend_total
 
             # ── contribution ─────────────────────────
+            _effective_monthly = (
+                0.0
+                if (getattr(config, 'contribution_end_months', None) is not None
+                    and elapsed_months >= config.contribution_end_months)
+                else config.monthly_contribution
+            )
             last_month = self.contribution_engine.process(
                 portfolio,
-                config.monthly_contribution,
+                _effective_monthly,
                 date,
                 last_month
             )
 
             # ── contribution sweep ───────────────────
-            if config.monthly_contribution > 0:
+            if _effective_monthly > 0:
                 cash_target = config.target_weights.get("CASH", 0)
                 if cash_target == 0:
                     self.cash_allocator.allocate_cash(

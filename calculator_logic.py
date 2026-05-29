@@ -186,38 +186,41 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
         _isa_cap_info = None
         if _planned_total > _ISA_TOTAL_LIMIT:
             _remaining = max(0.0, _ISA_TOTAL_LIMIT - initial_capital)
-            _orig_monthly = monthly_contrib
-            monthly_contrib = _remaining / (years * 12) if years > 0 else 0.0
+            _stop_months = int(_remaining / monthly_contrib) if monthly_contrib > 0 else years * 12
             _isa_cap_info = {
                 'capped': True,
                 'original_total': round(_planned_total),
                 'capped_total': _ISA_TOTAL_LIMIT,
-                'original_monthly': round(_orig_monthly),
-                'adjusted_monthly': round(monthly_contrib),
+                'original_monthly': round(monthly_contrib),
+                'stop_months': _stop_months,
+                'stop_years': _stop_months // 12,
+                'stop_months_remainder': _stop_months % 12,
             }
+            # monthly_contrib 변경 안 함 — AccumulationAnalyzer에 contribution_end_months로 전달
     else:
         _isa_cap_info = None
 
     analyzer = AccumulationAnalyzer(
-        portfolio_engine     = portfolio_engine,
-        tickers              = ticker_codes,
-        strategy_factory     = strategy_factory,
-        data_start           = data_start,
-        data_end             = data_end,
-        accumulation_years   = years,
-        monthly_contribution = monthly_contrib,
-        initial_capital      = initial_capital,
-        dividend_mode        = dividend_mode,
-        step_months          = 3,
-        verbose              = False,
-        div_start            = div_start,
-        tax_engine           = tax_engine,
-        account_type         = account_type,
-        isa_renewal          = isa_renewal,
-        gain_harvesting      = gain_harvesting,
-        progress_callback    = progress_callback,
-        use_synthetic        = use_synthetic,
-        synthetic_params     = _prep_meta.get("synthetic_info", {}) if use_synthetic else {},
+        portfolio_engine        = portfolio_engine,
+        tickers                 = ticker_codes,
+        strategy_factory        = strategy_factory,
+        data_start              = data_start,
+        data_end                = data_end,
+        accumulation_years      = years,
+        monthly_contribution    = monthly_contrib,
+        initial_capital         = initial_capital,
+        dividend_mode           = dividend_mode,
+        step_months             = 3,
+        verbose                 = False,
+        div_start               = div_start,
+        tax_engine              = tax_engine,
+        account_type            = account_type,
+        isa_renewal             = isa_renewal,
+        gain_harvesting         = gain_harvesting,
+        progress_callback       = progress_callback,
+        use_synthetic           = use_synthetic,
+        synthetic_params        = _prep_meta.get("synthetic_info", {}) if use_synthetic else {},
+        contribution_end_months = _isa_cap_info['stop_months'] if _isa_cap_info else None,
     )
 
     result = analyzer.run()

@@ -580,7 +580,14 @@ def task_status(task_id: str):
         if result.get('status') == 'CANCELLED':
             return jsonify({'status': 'CANCELLED'})
         if result.get('status') == 'FAILURE':
-            return jsonify({'status': 'FAILURE', 'error': result.get('error', '알 수 없는 오류')})
+            import json as _j
+            err_str = result.get('error', '알 수 없는 오류')
+            err_data = None
+            try:
+                err_data = _j.loads(err_str)
+            except Exception:
+                pass
+            return jsonify({'status': 'FAILURE', 'error': err_str, 'error_data': err_data})
         return jsonify({
             'status': 'SUCCESS',
             'result': result.get('result'),

@@ -409,7 +409,7 @@ async function pollTask(taskId, maxWait = 600000) {
 
     } else if (data.status === 'FAILURE') {
       const _e = new Error(data.error || '시뮬레이션 실패');
-      try { _e._data = JSON.parse(data.error); } catch(_) {}
+      _e._data = data.error_data || null;  // 서버에서 파싱한 구조화 에러
       throw _e;
     }
   }

@@ -129,22 +129,23 @@
 
   <!-- 리밸런싱 탭 -->
   <div id="tab-rebalance" style="display:none;">
-    <div class="ma-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <span style="font-size:0.85rem;font-weight:700;white-space:nowrap;">경고 밴드</span>
+    <div class="ma-card" style="display:flex;align-items:center;gap:12px;flex-wrap:nowrap;min-height:56px;">
+      <span style="font-size:0.85rem;font-weight:700;white-space:nowrap;flex-shrink:0;">경고 밴드</span>
       <input type="range" id="rebalBandSlider" min="0.5" max="20" value="5" step="0.5"
         oninput="syncRebalBand(parseFloat(this.value))"
-        style="flex:1;min-width:100px;">
+        style="flex:1;min-width:80px;">
       <input type="number" id="rebalBandInput" value="5" min="0.5" max="20" step="0.5"
         oninput="syncRebalBand(parseFloat(this.value))"
-        style="width:64px;font-size:0.85rem;font-weight:700;color:var(--blue);border:1px solid var(--border);border-radius:4px;padding:3px 6px;text-align:center;">
-      <span style="font-size:0.85rem;font-weight:700;color:var(--blue);">%</span>
-      <span style="font-size:0.75rem;color:var(--text-muted);">목표 비중에서 이 값 이상 벗어나면 경고</span>
+        style="width:60px;flex-shrink:0;font-size:0.85rem;font-weight:700;color:var(--blue);border:1px solid var(--border);border-radius:4px;padding:3px 6px;text-align:center;">
+      <span style="font-size:0.85rem;font-weight:700;color:var(--blue);flex-shrink:0;">%</span>
+      <span style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;flex-shrink:0;">이 값 이상 벗어나면 경고</span>
     </div>
     <div class="ma-card">
       <div class="ma-card-title">
         ⚖️ 리밸런싱 계산
         <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">그룹별 목표 비중 기준</span>
       </div>
+      <div id="rebalStatus" style="min-height:36px;margin-bottom:4px;"></div>
       <div id="rebalResult">
         <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;">
           그룹 탭에서 목표 비중을 설정하면 리밸런싱 계산이 표시됩니다
@@ -459,6 +460,7 @@ function syncRebalBand(val) {
 function renderRebalance() {
   const totalValue = holdings.reduce((s, h) => s + (prices[h.code]||0)*h.quantity, 0);
   if (!totalValue || !groups.length) {
+    document.getElementById('rebalStatus').innerHTML = '';
     document.getElementById('rebalResult').innerHTML =
       '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;">그룹을 만들고 목표 비중을 설정해주세요</div>';
     return;
@@ -483,6 +485,7 @@ function renderRebalance() {
   });
 
   if (!rows.length) {
+    document.getElementById('rebalStatus').innerHTML = '';
     document.getElementById('rebalResult').innerHTML =
       '<div style="padding:20px;color:var(--text-muted);font-size:0.85rem;">그룹 탭에서 목표 비중을 설정해주세요</div>';
     return;
@@ -497,7 +500,8 @@ function renderRebalance() {
         ✅ 모든 그룹이 목표 비중 ±${Math.round(_rebalBand*100)}% 이내입니다.
        </div>`;
 
-  document.getElementById('rebalResult').innerHTML = alertBanner + rows.map(r => {
+  document.getElementById('rebalStatus').innerHTML = alertBanner;
+  document.getElementById('rebalResult').innerHTML = rows.map(r => {
     const barColor = r.outOfBand ? '#F57C00' : '#66BB6A';
     const bandBadge = r.outOfBand
       ? `<span style="font-size:0.72rem;background:#FFF3E0;color:#E65100;padding:2px 6px;border-radius:4px;margin-left:4px;">밴드 이탈 ${(r.absDiff*100).toFixed(1)}%p</span>`

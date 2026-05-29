@@ -19,7 +19,7 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> Track A/B/C/D + 세금 Phase 1~3 전부 완료. 수동 테스트 T1~T4 완료(T4는 Track F 이후 무효). 다음: Track F(ISA 규제 정합성 isafix.md) → Track G(다중 계좌 시뮬) → ETF_BACKFILL V2 Phase 3+.
+> Track F(ISA 규제 정합성) 구현 완료, GitHub push 완료. Hetzner 배포 필요(SSH 타임아웃). 브라우저 T-F1~T-F8 직접 확인 후 다음: Track G(다중 계좌 시뮬) 또는 PHASE4 빠른 항목.
 
 ---
 

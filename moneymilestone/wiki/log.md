@@ -1,5 +1,34 @@
 # Log
 
+## [2026-05-29] feature | Track F — ISA/계좌 규제 정합성 강제 구현
+
+- **커밋:** `e8b7c1e feat: Track F — ISA/계좌 규제 정합성 강제`
+- **배포:** GitHub push 완료. Hetzner SSH 불가 (네트워크 타임아웃). 사용자 수동 배포 필요: `git pull --ff-only && systemctl restart domino domino-celery`
+- **구현 내용:**
+  - `base_tax.py`: `COMMODITY_ETF` 분류 추가 (골드선물·원유선물·원자재 등 키워드 기반). `classify_instrument_type()` 반환값에 추가.
+  - `account_tax.py`: 연금저축/IRP 블록 분리. IRP에 COMMODITY_ETF 금지 추가. `validate_isa_contribution(initial, monthly)` 신규 함수 — `(2000만-initial)/12` 기준 월납입 상한 검증.
+  - `calculator_logic.py`: 종목 제한 검증 + ISA 풍차돌리기 hard block + ISA 납입 하드 체크 + 1억 총 납입 소프트 캡 + `isa_cap_info` 반환.
+  - `retirement_logic.py`: 동일 검증 패턴 적용.
+  - `dividend_logic.py`: 종목 제한 + ISA 납입 하드 체크.
+  - `calculator.html`: 에러 배너 3종 추가 (종목 제한 빨간, ISA 한도 빨간, ISA 1억 캡 주황).
+  - `retirement.html`: 에러 배너 2종 추가.
+  - `calculator.js`: FAILURE 시 JSON 파싱 에러 핸들링 → 배너 표시. `renderResult`에 ISA 캡 경고 배너 처리.
+- **백엔드 단위 검증 PASS:**
+  - ISA+SPY → BLOCKED
+  - ISA+458730(KR_FOREIGN) → PASS
+  - ISA initial 3000만 → BLOCKED
+  - ISA monthly 100만(한도83만) → BLOCKED
+  - ISA 정상(500만/50만) → PASS
+  - KODEX 골드선물(132030) → COMMODITY_ETF
+  - IRP+골드선물 → BLOCKED
+  - 연금저축+골드선물 → PASS
+- **미완료:** 브라우저 배너 시각 확인 (사용자 직접 테스트 필요). Hetzner 배포.
+- **다음:** Track G (다중 계좌 시뮬) 또는 PHASE4 빠른 항목들.
+
+_작성: Claude_
+
+---
+
 ## [2026-05-29] planning | 규제 정합성 계획 + 마스터 로드맵 전면 재정비
 
 - **수동 테스트 T1~T4 완료**: T1(가상 데이터 배너) PASS, T2(종합과세/분할매도) PASS, T3(ETF 백필 provenance) PASS.

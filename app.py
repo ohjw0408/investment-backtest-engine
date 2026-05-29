@@ -1218,71 +1218,136 @@ def myassets_data():
     holdings = get_holdings(uid)
     groups   = get_groups(uid)
 
-    # 현재가 조회
-    from pathlib import Path as _P
+    import json as _json
     import sqlite3 as _sq
+    import yfinance as _yf
+    from pathlib import Path as _P
+    from datetime import datetime as _dt
+    from modules.krx.krx_client import KRXClient as _KRXC
 
     codes  = list({h['code'] for h in holdings})
     prices = {}
 
-    # USD/KRW 최신 환율 한 번만 조회
-    try:
-        idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
-        ic  = _sq.connect(str(idx_db))
-        row = ic.execute("SELECT close FROM index_daily WHERE code='USD/KRW' ORDER BY date DESC LIMIT 1").fetchone()
-        ic.close()
-        usdkrw = float(row[0]) if row else 1300.0
-    except Exception:
-        usdkrw = 1300.0
+    # ── Smart TTL (장중 15분, 장외 4시간) ──────────────────────────
+    def _asset_ttl():
+        now = _dt.utcnow()
+        if now.weekday() >= 5:
+            return 4 * 3600
+        nm = now.hour * 60 + now.minute
+        return 15 * 60 if (13 * 60 + 30 <= nm <= 20 * 60) else 4 * 3600
 
-    price_db = _P(__file__).parent / 'data' / 'price_cache' / 'price_daily.db'
-    pc = _sq.connect(str(price_db))
+    # ── Redis 캐시 helpers (market_quote_service의 Redis 재사용) ──
+    _r = getattr(market_quote_service, '_redis', None)
 
-    import yfinance as _yf
-    from modules.krx.krx_client import KRXClient as _KRXC
+    def _cache_get(code):
+        if not _r:
+            return None
+        try:
+            raw = _r.get(f'asset_px:{code}')
+            return float(_json.loads(raw)['p']) if raw else None
+        except Exception:
+            return None
 
-    pc.close()
+    def _cache_set(code, price_krw):
+        if not _r:
+            return
+        try:
+            _r.setex(f'asset_px:{code}', _asset_ttl(), _json.dumps({'p': price_krw}))
+        except Exception:
+            pass
 
-    # KR / US 종목 분리
+    # ── USD/KRW 환율 ──────────────────────────────────────────────
+    idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
+    usdkrw = _cache_get('USD/KRW')
+    if usdkrw is None:
+        try:
+            ic  = _sq.connect(str(idx_db))
+            row = ic.execute("SELECT close FROM index_daily WHERE code='USD/KRW' ORDER BY date DESC LIMIT 1").fetchone()
+            ic.close()
+            usdkrw = float(row[0]) if row else 1300.0
+        except Exception:
+            usdkrw = 1300.0
+        _cache_set('USD/KRW', usdkrw)
+
+    # ── KRX_GOLD ────────────────────────────────────────────────
+    if 'KRX_GOLD' in codes:
+        cached = _cache_get('KRX_GOLD')
+        if cached is not None:
+            prices['KRX_GOLD'] = cached
+        else:
+            try:
+                ic  = _sq.connect(str(idx_db))
+                row = ic.execute("SELECT close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date DESC LIMIT 1").fetchone()
+                ic.close()
+                prices['KRX_GOLD'] = round(float(row[0])) if row else 0
+            except Exception:
+                prices['KRX_GOLD'] = 0
+            _cache_set('KRX_GOLD', prices['KRX_GOLD'])
+
+    # ── KR / US 종목 분리 ────────────────────────────────────────
     kr_codes = [c for c in codes if c != 'KRX_GOLD' and portfolio_engine.loader.is_kr_etf(c)]
     us_codes = [c for c in codes if c != 'KRX_GOLD' and not portfolio_engine.loader.is_kr_etf(c)]
 
-    # KR 종목 → KRX API (공식 종가, 이미 KRW → 환율 변환 없음)
-    if kr_codes:
+    # KR 종목 — 캐시 히트 우선, 미스는 KRX 배치 + yfinance 폴백
+    kr_miss = []
+    for code in kr_codes:
+        cached = _cache_get(code)
+        if cached is not None:
+            prices[code] = cached
+        else:
+            kr_miss.append(code)
+
+    if kr_miss:
         try:
             krx   = _KRXC(debug=False)
-            kr_px = krx.get_current_prices_kr(kr_codes)
-            prices.update(kr_px)
+            kr_px = krx.get_current_prices_kr(kr_miss)
+            for code, px in kr_px.items():
+                if px:
+                    prices[code] = px
+                    _cache_set(code, px)
         except Exception:
             pass
-        # KRX API 실패한 종목은 yfinance .KS 폴백 (이미 KRW)
-        for code in kr_codes:
+        for code in kr_miss:
             if prices.get(code, 0) == 0:
                 try:
                     hist = _yf.Ticker(f"{code}.KS").history(period="2d")
                     if not hist.empty:
-                        prices[code] = float(hist["Close"].iloc[-1])  # .KS는 이미 KRW
+                        px = float(hist["Close"].iloc[-1])
+                        prices[code] = px
+                        _cache_set(code, px)
                 except Exception:
                     pass
 
-    # US 종목 → yfinance (USD) → KRW 변환
+    # US 종목 — 캐시 히트 우선, 미스는 yf.download 배치
+    us_miss = []
     for code in us_codes:
-        try:
-            hist = _yf.Ticker(code).history(period="2d")
-            if not hist.empty:
-                prices[code] = float(hist["Close"].iloc[-1]) * usdkrw  # USD → KRW
-        except Exception:
-            prices[code] = 0
+        cached = _cache_get(code)
+        if cached is not None:
+            prices[code] = cached
+        else:
+            us_miss.append(code)
 
-    # KRX_GOLD 별도 처리
-    if 'KRX_GOLD' in codes:
+    if us_miss:
         try:
-            ic  = _sq.connect(str(idx_db))
-            row = ic.execute("SELECT close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date DESC LIMIT 1").fetchone()
-            ic.close()
-            prices['KRX_GOLD'] = round(float(row[0])) if row else 0
+            df = _yf.download(us_miss, period="2d", progress=False, auto_adjust=True)
+            close = df["Close"] if len(us_miss) > 1 else df[["Close"]].rename(columns={"Close": us_miss[0]})
+            for code in us_miss:
+                try:
+                    px = float(close[code].dropna().iloc[-1]) * usdkrw
+                    prices[code] = px
+                    _cache_set(code, px)
+                except Exception:
+                    prices[code] = 0
         except Exception:
-            prices['KRX_GOLD'] = 0
+            for code in us_miss:
+                try:
+                    hist = _yf.Ticker(code).history(period="2d")
+                    if not hist.empty:
+                        px = float(hist["Close"].iloc[-1]) * usdkrw
+                        prices[code] = px
+                        _cache_set(code, px)
+                except Exception:
+                    prices[code] = 0
 
     return jsonify({
         'holdings': holdings,

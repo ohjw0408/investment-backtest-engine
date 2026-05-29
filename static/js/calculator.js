@@ -476,13 +476,15 @@ function updateProgressUI({ phase, queueRank, isWaiting, avgDuration, percent, c
     barEl.style.transition = 'width 0.5s';
     barEl.style.left      = '0%';
     barEl.style.width     = `${percent}%`;
-    phaseEl.textContent   = queueRank > 0
-      ? `⏳ 내 앞에 ${queueRank}개 대기 중 (${percent}%)`
+    const _concurrency = 2;  // Celery worker 수
+    const _waiting = queueRank >= _concurrency;
+    phaseEl.textContent   = _waiting
+      ? `⏳ 내 앞에 ${queueRank - _concurrency + 1}개 대기 중 (${percent}%)`
       : `⏳ 곧 시작됩니다...`;
-    detailEl.textContent  = '앞 계산 완료 후 자동으로 시작됩니다';
-    const waitSecs = queueRank * (avgDuration || 30);
+    detailEl.textContent  = _waiting ? '앞 계산 완료 후 자동으로 시작됩니다' : '워커 할당 완료, 바로 시작됩니다';
+    const waitSecs = Math.max(0, queueRank - _concurrency + 1) * (avgDuration || 30);
     const wm = Math.floor(waitSecs / 60), ws = waitSecs % 60;
-    etaEl.textContent = queueRank > 0
+    etaEl.textContent = _waiting
       ? (wm > 0 ? `약 ${wm}분 ${ws}초 후 시작 예상` : `약 ${ws}초 후 시작 예상`)
       : '';
   } else if (percent > 0) {

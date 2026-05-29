@@ -340,7 +340,6 @@ async function runCalculator() {
             detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
             if (_errData.disclaimer) detail.innerHTML += `<div style="margin-top:6px;font-style:italic;">${_errData.disclaimer}</div>`;
             banner.style.display = 'block';
-            document.getElementById('resultContent').style.display = 'block';
             document.getElementById('resultEmpty').style.display = 'none';
             _handled = true;
           }
@@ -350,7 +349,6 @@ async function runCalculator() {
           if (banner && detail) {
             detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
             banner.style.display = 'block';
-            document.getElementById('resultContent').style.display = 'block';
             document.getElementById('resultEmpty').style.display = 'none';
             _handled = true;
           }
@@ -547,11 +545,14 @@ function renderResult(data, payload) {
   document.getElementById('resultContent').style.display = 'block';
   _lastCalcResult = data;
 
-  // 에러 배너 숨기기 (성공 결과 표시 시 초기화)
+  // 에러/경고 배너 초기화
   ['accountRestrictBanner', 'isaLimitErrorBanner', 'isaCapBanner'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
+
+  // ISA 캡 디버그 (브라우저 콘솔에서 확인 가능)
+  if (data.isa_cap_info) console.log('[ISA cap]', data.isa_cap_info);
 
   // ISA 총 납입 캡 경고
   const capInfo = data.isa_cap_info;

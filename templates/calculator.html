@@ -185,6 +185,16 @@
   <!-- ===== 오른쪽: 결과 패널 ===== -->
   <div class="calc-result-panel" id="resultPanel">
 
+    <!-- 에러 배너 (resultContent 밖 — 항상 DOM에 존재) -->
+    <div id="accountRestrictBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
+      <strong>⛔ 계좌 유형 제한 위반</strong>
+      <div id="accountRestrictDetail" style="margin-top:6px;line-height:1.7;"></div>
+    </div>
+    <div id="isaLimitErrorBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
+      <strong>⛔ ISA 납입 한도 초과</strong>
+      <div id="isaLimitErrorDetail" style="margin-top:6px;line-height:1.7;"></div>
+    </div>
+
     <div class="result-empty" id="resultEmpty">
       <div class="result-empty-icon">📊</div>
       <div class="result-empty-title">시뮬레이션 결과가 여기에 표시됩니다</div>
@@ -208,19 +218,7 @@
         </div>
       </div>
 
-      <!-- 계좌 종목 제한 에러 배너 -->
-      <div id="accountRestrictBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
-        <strong>⛔ 계좌 유형 제한 위반</strong>
-        <div id="accountRestrictDetail" style="margin-top:6px;line-height:1.7;"></div>
-      </div>
-
-      <!-- ISA 납입 한도 초과 에러 배너 -->
-      <div id="isaLimitErrorBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
-        <strong>⛔ ISA 납입 한도 초과</strong>
-        <div id="isaLimitErrorDetail" style="margin-top:6px;line-height:1.7;"></div>
-      </div>
-
-      <!-- ISA 총 1억원 캡 경고 배너 -->
+      <!-- ISA 총 1억원 캡 경고 배너 (결과 내부) -->
       <div id="isaCapBanner" style="display:none;background:#FFF3E0;border:2px solid #F57C00;border-radius:8px;padding:16px 20px;margin-bottom:16px;font-size:0.92rem;color:#E65100;">
         <strong>⚠ ISA 총 납입 한도 적용 — 시뮬레이션이 조정되었습니다</strong>
         <div id="isaCapDetail" style="margin-top:8px;line-height:1.8;"></div>

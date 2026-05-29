@@ -129,6 +129,14 @@
 
   <!-- 리밸런싱 탭 -->
   <div id="tab-rebalance" style="display:none;">
+    <div class="ma-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="font-size:0.85rem;font-weight:700;white-space:nowrap;">경고 밴드</span>
+      <input type="range" id="rebalBandSlider" min="1" max="20" value="5" step="1"
+        oninput="document.getElementById('rebalBandLabel').textContent=this.value+'%'; _rebalBand=parseInt(this.value)/100; renderRebalance();"
+        style="flex:1;min-width:100px;">
+      <span id="rebalBandLabel" style="font-size:0.85rem;font-weight:700;color:var(--blue);min-width:32px;">5%</span>
+      <span style="font-size:0.75rem;color:var(--text-muted);">목표 비중에서 이 값 이상 벗어나면 경고</span>
+    </div>
     <div class="ma-card">
       <div class="ma-card-title">
         ⚖️ 리밸런싱 계산
@@ -430,7 +438,7 @@ function renderWeightChart(totalValue) {
 }
 
 // ── 리밸런싱 ──
-const REBAL_BAND = 0.05;  // 5% 기본 밴드 (향후 사용자 설정 가능)
+let _rebalBand = 0.05;  // 슬라이더로 사용자 조정 가능
 
 function renderRebalance() {
   const totalValue = holdings.reduce((s, h) => s + (prices[h.code]||0)*h.quantity, 0);
@@ -453,7 +461,7 @@ function renderRebalance() {
     const diff     = tgtPct - curPct;
     const diffVal  = diff * totalValue;
     const absDiff  = Math.abs(diff);
-    const outOfBand = absDiff > REBAL_BAND;
+    const outOfBand = absDiff > _rebalBand;
     const action   = absDiff < 0.001 ? 'ok' : diff > 0 ? 'buy' : 'sell';
     return { g, cur, curPct, tgtPct, diff, diffVal, action, outOfBand, absDiff };
   });
@@ -467,10 +475,10 @@ function renderRebalance() {
   const alertCount = rows.filter(r => r.outOfBand).length;
   const alertBanner = alertCount > 0
     ? `<div style="background:#FFF3E0;border:1px solid #F57C00;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:#E65100;">
-        <strong>⚠ 리밸런싱 필요</strong> — ${alertCount}개 그룹이 목표 비중 ±${Math.round(REBAL_BAND*100)}% 밴드를 이탈했습니다.
+        <strong>⚠ 리밸런싱 필요</strong> — ${alertCount}개 그룹이 목표 비중 ±${Math.round(_rebalBand*100)}% 밴드를 이탈했습니다.
        </div>`
     : `<div style="background:#E8F5E9;border:1px solid #66BB6A;border-radius:6px;padding:8px 14px;margin-bottom:12px;font-size:0.83rem;color:#2E7D32;">
-        ✅ 모든 그룹이 목표 비중 ±${Math.round(REBAL_BAND*100)}% 이내입니다.
+        ✅ 모든 그룹이 목표 비중 ±${Math.round(_rebalBand*100)}% 이내입니다.
        </div>`;
 
   document.getElementById('rebalResult').innerHTML = alertBanner + rows.map(r => {

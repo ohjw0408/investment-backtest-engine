@@ -445,6 +445,17 @@
 
   <!-- ===== 오른쪽: 결과 패널 ===== -->
   <div class="ret-right">
+
+    <!-- 에러 배너 (retResultContent 밖 — 항상 DOM에 존재) -->
+    <div id="retAccountRestrictBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
+      <strong>⛔ 계좌 유형 제한 위반</strong>
+      <div id="retAccountRestrictDetail" style="margin-top:6px;line-height:1.7;"></div>
+    </div>
+    <div id="retIsaLimitErrorBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
+      <strong>⛔ ISA 납입 한도 초과</strong>
+      <div id="retIsaLimitErrorDetail" style="margin-top:6px;line-height:1.7;"></div>
+    </div>
+
     <div id="retResultEmpty" class="ret-result-empty">
       포트폴리오를 구성하고 시뮬레이션을 실행하세요
     </div>
@@ -471,16 +482,6 @@
           <div class="survival-bar-bg">
             <div class="survival-bar-fill" id="retSurvivalBar" style="width:0%"></div>
           </div>
-        </div>
-        <!-- 계좌 종목 제한 에러 배너 -->
-        <div id="retAccountRestrictBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
-          <strong>⛔ 계좌 유형 제한 위반</strong>
-          <div id="retAccountRestrictDetail" style="margin-top:6px;line-height:1.7;"></div>
-        </div>
-        <!-- ISA 납입 한도 초과 에러 배너 -->
-        <div id="retIsaLimitErrorBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
-          <strong>⛔ ISA 납입 한도 초과</strong>
-          <div id="retIsaLimitErrorDetail" style="margin-top:6px;line-height:1.7;"></div>
         </div>
         <div class="ret-msg-box" id="retMsgBox"></div>
       </div>
@@ -1288,22 +1289,29 @@ function updateInflationInfo() {
     return `<span style="white-space:nowrap;">은퇴 ${y}년차: <strong>${fmtW(Math.round(amt/10000)*10000)}</strong></span>`;
   }).join(' &nbsp;·&nbsp; ');
 
-  // 인출 기간 총 필요 금액 (단순 합산 근사)
+  // 인출 기간 총 필요 금액 (월 생활비 합산)
   let total = 0;
   for (let m = 0; m < wdYears * 12; m++) {
-    total += atRetire * Math.pow(1 + infl, m / 12) / 12;
+    total += atRetire * Math.pow(1 + infl, m / 12);  // 월 금액 × 인플레 누적
   }
+
+  // 표시 포맷 — 백만원 단위
+  const fmtTotal = v => {
+    if (v >= 1e12) return (v/1e12).toFixed(1) + '조원';
+    if (v >= 1e8)  return (v/1e8).toFixed(1) + '억원';
+    return Math.round(v/1e6) + '백만원';
+  };
 
   const detail = document.getElementById('inflationInfoDetail');
   if (!detail) return;
   if (infl === 0) {
-    detail.innerHTML = `인플레이션 0% — 은퇴 후에도 월 <strong>${fmtW(monthly)}</strong> 고정.`;
+    detail.innerHTML = `인플레이션 0% — 은퇴 후에도 월 <strong>${fmtW(monthly)}</strong> 고정. 인출 ${wdYears}년간 총 <strong>${fmtTotal(monthly * wdYears * 12)}</strong> 필요.`;
     return;
   }
   detail.innerHTML =
-    `지금 월 <strong>${fmtW(monthly)}</strong> 기준, <strong>${accYears}년 후</strong> 은퇴 시 월 <strong>${fmtW(Math.round(atRetire/10000)*10000)}</strong> 필요<br>` +
+    `지금 월 <strong>${fmtW(monthly)}</strong> 기준, <strong>${accYears}년 후</strong> 은퇴 시 월 <strong>${fmtW(Math.round(atRetire))}</strong> 필요<br>` +
     `<span style="font-size:0.78rem;color:var(--text-muted);">${rows}</span><br>` +
-    `<span style="font-size:0.78rem;color:var(--text-muted);">인출 ${wdYears}년간 총 필요 금액: 약 <strong>${fmtW(Math.round(total/1e8)*1e8)}</strong> (명목 기준)</span>`;
+    `<span style="font-size:0.78rem;color:var(--text-muted);">인출 ${wdYears}년간 총 필요 금액: 약 <strong>${fmtTotal(total)}</strong> (명목 기준)</span>`;
 }
 
 // 페이지 로드 시 초기 계산

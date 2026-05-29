@@ -364,13 +364,11 @@ class TaxEngine:
         - non_deductible: 세액공제를 받지 못한 원금 총액
         - 과세 대상 = end_value - non_deductible
         """
-        if age < 55:
-            raise ValueError(
-                f"연금 수령은 만 55세 이상만 가능합니다. (입력 나이: {age})"
-            )
+        # 만 55세 미만이면 55세 기준 세율 적용 (시뮬레이션용 — 실제 수령 가능 나이 제한 없이 결과 표시)
+        eff_age = max(55, age)
         rate = (
-            self.PENSION_RATES[80] if age >= 80
-            else self.PENSION_RATES[70] if age >= 70
+            self.PENSION_RATES[80] if eff_age >= 80
+            else self.PENSION_RATES[70] if eff_age >= 70
             else self.PENSION_RATES[55]
         )
 

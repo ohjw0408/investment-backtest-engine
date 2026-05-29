@@ -98,11 +98,16 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     div_starts = [d for d in div_starts if d]
     div_start  = max(div_starts) if div_starts else None
 
-    tax_enabled     = body.get('tax_enabled', False)
-    account_type    = body.get('account_type', '위탁')
-    user_settings   = body.get('user_settings', {})
-    isa_renewal     = body.get('isa_renewal', False)
-    gain_harvesting = body.get('gain_harvesting', False)
+    tax_enabled        = body.get('tax_enabled', False)
+    account_type       = body.get('account_type', '위탁')
+    user_settings      = body.get('user_settings', {})
+    isa_renewal        = body.get('isa_renewal', False)
+    gain_harvesting    = body.get('gain_harvesting', False)
+    pension_start_age  = int(body.get('pension_start_age', 65))
+    # pension_start_age를 user_settings에 주입 → TaxEngine.pension_age 반영
+    if pension_start_age and account_type in ('연금저축', 'IRP'):
+        user_settings = dict(user_settings)
+        user_settings['pension_age'] = pension_start_age
     ret_tax_engine  = None
     if tax_enabled:
         from modules.tax.base_tax import TaxEngine
@@ -273,9 +278,13 @@ def run_withdrawal_logic(body: dict, progress_callback=None) -> dict:
 
     data_start = prep["effective_start"]
 
-    tax_enabled   = body.get('tax_enabled', False)
-    account_type  = body.get('account_type', '위탁')
-    user_settings = body.get('user_settings', {})
+    tax_enabled        = body.get('tax_enabled', False)
+    account_type       = body.get('account_type', '위탁')
+    user_settings      = body.get('user_settings', {})
+    pension_start_age  = int(body.get('pension_start_age', 65))
+    if pension_start_age and account_type in ('연금저축', 'IRP'):
+        user_settings = dict(user_settings)
+        user_settings['pension_age'] = pension_start_age
     acc_years     = int(body.get('accumulation_years', 0))
     ret_tax_engine = None
     if tax_enabled:

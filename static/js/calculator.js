@@ -329,9 +329,9 @@ async function runCalculator() {
   } catch (err) {
     if (err.message !== 'CANCELLED') {
       hideProgressUI();
+      const _errData = err._data;
       let _handled = false;
-      try {
-        const _errData = JSON.parse(err.message);
+      if (_errData && _errData.error) {
         const _errType = _errData.error;
         if (_errType === 'account_restrictions' || _errType === 'isa_windmill_disabled') {
           const banner = document.getElementById('accountRestrictBanner');
@@ -343,7 +343,7 @@ async function runCalculator() {
             document.getElementById('resultEmpty').style.display = 'none';
             _handled = true;
           }
-        } else if (_errType === 'isa_contribution_limit') {
+        } else if (_errType === 'isa_contribution_limit' || _errType === 'isa_windmill_disabled') {
           const banner = document.getElementById('isaLimitErrorBanner');
           const detail = document.getElementById('isaLimitErrorDetail');
           if (banner && detail) {
@@ -353,7 +353,7 @@ async function runCalculator() {
             _handled = true;
           }
         }
-      } catch (_) {}
+      }
       if (!_handled) alert('오류: ' + err.message);
     }
   } finally {
@@ -408,7 +408,9 @@ async function pollTask(taskId, maxWait = 600000) {
       return data.result;
 
     } else if (data.status === 'FAILURE') {
-      throw new Error(data.error || '시뮬레이션 실패');
+      const _e = new Error(data.error || '시뮬레이션 실패');
+      try { _e._data = JSON.parse(data.error); } catch(_) {}
+      throw _e;
     }
   }
   throw new Error('시간 초과 (10분)');

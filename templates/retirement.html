@@ -255,6 +255,14 @@
         </div>
 
         <div class="input-row">
+          <label>연금 수령 시작 나이 <span style="font-size:0.75rem;color:var(--text-muted);">(연금저축·IRP 세율 결정)</span></label>
+          <div class="input-group" style="max-width:120px;">
+            <input type="number" id="simPensionStartAge" class="calc-input" value="65" min="55" max="90" step="1">
+            <span class="unit">세</span>
+          </div>
+        </div>
+
+        <div class="input-row">
           <label>인플레이션</label>
           <div class="input-group" style="max-width:120px;">
             <input type="number" id="simInflation" class="calc-input" value="2" min="0" max="10" step="0.5"
@@ -304,6 +312,15 @@
             </div>
           </div>
           <input type="hidden" id="wdYears" value="30">
+        </div>
+
+        <div class="input-row">
+          <label>연금 수령 시작 나이 <span style="font-size:0.75rem;color:var(--text-muted);">(연금저축·IRP 세율 결정)</span></label>
+          <div class="input-group" style="max-width:120px;">
+            <input type="number" id="wdPensionStartAge" class="calc-input" value="65" min="55" max="90" step="1">
+            <span class="unit">세</span>
+          </div>
+          <div class="input-hint">55세 미만 입력 시 55세 기준 세율 적용</div>
         </div>
 
         <div class="input-row">
@@ -709,6 +726,7 @@ async function runRetirement() {
       monthly_withdrawal:   parseFloat(document.getElementById('simWithdraw').value) || 0,
       withdrawal_years:     parseInt(document.getElementById('simWdYears').value) || 30,
       inflation:            parseFloat(document.getElementById('simInflation').value) / 100 || 0,
+      pension_start_age:    parseInt(document.getElementById('simPensionStartAge')?.value) || 65,
       target_percentile:    targetProb,
       tax_enabled:          retTaxOn,
       account_type:         document.getElementById('retTaxAccount')?.value || '위탁',
@@ -728,6 +746,7 @@ async function runRetirement() {
       monthly_withdrawal: parseFloat(document.getElementById('wdWithdraw').value) || 0,
       withdrawal_years:   parseInt(document.getElementById('wdYears').value) || 30,
       inflation:          parseFloat(document.getElementById('wdInflation').value) / 100 || 0,
+      pension_start_age:  parseInt(document.getElementById('wdPensionStartAge')?.value) || 65,
       dividend_mode:      document.querySelector('input[name="wdDividend"]:checked').value,
       rebal_mode:         document.querySelector('input[name="wdRebal"]:checked').value,
       band_width:         Number(document.getElementById('wdBandSlider').value) / 100,
@@ -755,9 +774,9 @@ async function runRetirement() {
     }
   } catch(e) {
     if (e.message !== 'CANCELLED') {
+      const _errData = e._data;
       let _handled = false;
-      try {
-        const _errData = JSON.parse(e.message);
+      if (_errData && _errData.error) {
         const _errType = _errData.error;
         if (_errType === 'account_restrictions' || _errType === 'isa_windmill_disabled') {
           const banner = document.getElementById('retAccountRestrictBanner');
@@ -777,7 +796,7 @@ async function runRetirement() {
             _handled = true;
           }
         }
-      } catch(_) {}
+      }
       if (!_handled) alert('오류가 발생했습니다: ' + e.message);
     }
   } finally {
@@ -815,7 +834,9 @@ async function retPollTask(taskId, maxWait = 600000) {
     } else if (data.status === 'SUCCESS') {
       return data.result;
     } else if (data.status === 'FAILURE') {
-      throw new Error(data.error || '시뮬레이션 실패');
+      const _e = new Error(data.error || '시뮬레이션 실패');
+      try { _e._data = JSON.parse(data.error); } catch(_) {}
+      throw _e;
     }
   }
   throw new Error('시간 초과 (10분)');

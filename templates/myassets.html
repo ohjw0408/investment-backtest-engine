@@ -47,9 +47,12 @@
 .rebal-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
 .rebal-row:last-child { border-bottom: none; }
 .rebal-action { font-weight: 700; padding: 3px 10px; border-radius: 6px; font-size: 0.78rem; }
-.rebal-buy  { background: #E8F5E9; color: #2E7D32; }
-.rebal-sell { background: #FFEBEE; color: #C62828; }
-.rebal-ok   { background: #F5F5F5; color: #9E9E9E; }
+.rebal-buy   { background: #E8F5E9; color: #2E7D32; }
+.rebal-sell  { background: #FFEBEE; color: #C62828; }
+.rebal-ok    { background: #F5F5F5; color: #9E9E9E; }
+.rebal-alert { background: #FFF3E0; color: #E65100; font-weight: 600; }
+.ma-period-btn { font-size:0.75rem; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:var(--card); color:var(--text-muted); cursor:pointer; }
+.ma-period-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
 
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
 .summary-item { padding: 12px 14px; background: var(--bg); border-radius: 10px; }
@@ -105,6 +108,22 @@
       <div class="ma-card-title">📈 자산 구성</div>
       <div id="summaryGrid" class="summary-grid"></div>
       <canvas id="weightChart" height="80"></canvas>
+    </div>
+
+    <div class="ma-card">
+      <div class="ma-card-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>📊 자산 추이</span>
+        <div style="display:flex;gap:6px;">
+          <button class="ma-period-btn active" onclick="setHistoryPeriod(30,this)">1개월</button>
+          <button class="ma-period-btn" onclick="setHistoryPeriod(90,this)">3개월</button>
+          <button class="ma-period-btn" onclick="setHistoryPeriod(365,this)">1년</button>
+          <button class="ma-period-btn" onclick="setHistoryPeriod(0,this)">전체</button>
+        </div>
+      </div>
+      <canvas id="maHistoryChart" height="120"></canvas>
+      <div id="maHistoryEmpty" style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;display:none;">
+        보유 종목을 추가하면 자산 추이가 표시됩니다.
+      </div>
     </div>
   </div>
 
@@ -411,6 +430,8 @@ function renderWeightChart(totalValue) {
 }
 
 // ── 리밸런싱 ──
+const REBAL_BAND = 0.05;  // 5% 기본 밴드 (향후 사용자 설정 가능)
+
 function renderRebalance() {
   const totalValue = holdings.reduce((s, h) => s + (prices[h.code]||0)*h.quantity, 0);
   if (!totalValue || !groups.length) {
@@ -419,23 +440,22 @@ function renderRebalance() {
     return;
   }
 
-  // 그룹별 현재 가치
   const groupValues = {};
   holdings.forEach(h => {
     const val = (prices[h.code]||0)*h.quantity;
-    if (h.group_id) {
-      groupValues[h.group_id] = (groupValues[h.group_id]||0) + val;
-    }
+    if (h.group_id) groupValues[h.group_id] = (groupValues[h.group_id]||0) + val;
   });
 
   const rows = groups.filter(g => g.target_pct > 0).map(g => {
-    const cur     = groupValues[g.id] || 0;
-    const curPct  = totalValue > 0 ? cur/totalValue : 0;
-    const tgtPct  = g.target_pct/100;
-    const diff    = tgtPct - curPct;
-    const diffVal = diff * totalValue;
-    const action  = Math.abs(diffVal) < 10000 ? 'ok' : diffVal > 0 ? 'buy' : 'sell';
-    return { g, cur, curPct, tgtPct, diff, diffVal, action };
+    const cur      = groupValues[g.id] || 0;
+    const curPct   = totalValue > 0 ? cur/totalValue : 0;
+    const tgtPct   = g.target_pct/100;
+    const diff     = tgtPct - curPct;
+    const diffVal  = diff * totalValue;
+    const absDiff  = Math.abs(diff);
+    const outOfBand = absDiff > REBAL_BAND;
+    const action   = absDiff < 0.001 ? 'ok' : diff > 0 ? 'buy' : 'sell';
+    return { g, cur, curPct, tgtPct, diff, diffVal, action, outOfBand, absDiff };
   });
 
   if (!rows.length) {
@@ -444,16 +464,38 @@ function renderRebalance() {
     return;
   }
 
-  document.getElementById('rebalResult').innerHTML = rows.map(r => `
-    <div class="rebal-row">
+  const alertCount = rows.filter(r => r.outOfBand).length;
+  const alertBanner = alertCount > 0
+    ? `<div style="background:#FFF3E0;border:1px solid #F57C00;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:#E65100;">
+        <strong>⚠ 리밸런싱 필요</strong> — ${alertCount}개 그룹이 목표 비중 ±${Math.round(REBAL_BAND*100)}% 밴드를 이탈했습니다.
+       </div>`
+    : `<div style="background:#E8F5E9;border:1px solid #66BB6A;border-radius:6px;padding:8px 14px;margin-bottom:12px;font-size:0.83rem;color:#2E7D32;">
+        ✅ 모든 그룹이 목표 비중 ±${Math.round(REBAL_BAND*100)}% 이내입니다.
+       </div>`;
+
+  document.getElementById('rebalResult').innerHTML = alertBanner + rows.map(r => {
+    const barColor = r.outOfBand ? '#F57C00' : '#66BB6A';
+    const bandBadge = r.outOfBand
+      ? `<span style="font-size:0.72rem;background:#FFF3E0;color:#E65100;padding:2px 6px;border-radius:4px;margin-left:4px;">밴드 이탈 ${(r.absDiff*100).toFixed(1)}%p</span>`
+      : '';
+    const actionCls = r.action === 'buy' ? 'rebal-buy' : r.action === 'sell' ? 'rebal-sell' : 'rebal-ok';
+    const actionText = r.action === 'ok' ? '✅ 적정'
+      : r.action === 'buy' ? '▲ 매수 ' + fmtKRW(r.diffVal)
+      : '▼ 매도 ' + fmtKRW(Math.abs(r.diffVal));
+    return `
+    <div class="rebal-row" style="${r.outOfBand ? 'background:#FFFDE7;' : ''}">
       <span class="group-badge" style="background:${r.g.color}22;color:${r.g.color};min-width:70px;">${r.g.name}</span>
-      <span style="flex:1;color:var(--text-muted);">현재 ${fmtPct(r.curPct)} → 목표 ${fmtPct(r.tgtPct)}</span>
-      <span style="min-width:80px;">${fmtKRW(r.cur)}</span>
-      <span class="rebal-action ${r.action==='buy'?'rebal-buy':r.action==='sell'?'rebal-sell':'rebal-ok'}">
-        ${r.action==='ok'?'✅ 적정':r.action==='buy'?'▲ 매수 '+fmtKRW(r.diffVal):'▼ 매도 '+fmtKRW(Math.abs(r.diffVal))}
+      <span style="flex:1;">
+        <span style="color:var(--text-muted);">현재 ${fmtPct(r.curPct)} → 목표 ${fmtPct(r.tgtPct)}</span>
+        ${bandBadge}
+        <div style="height:4px;background:#eee;border-radius:2px;margin-top:4px;max-width:120px;">
+          <div style="height:4px;width:${Math.min(100,r.curPct/Math.max(r.tgtPct,0.01)*100)}%;background:${barColor};border-radius:2px;transition:width 0.3s;"></div>
+        </div>
       </span>
-    </div>
-  `).join('');
+      <span style="min-width:80px;">${fmtKRW(r.cur)}</span>
+      <span class="rebal-action ${actionCls}">${actionText}</span>
+    </div>`;
+  }).join('');
 }
 
 // ── 추가매수 ──
@@ -664,7 +706,82 @@ function selectHoldingCode(code, name) {
 
 // 외부 클릭으로 닫기 비활성화
 
-loadAll();
+loadAll().then(() => loadPortfolioHistory(30));
+
+// ── 자산 추이 차트 ──
+let _maHistoryChart = null;
+let _historyData    = null;
+
+async function loadPortfolioHistory(days) {
+  try {
+    const res  = await fetch('/api/portfolio/history', { cache: 'no-store' });
+    _historyData = await res.json();
+    renderHistoryChart(days);
+  } catch(e) {
+    document.getElementById('maHistoryEmpty').style.display = 'block';
+  }
+}
+
+function setHistoryPeriod(days, btn) {
+  document.querySelectorAll('.ma-period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (_historyData) renderHistoryChart(days);
+}
+
+function renderHistoryChart(days) {
+  const data = _historyData;
+  if (!data || data.empty || !data.labels || !data.values || !data.labels.length) {
+    document.getElementById('maHistoryEmpty').style.display = 'block';
+    return;
+  }
+  document.getElementById('maHistoryEmpty').style.display = 'none';
+
+  let labels = data.labels;
+  let values = data.values;
+  if (days > 0 && labels.length > days) {
+    labels = labels.slice(-days);
+    values = values.slice(-days);
+  }
+
+  const ctx = document.getElementById('maHistoryChart').getContext('2d');
+  if (_maHistoryChart) _maHistoryChart.destroy();
+  _maHistoryChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: '#1a73e8',
+        backgroundColor: 'rgba(26,115,232,0.08)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => hideAmounts ? '***원' : Math.round(ctx.parsed.y).toLocaleString() + '원'
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 6, font: { size: 11 } }, grid: { display: false } },
+        y: {
+          ticks: {
+            maxTicksLimit: 4,
+            font: { size: 11 },
+            callback: v => hideAmounts ? '***' : (v >= 1e8 ? (v/1e8).toFixed(1)+'억' : (v/1e4).toFixed(0)+'만')
+          }
+        }
+      }
+    }
+  });
+}
 </script>
 {% endif %}
 {% endblock %}

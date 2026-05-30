@@ -4,12 +4,16 @@ scripts/build_djdiv_proxy.py
 DJ US Dividend 100 proxy chain builder -> index_master.db
 
 Chain (earlier segments scaled to match the later anchor):
-  SCHD  (price_daily.db actual,  2011-10-20 ~ present)  <- anchor
-  SDY   (yfinance adj close,     2005-11-15 ~ 2011-10-19)
-  DVY   (yfinance adj close,     2003-11-07 ~ 2005-11-14)
-  ^GSPC (index_master.db,        1928 ~ 2003-11-06)
+  SCHD  (price_daily.db actual raw close, 2011-10-20 ~ present)  <- anchor
+  SDY   (yfinance raw close,     2005-11-15 ~ 2011-10-19)
+  DVY   (yfinance raw close,     2003-11-07 ~ 2005-11-14)
+  ^GSPC (index_master.db raw,    1928 ~ 2003-11-06)
 
-Dividends are embedded in adj close -> no separate injection needed.
+PRICE-RETURN chain (raw close, NOT total-return). All segments use raw close so the
+methodology is consistent: SCHD anchor (price_daily auto_adjust=False) + ^GSPC (raw
+index) + SDY/DVY (yfinance auto_adjust=False). Dividends are NOT embedded; they are
+injected separately onto the backfilled range from the DJUSDIV100 yield table
+(see ETF_BACKFILL_ARCHITECTURE_PLAN.md Phase 6.0 Stage A).
 Saved as DJUSDIV_PROXY in index_master.db.
 
 Usage:
@@ -33,7 +37,9 @@ PROXY_CODE = "DJUSDIV_PROXY"
 # ------------------------------------------------------------------ loaders
 
 def _fetch_yf(symbol):
-    hist = yf.Ticker(symbol).history(period="max", auto_adjust=True)
+    # auto_adjust=False → raw close (price-return). 배당은 가격에 녹지 않음.
+    # 앵커 SCHD(price_daily)·^GSPC(index)와 동일한 raw 방식으로 통일.
+    hist = yf.Ticker(symbol).history(period="max", auto_adjust=False)
     if hist.empty:
         raise ValueError(f"yfinance: no data for {symbol}")
     s = hist["Close"].copy()

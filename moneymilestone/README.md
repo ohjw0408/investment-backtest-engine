@@ -171,16 +171,17 @@ _검토/추가: Codex, 2026-05-28_
 ## 현재 프로젝트 컨텍스트 (2026-05-30 갱신)
 
 **앱**: Flask 웹앱 + Celery 비동기 계산 + Redis + SQLite × 4개 DB.  
-**배포**: Hetzner VPS Ubuntu, SSH키 `~/.ssh/hetzner_ed25519`, IP `5.78.209.211`.  
+**배포**: Hetzner VPS Ubuntu, SSH키 `~/.ssh/hetzner_ed25519`, IP `178.105.84.213`.
 **언어**: Python (백엔드) + HTML/JS (프론트, 프레임워크 없음).
 
-**현재 블로커**: 배당 데이터 근본 버그.
-- 백필 가격은 1928년까지 있으나 실측 배당은 ETF 상장 후만 존재 + DJUSDIV_PROXY가
-  total-return(adj-close)이라 배당이 가격에 임베딩 → 배당 액수 0 → 배당 지표 전부 0.
-- Track G(다중계좌 세금)·세금 Phase 2c(배당 역산)·2e(금종세)가 모두 이 데이터에 의존.
+**현재 상태**: 배당 백필 Stage A 서버 적용 완료.
+- DJUSDIV_PROXY를 price-return 체인으로 재구축하고, SCHD/458730/446720/402970 백필 구간에
+  명시적 배당을 주입했다.
+- 서버 `debug_dividend.py`/`stage_a_verify.py`/계산기 직접 실행에서 배당 지표 p50 > 0 확인.
+- 다음 블로커는 데이터 0이 아니라 **정상 배당 데이터 기준 세금 Phase 2c/2e 재검증**.
 - → `wiki/dev/status.md`, `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0` 참고.
 
 **다음 액션**:
 ```
-ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0 Stage A 구현해줘
+Phase 2c/2e 재검증해줘
 ```

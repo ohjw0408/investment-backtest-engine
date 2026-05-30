@@ -1,6 +1,6 @@
 # Project Master Roadmap
 
-Last updated: 2026-05-30 (⚠️ 배당 데이터 근본 버그 발견 → 우선순위 전환. Track G 보류)
+Last updated: 2026-05-30 (✅ 배당 백필 Stage A 서버 적용 완료 → 세금 2c/2e 재검증 대기)
 
 > ⚠️ **2026-05-30 정정:** 아래 "SCHD vs TIGER now converge" / "Phase 2c Gate 통과" / "Track A 완료"는 **가격(CAGR) 수렴만** 검증된 것이었음. `debug_dividend.py` 실측 결과, 배당 **액수**는 0임이 확인됨. 원인: Track A가 DJUSDIV_PROXY를 total-return(adj-close)로 구축 → 가격은 맞지만 배당이 가격에 임베딩되어 itemize 안 됨. 백필 가격 구간(1928~)에 배당 row 없음 + provenance 전부 0행. **이는 세금 Phase 2c(배당 역산)·2e(금종세)·Track G(다중계좌 세금)의 데이터 기반을 무효화한다.** 해결 owner: `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0`(범용 배당 백필 재설계). 우선순위는 아래 "Current Recommended Next Action" 참조.
 
@@ -15,37 +15,37 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 | File | Role | Status |
 |---|---|---|
 | `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed (A1/A2/A3/A5/A6/B5/C3/C5/D3 done) |
-| `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 1~3 + 2d 완료. ⚠️ **2c 재검증 필요**(배당 데이터 의존). ⚠️ **2e 부분 구현** — 종합과세 엔진+백테스트 배선만. 자동산출/전탭배선/`_ytd_income` 주입 미완 (상세는 owner plan 갭 섹션). 전부 Phase 6.0 선행. |
-| `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | Phase 0~2 스키마 존재. 🔴 **Phase 6.0(범용 배당 백필 재설계) = 현재 최우선.** Phase 3+ (etf_master, etf_proxy_map, confidence grading)는 이후. |
+| `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 1~3 + 2d 완료. 🔁 **2c/2e 재검증 필요**(Stage A 정상 배당 데이터 기준). ⚠️ **2e 부분 구현** — 종합과세 엔진+백테스트 배선만. 자동산출/전탭배선/`_ytd_income` 주입 미완 (상세는 owner plan 갭 섹션). |
+| `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | ✅ **Phase 6.0 Stage A 서버 적용 완료**(price-return DJUSDIV_PROXY + 명시 배당 + UI 실측/추정). 🔴 Stage B 채권/MMF는 후속 필수. Phase 3+ (etf_master, etf_proxy_map, confidence grading)는 이후. |
 | `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | ✅ Complete (Phase 1~10, all screens). |
 | `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | **Backend complete (e8b7c1e). Frontend partially done. BUG-1~5 remain.** |
 | `PHASE4_PLAN.md § 4G` | Multi-account simulation engine + real ISA windmill (sequential/conditional flow). Requires Track F first. Key constraint: percentiles must be computed after per-scenario sum, not by summing individual percentiles. | Not started. Requires Track F first. |
 
 ## Current Situation
 
-⚠️ **현재 블로커: 배당 데이터 근본 버그 (2026-05-30 발견).** 아래 "완료" 항목 중 배당
-관련 부분은 **가격 수렴만** 검증된 것이며 배당 액수는 0으로 깨져 있음. Track G와 세금
-Phase 2c/2e가 이 데이터에 의존하므로 선결 과제. 현재 위치 = Phase 6.0 Stage A 착수 직전.
+✅ **배당 데이터 근본 버그의 Stage A 조치 완료 (2026-05-30).** DJUSDIV_PROXY를
+price-return 체인으로 재구축하고 SCHD/458730/446720/402970에 명시적 배당을 주입했다.
+서버에서 `stage_a_verify.py`, `debug_dividend.py`, 계산기 직접 실행으로 배당 p50 > 0과
+UI 실측/추정 필드를 확인했다. 현재 위치 = 정상 배당 데이터 기준 세금 Phase 2c/2e 재검증 직전.
 
 현재 위치 (한눈에):
-- 🔴 **선결(지금):** 배당 백필 범용 재설계 — `ETF_BACKFILL § Phase 6.0 Stage A`
-- ⏸️ **보류:** Track G(다중계좌 세금) — 배당 데이터 정상화 후 재개
-- 🔁 **재검증 필요:** 세금 Phase 2c(배당 역산)/2e(금종세) — 정상 배당으로 다시 확인
+- ✅ **완료:** 배당 백필 범용 재설계 Stage A — `ETF_BACKFILL § Phase 6.0 Stage A`
+- 🔁 **지금:** 세금 Phase 2c(배당 역산)/2e(금종세) — 정상 배당 데이터로 다시 확인
+- 🔴 **후속 필수:** 배당 백필 Stage B(채권/MMF 쿠폰 분배금)
+- ⏸️ **대기:** Track G(다중계좌 세금) — 세금 재검증 후 재개
 
 완료 (가격/구조 레벨 — 단, 배당 액수 정확성은 별개):
 
 - ✅ Tax Phase 1~3, Phase 2a/2b/2d — Gates passed. 종합과세 **계산 엔진**도 완전(단위검증 OK).
   ⚠️ **2c: 재검증 필요**(배당 데이터 의존). ⚠️ **2e: 부분 구현** — 백테스트만 배선, 기존
-  금융소득 자동산출·전탭 배선·`_ytd_income` 주입 미완. 둘 다 Phase 6.0 선행.
-- ⚠️ Track A: DJUSDIV_PROXY chain built — **단 total-return(adj-close)이라 배당 액수가
-  안 나옴.** 가격(CAGR)은 수렴하나 배당 itemize 실패. Phase 6.0에서 raw-close 교체로 재작업.
+  금융소득 자동산출·전탭 배선·`_ytd_income` 주입 미완. Stage A 완료 후 정상 배당 데이터 기준 재검증 필요.
+- ✅ Track A/Stage A: DJUSDIV_PROXY raw-close price-return 재구축 + 배당 분리 주입 완료.
 - ⚠️ Track B: Phase 2c Gate "passed" — 가격 기준. 배당 정상화 후 재검증 대상.
 - ✅ Track C: Synthetic data integration complete across all screens (Phases 1~10).
-- ⚠️ ETF_BACKFILL Phase 0~2: provenance DB 스키마는 존재하나 **실제 백필이 우회하여
-  458730/SCHD provenance 0행.** Phase 6.0에서 단일 경로 강제로 해결.
+- ✅ ETF_BACKFILL Phase 0~2 provenance 스키마는 Stage A 백필 가격/배당 기록에 사용됨.
 - ✅ PHASE4: A1/A2/A3/A5/A6/B5/C3/C5/D3 done.
 
-Current blocker: **배당 데이터 근본 버그 (`ETF_BACKFILL § Phase 6.0`이 owner).**
+Current blocker: **정상 배당 데이터 기준 세금 Phase 2c/2e 재검증.**
 
 ## Decision
 
@@ -87,24 +87,19 @@ Do not implement client-canonical storage. First implement server diagnostics, `
 ✅ Tax Phase 1~3 + 2a/2b/2d
 ✅ Track C: Synthetic data 전 화면 완료
 ✅ Track F: ISA 규제 정합성 (BUG-1~5 해결)
-✅ Track G G1: 다중계좌 투자계산기 탭 (구조/가격 — 단 배당은 아래 버그로 0)
+✅ Track G G1: 다중계좌 투자계산기 탭 (구조/가격)
 ✅ PHASE4 부분 완료: A1/A2/A3/A5/A6/B5/C3/C5/D3
-⚠️ Track A/B: 가격 수렴만 — 배당 액수 0 (total-return 백필)
+✅ ETF_BACKFILL Stage A: price-return + 명시 배당으로 SCHD/458730/446720/402970 서버 적용
 
 현재 위치 ↓
 
-[1] 🔴 배당 백필 범용 재설계 — ETF_BACKFILL § Phase 6.0 Stage A (주식형)  ← 지금
-    → DJUSDIV_PROXY 등 total-return 체인을 raw-close + 명시적 배당으로 교체
-    → provenance 단일 경로 강제, UI 실측/추정 구분
-    → 검증: debug_dividend.py p50>0 + 총수익 보존
+[1] 🔁 세금 Phase 2c(배당 역산)/2e(금종세) 재검증 — 정상 배당 데이터로  ← 지금
 
-[2] 🔁 세금 Phase 2c(배당 역산)/2e(금종세) 재검증 — 정상 배당 데이터로
-
-[3] 🔴 배당 백필 Stage B (채권/MMF, 필수) — ETF_BACKFILL § Phase 7
+[2] 🔴 배당 백필 Stage B (채권/MMF, 필수) — ETF_BACKFILL § Phase 7
     → 금리 수치 → 듀레이션 가격 모델 + 쿠폰을 분배금으로 명시 주입
 
-[4] ⏸️ Track G 재개 (배당 토대 완성 후)
-    → G1 후속: ② 입력 커서 유실 ③ UI 통일 (① 배당 0은 [1]에서 해소)
+[3] ⏸️ Track G 재개 (세금 재검증 후)
+    → G1 후속: ② 입력 커서 유실 ③ UI 통일 (① 배당 0은 Stage A로 해소)
     → 은퇴/백테스트 탭 확장 → G2 자금이동 → G3 ISA→연금 이전
 
 [5] ETF_BACKFILL V2 Phase 3+: etf_master/etf_proxy_map, confidence A~F, 전체 US 유니버스
@@ -182,7 +177,7 @@ Exit criteria (original — partially met):
 - ISA windmill → hard error ✅
 - ISA total > 1억 → 납입중단 방식 캡 + orange banner ✅ (BUG-4 재설계 완료)
 
-✅ 2026-05-30: 에러 팝업→배너 미관, T-B3 목표비중 계정연동 해결. Track F 잔여 = 배당 0(Phase 6.0)뿐.
+✅ 2026-05-30: 에러 팝업→배너 미관, T-B3 목표비중 계정연동 해결. Track F의 배당 0 블로커는 Stage A로 해소, 세금 재검증 필요.
 
 ### Track E. PHASE4 Product Work (진행 중)
 
@@ -290,25 +285,19 @@ Completion note - YYYY-MM-DD
 
 > ⚠️ **우선순위 전환 (2026-05-30):** 배당 데이터 근본 버그 발견. Track G는 다중계좌 **세금**(금종세·배당) 시뮬이라 배당/세율 데이터가 정확해야 테스트·구현이 의미 있음. 현재 배당 액수가 0이라 Track G 진행은 검증 불가능한 토대 위에 쌓는 셈. **따라서 데이터 토대부터 고친다.**
 
-**[1] 지금 — 배당 백필 범용 재설계 (Stage A 주식형):**
-```text
-ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0 Stage A 구현해줘
-```
-모든 백필을 `price-return 가격 + 명시적 배당` 표준으로 통일. DJUSDIV_PROXY 등 total-return 체인을 raw-close로 교체 + `index_div_yield` 기반 배당 분리. provenance 기록. UI 실측/추정 구분. 검증: `debug_dividend.py` p50>0 + 총수익 보존.
-
-**[2] Stage A 후 — 세금 Phase 2c/2e 재검증:**
+**[1] 지금 — 세금 Phase 2c/2e 재검증:**
 ```text
 배당 데이터 정상화 후 Gate 2c/2e 재검증해줘
 ```
-배당 액수가 정확해진 데이터로 배당 역산(2c)·금종세 경고(2e)가 실제로 맞는지 재확인. 이전 "통과"는 가격 수렴만 본 것.
+Stage A가 서버 적용되어 배당 액수가 정상화됐다. 이 데이터로 배당 역산(2c)·금종세 경고(2e)가 실제로 맞는지 재확인. 이전 "통과"는 가격 수렴만 본 것.
 
-**[3] 그 다음 — 배당 백필 Stage B (채권/MMF, 필수):**
+**[2] 그 다음 — 배당 백필 Stage B (채권/MMF, 필수):**
 ```text
 ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 7 + Phase 6.0 Stage B 진행해줘
 ```
 채권/MMF 금리 수치 → 듀레이션 가격 모델 + 쿠폰을 분배금으로 명시 주입.
 
-**[4] 데이터 토대 완성 후 — Track G 재개:**
+**[3] 세금 재검증 후 — Track G 재개:**
 G1 후속 보완(② 입력 커서 유실 ③ UI 통일 — 배당 0(①)은 Stage A로 해소). 이후 은퇴/백테스트 탭 확장 → G2 자금이동.
 
 **[5] 이후 — PHASE4 핵심/복잡한 기능:**

@@ -293,7 +293,7 @@ G2는 G1 완성 후 **실제 코드 기준으로 분배 정책·트리거 설계
 ### 1. [버그] 배당 지표 0 — ⚠️ 다중계좌 문제 아님으로 정정 (2026-05-30 진단)
 **증상:** TIGER 미국배당다우존스(458730) 배당 지표 전부 0, SCHD 0 다수. 단일계좌에서도 발생.
 **정정된 근본 원인 (`debug_dividend.py` 실측):** 다중계좌 합산 문제가 아님. 데이터 레이어 + 롤링 윈도우 집계 문제. 가격은 프록시 체인 백필로 1928년까지 존재하나 실측 배당(`corporate_actions`)은 ETF 상장 후만 존재(SCHD 2011~, 458730 2023~). 백필 가격 구간에 배당 row가 없어, `data_start`가 1928로 잡히며 20년 롤링 윈도우 대부분이 배당 이전 시대 → `_fit_distribution`이 0 윈도우 포함 전체 퍼센타일 계산 → p50=0. 어린 ETF일수록 심함.
-**조치 (확정 — 범용 재설계):** 모든 백필을 'price-return 가격 + 명시적 배당' 표준으로 통일(total-return 임베딩 폐기). DJUSDIV_PROXY 등 adj-close 체인은 raw-close로 교체해 배당 분리. 단계적: Stage A 주식/배당형 먼저 → Stage B 채권/MMF 후속(필수). + UI 실측/추정 구분. 상세 계획: `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0` + Phase 7. 우선순위 높음.
+**조치 (확정 — 범용 재설계):** 모든 백필을 'price-return 가격 + 명시적 배당' 표준으로 통일(total-return 임베딩 폐기). DJUSDIV_PROXY 등 adj-close 체인은 raw-close로 교체해 배당 분리. **Stage A 주식/배당형은 2026-05-30 서버 적용 완료**(SCHD/458730/446720/402970 + UI 실측/추정). Stage B 채권/MMF 후속(필수). 상세 계획: `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0` + Phase 7. 다음은 세금 2c/2e 재검증 후 Track G 재개.
 
 ### 2. [UX] 계좌 입력란 커서 사라짐
 **증상:** 두 번째 계좌의 월 납입금/초기자산 입력 시 숫자 하나 입력하면 커서가 사라져 다시 클릭해야 함.

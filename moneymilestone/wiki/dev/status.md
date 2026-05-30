@@ -21,7 +21,7 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> ⚠️ **우선순위 전환 (2026-05-30):** 배당 지표 0 버그가 다중계좌 문제 아닌 **데이터 레이어 근본 버그**로 판명(`debug_dividend.py` 실측). DJUSDIV_PROXY가 total-return(adj-close)라 배당이 가격에 임베딩 → 액수 안 나옴. **Track G/세금 Phase 2c·2e가 모두 배당 데이터에 의존하므로 이 버그가 선결 과제.** 다음: `ETF_BACKFILL § Phase 6.0` 범용 배당 백필 재설계(Stage A 주식형 → Stage B 채권/MMF) → 세금 Phase 2c/2e 재검증 → Track G 재개.
+> ✅ **2026-05-30 업데이트:** 배당 백필 Stage A 서버 적용 완료. DJUSDIV_PROXY를 price-return 체인으로 재구축하고 SCHD/458730/446720/402970 백필 구간에 명시적 배당을 주입했다. 서버 `stage_a_verify.py`, `debug_dividend.py`, 계산기 직접 실행에서 배당 지표 p50 > 0 및 UI 실측/추정 필드 확인. **다음 최우선은 정상 배당 데이터 기준 세금 Phase 2c/2e 재검증.**
 
 > 이전 요약: Track G G1 투자계산기 탭 구현·검증·배포 완료 (b14ed44, L0~L3 + Gate 회귀 PASS, 브라우저 실검증).
 
@@ -174,14 +174,14 @@ tags: [dev]
 
 ---
 
-## 현재 블로커 ❌
+## 현재 블로커 / 재검증 필요 ❌
 
-> 🔴 **배당 데이터 근본 버그가 현재 블로커.** 배당 액수 0 → 세금 2c/2e·Track G 검증 불가. owner: `ETF_BACKFILL § Phase 6.0`.
+> 🔁 **배당 액수 0 블로커는 Stage A로 해소.** 이제 정상 배당 데이터 기준으로 세금 2c/2e를 다시 검증해야 한다.
 
 | 블로커 | 상태 |
 |---|---|
-| **배당 액수 0 (total-return 백필 + 배당 row 부재)** | ❌ 미해결 — 최우선. Phase 6.0 범용 배당 백필 재설계 |
-| SCHD vs TIGER 배당 결과 불일치 | ⚠️ 가격만 수렴(DJUSDIV_PROXY adj-close). 배당은 0 — 위 블로커로 재정의 |
+| **배당 액수 0 (total-return 백필 + 배당 row 부재)** | ✅ Stage A로 해소 — price-return proxy + 명시 배당 서버 적용 (Codex) |
+| SCHD vs TIGER 배당 결과 불일치 | ✅ 같은 DJUSDIV_PROXY + 명시 배당 경로로 수렴 확인 (Codex) |
 | Phase 2c Gate | ⚠️ 가격 기준 통과. 배당 정상화 후 재검증 필요 |
 | `_fetch_fred()` 메서드 없음 | ✅ def 선언 추가 (e1a4d6e) |
 | 백필 실패 코드가 완료 처리됨 | ✅ _backfill_skip_codes 분리 (a761750) |
@@ -194,7 +194,7 @@ tags: [dev]
 - Phase 1: 공통 세금 코어, 절세매도 12월 분리, 청산세 통일 (Gate 1 ✅)
 - Phase 2a: `TaxableSimulationRunner` 구현, 백테스트 전환 (Gate 2a ✅)
 - Phase 2b: 투자계산기 + 은퇴 적립 Runner 전환 (Gate 2b ✅)
-- Phase 2c: 배당 역산 Runner 구현 ✅ / 🔴 Gate 재검증 필요 (배당 데이터 0 버그)
+- Phase 2c: 배당 역산 Runner 구현 ✅ / 🔁 Gate 재검증 필요 (Stage A 정상 배당 데이터 기준)
 - Phase 2d: 은퇴 인출 세금 주입 (Gate 2d ✅ 5/5)
 - Phase 2e: ⚠️ 부분 구현 — 종합과세 엔진+백테스트 배선만. 자동산출/전탭배선/_ytd_income 미완
 - Phase 3: ISA 풍차돌리기 Runner 통일 ✅
@@ -225,10 +225,10 @@ tags: [dev]
 
 | 트랙 | 내용 | 선행 조건 | 실행 명령어 |
 |---|---|---|---|
-| ⏳ **배당 백필 Stage A** | 1~2 완료(proxy raw 재구축 + SCHD/458730 재백필+배당주입, 배당지표 0→정상 검증). 남음: UI 실측/추정 구분, 총수익 보존 검증, 다른 US배당 ETF 재백필, **서버 적용** | 로컬 검증 완료 | `Stage A 나머지(UI/검증/서버) 진행해줘` |
-| 🔁 세금 2c/2e 재검증 | 정상 배당으로 배당역산·금종세 재확인 | Stage A | `Phase 2c/2e 재검증해줘` |
-| 🔴 배당 백필 Stage B | 채권/MMF 금리→가격+쿠폰 분배금 (필수) | Stage A | `ETF_BACKFILL § Phase 7 + 6.0 Stage B` |
-| ⏸️ Track G | 다중계좌 — G1 ✅(Codex, 배당0은 Stage A로 해소). ② 커서 ③ UI + G2 자금이동 | 배당 토대 완성 | `Track G 재개해줘` |
+| ✅ **배당 백필 Stage A** | 서버 적용 완료: DJUSDIV_PROXY raw 재구축, SCHD/458730/446720/402970 재백필+배당주입, UI 실측/추정 구분, 검증 PASS (Codex) | 완료 | — |
+| 🔁 세금 2c/2e 재검증 | 정상 배당으로 배당역산·금종세 재확인 | Stage A 완료 | `Phase 2c/2e 재검증해줘` |
+| 🔴 배당 백필 Stage B | 채권/MMF 금리→가격+쿠폰 분배금 (필수) | 2c/2e 재검증 후/병렬 검토 | `ETF_BACKFILL § Phase 7 + 6.0 Stage B` |
+| ⏸️ Track G | 다중계좌 — G1 ✅(Codex, 배당0은 Stage A로 해소). ② 커서 ③ UI + G2 자금이동 | 세금 재검증 후 | `Track G 재개해줘` |
 | ✅ Track F | ISA/계좌 규제 — 백엔드 + BUG-1~5 완료 | — | (완료, 미관 잔여만) |
 | PHASE4 핵심 | D4 D1/D2/B1/A4/C1/C2/B4 | 배당 토대 후/병렬 | `PHASE4 다음 안전한 항목 진행해줘` |
 | ETF_BACKFILL V2 Ph.3+ | etf_master/etf_proxy_map, confidence A~F | Stage A/B 후 | `ETF_BACKFILL Phase 3부터` |

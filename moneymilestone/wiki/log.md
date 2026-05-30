@@ -1,5 +1,22 @@
 # Log
 
+## [2026-05-30] sync+ops | Stage A 서버 적용 완료 + 계획/위키 상태 동기화
+
+- **서버 적용:** Hetzner `178.105.84.213`의 `/root/investment-backtest-engine`을 `52e97c9`까지 fast-forward. `domino`, `domino-celery` 재시작 후 active 확인.
+- **서버 DB 재생성:** `scripts/build_djdiv_proxy.py` 실행 후 `scripts/stage_a_rebackfill.py SCHD 458730 446720 402970` 실행.
+  - SCHD: 백필 21,046행 + 백필 배당 335건.
+  - 458730: 백필 23,979행 + 백필 배당 382건.
+  - 446720: 백필 23,832행 + 백필 배당 379건.
+  - 402970: 백필 23,563행 + 백필 배당 375건.
+- **검증:** 서버 `stage_a_verify.py` PASS 성격 결과, `debug_dividend.py` 배당 p50 > 0 확인, 직접 `run_calculator_logic`에서 458730 `div_real_start=2023-07-28`, `div_is_backfilled=True`, `total_dividend_p50=153,950,817` 확인. `/`와 `/calculator` HTTP 200.
+- **정리:** 임시 서버 백업/점검 파일 삭제. 기존 서버 미추적 파일(`data/meta/index_master.db.bak_`, `gunicorn.conf.py`, `share_images/`)은 보존.
+- **문서 동기화:** README/로드맵/ETF plan/세금 plan/wiki status·phases·bugs·product 문서를 “배당 0 블로커 → Stage A로 해소, 다음은 Phase 2c/2e 재검증” 상태로 갱신.
+- **다음:** `Phase 2c/2e 재검증해줘`. 이후 Stage B(채권/MMF 쿠폰)와 Track G 재개.
+
+_작성: Codex_
+
+---
+
 ## [2026-05-30] feature | 배당 백필 Stage A 1~2 — 배당 0 버그 수정 (로컬 검증)
 
 - **Stage A-1 (`a1564ae`):** `build_djdiv_proxy.py`의 SDY/DVY를 `auto_adjust=False`(raw)로 → DJUSDIV_PROXY를 일관된 price-return 체인으로 재구축. 2011 이후(SCHD 앵커+실데이터) 보존, 2011 이전만 price-return 거동으로 변경.

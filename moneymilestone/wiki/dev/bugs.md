@@ -22,7 +22,6 @@ tags: [dev, bug]
 | BUG-3 | 연금 수령 시작 나이 입력 불가 | 은퇴 계산기에 "연금 수령 시작 나이" 입력칸 없음. `user_settings.age`(현재 나이) 사용 중 | `templates/retirement.html`, `retirement_logic.py`, `modules/tax/liquidation.py` | ✅ 수정 완료 |
 | BUG-4 | ISA 1억 캡 로직 오류 — 월 납입금 균등 축소 | 전 기간 월납입을 줄이는 방식. 올바른 동작: 납입 지속 → 1억 도달 시점부터 납입 0원 | `calculator_logic.py`, `retirement_logic.py`, `modules/retirement/accumulation_analyzer.py`, `static/js/calculator.js` | ✅ 수정 (7dd75a4) |
 | BUG-5 | 밴드 슬라이더 숫자 직접 입력 불가 | 슬라이더만 있고 0.5% 단위 정밀 입력 불가 | `templates/myassets.html` | ✅ 수정 완료 |
-| BUG-G1-1 | ⚠️ **정정** — 배당 지표 0 (다중계좌 문제 아님) | `debug_dividend.py` 실측: 단일계좌 458730/SCHD도 동일. 백필 가격(1928~)에 배당 row 없음 + DJUSDIV_PROXY가 total-return(adj-close)라 배당이 가격에 임베딩 → 별도 액수 안 나옴. 롤링 윈도우 대부분 배당 이전 시대 → p50=0. **세금 Phase 2c(배당 역산)/2e(금종세)의 데이터 기반을 무효화하는 근본 버그.** | `modules/backfill_engine.py`, `index_loader`, `modules/retirement/accumulation_analyzer.py` | ❌ 미해결 (**최우선** — `ETF_BACKFILL § Phase 6.0` 범용 재설계) |
 | BUG-G1-2 | Track G 다중계좌 2번째 계좌 입력 커서 사라짐 | 입력 중 `renderTaxAccounts()` 전체 재렌더 → 포커스 유실 (BUG-6 패턴) | `static/js/calculator.js` | ❌ 미해결 (중간) |
 
 **이전 "활성"에서 해결된 항목들:**
@@ -54,6 +53,7 @@ tags: [dev, bug]
 | 백테스트 T2 — `Object of type bool is not JSON serializable` | `split_sale_plan.over_threshold`가 `numpy.float64` 비교 결과인 `numpy.bool_`로 반환되어 Celery 결과 JSON 저장 실패 | 2026-05-29 | ✅ `bool(...)` 캐스팅, 서버 배포, 458730 `/api/backtest/submit` 과세 ON PASS |
 | 백테스트 T2 — 기존 금융소득 미반영/세후금액 미표시 | `backtest_logic.py`가 분할매도 계획 호출 시 `other_financial_income=0.0` 고정. 결과에는 세금만 있고 세후 이익 필드가 없었음 | 2026-05-29 | ✅ `other_financial_income` 입력/저장/전달, 일괄·분할·최적 세후 이익 반환/표시 |
 | Track G G1 — 다중 계좌 배당세 단위 테스트 | 신규 `MultiAccountSimulationLoop`에서 위탁 계좌 배당세가 현금 잔액에 반영되어야 L3 손계산과 일치. 공통 `TaxedDividendEngine` 전역 수정은 기존 Gate 2a 골든 회귀를 깨서 제외 | 2026-05-30 | ✅ 다중 계좌 루프 내부에서 gross-net 차이를 현금 차감, L3 PASS (Codex) |
+| BUG-G1-1 — 배당 지표 0 | 다중계좌 문제가 아니라 데이터 레이어 문제. DJUSDIV_PROXY total-return 체인 + 백필 구간 배당 row 부재 | 2026-05-30 | ✅ Stage A 서버 적용 완료: price-return proxy 재구축, 명시 배당 주입, UI 실측/추정 구분, 서버 검증 PASS (Codex) |
 
 ---
 
@@ -110,7 +110,7 @@ tags: [dev, bug]
 | 이슈 | 상태 | 비고 |
 |---|---|---|
 | `volume=0`으로 백필/가격 오류 | ⚠️ 미확인 | 일부 종목에서 가격 대신 배당 표시 가능성 |
-| **백필 provenance 전부 0행** | ❌ 확인됨 (2026-05-30) | `price_daily_source`/`corporate_action_source`/`backfill_runs` 모두 458730/SCHD에 기록 없음. 가격 백필이 `BackfillEngine`(provenance 기록) 아닌 index_loader 프록시 체인으로 돼서 우회. Phase 6.0에서 해결 |
+| **백필 provenance 전부 0행** | ✅ Stage A에서 해결 (2026-05-30, Codex) | SCHD/458730/446720/402970 백필 가격·배당 provenance 기록 확인. 과거 run_id 없는 백필 이력은 서버 재백필로 교체됨 |
 | provenance 테이블 없음 | ⚠️ 미확인 | 합성 데이터 출처 적재 제거됨 |
 | `TaxedDividendEngine._ytd_income` 초기값 0 | ⏳ 미완료 | `other_financial_income` 연동 필요 |
 | `modules/sim/tax_engine.py` 덮어씀 | ⏳ 미완료 | Phase 2c 이후 정리 예정 |

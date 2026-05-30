@@ -2,9 +2,9 @@
 
 > ⚠️ **2026-05-30 정리:** 이 문서는 2026-05-29 시점 스냅샷. 이후 변동:
 > - BUG-1~7 + 연금 나이 입력 등 대부분 해결 (→ `wiki/dev/bugs.md`, `isafix.md` 참조).
-> - **T-F5/BUG-2의 "배당 0원"은 근본 버그로 판명** — 다중계좌·UI 문제 아니라 데이터 레이어(배당 백필). 정본: `ETF_BACKFILL § Phase 6.0`. 현재 최우선 블로커.
+> - **T-F5/BUG-2의 "배당 0원"은 근본 버그로 판명** — 다중계좌·UI 문제 아니라 데이터 레이어(배당 백필). `ETF_BACKFILL § Phase 6.0 Stage A` 서버 적용으로 해소. 현재 최우선은 세금 2c/2e 재검증.
 > - ✅ **추가 해결:** T-D5(인플레 총액 유효숫자/금액), T-B3(리밸 목표비중 하드코딩→계정 연동), 에러 팝업→배너 미관 — 전부 해결.
-> - 🔴 **유일하게 남은 것:** 배당 0(Phase 6.0 배당 백필). 그 외 handoff 항목 전부 종료.
+> - 🔁 **다음:** 정상 배당 데이터 기준 Phase 2c/2e 재검증. 그 외 handoff 항목 전부 종료.
 > - 현재 진행 정본은 `PROJECT_MASTER_ROADMAP.md` + `wiki/dev/status.md`. 이 handoff는 과거 기록용.
 
 ## 완료된 작업
@@ -28,7 +28,7 @@
 ## 지금 당장 할 일: Hetzner 배포
 
 ```bash
-ssh -i ~/.ssh/hetzner_ed25519 root@5.78.209.211
+ssh -i ~/.ssh/hetzner_ed25519 root@178.105.84.213
 cd /root/investment-backtest-engine
 git pull --ff-only
 systemctl restart domino domino-celery

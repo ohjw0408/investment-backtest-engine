@@ -749,7 +749,11 @@ function dtRestoreForm(body) {
   }
   const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v; };
   set('dtTargetDiv', body.target_monthly_div);
-  if (body.probability !== undefined) set('dtProbSlider', Math.round(body.probability * 100));
+  if (body.probability !== undefined) {
+    set('dtProbSlider', Math.round(body.probability * 100));
+    // 슬라이더 프로그램 세팅은 input 이벤트를 안 발생시킴 → 라벨 수동 동기화 (값/위치/라벨 불일치 방지)
+    document.getElementById('dtProbLabel').textContent = document.getElementById('dtProbSlider').value + '%';
+  }
   if (body.seed?.center !== undefined) set('dtSeedVal', body.seed.center);
   if (body.monthly?.center !== undefined) set('dtMonthlyVal', body.monthly.center);
   if (body.years?.center !== undefined) set('dtYearsVal', body.years.center);
@@ -841,7 +845,7 @@ function renderResult(data, body) {
 
     document.getElementById('dtSolveTitle').textContent = solvedLabel || '달성 확률';
 
-    // 예상 월 배당금 분포 (최종연도 기준, 롤링 윈도우 p25~p75) — 고정/자동 모드 공통
+    // 예상 월 배당금 분포 (최종연도 기준, 롤링 윈도우 p25~p75) — 상단 핵심 노출
     const dist = res.distribution || {};
     const hasDist = dist.p50 != null && dist.p50 > 0;
     const distCards = hasDist ? `
@@ -850,26 +854,16 @@ function renderResult(data, body) {
         <div class="dist-card-value">${fmtKRW(Math.round(dist.p50/12))}</div>
       </div>
       <div class="dist-card">
-        <div class="dist-card-label">월 배당금 범위 (결과의 50% · p25~p75)</div>
+        <div class="dist-card-label">월 배당금 범위 (전체 결과의 50% · p25~p75)</div>
         <div class="dist-card-value" style="font-size:0.95rem;">${fmtKRW(Math.round(dist.p25/12))} ~ ${fmtKRW(Math.round(dist.p75/12))}</div>
       </div>` : '';
 
-    document.getElementById('dtSolveCards').innerHTML = (solvedLabel ? `
-      <div class="dist-card median">
-        <div class="dist-card-label">${solvedLabel}</div>
-        <div class="dist-card-value">${solvedValue}</div>
-      </div>
-      <div class="dist-card pessimistic">
-        <div class="dist-card-label">목표 월 배당금</div>
-        <div class="dist-card-value">${fmtKRW(body.target_monthly_div)}</div>
-      </div>
-      <div class="dist-card optimistic">
-        <div class="dist-card-label">달성 확률</div>
-        <div class="dist-card-value">${p}%</div>
-      </div>` : `
-      <div class="dist-card median"><div class="dist-card-label">달성 확률</div><div class="dist-card-value">${p}%</div></div>
-      <div class="dist-card pessimistic"><div class="dist-card-label">목표 월 배당금</div><div class="dist-card-value">${fmtKRW(body.target_monthly_div)}</div></div>
-      <div class="dist-card optimistic"><div class="dist-card-label">기준 확률</div><div class="dist-card-value">${Math.round(body.probability*100)}%</div></div>`) + distCards;
+    // 자동: 필요 투자금/적립/기간만 / 고정: 달성 확률만. 목표월배당·기준확률 중복표기 제거.
+    const primaryCard = solvedLabel
+      ? `<div class="dist-card optimistic"><div class="dist-card-label">${solvedLabel}</div><div class="dist-card-value">${solvedValue}</div></div>`
+      : `<div class="dist-card optimistic"><div class="dist-card-label">달성 확률</div><div class="dist-card-value">${p}%</div></div>`;
+
+    document.getElementById('dtSolveCards').innerHTML = primaryCard + distCards;
 
     // 공유 데이터
     try {

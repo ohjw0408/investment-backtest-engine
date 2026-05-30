@@ -193,11 +193,13 @@ def inject_monthly_coupons(
     price_series: pd.Series,
     yield_series: pd.Series,
     freq: int = 12,
+    book_factor: float = 1.0,
     table_name: str = "corporate_actions",
 ) -> tuple:
     """채권 쿠폰(이자)을 월말에 분배금으로 corporate_actions에 주입 (Stage B).
 
-    쿠폰 = price[ex_date] × (해당시점 yield(%) / 100) / freq.
+    쿠폰 = price[ex_date] × (해당시점 yield(%) / 100) / freq × book_factor.
+    book_factor: 모델 쿠폰(현재 시장금리)을 실측 분배(book yield, 보수 차감)에 맞추는 보정(<1).
     yield_series = 금리(%) 시계열 (DGS* 등). 백필 가격구간(price_series)에만 주입한다.
     """
     if price_series.empty:
@@ -218,7 +220,7 @@ def inject_monthly_coupons(
         rate = float(yv.iloc[-1]) / 100.0
         if rate <= 0:
             continue
-        coupon = float(price_series[ex_date]) * rate / float(freq)
+        coupon = float(price_series[ex_date]) * rate / float(freq) * float(book_factor)
         if coupon <= 0:
             continue
         records.append((code, ex_date.strftime("%Y-%m-%d"), round(coupon, 6), 1.0))
@@ -490,7 +492,9 @@ class BackfillEngine:
         # 채권 ETF (Stage B): 명시 config(rate 금리시계열 + duration)로 직접 매핑.
         # us_etf_list category가 "US Fixed Income"으로 뭉뚱그려져 듀레이션 구분 불가하므로
         # ETF 코드로 직접 키잉한다 (etf_proxy_map 씨앗).
-        from modules.bond_model import bond_config, build_bond_price_series, COUPON_FREQ_PER_YEAR
+        from modules.bond_model import (
+            bond_config, build_bond_price_series, COUPON_FREQ_PER_YEAR, COUPON_BOOK_FACTOR,
+        )
         bcfg    = bond_config(code)
         is_bond = bcfg is not None
 
@@ -544,7 +548,8 @@ class BackfillEngine:
         bond_yield = None
         if is_bond:
             bond_yield   = index_series.copy()
-            index_series = build_bond_price_series(index_series, bcfg["duration"])
+            index_series = build_bond_price_series(
+                index_series, bcfg["duration"], bcfg.get("model", "duration"))
 
         # ETF 상장일 이전 지수 데이터 확인
         pre_series = index_series[index_series.index < etf_start]
@@ -613,6 +618,7 @@ class BackfillEngine:
                 price_series=scaled,
                 yield_series=bond_yield,
                 freq=COUPON_FREQ_PER_YEAR,
+                book_factor=COUPON_BOOK_FACTOR,
             )
         elif leverage == 1.0 and index_code not in _NO_DIVIDEND_INDICES:
             yield_table = self._load_div_yield_table(index_code)

@@ -15,40 +15,53 @@ import pandas as pd
 
 # ETF별 명시 매핑 (etf_proxy_map 씨앗).
 #   rate     : 금리 시계열 코드 (index_master.db index_daily, 단위 = %)
-#   duration : 표준 듀레이션(년)
+#   duration : 유효 듀레이션(년). 실측 회귀 중앙값으로 보정(stage_b_full_verify D).
+#   model    : "duration" = 가격 -dur×Δy / "carry" = 가격 평평·수익은 이자(MMF·CD·초단기)
+# 듀레이션 값은 stage_b_full_verify의 실측 유효듀레이션(연도별 회귀 중앙값)에 맞춤.
 _BOND_ETF_CONFIG: dict[str, dict] = {
-    # ── US 국채 ──
-    "TLT":  {"rate": "DGS30",  "duration": 17.0},   # 20+yr
-    "VGLT": {"rate": "DGS30",  "duration": 16.0},   # long
-    "SPTL": {"rate": "DGS30",  "duration": 16.0},   # long
-    "IEF":  {"rate": "DGS10",  "duration": 7.5},    # 7-10yr
-    "GOVT": {"rate": "DGS10",  "duration": 6.0},    # broad treasury
-    "AGG":  {"rate": "DGS10",  "duration": 6.0},    # aggregate (국채 근사)
-    "BND":  {"rate": "DGS10",  "duration": 6.0},    # total bond (국채 근사)
-    "SHY":  {"rate": "DGS3MO", "duration": 1.9},    # 1-3yr
-    "SCHO": {"rate": "DGS3MO", "duration": 1.9},    # short
+    # ── US 국채 (장/중기) — duration 모델 ──
+    "TLT":  {"rate": "DGS30",  "duration": 17.0, "model": "duration"},  # 실측 17.1
+    "VGLT": {"rate": "DGS30",  "duration": 16.0, "model": "duration"},  # 실측 16.0
+    "SPTL": {"rate": "DGS30",  "duration": 16.0, "model": "duration"},  # 실측 16.1
+    "IEF":  {"rate": "DGS10",  "duration": 7.5,  "model": "duration"},  # 실측 7.4
+    "GOVT": {"rate": "DGS10",  "duration": 5.3,  "model": "duration"},  # 실측 5.3 (구 6.0)
+    "AGG":  {"rate": "DGS10",  "duration": 4.4,  "model": "duration"},  # 실측 4.2 (구 6.0; 회사채/MBS 섞임)
+    "BND":  {"rate": "DGS10",  "duration": 4.4,  "model": "duration"},  # 실측 4.4 (구 6.0)
+    # ── US 초단기 — duration 작음(가격 거의 평평, 수익 carry 위주) ──
+    "SHY":  {"rate": "DGS3MO", "duration": 0.8,  "model": "duration"},  # 실측 0.8 (구 1.9)
+    "SCHO": {"rate": "DGS3MO", "duration": 0.8,  "model": "duration"},  # 실측 0.8
+    # ── US T-bill(MMF 성격) — carry 모델(가격 평평, 수익=이자). 한국 CD/MMF 검증용 ──
+    "BIL":  {"rate": "DGS3MO", "duration": 0.0,  "model": "carry"},
 }
 
 COUPON_FREQ_PER_YEAR = 12  # 채권 ETF는 보통 월 분배
+
+# 모델 쿠폰(현재 시장금리 기반)을 실측 분배(book yield = 보수 차감 + 평균 매입금리)에 맞추는 보정.
+# stage_b_full_verify B: 국채 ETF 모델/실측 분배yield 비 ≈ 1.13~1.19 → 약 0.87.
+COUPON_BOOK_FACTOR = 0.87
 
 # 일일 가격수익 클리핑 (금리 데이터 이상치 방어)
 _DAILY_RET_CLIP = 0.10
 
 
 def bond_config(code: str) -> dict | None:
-    """채권 ETF면 {rate, duration} 반환, 아니면 None."""
+    """채권 ETF면 {rate, duration, model} 반환, 아니면 None."""
     return _BOND_ETF_CONFIG.get(code)
 
 
-def build_bond_price_series(yield_series: pd.Series, duration: float) -> pd.Series:
+def build_bond_price_series(yield_series: pd.Series, duration: float,
+                            model: str = "duration") -> pd.Series:
     """yield(%, 예: 4.27) 시계열 → 상대 price-return 지수(시작값 1.0).
 
-    일일 가격수익 = -duration × Δyield(decimal). 캐리(이자)는 제외 — 쿠폰으로 분리.
+    model="duration": 일일 가격수익 = -duration × Δyield(decimal). 캐리(이자)는 제외(쿠폰 분리).
+    model="carry":    가격 평평(NAV ~ 일정). 모든 수익은 쿠폰(이자)으로 — MMF·CD·초단기.
     반환 시계열은 _scale_to_etf로 ETF 상장가에 앵커링해 사용한다.
     """
     y = yield_series.dropna().sort_index().astype(float)
     if y.empty:
         return pd.Series(dtype=float)
+    if model == "carry":
+        return pd.Series(1.0, index=y.index, name="bond_price")
     dy = y.diff().fillna(0.0) / 100.0          # %p → decimal
     daily_ret = (-float(duration)) * dy
     daily_ret = daily_ret.clip(-_DAILY_RET_CLIP, _DAILY_RET_CLIP)

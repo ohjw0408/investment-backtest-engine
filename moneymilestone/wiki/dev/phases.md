@@ -60,4 +60,4 @@ tags: [dev]
 
 → 전체 체크리스트: [[dev/status]]  
 → 완료 항목: A1 A2 A3 A5 A6 B5 C3 C5 D3 + F1 B2-b B2-c B3 D5  
-→ 미완/이슈: D4(미착수), D5(인플레 총액 유효숫자/금액 버그 — handoff 참고), A4 B1 C1 C2 B4 D1 D2
+→ 미착수: D4, A4, B1, B2-a, C1, C2, B4, D1, D2, D6

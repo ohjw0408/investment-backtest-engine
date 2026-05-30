@@ -230,7 +230,7 @@ tags: [dev]
 | 🔴 배당 백필 Stage B | 채권/MMF 금리→가격+쿠폰 분배금 (필수) | Stage A | `ETF_BACKFILL § Phase 7 + 6.0 Stage B` |
 | ⏸️ Track G | 다중계좌 — G1 ✅(Codex, 배당0은 Stage A로 해소). ② 커서 ③ UI + G2 자금이동 | 배당 토대 완성 | `Track G 재개해줘` |
 | ✅ Track F | ISA/계좌 규제 — 백엔드 + BUG-1~5 완료 | — | (완료, 미관 잔여만) |
-| PHASE4 핵심 | D4 D1/D2/B1/A4/C1/C2/B4 (D5 버그 수정 포함) | 배당 토대 후/병렬 | `PHASE4 다음 안전한 항목 진행해줘` |
+| PHASE4 핵심 | D4 D1/D2/B1/A4/C1/C2/B4 | 배당 토대 후/병렬 | `PHASE4 다음 안전한 항목 진행해줘` |
 | ETF_BACKFILL V2 Ph.3+ | etf_master/etf_proxy_map, confidence A~F | Stage A/B 후 | `ETF_BACKFILL Phase 3부터` |
 | E1 모바일 / C4 온보딩 | 반응형 / 튜토리얼 | 전체 기능 안정화 후 | — |
 

@@ -180,29 +180,22 @@ Exit criteria (original — partially met):
 - 연금저축 + commodity ETF → passes ✅
 - ISA contribution limits → hard error ✅
 - ISA windmill → hard error ✅
-- ISA total > 1억 → orange banner ⚠️ (캡 로직 재설계 필요, BUG-4)
+- ISA total > 1억 → 납입중단 방식 캡 + orange banner ✅ (BUG-4 재설계 완료)
 
-Suggested command phrase:
-```text
-BUG-1,2,3,4,5 수정해줘
-```
+✅ 2026-05-30: 에러 팝업→배너 미관, T-B3 목표비중 계정연동 해결. Track F 잔여 = 배당 0(Phase 6.0)뿐.
 
 ### Track E. PHASE4 Product Work (진행 중)
 
 Owner plan: `PHASE4_PLAN.md`
 
-**완료:** A1/A2/A3/A5/A6/B5/C3/C5/D3
+**완료:** A1/A2/A3/A5/A6/B5/C3/C5/D3 + F1/B2-b/B2-c/B3/D5
 
-**Track F와 병렬 가능 (의존성 없는 항목):**
+**남은 항목 (의존성 없음):**
 
 | 항목 | 난이도 | 선행 조건 |
 |------|--------|-----------|
-| F1 대기 순위 UX 수정 | 0.5일 | 없음 |
-| B2-c 내자산 현재가 캐싱 | 0.5일 | 없음 |
 | D4 거래수수료 설정 | 1~2일 | 없음 |
-| D5 인플레이션 검증 + 실질생활비 | 2~3일 | 없음 |
-| B2 자산 추이 + 홈 토글 | 1~2일 | 없음 |
-| B3 리밸런싱 경고 밴드 | 1일 | B2 |
+| B2-a 홈 화면 자산 토글 | 0.5일 | 없음 |
 | D6 합성 데이터 백테스트 체크박스 | 1~2일 | Track C ✅ |
 
 **Track G 이후 또는 병렬 가능:**

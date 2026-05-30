@@ -1,5 +1,15 @@
 # Log
 
+## [2026-05-30] update | 추가 해결 항목 반영 (오너 확인)
+
+- 오너 확인: isafix 잔여 ①(에러 팝업→배너)·③(T-B3 목표비중 계정연동), handoff T-D5·T-B3·에러팝업, PHASE4 D5·B3 — **전부 해결**.
+- 반영: `isafix.md`, `handoff.md`, `PHASE4_PLAN.md`, `PROJECT_MASTER_ROADMAP.md`(Track F 잔여=배당0뿐, Track E 완료목록 갱신), wiki `phases.md`/`status.md`.
+- 남은 블로커: 배당 0(`ETF_BACKFILL Phase 6.0`)뿐.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-30] sync | 전 계획 파일 + 위키 진행상황 일괄 최신화 + README 규칙 추가
 
 - **배경:** 계획 파일들이 서로 stale·모순 (로드맵은 "Phase 2c/2e 완료·블로커 없음", 세금 plan은 "2e pending", phases.md는 "SCHD/TIGER 수렴"). 실제 진행과 불일치.

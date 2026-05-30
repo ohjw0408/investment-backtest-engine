@@ -441,39 +441,33 @@ class DividendSimulator:
         return results
 
     def _find_real_data_start(self) -> pd.Timestamp:
-        """
-        배당 주기 변화 감지로 실제 상장일(백필 끝나는 시점) 추정.
-        최근 배당 간격과 크게 다른 간격이 나오는 지점 = 백필/실데이터 경계.
+        """실측 데이터(volume>0) 시작일 = 백필(volume=0)/실데이터 경계.
+        provenance 기반 결정값(배당간격 휴리스틱 아님). 다종목이면 가장 늦은
+        실데이터 시작(모든 종목이 실측인 시점)을 반환한다.
         """
         candidates = []
         for t in self.tickers:
-            df = self._load(t)
-            if df.empty:
-                continue
-            div_df = df[df["dividend"] > 0].sort_index()
-            if len(div_df) < 6:
-                candidates.append(div_df.index.min() if not div_df.empty else df.index.min())
-                continue
-
-            dates = div_df.index.to_list()
-            # 최근 12회 배당으로 정상 간격 계산
-            recent = dates[-min(12, len(dates)):]
-            if len(recent) < 2:
-                candidates.append(dates[0])
-                continue
-            recent_gap = (recent[-1] - recent[0]).days / (len(recent) - 1)
-
-            # 뒤에서 앞으로 스캔: 정상 간격 벗어나는 첫 지점 = 실데이터 시작
-            real_start = dates[0]
-            for i in range(len(dates) - 1, 0, -1):
-                gap = (dates[i] - dates[i - 1]).days
-                if gap > recent_gap * 1.8 or gap < recent_gap * 0.4:
-                    real_start = dates[i]
-                    break
-
-            candidates.append(real_start)
-
+            row = self.loader.conn.execute(
+                "SELECT MIN(date) FROM price_daily WHERE code=? AND volume>0", (t,)
+            ).fetchone()
+            if row and row[0]:
+                candidates.append(pd.Timestamp(row[0]))
+            else:
+                df = self._load(t)
+                if not df.empty:
+                    candidates.append(df.index.min())
         return max(candidates) if candidates else pd.Timestamp("1900-01-01")
+
+    def _roll_window(self, seed, monthly, years, start_dt, end_dt) -> List[float]:
+        """[start_dt, end_dt]를 step_months 간격으로 롤링해 케이스 생성."""
+        results = []
+        if start_dt <= end_dt:
+            roll_starts = pd.date_range(start_dt, end_dt, freq=f"{self.step_months}ME")
+            for start in roll_starts:
+                val = self._simulate_one(seed, monthly, years, start.strftime("%Y-%m-%d"))
+                if val > 0:
+                    results.append(val)
+        return results
 
     def _run_rolling(self, seed, monthly, years) -> List[float]:
         cache_key = f"{round(seed,-4)}_{round(monthly,-4)}_{years}"
@@ -486,25 +480,24 @@ class DividendSimulator:
 
         actual_start_dt  = pd.Timestamp(actual_start)
         real_data_start  = self._find_real_data_start()
-        effective_start  = max(actual_start_dt, real_data_start)
         sim_end_latest   = pd.Timestamp.today() - pd.DateOffset(years=years)
 
-        # 실제 데이터 롤링
-        real_results = []
-        if effective_start <= sim_end_latest:
-            roll_starts = pd.date_range(effective_start, sim_end_latest, freq=f"{self.step_months}ME")
-            for start in roll_starts:
-                val = self._simulate_one(seed, monthly, years, start.strftime("%Y-%m-%d"))
-                if val > 0:
-                    real_results.append(val)
-
-        # 케이스 부족 시 가상 데이터로 보충
-        # [SYNTHETIC_PATH: In-Memory] DividendSimulator._run_synthetic_rolling
-        # 롤링 케이스 < MIN_CASES 시 자동 발동. DB 기록 없음. ScenarioDataPreparer 경유 불필요.
-        if len(real_results) >= self.MIN_CASES:
-            results = real_results
+        # 3단 폴백: 실측을 버리지 않고, 부족분만 가상으로 보충한다.
+        # 1단 — 실데이터(volume>0) 구간만 롤링. 실측 역사가 충분하면 그대로 사용.
+        real_start = max(actual_start_dt, real_data_start)
+        real_only  = self._roll_window(seed, monthly, years, real_start, sim_end_latest)
+        if len(real_only) >= self.MIN_CASES:
+            results = real_only
         else:
-            results = self._run_synthetic_rolling(seed, monthly, years, self.MIN_CASES)
+            # 2단 — 백필 포함 전구간 롤링. 실측+백필 경로를 최대한 사용.
+            full = self._roll_window(seed, monthly, years, actual_start_dt, sim_end_latest)
+            if len(full) >= self.MIN_CASES:
+                results = full
+            else:
+                # 3단 — 부족분만 가상으로 보충 (실측/백필 케이스는 유지).
+                # [SYNTHETIC_PATH: In-Memory] DB 기록 없음. ScenarioDataPreparer 경유 불필요.
+                need    = self.MIN_CASES - len(full)
+                results = full + self._run_synthetic_rolling(seed, monthly, years, need)
         self._sim_cache[cache_key] = results
         return results
 

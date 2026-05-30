@@ -29,7 +29,9 @@ except Exception:
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 PRICE_DB = BASE / "data" / "price_cache" / "price_daily.db"
-CODES = ["SCHD", "458730"]
+# 코드를 인자로 받음. 없으면 기본(이미 완료한 SCHD/458730).
+# 예: python scripts/stage_a_rebackfill.py 446720 402970
+CODES = sys.argv[1:] if len(sys.argv) > 1 else ["SCHD", "458730"]
 SEP = "=" * 80
 
 

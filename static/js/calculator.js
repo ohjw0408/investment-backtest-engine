@@ -742,9 +742,16 @@ function renderResult(data, payload) {
   ];
 
   const noDividend = dist.no_dividend === true;
-  const divNote = dist.div_data_start
-    ? `※ ${dist.div_data_start} 이후 ${dist.div_cases_count}개 케이스 기준`
-    : '';
+  let divNote = '';
+  if (dist.div_data_start) {
+    if (dist.div_is_backfilled && dist.div_real_start) {
+      const realYr = String(dist.div_real_start).slice(0, 4);
+      const bfYr   = String(dist.div_data_start).slice(0, 4);
+      divNote = `※ 배당: 실측 ${realYr}년~, 그 이전(${bfYr}년~)은 프록시 지수 기반 추정(백필) · ${dist.div_cases_count}개 케이스`;
+    } else {
+      divNote = `※ ${dist.div_data_start} 이후 ${dist.div_cases_count}개 케이스 기준`;
+    }
+  }
 
   histConfigs.forEach(cfg => {
     const isDivDisabled = cfg.div && noDividend;

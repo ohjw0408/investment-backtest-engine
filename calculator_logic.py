@@ -40,6 +40,23 @@ def _get_dividend_start(portfolio_engine, ticker: str):
         return None
 
 
+def _get_real_dividend_start(portfolio_engine, ticker: str):
+    """실측 배당 최초일 = 실데이터(volume>0) 구간의 첫 배당.
+    백필 주입 배당은 실데이터 시작 이전이므로 제외됨.
+    """
+    try:
+        cur = portfolio_engine.loader.conn.execute(
+            "SELECT MIN(ca.date) FROM corporate_actions ca "
+            "WHERE ca.code=? AND ca.dividend > 0 AND ca.date >= "
+            "(SELECT MIN(date) FROM price_daily WHERE code=? AND volume > 0)",
+            (ticker, ticker)
+        )
+        row = cur.fetchone()
+        return row[0] if row and row[0] else None
+    except Exception:
+        return None
+
+
 def _make_strategy_factory(target_weights, rebal_mode, band_width=0.05):
     from modules.rebalance.periodic import PeriodicRebalance
     if rebal_mode == 'none':
@@ -161,6 +178,10 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
     div_starts = [d for d in div_starts if d]
     div_start  = max(div_starts) if div_starts else None
 
+    real_div_starts = [_get_real_dividend_start(portfolio_engine, t) for t in all_tickers]
+    real_div_starts = [d for d in real_div_starts if d]
+    div_real_start  = max(real_div_starts) if real_div_starts else None
+
     import json as _json
     tax_engine = None
     if tax_enabled:
@@ -260,8 +281,11 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
     distribution = result['combined']['distribution']
 
     if div_start:
-        distribution['div_data_start']  = div_start
-        distribution['div_cases_count'] = len(result['cases'])
+        distribution['div_data_start']     = div_start
+        distribution['div_backfill_start'] = div_start
+        distribution['div_real_start']     = div_real_start
+        distribution['div_is_backfilled']  = bool(div_real_start and div_real_start > div_start)
+        distribution['div_cases_count']    = len(result['cases'])
     else:
         distribution['no_dividend'] = True
 
@@ -395,6 +419,10 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
     div_starts = [d for d in div_starts if d]
     div_start  = max(div_starts) if div_starts else None
 
+    real_div_starts = [_get_real_dividend_start(portfolio_engine, t) for t in ticker_codes]
+    real_div_starts = [d for d in real_div_starts if d]
+    div_real_start  = max(real_div_starts) if real_div_starts else None
+
     tax_enabled     = body.get('tax_enabled', False)
     account_type    = body.get('account_type', '위탁')
     user_settings   = body.get('user_settings', {})
@@ -485,8 +513,11 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
     result = analyzer.run()
 
     if div_start:
-        result['distribution']['div_data_start']  = div_start
-        result['distribution']['div_cases_count'] = len(result['cases'])
+        result['distribution']['div_data_start']     = div_start
+        result['distribution']['div_backfill_start'] = div_start
+        result['distribution']['div_real_start']     = div_real_start
+        result['distribution']['div_is_backfilled']  = bool(div_real_start and div_real_start > div_start)
+        result['distribution']['div_cases_count']    = len(result['cases'])
     else:
         result['distribution']['no_dividend'] = True
 

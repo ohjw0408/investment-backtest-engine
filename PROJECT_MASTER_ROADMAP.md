@@ -1,6 +1,8 @@
 # Project Master Roadmap
 
-Last updated: 2026-05-30 (Track G G1 구현·검증 완료, 후속 보완 대기)
+Last updated: 2026-05-30 (⚠️ 배당 데이터 근본 버그 발견 → 우선순위 전환. Track G 보류)
+
+> ⚠️ **2026-05-30 정정:** 아래 "SCHD vs TIGER now converge" / "Phase 2c Gate 통과" / "Track A 완료"는 **가격(CAGR) 수렴만** 검증된 것이었음. `debug_dividend.py` 실측 결과, 배당 **액수**는 0임이 확인됨. 원인: Track A가 DJUSDIV_PROXY를 total-return(adj-close)로 구축 → 가격은 맞지만 배당이 가격에 임베딩되어 itemize 안 됨. 백필 가격 구간(1928~)에 배당 row 없음 + provenance 전부 0행. **이는 세금 Phase 2c(배당 역산)·2e(금종세)·Track G(다중계좌 세금)의 데이터 기반을 무효화한다.** 해결 owner: `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0`(범용 배당 백필 재설계). 우선순위는 아래 "Current Recommended Next Action" 참조.
 
 ## Purpose
 
@@ -285,29 +287,31 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-**[1] 지금 — Track G G1 후속 보완:**
+> ⚠️ **우선순위 전환 (2026-05-30):** 배당 데이터 근본 버그 발견. Track G는 다중계좌 **세금**(금종세·배당) 시뮬이라 배당/세율 데이터가 정확해야 테스트·구현이 의미 있음. 현재 배당 액수가 0이라 Track G 진행은 검증 불가능한 토대 위에 쌓는 셈. **따라서 데이터 토대부터 고친다.**
+
+**[1] 지금 — 배당 백필 범용 재설계 (Stage A 주식형):**
 ```text
-trackG_multiaccount_plan.md "G1 후속 보완" 1번부터 수정해줘
+ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0 Stage A 구현해줘
 ```
-G1 투자계산기 탭 구현·검증·배포 완료 (2026-05-30, b14ed44). L0~L3 + Gate 회귀 PASS. 남은 보완(중요도순): ① 다중계좌 배당 지표 0 버그(높음) ② 계좌 입력 커서 유실(중간) ③ 계좌 카드 UI 통일(낮음).
+모든 백필을 `price-return 가격 + 명시적 배당` 표준으로 통일. DJUSDIV_PROXY 등 total-return 체인을 raw-close로 교체 + `index_div_yield` 기반 배당 분리. provenance 기록. UI 실측/추정 구분. 검증: `debug_dividend.py` p50>0 + 총수익 보존.
 
-**[2] G1 보완 후 — 나머지 탭 확장:**
-은퇴 → 백테스트 탭에 다중계좌 적용 (배당금 제외). 검증된 투자계산기 패턴 복제.
-
-**[3] 그 다음 — Track G G2:**
+**[2] Stage A 후 — 세금 Phase 2c/2e 재검증:**
 ```text
-PHASE4_PLAN.md § 4G / trackG_multiaccount_plan.md G2 설계 정밀화해줘
+배당 데이터 정상화 후 Gate 2c/2e 재검증해줘
 ```
-자금이동 ON(분배 정책). G1 실제 코드 보고 시점별 트리거 설계 보강 후 착수. 퍼센타일 단순 덧셈 금지.
+배당 액수가 정확해진 데이터로 배당 역산(2c)·금종세 경고(2e)가 실제로 맞는지 재확인. 이전 "통과"는 가격 수렴만 본 것.
 
-**[3] Track G와 병렬 — ETF_BACKFILL V2 Phase 3+:**
+**[3] 그 다음 — 배당 백필 Stage B (채권/MMF, 필수):**
 ```text
-ETF_BACKFILL_ARCHITECTURE_PLAN.md Phase 3부터 진행해줘
+ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 7 + Phase 6.0 Stage B 진행해줘
 ```
-etf_master/etf_proxy_map 정밀 매핑, confidence A~F, 전체 미국 ETF 유니버스. 시뮬 데이터 신뢰도 근본적 개선.
+채권/MMF 금리 수치 → 듀레이션 가격 모델 + 쿠폰을 분배금으로 명시 주입.
 
-**[4] 이후 — PHASE4 핵심/복잡한 기능:**
+**[4] 데이터 토대 완성 후 — Track G 재개:**
+G1 후속 보완(② 입력 커서 유실 ③ UI 통일 — 배당 0(①)은 Stage A로 해소). 이후 은퇴/백테스트 탭 확장 → G2 자금이동.
+
+**[5] 이후 — PHASE4 핵심/복잡한 기능:**
 D1/D2/B1/A4/C1/C2/B4
 
-**[5] 마지막 — 인프라/UX 마감:**
+**[6] 마지막 — 인프라/UX 마감:**
 E1 모바일, E2/E3/E4 최적화, C4 온보딩

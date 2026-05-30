@@ -21,7 +21,9 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> Track G G1 투자계산기 탭 구현·검증·배포 완료 (b14ed44, L0~L3 + Gate 회귀 PASS, 브라우저 실검증). 다음: G1 후속 보완(① 다중계좌 배당지표 0 버그 높음 ② 입력 커서 유실 ③ UI 통일) → 은퇴/백테스트 탭 확장 → G2.
+> ⚠️ **우선순위 전환 (2026-05-30):** 배당 지표 0 버그가 다중계좌 문제 아닌 **데이터 레이어 근본 버그**로 판명(`debug_dividend.py` 실측). DJUSDIV_PROXY가 total-return(adj-close)라 배당이 가격에 임베딩 → 액수 안 나옴. **Track G/세금 Phase 2c·2e가 모두 배당 데이터에 의존하므로 이 버그가 선결 과제.** 다음: `ETF_BACKFILL § Phase 6.0` 범용 배당 백필 재설계(Stage A 주식형 → Stage B 채권/MMF) → 세금 Phase 2c/2e 재검증 → Track G 재개.
+
+> 이전 요약: Track G G1 투자계산기 탭 구현·검증·배포 완료 (b14ed44, L0~L3 + Gate 회귀 PASS, 브라우저 실검증).
 
 ---
 

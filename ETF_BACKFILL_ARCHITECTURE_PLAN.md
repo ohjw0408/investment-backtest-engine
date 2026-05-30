@@ -837,6 +837,95 @@ Acceptance criteria:
 - Method code is testable independently.
 - Unsafe product types are rejected explicitly.
 
+### Phase 6.0. (범용 재설계) 배당 분리 백필 — total-return 임베딩 폐기, 전 지수·전 백필 적용
+
+**목표:** 모든 백필을 **"price-return 가격 + 명시적 배당 레코드"** 표준으로 통일.
+total-return(adj close)에 배당을 가격에 녹이는 방식을 폐기한다. 이래야 배당 "액수"가
+itemize되어 모든 배당 지표가 정상 산출되고, 이중계산이 구조적으로 차단된다.
+아래 Phase 6(분배 frequency 정교화)·Phase 7(채권 가격 모델)을 포괄하는 상위 통합 목표.
+
+**진단 (2026-05-30, `debug_dividend.py`로 실측 — 추정 아님):**
+
+- 증상: 투자계산기 다중/단일계좌에서 TIGER 미국배당다우존스(458730) 배당 지표 전부 0,
+  SCHD 0 다수. 세금설정 OFF. (다중계좌 문제 아님 — 데이터 레이어 + 롤링 집계 문제.)
+- `price_daily`는 프록시 체인 백필로 1928년까지 존재 (458730: volume=0 백필 97%,
+  SCHD 85%). 그러나 실측 배당(`corporate_actions`)은 ETF 상장 후만 존재
+  (SCHD 2011-12~, 458730 2023-07~). **백필 가격 구간에 배당 row가 없음.**
+- 두 가지 원인:
+  1. 가격 백필이 프록시 체인(`index_loader`) 경로라 `BackfillEngine.backfill()`의
+     배당 주입 단계를 건너뜀. provenance(`price_daily_source`/`corporate_action_source`/
+     `backfill_runs`) 전부 0행 — 백필이 provenance 시스템을 우회 중.
+  2. DJUSDIV_PROXY 체인(SCHD←SDY←DVY←^GSPC)이 **adj close(total-return)**라 배당이
+     가격에 이미 임베딩됨 → 별도 주입 시 이중계산 → `_NO_DIVIDEND_INDICES`에 의도적
+     제외(`backfill_engine.py:36`). 그래서 배당 "액수"가 따로 안 나옴.
+- 결과: `data_start`가 1928/1964로 잡힘 → 20년 롤링 윈도우 대부분이 배당 이전 시대 →
+  `AccumulationAnalyzer._calc_metrics`의 배당 집계(`history[date >= div_start]`)가 0 →
+  `_fit_distribution`이 0 윈도우 포함 전체 퍼센타일 계산 → 중앙값(p50) 0.
+
+**핵심 원칙 (price-return + 명시적 배당):**
+
+- 백필 가격은 **순수 가격 변동(price-return / raw close)** 만 담는다. 배당락 반영.
+- 배당은 `corporate_actions`에 **별도 cash 레코드**로 분리 → 엔진이 따로 지급/재투자.
+- 총 경제적 수익은 두 방식이 reinvest 모드에서 동일. 차이는 배당 itemize 여부뿐.
+- **금지:** total-return 가격을 유지한 채 배당까지 주입 = 이중계산. 따라서 total-return
+  체인은 raw-close로 **교체**한다(병행 아님).
+
+**단계 (2026-05-30 사용자 결정):**
+
+- **Stage A — 주식/배당형 (먼저):**
+  - total-return 프록시 체인 식별(DJUSDIV_PROXY 등 adj-close 기반) → **price-return 지수로
+    재구축** + `index_div_yield` 기반 배당 분리 주입.
+  - `_NO_DIVIDEND_INDICES`에서 DJUSDIV_PROXY 제거.
+  - 영향받는 ETF code 재백필: 기존 total-return 백필 가격 row를 price-return으로 교체 +
+    배당 주입. provenance 기록(가격/배당 각각).
+  - yield 소스 우선순위: (1) 프록시 지수 `index_div_yield` 테이블(DJUSDIV100 2011~2026,
+    `^GSPC` 1993~ 등, 테이블 밖 연도는 `_resolve_yield` mu/sigma fallback),
+    (2) 없으면 ETF 자기 실측 배당 mu/sigma(`_load_etf_actual_div_yield`).
+  - confidence: 테이블 기반 B, ETF 자체 추정 C.
+
+- **Stage B — 채권/MMF (후속, 필수 — 생략 불가):**
+  - Phase 7 듀레이션 모델로 금리 수치(DGS10/30/3MO 등)를 **가격으로 변환** 후,
+    쿠폰/이자를 **분배금(배당)으로 명시 주입**. 채권/MMF는 무배당이 아니라 이자 지급 자산.
+  - `_NO_DIVIDEND_INDICES`에서 DGS10/30/3MO 제거(가격 모델·쿠폰 모델 완성 후).
+  - MMF/CD/KOFR: 단기금리 누적 분배 모델.
+  - 원자재(GC=F/SI=F/CL=F/HG=F)·FX(USD/KRW, USD/JPY)는 무배당 유지(정상).
+
+**범용화 (전 지수·전 백필 강제):**
+
+- 신규 백필도 항상 이 표준(price-return + 명시 배당)을 따르도록 백필을 **단일 경로**로
+  강제. `index_loader` 프록시 체인이 배당·provenance를 우회하지 못하게 한다.
+- 지수별 **배당 정책 테이블** 도입: 주식형(분기/월 frequency) / 채권·MMF(쿠폰) /
+  무배당(원자재·FX). Phase 6 V2의 dividend policy module과 통합.
+
+**Cross-cutting (Stage A/B 공통):**
+
+- **Provenance 필수:** 모든 백필 가격·배당을 run_id로 기록·선택삭제·재생성 가능하게.
+  (현재 전부 0행 — 백필이 provenance를 우회 중이라 먼저 해결.)
+- **이중계산 가드:** 한 code가 total-return 가격 + 명시 배당을 동시 보유하지 않음을
+  검증하는 자동 체크 추가.
+- **실측/추정 구분 (UI):** `div_real_start`(실측 배당 최초일) vs
+  `div_backfill_start`(백필 포함 최초일) 분리. `_get_dividend_start`가 백필 후 1928을
+  반환하면 안 됨. API `distribution`에 두 값 + 윈도우별 실측/추정 비중 추가. 프론트
+  결과 하단에 "실측 N년(YYYY~) + 백필 추정 M년" 명시(기존 합성 데이터 배너 패턴 재사용).
+
+**검증:**
+
+- `debug_dividend.py` 재실행 → 458730/SCHD 배당 지표 p50 > 0.
+- **총수익 보존:** raw-close 교체 후 reinvest CAGR/종료자산이 기존 total-return 대비
+  허용오차(±0.5%p 등) 내 — 이중계산·누락 없음 증명.
+- 실측 배당 row는 백필로 변경되지 않음(INSERT OR IGNORE, provenance 분리).
+- 단일계좌 회귀: Gate 2a/2b/2c 안 깨짐.
+- 이중계산 가드 통과(total-return + 배당 동시 보유 code = 0).
+
+**Acceptance criteria:**
+
+- 모든 배당형 ETF 백필 구간이 명시적 배당을 가진다(total-return 임베딩 잔존 0).
+- 채권/MMF도 가격 모델 + 쿠폰 분배금을 가진다(Stage B 완료 시).
+- 신규 백필이 price-return + 명시 배당 표준을 강제한다(우회 경로 차단).
+- 배당 지표가 어린 ETF에서도 0이 아닌 합리적 분포를 낸다.
+- UI가 실측 vs 추정 배당 비중을 정직하게 표시한다.
+- 모든 백필 가격·배당이 run_id로 가역(삭제·재생성).
+
 ### Phase 6. Dividend Backfill V2
 
 Goal:
@@ -860,9 +949,13 @@ Acceptance criteria:
 
 ### Phase 7. Bond and Rate Models
 
+> Phase 6.0 Stage B(필수). 채권/MMF는 무배당이 아니라 이자(쿠폰/분배금) 지급 자산이다.
+> 가격 모델뿐 아니라 **쿠폰을 명시적 배당(분배금)으로 분리 주입**해야 배당 지표가
+> 정상 산출된다. price-return + 명시 배당 원칙을 채권에도 동일 적용.
+
 Goal:
 
-Replace invalid yield-as-price bond backfills.
+Replace invalid yield-as-price bond backfills, and model coupon/interest as explicit distributions.
 
 Tasks:
 
@@ -870,12 +963,16 @@ Tasks:
 - Add spread loaders where possible.
 - Define category-level duration assumptions.
 - Add per-ETF duration overrides where data is available.
-- Implement duration return model.
+- Implement duration return model (price-return, not yield-as-price).
+- **Model coupon/interest as explicit distribution records** in `corporate_actions`
+  (쿠폰=금리수준×액면, 분배 주기는 ETF 유형별). MMF/CD/KOFR는 단기금리 누적 분배.
+- **Remove `DGS10/DGS30/DGS3MO` from `_NO_DIVIDEND_INDICES`** once price+coupon model exists.
 - Validate TLT, IEF, SHY, AGG, LQD, HYG against actual histories.
 
 Acceptance criteria:
 
 - Bond ETF backfills use yield changes, not yield levels as prices.
+- Bond/MMF ETFs receive explicit coupon/interest distributions (not treated as no-dividend).
 - Validation metrics are stored.
 - Poorly validated bond products are C/D/F, not A/B.
 

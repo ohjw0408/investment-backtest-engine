@@ -1,5 +1,19 @@
 # Log
 
+## [2026-05-30] diagnosis+planning | 배당 0 버그 근본원인 규명 + 배당 백필 계획 추가
+
+- **버그 재정의:** "다중계좌 배당 0"은 다중계좌 문제 아님. 단일계좌 458730/SCHD도 동일. `debug_dividend.py`로 실측(추정 아님).
+- **근본 원인:** 가격은 프록시 체인 백필로 1928년까지 존재(458730 백필 97%, SCHD 85%)하나, 실측 배당은 ETF 상장 후만(SCHD 2011~, 458730 2023~). 백필 가격 구간에 `corporate_actions` 배당 row 없음(가격 백필이 `BackfillEngine` 아닌 index_loader 프록시 체인 경로라 배당 주입 단계 누락). `data_start`=1928 → 20년 롤링 윈도우 169개 대부분 배당 이전 시대 → `_fit_distribution` p50=0.
+- **추가 발견:** DJUSDIV_PROXY 체인은 adj-close(total-return)라 배당이 가격에 임베딩 → 별도 주입 시 이중계산 → `_NO_DIVIDEND_INDICES`에 의도적 제외. 채권/MMF는 프록시가 금리 수치(DGS10/30/3MO)라 현재 공식 적용 불가로 제외(무배당이라서가 아님). provenance 테이블 전부 0행 = 백필이 provenance 우회 중.
+- **결정 (사용자) — 범용 재설계:** 모든 백필을 'price-return 가격 + 명시적 배당' 표준으로 통일(total-return 임베딩 폐기, 이중계산 구조적 차단). DJUSDIV_PROXY 등 adj-close 체인 raw-close로 교체. 단계적: Stage A 주식/배당형 먼저 → Stage B 채권/MMF 후속(필수, 생략 불가). 원자재·FX는 무배당 유지.
+- **계획 갱신:** `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0`를 범용 재설계로 재작성 + Phase 7에 쿠폰→분배금 명시 주입(Stage B 필수) 추가. `trackG_multiaccount_plan.md` item 1 정정.
+- **코드 변경 없음.** 진단 스크립트(`debug_dividend.py`) + 계획 문서만.
+- **다음:** Stage A 구현(total-return 체인 식별 → price-return 재구축 + 배당 분리 → provenance → UI 라벨링 → 검증). 이후 Stage B(채권/MMF).
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-30] feature+verify | Track G G1 구현(Codex) + 검증(Claude) + 브라우저 실검증
 
 - **커밋:** `b14ed44` (Codex G1 구현), `045d3a7` (divrefactoring.md 커밋). 자동 배포됨.

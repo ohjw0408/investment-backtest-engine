@@ -22,7 +22,7 @@ tags: [dev, bug]
 | BUG-3 | 연금 수령 시작 나이 입력 불가 | 은퇴 계산기에 "연금 수령 시작 나이" 입력칸 없음. `user_settings.age`(현재 나이) 사용 중 | `templates/retirement.html`, `retirement_logic.py`, `modules/tax/liquidation.py` | ✅ 수정 완료 |
 | BUG-4 | ISA 1억 캡 로직 오류 — 월 납입금 균등 축소 | 전 기간 월납입을 줄이는 방식. 올바른 동작: 납입 지속 → 1억 도달 시점부터 납입 0원 | `calculator_logic.py`, `retirement_logic.py`, `modules/retirement/accumulation_analyzer.py`, `static/js/calculator.js` | ✅ 수정 (7dd75a4) |
 | BUG-5 | 밴드 슬라이더 숫자 직접 입력 불가 | 슬라이더만 있고 0.5% 단위 정밀 입력 불가 | `templates/myassets.html` | ✅ 수정 완료 |
-| BUG-G1-1 | Track G 다중계좌 시 배당 지표 전부 0 | 총배당/마지막연도배당/배당CAGR/배당률분포가 다중계좌에서 0. 결과 합산 시 배당 분포 메트릭 미집계 추정. 단일계좌는 정상 | `modules/retirement/multi_account_analyzer.py`, `calculator_logic.py`, `static/js/calculator.js` | ❌ 미해결 (우선순위 높음, trackG plan 후속보완 1) |
+| BUG-G1-1 | ⚠️ **정정** — 배당 지표 0 (다중계좌 문제 아님) | `debug_dividend.py` 실측: 단일계좌 458730/SCHD도 동일. 백필 가격(1928~)에 배당 row 없음 + DJUSDIV_PROXY가 total-return(adj-close)라 배당이 가격에 임베딩 → 별도 액수 안 나옴. 롤링 윈도우 대부분 배당 이전 시대 → p50=0. **세금 Phase 2c(배당 역산)/2e(금종세)의 데이터 기반을 무효화하는 근본 버그.** | `modules/backfill_engine.py`, `index_loader`, `modules/retirement/accumulation_analyzer.py` | ❌ 미해결 (**최우선** — `ETF_BACKFILL § Phase 6.0` 범용 재설계) |
 | BUG-G1-2 | Track G 다중계좌 2번째 계좌 입력 커서 사라짐 | 입력 중 `renderTaxAccounts()` 전체 재렌더 → 포커스 유실 (BUG-6 패턴) | `static/js/calculator.js` | ❌ 미해결 (중간) |
 
 **이전 "활성"에서 해결된 항목들:**
@@ -110,6 +110,7 @@ tags: [dev, bug]
 | 이슈 | 상태 | 비고 |
 |---|---|---|
 | `volume=0`으로 백필/가격 오류 | ⚠️ 미확인 | 일부 종목에서 가격 대신 배당 표시 가능성 |
+| **백필 provenance 전부 0행** | ❌ 확인됨 (2026-05-30) | `price_daily_source`/`corporate_action_source`/`backfill_runs` 모두 458730/SCHD에 기록 없음. 가격 백필이 `BackfillEngine`(provenance 기록) 아닌 index_loader 프록시 체인으로 돼서 우회. Phase 6.0에서 해결 |
 | provenance 테이블 없음 | ⚠️ 미확인 | 합성 데이터 출처 적재 제거됨 |
 | `TaxedDividendEngine._ytd_income` 초기값 0 | ⏳ 미완료 | `other_financial_income` 연동 필요 |
 | `modules/sim/tax_engine.py` 덮어씀 | ⏳ 미완료 | Phase 2c 이후 정리 예정 |

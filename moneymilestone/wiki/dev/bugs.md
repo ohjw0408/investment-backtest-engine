@@ -23,6 +23,7 @@ tags: [dev, bug]
 | BUG-4 | ISA 1억 캡 로직 오류 — 월 납입금 균등 축소 | 전 기간 월납입을 줄이는 방식. 올바른 동작: 납입 지속 → 1억 도달 시점부터 납입 0원 | `calculator_logic.py`, `retirement_logic.py`, `modules/retirement/accumulation_analyzer.py`, `static/js/calculator.js` | ✅ 수정 (7dd75a4) |
 | BUG-5 | 밴드 슬라이더 숫자 직접 입력 불가 | 슬라이더만 있고 0.5% 단위 정밀 입력 불가 | `templates/myassets.html` | ✅ 수정 완료 |
 | BUG-G1-2 | Track G 다중계좌 2번째 계좌 입력 커서 사라짐 | 입력 중 `renderTaxAccounts()` 전체 재렌더 → 포커스 유실 (BUG-6 패턴) | `static/js/calculator.js` | ❌ 미해결 (중간) |
+| BUG-DIV-1 | 배당금 계산기 역산 SCHD≠458730 (구 4x 차이) | `_find_real_data_start()` 배당간격 휴리스틱이 월배당 ETF(458730)를 synthetic 경로로, 분기배당(SCHD)을 백필 실롤링 경로로 분기시킴 → 분포 폭 달라 p90 역산 4x 갈림. ^GSPC(1928~2003) 제거로 SCHD 긴 꼬리 롤링 사라지며 **수렴(1.2x)으로 해소**. 휴리스틱 자체는 잔존(취약) | `modules/dividend_simulator.py` (`_find_real_data_start`/`_run_rolling`) | ⚠️ 증상 해소(e6707bd), 휴리스틱 기술부채 잔존 (Claude) |
 
 **이전 "활성"에서 해결된 항목들:**
 

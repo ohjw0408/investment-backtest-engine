@@ -21,7 +21,9 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> ✅ **2026-05-30 업데이트:** 배당 백필 Stage A 서버 적용 완료. DJUSDIV_PROXY를 price-return 체인으로 재구축하고 SCHD/458730/446720/402970 백필 구간에 명시적 배당을 주입했다. 서버 `stage_a_verify.py`, `debug_dividend.py`, 계산기 직접 실행에서 배당 지표 p50 > 0 및 UI 실측/추정 필드 확인. **다음 최우선은 정상 배당 데이터 기준 세금 Phase 2c/2e 재검증.**
+> ✅ **2026-05-30 업데이트 2 (Phase 2c/2e 재검증 + 프록시 2003 단축):** DJUSDIV_PROXY에서 S&P500(^GSPC) 1928~2003 구간 제거 — 광범위 시장지수는 SCHD 배당전략을 대표 못함. 체인을 DVY(2003-11-07)←SDY←SCHD로 단축, SCHD/458730/446720/402970 재백필(price_daily 2003~). 재검증: **투자계산기 SCHD≈458730**(total_div 97.2M≈99.4M, yield 13.9%≈13.0%), **배당금 계산기 역산 Gate 2c PASSED 3/3**(SCHD 71.25M vs 458730 86.25M, 구 4x→1.2x 수렴). 2e 종합과세 엔진 `tax_truth_test` 64/64 PASS. 커밋 e6707bd. ⚠️ 20yr 롤링 케이스 169→11 감소(2003 시작 트레이드오프). 잔존: `_find_real_data_start` 휴리스틱 기술부채([[dev/bugs]] BUG-DIV-1), 2e 자동산출/전탭배선 미완.
+
+> 이전 요약: 배당 백필 Stage A 서버 적용 완료. DJUSDIV_PROXY를 price-return 체인으로 재구축하고 SCHD/458730/446720/402970 백필 구간에 명시적 배당을 주입했다. 서버 `stage_a_verify.py`, `debug_dividend.py`, 계산기 직접 실행에서 배당 지표 p50 > 0 및 UI 실측/추정 필드 확인.
 
 > 이전 요약: Track G G1 투자계산기 탭 구현·검증·배포 완료 (b14ed44, L0~L3 + Gate 회귀 PASS, 브라우저 실검증).
 
@@ -181,8 +183,8 @@ tags: [dev]
 | 블로커 | 상태 |
 |---|---|
 | **배당 액수 0 (total-return 백필 + 배당 row 부재)** | ✅ Stage A로 해소 — price-return proxy + 명시 배당 서버 적용 (Codex) |
-| SCHD vs TIGER 배당 결과 불일치 | ✅ 같은 DJUSDIV_PROXY + 명시 배당 경로로 수렴 확인 (Codex) |
-| Phase 2c Gate | ⚠️ 가격 기준 통과. 배당 정상화 후 재검증 필요 |
+| SCHD vs TIGER 배당 결과 불일치 | ✅ 투자계산기·배당금계산기 양쪽 수렴 확인. ^GSPC 제거로 역산 4x→1.2x (e6707bd, Claude) |
+| Phase 2c Gate | ✅ 재검증 완료 — 2003 시작 데이터로 Gate 2c PASSED 3/3 (Claude) |
 | `_fetch_fred()` 메서드 없음 | ✅ def 선언 추가 (e1a4d6e) |
 | 백필 실패 코드가 완료 처리됨 | ✅ _backfill_skip_codes 분리 (a761750) |
 

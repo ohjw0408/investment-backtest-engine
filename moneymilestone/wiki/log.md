@@ -1,5 +1,23 @@
 # Log
 
+## [2026-05-30] fix+verify | DJUSDIV_PROXY ^GSPC 제거(2003 시작) + Phase 2c/2e 재검증
+
+- **배경:** Phase 2c/2e 재검증 중 발견 — 배당금 계산기 역산에서 SCHD seed 225M vs 458730 56.25M (**4x 갈림**). 근본원인 둘:
+  - ① `dividend_simulator._find_real_data_start()` 배당간격 휴리스틱이 월배당(458730)을 synthetic 경로로, 분기배당(SCHD)을 1928~ 백필 실롤링 경로로 분기 → 분포 폭 달라 p90 역산 증폭.
+  - ② DJUSDIV_PROXY 1928~2003 구간이 **^GSPC(S&P500 가격지수)** — 광범위 시장지수라 SCHD 배당전략 미대표. 오너 판단: "전부 빼고 2003 시작".
+- **코드 변경 (`e6707bd`):** `scripts/build_djdiv_proxy.py`에서 ^GSPC 세그먼트 + `_fetch_index_db` 제거. 체인 = DVY(2003-11-07)←SDY←SCHD. proxy 24,718행→5,674행.
+- **서버 재실행:** `build_djdiv_proxy.py`(DJUSDIV_PROXY 2003-11-07~2026, 5,674행) + `stage_a_rebackfill.py SCHD 458730 446720 402970`. 4개 ETF price_daily 2003~ 재생성(SCHD 5,674행=백필2,002+실3,672). 실측 배당·실데이터 보존.
+- **재검증 (서버):**
+  - 투자계산기(`calculator_logic`): SCHD total_div p50=97.2M·yield 13.9% ≈ 458730 99.4M·13.0% (div_data_start=2003-12-31, cases=11). **수렴 ✅**
+  - 배당금 계산기 역산(`gate_2c_verify.py`): **Gate 2c PASSED 3/3**. SCHD seed 71.25M vs 458730 86.25M — 구 4x→**1.2x 수렴** ✅ (^GSPC 제거로 SCHD 긴 꼬리 롤링 사라지며 자연 해소).
+  - 2e 종합과세 엔진(`tax_truth_test.py`): **64/64 PASS**.
+- **트레이드오프:** 20yr 롤링 케이스 169→11 (2003 시작이라 20yr-시작점 2003~2006뿐). 신뢰구간 넓어짐 + 2008 폭락 포함으로 dividend_mdd 악화. 방법론상 정직.
+- **잔존:** ① `_find_real_data_start` 휴리스틱 자체는 취약(현재 수렴엔 무영향) — bugs.md BUG-DIV-1. ② 2e 갭(other_financial_income 자동산출/전탭배선/_ytd_income 0) = 빌드작업, 재검증 범위 밖.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-30] sync+ops | Stage A 서버 적용 완료 + 계획/위키 상태 동기화
 
 - **서버 적용:** Hetzner `178.105.84.213`의 `/root/investment-backtest-engine`을 `52e97c9`까지 fast-forward. `domino`, `domino-celery` 재시작 후 active 확인.

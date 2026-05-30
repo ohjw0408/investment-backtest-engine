@@ -58,8 +58,8 @@ class AccumulationAnalyzer:
         self.synthetic_params      = synthetic_params or {}
         self.contribution_end_months = contribution_end_months
 
-    def _estimate_total_cases(self) -> int:
-        cur = self.data_start
+    def _estimate_total_cases(self, start=None) -> int:
+        cur = start if start is not None else self.data_start
         count = 0
         while True:
             end = cur + relativedelta(years=self.accumulation_years)
@@ -104,9 +104,28 @@ class AccumulationAnalyzer:
         from modules.config.simulation_config   import SimulationConfig
 
         runner      = TaxableSimulationRunner()
-        total_cases = self._estimate_total_cases() if self.progress_callback else 0
+
+        # use_synthetic이고 외부 합성 params가 없으면(실데이터 충분하나 케이스 보충 원함) 윈도우별
+        # 독립 합성 params를 만들어 롤링 시작점을 앞당겨 TARGET까지 보충한다. 기존 DataPreparer 합성
+        # 흐름(params 이미 존재)·ISA 풍차돌리기는 건드리지 않는다.
+        self._synth_supplement = False
+        if self.use_synthetic and not self.synthetic_params and not self.isa_renewal:
+            from modules.retirement.synthetic_price_generator import build_window_synth_params
+            built = build_window_synth_params(self.portfolio_engine, self.tickers)
+            if built:
+                self.synthetic_params = built
+                self._synth_supplement = True
+
+        roll_start = self.data_start
+        if self._synth_supplement:
+            from modules.retirement.synthetic_price_generator import WINDOW_SYNTH_TARGET_CASES
+            extended = (self.data_end - relativedelta(years=self.accumulation_years)
+                        - relativedelta(months=WINDOW_SYNTH_TARGET_CASES * self.step_months))
+            roll_start = min(self.data_start, extended)
+
+        total_cases = self._estimate_total_cases(roll_start) if self.progress_callback else 0
         start_time  = time.time()
-        cases, cur, run_id = [], self.data_start, 1
+        cases, cur, run_id = [], roll_start, 1
 
         while True:
             end = cur + relativedelta(years=self.accumulation_years)

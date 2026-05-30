@@ -122,3 +122,53 @@ def generate_and_save(
         "anchor":     anchor_price,
         "dates":      [r[1] for r in rows],
     }
+
+
+# use_synthetic 보충 시 롤링 케이스를 이 개수까지 윈도우별 독립 합성으로 채운다.
+WINDOW_SYNTH_TARGET_CASES = 40
+
+
+def build_window_synth_params(portfolio_engine, tickers) -> dict:
+    """윈도우별 독립 합성 보충용 종목별 파라미터.
+
+    반환: code -> {mu_monthly, sigma_monthly, anchor_price, actual_start}
+    anchor_price는 실 suffix(get_price, FX 적용)와 동일 단위로 산출한다 — raw price_daily(USD)를
+    쓰면 합성 prefix(USD)·실 suffix(KRW)가 어긋나 가격이 폭발한다. 통계/경로 산출 불가 종목은 제외.
+    """
+    try:
+        from modules.retirement.ticker_stats_cache import TickerStatsCache
+        from modules.price_loader import DB_PATH
+        pl = portfolio_engine.price_loader.loader
+        cache = TickerStatsCache(DB_PATH)
+    except Exception:
+        return {}
+
+    import pandas as _pd
+    params: dict = {}
+    for code in tickers:
+        try:
+            stats = cache.get_or_compute(code)
+            if not stats or stats.get("mu_monthly") is None or stats.get("sigma_monthly") is None:
+                continue
+            row = pl.conn.execute(
+                "SELECT MIN(date) FROM price_daily WHERE code=?", (code,)
+            ).fetchone()
+            if not row or not row[0]:
+                continue
+            actual_start = str(row[0])[:10]
+            _a_end = (_pd.Timestamp(actual_start) + _pd.Timedelta(days=14)).strftime("%Y-%m-%d")
+            adf = pl.get_price(code, actual_start, _a_end, allow_synthetic=False)
+            if adf is None or adf.empty or "close" not in adf.columns:
+                continue
+            anchor = float(adf["close"].iloc[0])
+            if not anchor > 0:
+                continue
+            params[code] = {
+                "mu_monthly":    float(stats["mu_monthly"]),
+                "sigma_monthly": float(stats["sigma_monthly"]),
+                "anchor_price":  anchor,
+                "actual_start":  actual_start,
+            }
+        except Exception:
+            continue
+    return params

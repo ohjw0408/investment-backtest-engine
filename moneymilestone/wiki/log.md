@@ -1,5 +1,22 @@
 # Log
 
+## [2026-05-30] feature | 투자계산기 가상데이터 보충 (use_synthetic 체크 시 윈도우별 독립 합성)
+
+- **배경:** 투자계산기 SCHD 20년이 11케이스뿐(2003 컷 → 22.6년 데이터에 20년 윈도우가 ~11개, 98% 겹쳐 사실상 독립표본 ~1개). "가상데이터 사용" 체크해도 안 늘어남. 원인:
+  - DataPreparer 보완 루프가 종목별 **백필 "ok"면 synthetic 스킵** → SCHD는 백필 성공(0행)이라 합성 생성 안 함.
+  - 단일계좌=`AccumulationAnalyzer`(체크박스 흔한 경로), 2+계좌=`MultiAccountAnalyzer`. 둘 다 윈도우 수는 data_start~data_end 제한.
+- **결정(오너):** B안 — 투자계산기도 배당계산기처럼 **부족분만 가상 보충**. TARGET=40. 체크박스 ON일 때만(OFF면 순수 실데이터). 꼬리 중요 → 윈도우별 독립 GBM(단일경로 슬라이스 아티팩트 회피).
+- **구현 (`3c86c49`~`7af4c05`):**
+  - `synthetic_price_generator.build_window_synth_params` 공유 헬퍼 추출(종목별 mu/sigma/anchor/actual_start). `WINDOW_SYNTH_TARGET_CASES=40`.
+  - `MultiAccountAnalyzer`·`AccumulationAnalyzer` 양쪽: use_synthetic이고 외부 합성 params 없으면 헬퍼로 params 빌드 + 롤링 시작점을 `data_end - years - TARGET×step`로 앞당김 → 합성 prefix + 실 suffix 윈도우 보충. AccumulationAnalyzer는 `_synth_supplement` 플래그로 **기존 DataPreparer 합성 흐름·ISA 풍차돌리기는 불변**.
+  - **버그 수정:** anchor를 raw price_daily(USD)로 쓰면 실 suffix가 `get_price`(USD ETF→KRW ×환율)라 단위 불일치 → 2003에서 ~1181배 점프 → CAGR 860억배 폭발. anchor를 `get_price`(FX 적용)로 산출해 해결.
+- **검증 (서버):** 단일계좌 SCHD 20년 — syn OFF=11케이스(end_value p50 78.5M), syn ON=**41케이스**(p50 66.5M, p10 69M→45M로 꼬리 확장, 값 정상). 회귀 26/26 PASS(track_g/scenario/rolling), gate 2c PASSED, HTTP 200.
+- **유의:** ① 합성 꼬리는 GBM 모델이라 표본 수↑여도 "진짜 정보"는 안 늘고 모델 꼬리만 매끈. ② use_synthetic ON 시 ~4배 느려짐(풀 시뮬). ③ MultiAccountAnalyzer `cagr` 필드는 syn 무관하게 garbage(기존 별개 버그, 분포는 end_value 사용이라 무영향) — 추후 확인.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-30] feature | 배당 계산기 확률 슬라이더 기본 50% + 월배당 p25~p75 분포 표시
 
 - **배경:** 자동모드 헤드라인이 90% 단일 꼬리값 → 같은 지수 ETF(402970/458730/SCHD)도 seed가 430~520M로 25% 갈려 보이고 숫자 부풀려 보임(넛지 우려). 실측: 50%(중앙값)로 풀면 4개 다 ~361~364M로 수렴(<1% 차). 차이는 전부 1년+p90 꼬리효과(한국ETF FX리스크 + 실데이터경계 아티팩트).

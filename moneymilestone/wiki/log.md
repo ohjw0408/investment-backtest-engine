@@ -1,5 +1,43 @@
 # Log
 
+## [2026-05-31] verify+handoff | Stage B 한국 채권 종합검증 완료 + 다음 세션 핸드오프 (헤지비용·회사채)
+
+**다음 세션 시작점 — 검증이 잡은 2문제 해결.** 아래 그대로 이어받으면 됨.
+
+### 종합 검증 결과 (`scripts/stage_b_verify_kr.py`, 카테고리당 2~3종, C 총수익보존 + D 듀레이션)
+TR은 DB 실데이터로 재구성(close수익 + 배당재투자, yfinance 불필요).
+
+| 카테고리 | C 월TR상관 | C CAGR차 | 판정 |
+|---|---|---|---|
+| 국고채 3Y/10Y/30Y | 0.96~1.00 | 0.1~0.9p | ✅ 확실 |
+| 스트립 30Y | 1.00 | 0.25p (D실측 26.7≈config 28.8) | ✅ |
+| 종합채권 | 0.93~0.94 | 0.45~0.52p | ✅ |
+| 레버리지 2x | 0.93 | 1.17p (`_apply_leverage` 일별리셋 확인) | ✅ |
+| CD/MMF carry | 0.71~0.84(평평해 corr낮음) | 0.13~0.57p | ✅ |
+| **회사채** | 0.86~0.96 | **1.05~2.17p** | ⚠️ 보통 |
+| **한국 미국채(헤지)** | 0.97(shape 좋음) | **2.31~2.76p** | ❌ LEVEL 과대 |
+
+### ★ 다음에 풀 문제 2개 + 해결방향
+
+**[문제1 — 우선] 한국상장 미국채(헤지) CAGR 2.5%p 과대.**
+- 원인: **헤지비용 누락.** 헤지 ETF 수익 = USD국채수익 − 헤지비용(≈ 미-한 단기금리차 ~2.5%/yr). 모델은 DGS30 그대로라 과대. shape(월상관0.97)는 맞고 LEVEL만 틀림.
+- 해결방향: 헤지 ETF(meta hedge="hedge")의 백필 가격수익에서 **(DGS3MO − CD91)/252 일일 차감.** 데이터 둘 다 index_master에 있음. 적용지점 = `backfill_engine.backfill()` 채권 분기(bond price 만든 직후) or `bond_model.build_bond_price_series`에 hedge_cost 인자 추가.
+- 대상: meta hedge="hedge"인 채권 ETF (US_TREASURY_30Y 대부분). 언헤지는 ×환율(이미 처리)이라 별개.
+
+**[문제2] 회사채 CAGR차 1~2p (국채 0.1~0.5p보다 큼).**
+- 원인: ① 만기형 듀레이션 실측 0.7~1.0 vs 모델 2.6(롤오버 프록시라 의도된 것) ② carry(CORPAA3Y yield) 과대. 
+- 해결방향: 회사채 `book_factor` 별도로 더 낮추거나(현재 전역 0.87), 그냥 Grade C 수용(만기형은 롤오버 프록시라 큰 오차 불가피). 우선순위 낮음.
+
+### 현재 상태 (코드/데이터)
+- **모든 채권 백필 클리어됨 → on-demand 재생성** (유저가 ETF 쓸 때 현재 config로). 실데이터·KR금리(ECOS) 보존.
+- 핵심 파일: `modules/bond_model.py`(_BOND_ETF_CONFIG US / _BOND_CATEGORY_CONFIG 한국 / COUPON_BOOK_FACTOR 0.87 / STRIP_DURATION_MULT 1.6), `modules/backfill_engine.py`(채권 분기 ~L447-565 / inject_monthly_coupons / _apply_leverage L427 일별리셋).
+- 검증 스크립트: `stage_b_verify_kr.py`(한국 C·D), `stage_b_full_verify.py`(US A·B·C·D), `stage_b_duration`/`fetch_kr_rates`/`stage_b_clear_backfill`/`stage_b_rebackfill`.
+- gate 2c PASSED.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-31] feature | Stage B 채권 모델 완성 — 회사채/스트립/레버리지 + 전 백필 클리어(on-demand)
 
 - **회사채(만기형 포함):** `KR_CORPORATE` 단일 듀레이션 2.6(상시형 실측). 오너 통찰 — 만기형은 롤오버하면 채권사다리라 평균듀레이션 단일값으로 충분(income 추구라 듀레이션 정밀도 실익 작음, 만기보유 시 총수익≈쿠폰yield). 만기 후 데이터 끝은 백필로 못 푸는 별개 한계(티커 자동롤오버 미지원).

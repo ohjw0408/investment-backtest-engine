@@ -297,7 +297,11 @@ Completion note - YYYY-MM-DD
 all-or-nothing) 수정. 배당계산기 UX(슬라이더 50%·p25~p75) + 투자계산기 가상보충 추가.
 잔여: **2e 배선 갭**(`other_financial_income` 자동산출·전탭 배선·`_ytd_income` 주입) = 빌드 작업.
 
-**[2] 지금 — 배당 백필 Stage B (채권/MMF, 필수):**
+**[진행중 2026-05-31] Stage B 채권 — 대부분 완료, 검증이 잡은 2문제 남음:**
+US 국채(전수검증) + 한국(국고채/종합채권/회사채/CD·MMF carry/스트립/레버리지) 듀레이션 가격모델 + 월쿠폰 구현·검증 완료. 한국금리 ECOS 수집. 백필 전부 클리어(on-demand 재생성).
+**다음 세션 시작점 (검증이 잡은 2문제):** ❶ 한국상장 미국채(헤지) CAGR 2.5%p 과대 = 헤지비용 누락 → (DGS3MO−CD91)/252 차감(우선). ❷ 회사채 CAGR차 1~2p(만기형, Grade C 경계). 상세 = `wiki/log.md` 최상단 핸드오프.
+
+**[2] 옛 항목 — 배당 백필 Stage B (채권/MMF, 필수):**
 ```text
 ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 7 + Phase 6.0 Stage B 진행해줘
 ```

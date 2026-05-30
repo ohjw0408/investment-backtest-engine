@@ -495,7 +495,7 @@ class BackfillEngine:
         from modules.bond_model import (
             bond_config, build_bond_price_series, COUPON_FREQ_PER_YEAR, COUPON_BOOK_FACTOR,
         )
-        bcfg    = bond_config(code)
+        bcfg    = bond_config(code, index_nm)
         is_bond = bcfg is not None
 
         # 지수 코드 매핑

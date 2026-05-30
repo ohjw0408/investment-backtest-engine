@@ -34,6 +34,22 @@ _BOND_ETF_CONFIG: dict[str, dict] = {
     "BIL":  {"rate": "DGS3MO", "duration": 0.0,  "model": "carry"},
 }
 
+# 카테고리(meta.index) 기반 매핑 — 한국 채권 ETF는 index 필드가 이미 세분 카테고리라 코드별 대신
+# 카테고리로 매핑(신규 ETF 자동 커버). duration은 실측 검증 후 보정 대상(초기 표준 추정).
+#   FX/헤지는 backfill_engine의 meta(market/hedge)가 처리 — 한국상장 미국채는 ×환율 or 헤지.
+_BOND_CATEGORY_CONFIG: dict[str, dict] = {
+    # ── 한국 국고채 (KRW, 무FX) ──
+    "KR_TREASURY_3Y":   {"rate": "KTB3Y",    "duration": 2.7,  "model": "duration"},
+    "KR_TREASURY_10Y":  {"rate": "KTB10Y",   "duration": 8.0,  "model": "duration"},
+    "KR_TREASURY_30Y":  {"rate": "KTB30Y",   "duration": 18.0, "model": "duration"},
+    "KR_BOND_AGGREGATE":{"rate": "KTB3Y",    "duration": 5.0,  "model": "duration"},  # 종합채권
+    "KR_CORPORATE":     {"rate": "CORPAA3Y", "duration": 2.5,  "model": "duration"},  # 회사채(금리에 스프레드 포함)
+    # ── 한국 CD/KOFR/MMF/단기 — carry(가격 평평, 수익=이자) ──
+    "KR_MONEY_MARKET":  {"rate": "CD91",     "duration": 0.0,  "model": "carry"},
+    # ── 한국상장 미국채 (USD 금리 + FX/헤지는 meta가 처리) ──
+    "US_TREASURY_30Y":  {"rate": "DGS30",    "duration": 17.0, "model": "duration"},
+}
+
 COUPON_FREQ_PER_YEAR = 12  # 채권 ETF는 보통 월 분배
 
 # 모델 쿠폰(현재 시장금리 기반)을 실측 분배(book yield = 보수 차감 + 평균 매입금리)에 맞추는 보정.
@@ -44,9 +60,16 @@ COUPON_BOOK_FACTOR = 0.87
 _DAILY_RET_CLIP = 0.10
 
 
-def bond_config(code: str) -> dict | None:
-    """채권 ETF면 {rate, duration, model} 반환, 아니면 None."""
-    return _BOND_ETF_CONFIG.get(code)
+def bond_config(code: str, index_category: str | None = None) -> dict | None:
+    """채권 ETF면 {rate, duration, model} 반환, 아니면 None.
+
+    우선순위: ETF 코드별 명시 매핑(US) > index 카테고리 매핑(한국). 둘 다 없으면 None.
+    """
+    if code in _BOND_ETF_CONFIG:
+        return _BOND_ETF_CONFIG[code]
+    if index_category and index_category in _BOND_CATEGORY_CONFIG:
+        return _BOND_CATEGORY_CONFIG[index_category]
+    return None
 
 
 def build_bond_price_series(yield_series: pd.Series, duration: float,

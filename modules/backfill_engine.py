@@ -187,6 +187,52 @@ def inject_quarterly_dividends(
     return len(records), [r[1] for r in records]
 
 
+def inject_monthly_coupons(
+    price_conn: sqlite3.Connection,
+    code: str,
+    price_series: pd.Series,
+    yield_series: pd.Series,
+    freq: int = 12,
+    table_name: str = "corporate_actions",
+) -> tuple:
+    """채권 쿠폰(이자)을 월말에 분배금으로 corporate_actions에 주입 (Stage B).
+
+    쿠폰 = price[ex_date] × (해당시점 yield(%) / 100) / freq.
+    yield_series = 금리(%) 시계열 (DGS* 등). 백필 가격구간(price_series)에만 주입한다.
+    """
+    if price_series.empty:
+        return 0, []
+    y = yield_series.dropna().sort_index().astype(float)
+    if y.empty:
+        return 0, []
+
+    records = []
+    # 월별 마지막 거래일
+    month_last = pd.Series(price_series.index, index=price_series.index).groupby(
+        [price_series.index.year, price_series.index.month]
+    ).last()
+    for ex_date in month_last:
+        yv = y[y.index <= ex_date]
+        if yv.empty:
+            continue
+        rate = float(yv.iloc[-1]) / 100.0
+        if rate <= 0:
+            continue
+        coupon = float(price_series[ex_date]) * rate / float(freq)
+        if coupon <= 0:
+            continue
+        records.append((code, ex_date.strftime("%Y-%m-%d"), round(coupon, 6), 1.0))
+
+    if not records:
+        return 0, []
+    price_conn.executemany(
+        f"INSERT OR IGNORE INTO {table_name} (code, date, dividend, split) VALUES (?,?,?,?)",
+        records,
+    )
+    price_conn.commit()
+    return len(records), [r[1] for r in records]
+
+
 class BackfillEngine:
 
     def __init__(self, verbose: bool = True):
@@ -441,11 +487,20 @@ class BackfillEngine:
         hedge     = str(meta["hedge"])
         name      = str(meta.get("name", code))
 
+        # 채권 ETF (Stage B): 명시 config(rate 금리시계열 + duration)로 직접 매핑.
+        # us_etf_list category가 "US Fixed Income"으로 뭉뚱그려져 듀레이션 구분 불가하므로
+        # ETF 코드로 직접 키잉한다 (etf_proxy_map 씨앗).
+        from modules.bond_model import bond_config, build_bond_price_series, COUPON_FREQ_PER_YEAR
+        bcfg    = bond_config(code)
+        is_bond = bcfg is not None
+
         # 지수 코드 매핑
         # US ETF는 index 컬럼이 이미 index_master.db 코드 (^GSPC, DGS30 등)
         # KR ETF는 index 컬럼이 SP500, NASDAQ100 등 → INDEX_MAP으로 변환
         etf_type = str(meta.get("etf_type", "KR"))
-        if etf_type == "US":
+        if is_bond:
+            index_code = bcfg["rate"]
+        elif etf_type == "US":
             index_code = index_nm if index_nm and index_nm != "None" else None
         else:
             index_code = INDEX_MAP.get(index_nm)
@@ -484,6 +539,12 @@ class BackfillEngine:
                 "code": code,
                 "status": f"index_insufficient ({index_code}: {len(index_series)} rows < {_MIN_INDEX_ROWS})",
             }
+
+        # 채권: yield(%) 시계열 → price-return 지수로 변환 (캐리=이자는 쿠폰으로 분리).
+        bond_yield = None
+        if is_bond:
+            bond_yield   = index_series.copy()
+            index_series = build_bond_price_series(index_series, bcfg["duration"])
 
         # ETF 상장일 이전 지수 데이터 확인
         pre_series = index_series[index_series.index < etf_start]
@@ -541,10 +602,19 @@ class BackfillEngine:
 
         self._save(code, df)
 
-        # ── 배당 주입 ─────────────────────────────────────
+        # ── 배당/쿠폰 주입 ─────────────────────────────────
         div_rows = 0
         div_dates: list[str] = []
-        if leverage == 1.0 and index_code not in _NO_DIVIDEND_INDICES:
+        if is_bond:
+            # 채권: 쿠폰(이자)을 월 분배금으로 명시 주입 (해당시점 yield × price / 12).
+            div_rows, div_dates = inject_monthly_coupons(
+                price_conn=self.price_conn,
+                code=code,
+                price_series=scaled,
+                yield_series=bond_yield,
+                freq=COUPON_FREQ_PER_YEAR,
+            )
+        elif leverage == 1.0 and index_code not in _NO_DIVIDEND_INDICES:
             yield_table = self._load_div_yield_table(index_code)
 
             if yield_table:
@@ -575,7 +645,7 @@ class BackfillEngine:
             write_action_source, MODEL_VERSION_BACKFILL,
         )
         run_id     = new_run_id()
-        confidence = "C" if leverage != 1.0 else "B"
+        confidence = "C" if (leverage != 1.0 or is_bond) else "B"
         write_price_source(
             conn=self.price_conn,
             run_id=run_id,

@@ -38,11 +38,11 @@ _BOND_ETF_CONFIG: dict[str, dict] = {
 # 카테고리로 매핑(신규 ETF 자동 커버). duration은 실측 검증 후 보정 대상(초기 표준 추정).
 #   FX/헤지는 backfill_engine의 meta(market/hedge)가 처리 — 한국상장 미국채는 ×환율 or 헤지.
 _BOND_CATEGORY_CONFIG: dict[str, dict] = {
-    # ── 한국 국고채 (KRW, 무FX) ──
-    "KR_TREASURY_3Y":   {"rate": "KTB3Y",    "duration": 2.7,  "model": "duration"},
-    "KR_TREASURY_10Y":  {"rate": "KTB10Y",   "duration": 8.0,  "model": "duration"},
-    "KR_TREASURY_30Y":  {"rate": "KTB30Y",   "duration": 18.0, "model": "duration"},
-    "KR_BOND_AGGREGATE":{"rate": "KTB3Y",    "duration": 5.0,  "model": "duration"},  # 종합채권
+    # ── 한국 국고채 (KRW, 무FX) — 실측 유효듀레이션으로 통일 (운용사 일관: σ≤0.3) ──
+    "KR_TREASURY_3Y":   {"rate": "KTB3Y",    "duration": 2.6,  "model": "duration"},  # 실측 2.50~3.01 중앙 2.54
+    "KR_TREASURY_10Y":  {"rate": "KTB10Y",   "duration": 7.7,  "model": "duration"},  # 실측 7.42~8.08 중앙 7.68
+    "KR_TREASURY_30Y":  {"rate": "KTB30Y",   "duration": 18.0, "model": "duration"},  # ⚠️ 흩어짐(순수17 vs 스트립/Enhanced 23~27) — 별도 검토
+    "KR_BOND_AGGREGATE":{"rate": "KTB3Y",    "duration": 4.2,  "model": "duration"},  # 종합채권, 실측 3.63~4.89 중앙 4.17
     "KR_CORPORATE":     {"rate": "CORPAA3Y", "duration": 2.5,  "model": "duration"},  # 회사채(금리에 스프레드 포함)
     # ── 한국 CD/KOFR/MMF/단기 — carry(가격 평평, 수익=이자) ──
     "KR_MONEY_MARKET":  {"rate": "CD91",     "duration": 0.0,  "model": "carry"},

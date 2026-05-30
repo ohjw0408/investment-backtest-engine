@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> ✅ **2026-05-31 업데이트 7 (Stage B 모델타입 일반화 + 전수검증):** US 채권 10종 `stage_b_full_verify`(가격/쿠폰/총수익보존/시변듀레이션). 듀레이션 실측 보정(GOVT 5.3·AGG/BND 4.4·SHY/SCHO 0.8), `model` 필드(duration|carry), 쿠폰 book_factor 0.87. **carry 모델 BIL 검증**(총수익 상관 0.945·CAGR차 0.14%p) → 한국 CD/MMF 모델타입 입증. 총수익 보존 전 10종 CAGR차 0.03~0.86%p. 한계(Grade C): SHY/SCHO 가격상관 0.4·AGG/BND 0.88·장기채 TE~5%. gate 2c PASS. **다음=한국 금리수집(KOFR/KTB/CD)→config 행추가+FX.**
+
 > ✅ **2026-05-31 업데이트 6 (배당 백필 Stage B — US 국채):** 채권이 `DGS*` 금리를 가격으로 쓰던(가짜) 문제 + 쿠폰 0 해소. `bond_model.build_bond_price_series`(yield→price = -duration×Δyield) + `inject_monthly_coupons`. ETF별 듀레이션 명시 매핑(TLT/IEF/SHY…→DGS30/10/3MO). 검증: 모델 vs 실측 TLT 월상관 **0.986**, Grade C. TLT 백필 1977~2002(6461행+쿠폰311) + 계산기 total_dividend 0→35.2M. gate 2c PASS·SCHD 불변. **다음=한국 국채/회사채/MMF (KOFR/KTB·CD 금리 수집 선행).**
 
 > ✅ **2026-05-31 업데이트 5 (투자계산기 가상데이터 보충):** "가상데이터 사용" 체크해도 SCHD 20년이 11케이스 그대로던 문제 수정(`3c86c49`~`7af4c05`). 원인=DataPreparer가 백필 "ok"면 합성 스킵 + 분석기가 윈도우 수를 data 범위로 제한. `AccumulationAnalyzer`·`MultiAccountAnalyzer` 양쪽이 use_synthetic 시 윈도우별 독립 GBM으로 **TARGET=40까지 보충**(체크 OFF면 순수 실데이터). 공유 헬퍼 `build_window_synth_params` 추출. **버그수정:** anchor를 raw USD로 잡아 실 suffix(get_price=KRW×환율)와 1181배 어긋나 CAGR 폭발 → anchor를 get_price(FX)로 산출. 검증: SCHD 20년 OFF=11/ON=41케이스, end_value 정상·꼬리확장(p10 69→45M), 회귀 26/26·gate 2c PASS. ⚠️ ON 시 ~4배 느림. ⚠️ MultiAccountAnalyzer `cagr` 필드 garbage(기존 별개 버그, 분포는 end_value라 무영향).

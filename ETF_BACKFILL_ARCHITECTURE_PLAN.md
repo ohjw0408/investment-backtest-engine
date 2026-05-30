@@ -1014,10 +1014,18 @@ Replace invalid yield-as-price bond backfills, and model coupon/interest as expl
 > = price×yield/12). 채권 분기를 `backfill()`에 통합(bond_config로 ETF 코드 직접 키잉, "US Fixed Income"
 > 뭉뚱그림 우회). confidence=C. **검증:** 모델 vs 실측 TLT 오버랩 월상관 0.986·TE~5%·Grade C. TLT 백필
 > 1977~2002(6461행+쿠폰311), 계산기 total_dividend 0→정상. gate 2c PASS·주식 백필 불변.
-> **남은 것:** ① 한국 국채/회사채/MMF — KOFR/KTB·CD 단기금리 수집(ECOS/KRX) 후 `_BOND_ETF_CONFIG` 행 추가.
-> ② 회사채(LQD/HYG) 신용스프레드 데이터(없음) — 국채 근사 시 Grade 하향. ③ 볼록성/시변 듀레이션은
-> 추후 정밀화(현재 단일 고정 듀레이션, TE~5%). ④ DGS는 `_NO_DIVIDEND_INDICES` 유지(채권 분기가 쿠폰
-> 별도 처리, 일반 경로는 안 탐). _추가: Claude (Opus 4.8), 2026-05-31_
+> **모델타입 일반화 + 전수검증 (2026-05-31):** US 채권 10종 `stage_b_full_verify`(A 가격·B 쿠폰·C
+> 총수익보존·D 시변듀레이션). ① 듀레이션을 실측 유효듀레이션으로 보정(GOVT 5.3·AGG/BND 4.4·SHY/SCHO 0.8).
+> ② `model` 필드 추가 — `duration`(가격 -dur×Δy) | `carry`(가격 평평·수익=이자, MMF/CD/초단기). US BIL로
+> carry 검증(총수익 상관 0.945·CAGR차 0.14%p). ③ 쿠폰 book_factor=0.87(현재금리→book yield 보정).
+> **검증 결과:** 총수익 보존 전 10종 CAGR차 0.03~0.86%p. 장/중기 국채 가격상관 0.96~0.99. **한계(Grade C
+> 수용):** SHY/SCHO 가격상관 0.4(DGS3MO≠단기곡선, 총수익은 맞음), AGG/BND 0.88(신용/MBS 미모델), 장기채
+> TE~5%(상수 듀레이션). `stage_b_rebackfill.py`로 재백필.
+>
+> **남은 것:** ① 한국 — KOFR/KTB/CD 금리 수집(ECOS/KRX) → `_BOND_ETF_CONFIG` 행 추가(국고채=duration,
+> CD/MMF=carry, 회사채=duration+스프레드) + FX(원화 미국채 ×환율). 모델타입은 입증됨 → "행 추가"로 확장.
+> ② 회사채 신용스프레드 데이터(없음) — 국채 근사 시 Grade 하향. ③ 볼록성/시변 듀레이션 정밀화는 추후.
+> ④ DGS는 `_NO_DIVIDEND_INDICES` 유지(채권 분기가 쿠폰 별도 처리). _추가: Claude (Opus 4.8), 2026-05-31_
 
 Tasks:
 

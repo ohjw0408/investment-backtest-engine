@@ -1,5 +1,26 @@
 # Log
 
+## [2026-05-31] feature+verify | Stage B 모델타입 일반화 + 전수 검증 (US 채권 10종)
+
+- **배경:** Stage B 1차(TLT만 검증) 후 전수 검증(`stage_b_full_verify`: A 가격·B 쿠폰·C 총수익보존·D 시변듀레이션)으로 문제 발견 — ① SHY/SCHO 가격상관 0.4(DGS3MO가 단기곡선 미대표) ② AGG/BND 듀레이션 config 6 vs 실측 4.4 ③ 쿠폰 1.13~1.52x 과대(모델=현재금리 vs 실측=book yield). **실측 데이터는 무손상**(모델은 백필 구간만 생성).
+- **결론(검증):** 상수 듀레이션은 장기채 TE(~5%)만 유발(상관 0.98). 더 나쁜 케이스는 rate 매핑(단기)·신용 미모델(aggregate)·쿠폰 기준 문제. **한국 국채/회사채/CD/단기채에서 동일 재발** 예상 → US에서 모델타입 먼저 일반화(오너 결정).
+- **구현 (`bond_model.py`/`backfill_engine.py`):**
+  - **듀레이션 실측 보정**: GOVT 6→5.3, AGG/BND 6→4.4, SHY/SCHO 1.9→0.8 (stage_b_full_verify D 회귀 중앙값).
+  - **`model` 필드**: `duration`(가격 -dur×Δy) | `carry`(가격 평평·수익=이자, MMF/CD/초단기). US **BIL**(단기 T-bill)을 carry 검증용 추가.
+  - **쿠폰 book_factor=0.87**: 모델 쿠폰(현재금리)을 실측 분배(book yield, 보수차감)에 근접.
+  - `stage_b_rebackfill.py`: 백필 삭제→현재 config 재생성(실데이터 보존). 10종 재백필.
+- **재검증 (서버):**
+  - D 듀레이션: GOVT 5.3·AGG 4.2·BND 4.4·SHY/SCHO 0.8 = config 일치 ✅.
+  - **carry 모델(BIL): 가격 평평 + 쿠폰만으로 총수익 상관 0.945·CAGR차 0.14%p** ✅ → 한국 CD/MMF 모델타입 입증.
+  - **총수익 보존 전 10종 우수** (CAGR차 0.03~0.86%p).
+  - 회귀: gate 2c PASSED, SCHD 불변.
+- **남은 한계(문서화·Grade C 수용):** SHY/SCHO 가격상관 0.4(DGS3MO≠단기곡선; 총수익은 맞음), AGG/BND 0.88(신용/MBS 미모델), 장기채 TE~5%(상수듀레이션), 쿠폰 book_factor는 verify의 raw B엔 미반영(주입 단계만).
+- **다음:** 한국 — KOFR/KTB/CD 금리 수집(ECOS/KRX) → config 행 추가(model: 국고채=duration, CD/MMF=carry, 회사채=duration+스프레드) + FX(원화 미국채 ×환율). 모델타입은 입증됨.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-31] feature | 배당 백필 Stage B — 채권 듀레이션 가격모델 + 쿠폰 주입 (US 국채)
 
 - **목표:** Stage A의 "price-return 가격 + 명시 분배금" 표준을 채권에 적용. 기존엔 채권 ETF가 `DGS*`(금리 **수치**)에 매핑돼 yield를 가격으로 쓰고(가짜) `_NO_DIVIDEND_INDICES`라 쿠폰 0이었음.

@@ -445,17 +445,25 @@ class DividendSimulator:
         provenance 기반 결정값(배당간격 휴리스틱 아님). 다종목이면 가장 늦은
         실데이터 시작(모든 종목이 실측인 시점)을 반환한다.
         """
+        conn = getattr(self.loader, "conn", None)
         candidates = []
         for t in self.tickers:
-            row = self.loader.conn.execute(
-                "SELECT MIN(date) FROM price_daily WHERE code=? AND volume>0", (t,)
-            ).fetchone()
-            if row and row[0]:
-                candidates.append(pd.Timestamp(row[0]))
-            else:
+            ts = None
+            if conn is not None:
+                try:
+                    row = conn.execute(
+                        "SELECT MIN(date) FROM price_daily WHERE code=? AND volume>0", (t,)
+                    ).fetchone()
+                    if row and row[0]:
+                        ts = pd.Timestamp(row[0])
+                except Exception:
+                    ts = None
+            if ts is None:
                 df = self._load(t)
                 if not df.empty:
-                    candidates.append(df.index.min())
+                    ts = df.index.min()
+            if ts is not None:
+                candidates.append(ts)
         return max(candidates) if candidates else pd.Timestamp("1900-01-01")
 
     def _roll_window(self, seed, monthly, years, start_dt, end_dt) -> List[float]:

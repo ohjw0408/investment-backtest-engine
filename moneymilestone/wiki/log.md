@@ -1,5 +1,21 @@
 # Log
 
+## [2026-05-31] feature | Stage B 한국 채권 — ECOS 금리 수집 + 카테고리 매핑
+
+- **한국 금리 수집 (`scripts/fetch_kr_rates.py`):** ECOS 시장금리 일별(817Y002) → index_master. 국고채 1/2/3/10/20/30년(010190000~010230000), CD91(010502000), KOFR(010901000), 회사채 AA-/BBB- 3년(010300000/010320000). 서버 수집 완료: KTB3Y 6825행(1998~), KTB10Y 6301(2000~), KTB30Y 3380(2012~), CD91 7975(1995~), KOFR 1106(2021~), CORPAA3Y 7975(1995~). ECOS 키 서버 업로드(chmod 600).
+- **카테고리 매핑 (`bond_model._BOND_CATEGORY_CONFIG`):** 한국 채권 ETF는 meta.index가 이미 세분 카테고리라 코드별 대신 카테고리 매핑(신규 ETF 자동 커버). `bond_config(code, category)` = 코드별(US) > 카테고리(한국). KR_TREASURY_3Y/10Y/30Y→KTB, KR_BOND_AGGREGATE/KR_CORPORATE→duration, KR_MONEY_MARKET→CD91 carry, US_TREASURY_30Y→DGS30. FX/헤지는 기존 meta(market/hedge)가 처리.
+- **검증 (한국 대표 3종 백필):**
+  - 114260 KODEX 국고채3년 → KTB3Y duration: 2662행(1998~2009) + 쿠폰129 ✅
+  - 459580 KODEX CD금리액티브 → CD91 **carry(가격 평평 1,000,965)** + 쿠폰342 ✅
+  - 453850 ACE 미국30년국채(H) → DGS30 duration(헤지 무FX): 11513행(1977~) + 쿠폰554 ✅
+  - gate 2c PASSED.
+- **발견:** **stale 백필(이전 비-bond 로드)이 신규 bond 백필을 `already` 체크로 차단/오염**(114260 1행만, 453850 NULL close). `stage_b_rebackfill.py`로 삭제 후 재생성하면 정상. → **기존 로드된 한국 채권 ETF 전부 재백필 필요(ops).**
+- **남은 것:** ① 한국 ETF 듀레이션 실측 보정(US처럼 — 단 yfinance 한국 adj-close 커버리지 한계로 검증 방식 조정 필요) ② 전 한국 채권 ETF 재백필 ③ 헤지 미국채 hedge-cost(현재 무시) ④ 미배선 카테고리(US_MIXED 혼합형, USD_SOFR, unhedged 미국 MMF).
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-31] feature+verify | Stage B 모델타입 일반화 + 전수 검증 (US 채권 10종)
 
 - **배경:** Stage B 1차(TLT만 검증) 후 전수 검증(`stage_b_full_verify`: A 가격·B 쿠폰·C 총수익보존·D 시변듀레이션)으로 문제 발견 — ① SHY/SCHO 가격상관 0.4(DGS3MO가 단기곡선 미대표) ② AGG/BND 듀레이션 config 6 vs 실측 4.4 ③ 쿠폰 1.13~1.52x 과대(모델=현재금리 vs 실측=book yield). **실측 데이터는 무손상**(모델은 백필 구간만 생성).

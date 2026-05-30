@@ -877,13 +877,22 @@ class DividendSimulator:
         if vary_count == 0:
             if opt_seed:
                 v = self._find_anchor_seed(monthly_cfg['center'], years_cfg['center'], target_monthly_div, probability, cancel_check=cancel_check)
-                return {"mode": "probability", "result": {"solved_seed": v, "probability": probability}}
+                res = {"solved_seed": v, "probability": probability}
+                if v is not None:
+                    res["distribution"] = self.get_probability(v, monthly_cfg['center'], years_cfg['center'], target_monthly_div).get("distribution", {})
+                return {"mode": "probability", "result": res}
             elif opt_monthly:
                 v = self._find_anchor_monthly(seed_cfg['center'], years_cfg['center'], target_monthly_div, probability, cancel_check=cancel_check)
-                return {"mode": "probability", "result": {"solved_monthly": v, "probability": probability}}
+                res = {"solved_monthly": v, "probability": probability}
+                if v is not None:
+                    res["distribution"] = self.get_probability(seed_cfg['center'], v, years_cfg['center'], target_monthly_div).get("distribution", {})
+                return {"mode": "probability", "result": res}
             else:
                 v = self._find_anchor_years(seed_cfg['center'], monthly_cfg['center'], target_monthly_div, probability, cancel_check=cancel_check)
-                return {"mode": "probability", "result": {"solved_years": v, "probability": probability}}
+                res = {"solved_years": v, "probability": probability}
+                if v is not None:
+                    res["distribution"] = self.get_probability(seed_cfg['center'], monthly_cfg['center'], v, target_monthly_div).get("distribution", {})
+                return {"mode": "probability", "result": res}
 
         # 탐색 1개 → X축 = 탐색 변수, Y축 = 최적화 변수 (등위선 1개)
         # 탐색 2개 → X축 = 더 많은 포인트 가진 변수, 나머지 탐색 변수는 여러 선

@@ -90,7 +90,7 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
 
     return sim.run_scenario(
         target_monthly_div = float(body['target_monthly_div']),
-        probability        = float(body.get('probability', 0.90)),
+        probability        = float(body.get('probability', 0.50)),
         seed_cfg           = seed_cfg,
         monthly_cfg        = monthly_cfg,
         years_cfg          = years_cfg,

@@ -70,9 +70,12 @@
         <div class="input-hint" id="dtTargetDivHint">₩1,000,000</div>
       </div>
       <div class="input-row">
-        <label>달성 확률 기준 <span id="dtProbLabel" class="label-val">90%</span></label>
-        <input type="range" id="dtProbSlider" class="calc-slider" min="50" max="99" value="90" step="1">
-        <div class="slider-marks"><span>50%</span><span>70%</span><span>90%</span><span>99%</span></div>
+        <label>달성 확률 기준 <span id="dtProbLabel" class="label-val">50%</span></label>
+        <input type="range" id="dtProbSlider" class="calc-slider" min="0" max="100" value="50" step="1">
+        <div class="slider-marks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+          50% = 전형적(중앙값) 시나리오 · 높일수록 보수적(더 많은 투자금 필요)
+        </div>
       </div>
     </div>
 
@@ -837,7 +840,21 @@ function renderResult(data, body) {
     if (res.solved_monthly !== undefined) { solvedLabel='필요 월 적립금';  solvedValue = res.solved_monthly > 0 ? fmtKRW(res.solved_monthly) : '적립금 불필요'; }
 
     document.getElementById('dtSolveTitle').textContent = solvedLabel || '달성 확률';
-    document.getElementById('dtSolveCards').innerHTML = solvedLabel ? `
+
+    // 예상 월 배당금 분포 (최종연도 기준, 롤링 윈도우 p25~p75) — 고정/자동 모드 공통
+    const dist = res.distribution || {};
+    const hasDist = dist.p50 != null && dist.p50 > 0;
+    const distCards = hasDist ? `
+      <div class="dist-card median">
+        <div class="dist-card-label">예상 월 배당금 (중앙값)</div>
+        <div class="dist-card-value">${fmtKRW(Math.round(dist.p50/12))}</div>
+      </div>
+      <div class="dist-card">
+        <div class="dist-card-label">월 배당금 범위 (결과의 50% · p25~p75)</div>
+        <div class="dist-card-value" style="font-size:0.95rem;">${fmtKRW(Math.round(dist.p25/12))} ~ ${fmtKRW(Math.round(dist.p75/12))}</div>
+      </div>` : '';
+
+    document.getElementById('dtSolveCards').innerHTML = (solvedLabel ? `
       <div class="dist-card median">
         <div class="dist-card-label">${solvedLabel}</div>
         <div class="dist-card-value">${solvedValue}</div>
@@ -852,7 +869,7 @@ function renderResult(data, body) {
       </div>` : `
       <div class="dist-card median"><div class="dist-card-label">달성 확률</div><div class="dist-card-value">${p}%</div></div>
       <div class="dist-card pessimistic"><div class="dist-card-label">목표 월 배당금</div><div class="dist-card-value">${fmtKRW(body.target_monthly_div)}</div></div>
-      <div class="dist-card optimistic"><div class="dist-card-label">기준 확률</div><div class="dist-card-value">${Math.round(body.probability*100)}%</div></div>`;
+      <div class="dist-card optimistic"><div class="dist-card-label">기준 확률</div><div class="dist-card-value">${Math.round(body.probability*100)}%</div></div>`) + distCards;
 
     // 공유 데이터
     try {

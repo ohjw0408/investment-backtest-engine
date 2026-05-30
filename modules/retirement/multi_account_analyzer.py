@@ -15,6 +15,11 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 
 
+# use_synthetic=True 시 롤링 케이스를 이 개수까지 윈도우별 독립 합성으로 보충한다.
+# (체크박스 OFF면 보충 없음 — 순수 실데이터 롤링)
+TARGET_SYNTHETIC_CASES = 40
+
+
 def calc_metrics_from_history(
     history: pd.DataFrame,
     years: int,
@@ -181,6 +186,7 @@ class MultiAccountAnalyzer:
         self.price_provider = price_provider
         self.use_synthetic = use_synthetic
         self.div_start = div_start
+        self._synth_params: dict = {}
 
     def run(self) -> dict:
         cases = self._run_rolling()
@@ -209,8 +215,8 @@ class MultiAccountAnalyzer:
             "cases_count": len(cases),
         }
 
-    def _estimate_total_cases(self) -> int:
-        cur = self.data_start
+    def _estimate_total_cases(self, start=None) -> int:
+        cur = start if start is not None else self.data_start
         count = 0
         while True:
             end = cur + relativedelta(years=self.accumulation_years)
@@ -226,10 +232,23 @@ class MultiAccountAnalyzer:
         from modules.rebalance.periodic import PeriodicRebalance
         from modules.simulation.multi_account_loop import MultiAccountSimulationLoop
 
-        total_cases = self._estimate_total_cases() if self.progress_callback else 0
+        # use_synthetic=True면 윈도우별 독립 합성으로 TARGET_SYNTHETIC_CASES까지 보충.
+        # 실데이터 시작 이전으로 롤링 시작점을 앞당겨 추가 윈도우를 만든다(합성 prefix + 실 suffix).
+        self._synth_params = self._build_synth_params() if self.use_synthetic else {}
+        if self._synth_params:
+            extended = (
+                self.data_end
+                - relativedelta(years=self.accumulation_years)
+                - relativedelta(months=TARGET_SYNTHETIC_CASES * self.step_months)
+            )
+            roll_start = min(self.data_start, extended)
+        else:
+            roll_start = self.data_start
+
+        total_cases = self._estimate_total_cases(roll_start) if self.progress_callback else 0
         start_time = time.time()
         cases: list[dict[str, Any]] = []
-        cur = self.data_start
+        cur = roll_start
         run_id = 1
 
         while True:
@@ -239,11 +258,14 @@ class MultiAccountAnalyzer:
 
             all_tickers = self._all_tickers()
             try:
-                price_data, dates = self._load_prices(
-                    all_tickers,
-                    cur.strftime("%Y-%m-%d"),
-                    end.strftime("%Y-%m-%d"),
-                )
+                if self._synth_params and cur < self.data_start:
+                    price_data, dates = self._load_window_synthetic(all_tickers, cur, end)
+                else:
+                    price_data, dates = self._load_prices(
+                        all_tickers,
+                        cur.strftime("%Y-%m-%d"),
+                        end.strftime("%Y-%m-%d"),
+                    )
             except Exception:
                 cur += relativedelta(months=self.step_months)
                 run_id += 1
@@ -373,6 +395,127 @@ class MultiAccountAnalyzer:
             end_date,
             allow_synthetic=self.use_synthetic,
         )
+
+    def _build_synth_params(self) -> dict:
+        """use_synthetic 보충용 종목별 GBM 파라미터(mu/sigma/anchor/actual_start).
+        주입 로더(price_provider) 경로나 통계 산출 불가 종목은 제외."""
+        if self.price_provider is not None:
+            return {}
+        try:
+            from modules.retirement.ticker_stats_cache import TickerStatsCache
+            from modules.price_loader import DB_PATH as _PRICE_DB
+            pl = self.portfolio_engine.price_loader.loader
+            cache = TickerStatsCache(_PRICE_DB)
+        except Exception:
+            return {}
+        params: dict = {}
+        for code in self._all_tickers():
+            try:
+                stats = cache.get_or_compute(code)
+                if not stats or stats.get("mu_monthly") is None or stats.get("sigma_monthly") is None:
+                    continue
+                # anchor = price_daily 최초 행(백필 포함). 그 이전만 합성으로 채운다.
+                row = pl.conn.execute(
+                    "SELECT date, close FROM price_daily WHERE code=? ORDER BY date LIMIT 1",
+                    (code,),
+                ).fetchone()
+                if not row or not row[1]:
+                    continue
+                params[code] = {
+                    "mu_monthly":    float(stats["mu_monthly"]),
+                    "sigma_monthly": float(stats["sigma_monthly"]),
+                    "anchor_price":  float(row[1]),
+                    "actual_start":  str(row[0])[:10],
+                }
+            except Exception:
+                continue
+        return params
+
+    def _load_window_synthetic(self, tickers, window_start, window_end):
+        """윈도우별 독립 GBM(Student-t) 합성 prefix + 실 suffix.
+        단일 합성 경로를 슬라이싱하는 아티팩트를 피해 윈도우마다 독립 시드를 쓴다.
+        반환 포맷은 PriceDataLoader.load와 동일 (price_data dict, dates)."""
+        from modules.retirement.synthetic_price_generator import (
+            SYNTHETIC_DF, T_SCALE, TRADING_DAYS_PER_MONTH,
+        )
+        raw_loader = self.portfolio_engine.price_loader.loader
+        ws = window_start.strftime("%Y-%m-%d")
+        we = window_end.strftime("%Y-%m-%d")
+        combined: dict = {}
+        all_dates: set = set()
+
+        for code in tickers:
+            params = self._synth_params.get(code)
+            if params is None:
+                df = raw_loader.get_price(code, ws, we, allow_synthetic=True)
+                df["date"] = pd.to_datetime(df["date"]); df = df.set_index("date")
+                combined[code] = df; all_dates.update(df.index)
+                continue
+
+            actual_start_dt = pd.Timestamp(params["actual_start"])
+            mu_d  = float(params["mu_monthly"]) / TRADING_DAYS_PER_MONTH
+            sig_d = float(params["sigma_monthly"]) / np.sqrt(TRADING_DAYS_PER_MONTH)
+            anchor = float(params["anchor_price"])
+
+            if window_start >= actual_start_dt:
+                df = raw_loader.get_price(code, ws, we, allow_synthetic=False)
+                df["date"] = pd.to_datetime(df["date"]); df = df.set_index("date")
+                combined[code] = df; all_dates.update(df.index)
+                continue
+
+            synth_end = min(actual_start_dt - pd.Timedelta(days=1), window_end)
+            bdays = pd.bdate_range(start=window_start, end=synth_end)
+            synth_df = None
+            if len(bdays) > 0:
+                seed = abs(hash(code + ws)) % (2 ** 31)
+                n = len(bdays)
+                rng = np.random.default_rng(seed=seed)
+                rets = (rng.standard_t(df=SYNTHETIC_DF, size=n) / T_SCALE) * sig_d + mu_d
+                prices = np.empty(n)
+                prices[-1] = anchor / (1.0 + rets[-1])
+                for i in range(n - 2, -1, -1):
+                    prices[i] = prices[i + 1] / (1.0 + rets[i])
+                    if prices[i] <= 0:
+                        prices[i] = prices[i + 1] * 0.99
+                synth_df = pd.DataFrame(
+                    {"open": prices, "high": prices, "low": prices, "close": prices,
+                     "volume": np.zeros(n), "dividend": np.zeros(n), "split": np.ones(n)},
+                    index=pd.DatetimeIndex(bdays),
+                )
+                synth_df.index.name = "date"
+
+            if window_end >= actual_start_dt:
+                real_df = raw_loader.get_price(code, params["actual_start"], we, allow_synthetic=False)
+                real_df["date"] = pd.to_datetime(real_df["date"]); real_df = real_df.set_index("date")
+                for col in ["open", "high", "low", "close", "volume", "dividend", "split"]:
+                    if col not in real_df.columns:
+                        real_df[col] = 0.0 if col != "split" else 1.0
+                if synth_df is not None and not synth_df.empty:
+                    df = pd.concat([synth_df, real_df], axis=0)
+                    df = df[~df.index.duplicated(keep="last")].sort_index()
+                else:
+                    df = real_df
+            else:
+                df = synth_df if synth_df is not None else pd.DataFrame()
+
+            if df is not None and not df.empty:
+                combined[code] = df; all_dates.update(df.index)
+
+        if not combined:
+            return {}, []
+        dates = sorted(all_dates)
+        full_index = pd.DatetimeIndex(dates)
+        for code in tickers:
+            if code not in combined:
+                continue
+            df = combined[code].reindex(full_index)
+            df[["open", "high", "low", "close", "volume"]] = df[["open", "high", "low", "close", "volume"]].ffill()
+            if "dividend" in df.columns:
+                df["dividend"] = df["dividend"].fillna(0)
+            if "split" in df.columns:
+                df["split"] = df["split"].fillna(1)
+            combined[code] = df
+        return combined, dates
 
     def _fit_distribution(self, cases: list[dict[str, Any]]) -> dict:
         keys = [

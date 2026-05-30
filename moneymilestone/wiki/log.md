@@ -1,5 +1,23 @@
 # Log
 
+## [2026-05-31] feature | 배당 백필 Stage B — 채권 듀레이션 가격모델 + 쿠폰 주입 (US 국채)
+
+- **목표:** Stage A의 "price-return 가격 + 명시 분배금" 표준을 채권에 적용. 기존엔 채권 ETF가 `DGS*`(금리 **수치**)에 매핑돼 yield를 가격으로 쓰고(가짜) `_NO_DIVIDEND_INDICES`라 쿠폰 0이었음.
+- **결정(오너):** US 국채만 먼저, 듀레이션 표준값. 한국 국채/회사채/MMF는 바로 후속(검증 후). 가용 데이터: DGS10(1962~)/DGS30(1977~)/DGS3MO(1982~) 준비됨. 한국 금리(KOFR/KTB)·신용스프레드는 없음 → 후속 수집 필요.
+- **구현 (`modules/bond_model.py` + `backfill_engine.py`, 2개 커밋):**
+  - `bond_model`: `_BOND_ETF_CONFIG`(ETF별 rate+duration 명시 매핑, etf_proxy_map 씨앗 — TLT/VGLT/SPTL→DGS30, IEF/GOVT/AGG/BND→DGS10, SHY/SCHO→DGS3MO). `build_bond_price_series`: yield(%)→price-return = `-duration×Δyield`(캐리=이자 제외, 쿠폰으로 분리 → 이중계산 방지).
+  - `backfill_engine`: bond_config(code)면 채권 분기 — index_code=rate, yield→price 변환, 배당 대신 `inject_monthly_coupons`(월 쿠폰=price×yield/12). confidence=C. us_etf_list "US Fixed Income" 뭉뚱그림은 ETF 코드 직접 키잉으로 우회.
+- **검증 (서버):**
+  - 모델 vs 실측 TLT 오버랩(2003~2023): **월수익 상관 0.986**, 추적오차 ~4.9~5.1%, CAGR 모델 -0.12% vs 실측 0.65% → **Grade C** (상관은 A/B급, TE만 C). 가격 경로가 80년대 금리폭등→채권폭락(1977 93.7→1985 36.5)·이후 회복 잡음.
+  - TLT 백필: 1977-02~2002-12 (6,461행 + 쿠폰 311건 월). 실측 2003(86.3)에 매끄럽게 연결.
+  - 계산기: TLT 20yr **total_dividend(쿠폰) p50=35.2M**(이전 0), end_value p50 71M(~10%/yr), 118케이스(DGS 긴 데이터).
+  - 회귀: gate 2c PASSED, SCHD 주식경로 불변(2003~2026, 5674행).
+- **다음:** 한국 국채/회사채/MMF — KOFR/KTB·CD 금리 수집(ECOS/KRX) 후 `_BOND_ETF_CONFIG`에 행 추가. 회사채는 신용스프레드 데이터 필요(국채 근사 시 Grade↓).
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-30] feature | 투자계산기 가상데이터 보충 (use_synthetic 체크 시 윈도우별 독립 합성)
 
 - **배경:** 투자계산기 SCHD 20년이 11케이스뿐(2003 컷 → 22.6년 데이터에 20년 윈도우가 ~11개, 98% 겹쳐 사실상 독립표본 ~1개). "가상데이터 사용" 체크해도 안 늘어남. 원인:

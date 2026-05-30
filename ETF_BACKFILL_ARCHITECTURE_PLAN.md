@@ -1009,6 +1009,16 @@ Goal:
 
 Replace invalid yield-as-price bond backfills, and model coupon/interest as explicit distributions.
 
+> **진행 (2026-05-31) — US 국채 완료:** `modules/bond_model.py`(`_BOND_ETF_CONFIG` ETF별 rate+duration,
+> `build_bond_price_series` = yield→price `-dur×Δyield`) + `backfill_engine.inject_monthly_coupons`(월 쿠폰
+> = price×yield/12). 채권 분기를 `backfill()`에 통합(bond_config로 ETF 코드 직접 키잉, "US Fixed Income"
+> 뭉뚱그림 우회). confidence=C. **검증:** 모델 vs 실측 TLT 오버랩 월상관 0.986·TE~5%·Grade C. TLT 백필
+> 1977~2002(6461행+쿠폰311), 계산기 total_dividend 0→정상. gate 2c PASS·주식 백필 불변.
+> **남은 것:** ① 한국 국채/회사채/MMF — KOFR/KTB·CD 단기금리 수집(ECOS/KRX) 후 `_BOND_ETF_CONFIG` 행 추가.
+> ② 회사채(LQD/HYG) 신용스프레드 데이터(없음) — 국채 근사 시 Grade 하향. ③ 볼록성/시변 듀레이션은
+> 추후 정밀화(현재 단일 고정 듀레이션, TE~5%). ④ DGS는 `_NO_DIVIDEND_INDICES` 유지(채권 분기가 쿠폰
+> 별도 처리, 일반 경로는 안 탐). _추가: Claude (Opus 4.8), 2026-05-31_
+
 Tasks:
 
 - Add rate curve loader.

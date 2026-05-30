@@ -414,18 +414,28 @@ class MultiAccountAnalyzer:
                 stats = cache.get_or_compute(code)
                 if not stats or stats.get("mu_monthly") is None or stats.get("sigma_monthly") is None:
                     continue
-                # anchor = price_daily 최초 행(백필 포함). 그 이전만 합성으로 채운다.
+                # actual_start = price_daily 최초일(백필 포함). 그 이전만 합성으로 채운다.
                 row = pl.conn.execute(
-                    "SELECT date, close FROM price_daily WHERE code=? ORDER BY date LIMIT 1",
-                    (code,),
+                    "SELECT MIN(date) FROM price_daily WHERE code=?", (code,),
                 ).fetchone()
-                if not row or not row[1]:
+                if not row or not row[0]:
+                    continue
+                actual_start = str(row[0])[:10]
+                # anchor는 실 suffix(_load_window_synthetic의 get_price)와 동일 단위여야 함.
+                # get_price는 한국 사용자 기준 USD ETF를 KRW(×환율)로 변환하므로 raw price_daily(USD)를
+                # 쓰면 합성 prefix(USD)·실 suffix(KRW)가 어긋나 가격이 폭발한다. get_price로 anchor 산출.
+                _a_end = (pd.Timestamp(actual_start) + pd.Timedelta(days=14)).strftime("%Y-%m-%d")
+                adf = pl.get_price(code, actual_start, _a_end, allow_synthetic=False)
+                if adf is None or adf.empty or "close" not in adf.columns:
+                    continue
+                anchor_price = float(adf["close"].iloc[0])
+                if not anchor_price > 0:
                     continue
                 params[code] = {
                     "mu_monthly":    float(stats["mu_monthly"]),
                     "sigma_monthly": float(stats["sigma_monthly"]),
-                    "anchor_price":  float(row[1]),
-                    "actual_start":  str(row[0])[:10],
+                    "anchor_price":  anchor_price,
+                    "actual_start":  actual_start,
                 }
             except Exception:
                 continue

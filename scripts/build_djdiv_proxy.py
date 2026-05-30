@@ -6,13 +6,14 @@ DJ US Dividend 100 proxy chain builder -> index_master.db
 Chain (earlier segments scaled to match the later anchor):
   SCHD  (price_daily.db actual raw close, 2011-10-20 ~ present)  <- anchor
   SDY   (yfinance raw close,     2005-11-15 ~ 2011-10-19)
-  DVY   (yfinance raw close,     2003-11-07 ~ 2005-11-14)
-  ^GSPC (index_master.db raw,    1928 ~ 2003-11-06)
+  DVY   (yfinance raw close,     2003-11-07 ~ 2005-11-14)  <- chain start
 
 PRICE-RETURN chain (raw close, NOT total-return). All segments use raw close so the
-methodology is consistent: SCHD anchor (price_daily auto_adjust=False) + ^GSPC (raw
-index) + SDY/DVY (yfinance auto_adjust=False). Dividends are NOT embedded; they are
-injected separately onto the backfilled range from the DJUSDIV100 yield table
+methodology is consistent: SCHD anchor (price_daily auto_adjust=False) + SDY/DVY
+(yfinance auto_adjust=False). The chain starts 2003-11-07 (DVY). The S&P 500 (^GSPC)
+segment was removed: a broad-market price index does not represent the DJ US Dividend
+100 / SCHD dividend strategy, so no pre-DVY backfill. Dividends are NOT embedded; they
+are injected separately onto the backfilled range from the DJUSDIV100 yield table
 (see ETF_BACKFILL_ARCHITECTURE_PLAN.md Phase 6.0 Stage A).
 Saved as DJUSDIV_PROXY in index_master.db.
 
@@ -60,19 +61,6 @@ def _fetch_price_daily(code):
     return df.set_index("date")["close"].astype(float).rename(code)
 
 
-def _fetch_index_db(code):
-    conn = sqlite3.connect(str(INDEX_DB))
-    df = pd.read_sql(
-        "SELECT date, close FROM index_daily WHERE code=? ORDER BY date",
-        conn, params=(code,),
-    )
-    conn.close()
-    if df.empty:
-        raise ValueError(f"index_master.db: no data for {code}")
-    df["date"] = pd.to_datetime(df["date"])
-    return df.set_index("date")["close"].astype(float).rename(code)
-
-
 # ------------------------------------------------------------------ stitching
 
 def _scale_earlier_to_later(earlier, later):
@@ -113,10 +101,6 @@ def build_chain():
     dvy = _fetch_yf("DVY")
     print(f"   {dvy.index[0].date()} ~ {dvy.index[-1].date()}  ({len(dvy):,} rows)")
 
-    print("4) ^GSPC - index_master.db...")
-    gspc = _fetch_index_db("^GSPC")
-    print(f"   {gspc.index[0].date()} ~ {gspc.index[-1].date()}  ({len(gspc):,} rows)")
-
     print("\nStitching chain...")
 
     # Segment 1: SCHD full (anchor)
@@ -136,27 +120,15 @@ def build_chain():
     sdy_at_join  = float(overlap_sdy_schd.iloc[0])
     sdy_scaled_full = sdy * (sdy_join_val / sdy_at_join)
 
-    # Segment 3: DVY scaled to sdy_scaled_full, covering period before SDY start
+    # Segment 3: DVY scaled to sdy_scaled_full, covering period before SDY start.
+    # DVY is the earliest segment -> chain starts at DVY's first date (2003-11-07).
     seg_dvy = _scale_earlier_to_later(dvy, sdy_scaled_full)
-    dvy_start = dvy.index[0]
 
-    # For segment 4 we need dvy fully scaled
-    overlap_dvy_sdy = sdy_scaled_full[sdy_scaled_full.index >= dvy_start]
-    if overlap_dvy_sdy.empty:
-        raise ValueError("DVY and SDY do not overlap")
-    dvy_join_val  = float(overlap_dvy_sdy.iloc[0])
-    dvy_at_join   = float(dvy[dvy.index >= dvy_start].iloc[0])
-    dvy_scaled_full = dvy * (dvy_join_val / dvy_at_join)
-
-    # Segment 4: ^GSPC scaled to dvy_scaled_full, covering period before DVY start
-    seg_gspc = _scale_earlier_to_later(gspc, dvy_scaled_full)
-
-    print(f"  ^GSPC: {seg_gspc.index[0].date()} ~ {seg_gspc.index[-1].date()} ({len(seg_gspc):,} rows)")
     print(f"  DVY:   {seg_dvy.index[0].date()} ~ {seg_dvy.index[-1].date()} ({len(seg_dvy):,} rows)")
     print(f"  SDY:   {seg_sdy.index[0].date()} ~ {seg_sdy.index[-1].date()} ({len(seg_sdy):,} rows)")
     print(f"  SCHD:  {seg_schd.index[0].date()} ~ {seg_schd.index[-1].date()} ({len(seg_schd):,} rows)")
 
-    chain = pd.concat([seg_gspc, seg_dvy, seg_sdy, seg_schd]).sort_index()
+    chain = pd.concat([seg_dvy, seg_sdy, seg_schd]).sort_index()
     chain = chain[~chain.index.duplicated(keep="last")]
     chain = chain.dropna()
     chain = chain[chain > 0]

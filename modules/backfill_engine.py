@@ -493,10 +493,15 @@ class BackfillEngine:
         # us_etf_list category가 "US Fixed Income"으로 뭉뚱그려져 듀레이션 구분 불가하므로
         # ETF 코드로 직접 키잉한다 (etf_proxy_map 씨앗).
         from modules.bond_model import (
-            bond_config, build_bond_price_series, COUPON_FREQ_PER_YEAR, COUPON_BOOK_FACTOR,
+            bond_config, build_bond_price_series, COUPON_FREQ_PER_YEAR,
+            COUPON_BOOK_FACTOR, STRIP_DURATION_MULT,
         )
         bcfg    = bond_config(code, index_nm)
         is_bond = bcfg is not None
+        # 스트립(무이표)은 듀레이션 ≈ 만기로 길다 → 이름 감지해 가산.
+        # 레버리지/인버스는 meta.leverage로 아래 _apply_leverage가 기존 로직으로 처리.
+        if is_bond and ("스트립" in name or "strip" in name.lower()):
+            bcfg = {**bcfg, "duration": bcfg["duration"] * STRIP_DURATION_MULT}
 
         # 지수 코드 매핑
         # US ETF는 index 컬럼이 이미 index_master.db 코드 (^GSPC, DGS30 등)

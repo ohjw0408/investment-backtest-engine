@@ -43,7 +43,7 @@ _BOND_CATEGORY_CONFIG: dict[str, dict] = {
     "KR_TREASURY_10Y":  {"rate": "KTB10Y",   "duration": 7.7,  "model": "duration"},  # 실측 7.42~8.08 중앙 7.68
     "KR_TREASURY_30Y":  {"rate": "KTB30Y",   "duration": 18.0, "model": "duration"},  # ⚠️ 흩어짐(순수17 vs 스트립/Enhanced 23~27) — 별도 검토
     "KR_BOND_AGGREGATE":{"rate": "KTB3Y",    "duration": 4.2,  "model": "duration"},  # 종합채권, 실측 3.63~4.89 중앙 4.17
-    "KR_CORPORATE":     {"rate": "CORPAA3Y", "duration": 2.5,  "model": "duration"},  # 회사채(금리에 스프레드 포함)
+    "KR_CORPORATE":     {"rate": "CORPAA3Y", "duration": 2.6,  "model": "duration"},  # 상시형 실측 2.59; 만기형도 단일값(롤오버 프록시)
     # ── 한국 CD/KOFR/MMF/단기 — carry(가격 평평, 수익=이자) ──
     "KR_MONEY_MARKET":  {"rate": "CD91",     "duration": 0.0,  "model": "carry"},
     # ── 한국상장 미국채 (USD 금리 + FX/헤지는 meta가 처리) ──
@@ -51,6 +51,9 @@ _BOND_CATEGORY_CONFIG: dict[str, dict] = {
 }
 
 COUPON_FREQ_PER_YEAR = 12  # 채권 ETF는 보통 월 분배
+
+# 스트립(무이표) 채권 = 듀레이션 ≈ 만기. 이표채 대비 길어 ETF명에 '스트립'/strip 있으면 듀레이션 가산.
+STRIP_DURATION_MULT = 1.6
 
 # 모델 쿠폰(현재 시장금리 기반)을 실측 분배(book yield = 보수 차감 + 평균 매입금리)에 맞추는 보정.
 # stage_b_full_verify B: 국채 ETF 모델/실측 분배yield 비 ≈ 1.13~1.19 → 약 0.87.

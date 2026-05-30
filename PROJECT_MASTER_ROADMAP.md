@@ -1,6 +1,6 @@
 # Project Master Roadmap
 
-Last updated: 2026-05-30 (✅ 배당 백필 Stage A 서버 적용 완료 → 세금 2c/2e 재검증 대기)
+Last updated: 2026-05-31 (✅ Stage A + ^GSPC 제거(proxy 2003 시작) + Phase 2c 재검증 완료, 배당역산 4x버그 수정, 투자계산기 가상보충 → 다음=Stage B 채권/MMF 쿠폰)
 
 > ⚠️ **2026-05-30 정정:** 아래 "SCHD vs TIGER now converge" / "Phase 2c Gate 통과" / "Track A 완료"는 **가격(CAGR) 수렴만** 검증된 것이었음. `debug_dividend.py` 실측 결과, 배당 **액수**는 0임이 확인됨. 원인: Track A가 DJUSDIV_PROXY를 total-return(adj-close)로 구축 → 가격은 맞지만 배당이 가격에 임베딩되어 itemize 안 됨. 백필 가격 구간(1928~)에 배당 row 없음 + provenance 전부 0행. **이는 세금 Phase 2c(배당 역산)·2e(금종세)·Track G(다중계좌 세금)의 데이터 기반을 무효화한다.** 해결 owner: `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0`(범용 배당 백필 재설계). 우선순위는 아래 "Current Recommended Next Action" 참조.
 
@@ -26,13 +26,19 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 ✅ **배당 데이터 근본 버그의 Stage A 조치 완료 (2026-05-30).** DJUSDIV_PROXY를
 price-return 체인으로 재구축하고 SCHD/458730/446720/402970에 명시적 배당을 주입했다.
 서버에서 `stage_a_verify.py`, `debug_dividend.py`, 계산기 직접 실행으로 배당 p50 > 0과
-UI 실측/추정 필드를 확인했다. 현재 위치 = 정상 배당 데이터 기준 세금 Phase 2c/2e 재검증 직전.
+UI 실측/추정 필드를 확인했다.
+
+✅ **2026-05-31 추가 완료:** ① ^GSPC(S&P500) 백필 제거 → proxy 2003 시작(SCHD 배당전략 미대표).
+② Phase 2c 재검증 완료(Gate 2c PASSED 3/3, 양 계산기 SCHD≈458730 수렴, 2e 엔진 `tax_truth_test`
+64/64). ③ 배당역산 SCHD≠458730 4x버그 수정(`dividend_simulator` 3단 폴백 + 휴리스틱 결정화,
+[[dev/bugs]] BUG-DIV-1). ④ 배당계산기 UX(확률 슬라이더 50% 기본 + p25~p75 분포). ⑤ 투자계산기
+가상데이터 보충(use_synthetic 체크 시 윈도우별 독립 합성 TARGET=40). 현재 위치 = **Stage B 착수 직전.**
 
 현재 위치 (한눈에):
-- ✅ **완료:** 배당 백필 범용 재설계 Stage A — `ETF_BACKFILL § Phase 6.0 Stage A`
-- 🔁 **지금:** 세금 Phase 2c(배당 역산)/2e(금종세) — 정상 배당 데이터로 다시 확인
-- 🔴 **후속 필수:** 배당 백필 Stage B(채권/MMF 쿠폰 분배금)
-- ⏸️ **대기:** Track G(다중계좌 세금) — 세금 재검증 후 재개
+- ✅ **완료:** 배당 백필 Stage A + ^GSPC 제거(2003) — `ETF_BACKFILL § Phase 6.0 Stage A`
+- ✅ **완료:** 세금 Phase 2c 재검증 (2e 엔진 검증 완료, 2e 배선 갭은 빌드 잔여)
+- 🔴 **지금/후속 필수:** 배당 백필 Stage B(채권/MMF 쿠폰 분배금) — `ETF_BACKFILL § Phase 7`
+- ⏸️ **대기:** Track G(다중계좌 세금) — G1 ✅, 후속 ②커서 ③UI
 
 완료 (가격/구조 레벨 — 단, 배당 액수 정확성은 별개):
 
@@ -45,7 +51,7 @@ UI 실측/추정 필드를 확인했다. 현재 위치 = 정상 배당 데이터
 - ✅ ETF_BACKFILL Phase 0~2 provenance 스키마는 Stage A 백필 가격/배당 기록에 사용됨.
 - ✅ PHASE4: A1/A2/A3/A5/A6/B5/C3/C5/D3 done.
 
-Current blocker: **정상 배당 데이터 기준 세금 Phase 2c/2e 재검증.**
+Current blocker: **배당 백필 Stage B (채권/MMF 쿠폰 분배금).** (Phase 2c 재검증은 완료 — 2026-05-31.)
 
 ## Decision
 
@@ -285,13 +291,13 @@ Completion note - YYYY-MM-DD
 
 > ⚠️ **우선순위 전환 (2026-05-30):** 배당 데이터 근본 버그 발견. Track G는 다중계좌 **세금**(금종세·배당) 시뮬이라 배당/세율 데이터가 정확해야 테스트·구현이 의미 있음. 현재 배당 액수가 0이라 Track G 진행은 검증 불가능한 토대 위에 쌓는 셈. **따라서 데이터 토대부터 고친다.**
 
-**[1] 지금 — 세금 Phase 2c/2e 재검증:**
-```text
-배당 데이터 정상화 후 Gate 2c/2e 재검증해줘
-```
-Stage A가 서버 적용되어 배당 액수가 정상화됐다. 이 데이터로 배당 역산(2c)·금종세 경고(2e)가 실제로 맞는지 재확인. 이전 "통과"는 가격 수렴만 본 것.
+**[1] ✅ 완료 (2026-05-31) — 세금 Phase 2c 재검증 + 배당역산 버그 수정:**
+^GSPC 제거(proxy 2003 시작) 후 Gate 2c PASSED 3/3, 투자·배당 계산기 양쪽 SCHD≈458730 수렴,
+2e 종합과세 엔진 `tax_truth_test` 64/64. 배당역산 4x 갈림 버그(`_find_real_data_start` 휴리스틱 +
+all-or-nothing) 수정. 배당계산기 UX(슬라이더 50%·p25~p75) + 투자계산기 가상보충 추가.
+잔여: **2e 배선 갭**(`other_financial_income` 자동산출·전탭 배선·`_ytd_income` 주입) = 빌드 작업.
 
-**[2] 그 다음 — 배당 백필 Stage B (채권/MMF, 필수):**
+**[2] 지금 — 배당 백필 Stage B (채권/MMF, 필수):**
 ```text
 ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 7 + Phase 6.0 Stage B 진행해줘
 ```

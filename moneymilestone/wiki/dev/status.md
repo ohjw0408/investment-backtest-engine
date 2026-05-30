@@ -21,6 +21,10 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> ✅ **2026-05-31 업데이트 5 (투자계산기 가상데이터 보충):** "가상데이터 사용" 체크해도 SCHD 20년이 11케이스 그대로던 문제 수정(`3c86c49`~`7af4c05`). 원인=DataPreparer가 백필 "ok"면 합성 스킵 + 분석기가 윈도우 수를 data 범위로 제한. `AccumulationAnalyzer`·`MultiAccountAnalyzer` 양쪽이 use_synthetic 시 윈도우별 독립 GBM으로 **TARGET=40까지 보충**(체크 OFF면 순수 실데이터). 공유 헬퍼 `build_window_synth_params` 추출. **버그수정:** anchor를 raw USD로 잡아 실 suffix(get_price=KRW×환율)와 1181배 어긋나 CAGR 폭발 → anchor를 get_price(FX)로 산출. 검증: SCHD 20년 OFF=11/ON=41케이스, end_value 정상·꼬리확장(p10 69→45M), 회귀 26/26·gate 2c PASS. ⚠️ ON 시 ~4배 느림. ⚠️ MultiAccountAnalyzer `cagr` 필드 garbage(기존 별개 버그, 분포는 end_value라 무영향).
+
+> ✅ **2026-05-31 업데이트 4 (배당 계산기 UX):** 확률 슬라이더 기본 90%→**50%**, 범위 0~100%(50%=중앙값=균형점, 넛지 완화). `probability` 모드 결과에 **예상 월배당 중앙값(p50)+범위(p25~p75)** 카드 추가(중복표기 목표월배당·기준확률 제거). 슬라이더 라벨 desync 버그 수정(stale 복원 시 라벨 미갱신). 커밋 `73791c6`·`06bd19f`. 범위(scenario) 모드는 확률곡선이 이미 전 확률 표시 → 밴드 불필요.
+
 > ✅ **2026-05-30 업데이트 3 (배당 역산 3단 폴백):** 배당금 계산기 역산이 실데이터<30케이스 시 실측 전부 버리고 가상으로만 돌던 버그 수정(`97ac6ab`). `_find_real_data_start` 배당간격 휴리스틱(4종목 전부 오검출)→`volume>0` 결정값 교체, `_run_rolling` 3단 폴백(①실데이터 ②백필포함 전구간 ③부족분만 가상 보충, 실측 유지). 검증: 휴리스틱 4/4 OK, 20yr=백필실측10+가상20, Gate 2c PASSED 3/3, **역산 SCHD 78.75M vs 458730 82.5M = 1.05x 수렴**(4x→1.2x→1.05x). BUG-DIV-1 해소.
 
 > ✅ **2026-05-30 업데이트 2 (Phase 2c/2e 재검증 + 프록시 2003 단축):** DJUSDIV_PROXY에서 S&P500(^GSPC) 1928~2003 구간 제거 — 광범위 시장지수는 SCHD 배당전략을 대표 못함. 체인을 DVY(2003-11-07)←SDY←SCHD로 단축, SCHD/458730/446720/402970 재백필(price_daily 2003~). 재검증: **투자계산기 SCHD≈458730**(total_div 97.2M≈99.4M, yield 13.9%≈13.0%), **배당금 계산기 역산 Gate 2c PASSED 3/3**(SCHD 71.25M vs 458730 86.25M, 구 4x→1.2x 수렴). 2e 종합과세 엔진 `tax_truth_test` 64/64 PASS. 커밋 e6707bd. ⚠️ 20yr 롤링 케이스 169→11 감소(2003 시작 트레이드오프). 잔존: `_find_real_data_start` 휴리스틱 기술부채([[dev/bugs]] BUG-DIV-1), 2e 자동산출/전탭배선 미완.

@@ -13,7 +13,7 @@ tags: [dev, bug]
 
 ## 활성 버그 목록
 
-> updated: 2026-05-30
+> updated: 2026-05-31
 
 | # | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|---|
@@ -24,6 +24,9 @@ tags: [dev, bug]
 | BUG-5 | 밴드 슬라이더 숫자 직접 입력 불가 | 슬라이더만 있고 0.5% 단위 정밀 입력 불가 | `templates/myassets.html` | ✅ 수정 완료 |
 | BUG-G1-2 | Track G 다중계좌 2번째 계좌 입력 커서 사라짐 | 입력 중 `renderTaxAccounts()` 전체 재렌더 → 포커스 유실 (BUG-6 패턴) | `static/js/calculator.js` | ❌ 미해결 (중간) |
 | BUG-DIV-1 | 배당금 계산기 역산 SCHD≠458730 (구 4x 차이) | ① `_find_real_data_start()` 배당간격 휴리스틱이 월배당 ETF(458730)를 synthetic 경로로, 분기배당(SCHD)을 백필 실롤링 경로로 분기시킴. ② `_run_rolling` all-or-nothing — 실 케이스<30이면 실데이터 버리고 가상 30개로 교체 | `modules/dividend_simulator.py` (`_find_real_data_start`/`_run_rolling`) | ✅ 수정 완료 (97ac6ab + cfdd151): 휴리스틱→`volume>0` 결정값 교체(4/4 OK), 롤링 3단 폴백(실측 유지+부족분만 가상). 역산 4x→1.05x 수렴. cfdd151=mock loader conn 가드(회귀수정). 회귀 6/6 PASS, HTTP 200 (Claude) |
+| BUG-DIV-2 | 배당 계산기 슬라이더 라벨/위치/계산 불일치 (라벨 50%인데 90% 동작) | `dtRestoreForm`이 stale localStorage(이전 90% 결과) 복원 시 슬라이더 value만 세팅하고 라벨 미갱신(input 이벤트 미발생) | `templates/dividend_target.html` | ✅ 수정 (06bd19f): 복원 시 라벨 수동 동기화 (Claude) |
+| BUG-DIV-3 | 투자계산기 가상보충 시 가격 폭발 (CAGR 860억배) | 합성 prefix anchor를 raw price_daily(USD)로 잡았는데 실 suffix는 `get_price`(USD ETF→KRW ×환율 ~1181) → 2003 경계에서 1181배 점프 | `modules/retirement/synthetic_price_generator.py` (`build_window_synth_params`) | ✅ 수정 (4f.. anchor를 get_price(FX)로 산출, 7af4c05까지): end_value 정상 검증 (Claude) |
+| BUG-MAA-1 | MultiAccountAnalyzer `cagr` 필드 garbage (1e10 수준) | `cagr=(final/positive_cf)**(1/years)-1`에서 positive_cf 비정상(초기금만·월납0 시) 추정. use_synthetic 무관(기존). 분포는 `end_value` 사용이라 화면 무영향 | `modules/retirement/multi_account_analyzer.py` | ⚠️ 미해결(낮음) — 화면 영향 없음, 추후 확인 (Claude) |
 
 **이전 "활성"에서 해결된 항목들:**
 

@@ -1,5 +1,19 @@
 # Log
 
+## [2026-05-30] feature | 배당 백필 Stage A 1~2 — 배당 0 버그 수정 (로컬 검증)
+
+- **Stage A-1 (`a1564ae`):** `build_djdiv_proxy.py`의 SDY/DVY를 `auto_adjust=False`(raw)로 → DJUSDIV_PROXY를 일관된 price-return 체인으로 재구축. 2011 이후(SCHD 앵커+실데이터) 보존, 2011 이전만 price-return 거동으로 변경.
+- **Stage A-2:** `backfill_engine.py` — `_NO_DIVIDEND_INDICES`에서 DJUSDIV_PROXY 제거 + `_YIELD_TABLE_ALIAS` (DJUSDIV_PROXY→DJUSDIV100 16년치 yield) 추가. `scripts/stage_a_rebackfill.py`로 SCHD/458730 vol=0 백필 삭제 → 새 proxy로 재백필 + 배당 분리 주입.
+  - SCHD: 백필 21,046행 재생성 + 배당 335건. 458730: 23,979행 + 배당 382건(×환율). 실데이터(vol>0)·실측배당 100% 보존.
+  - provenance 기록됨 (backfill_runs/price_daily_source/corporate_action_source).
+- **검증 (`debug_dividend.py`):** 배당 지표 0→정상. 458730/SCHD total_dividend p50≈1.23억, div CAGR≈8.9%, yield_on_cost≈12.7%. **SCHD≈458730 수렴** (같은 프록시).
+- ⚠️ **로컬만 적용** — `price_daily.db`는 git 미추적. 서버(Hetzner)는 코드 pull 후 `build_djdiv_proxy.py` + `stage_a_rebackfill.py` 재실행 필요.
+- **남은 Stage A:** ① UI 실측/추정 구분(div_data_start가 1928 표시 — 오해소지) ② 총수익 보존 검증(CAGR 전후 대조) ③ DJUSDIV_PROXY 쓰는 다른 US배당 ETF도 재백필.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-30] update | 추가 해결 항목 반영 (오너 확인)
 
 - 오너 확인: isafix 잔여 ①(에러 팝업→배너)·③(T-B3 목표비중 계정연동), handoff T-D5·T-B3·에러팝업, PHASE4 D5·B3 — **전부 해결**.

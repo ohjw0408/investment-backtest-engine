@@ -225,7 +225,7 @@ tags: [dev]
 
 | 트랙 | 내용 | 선행 조건 | 실행 명령어 |
 |---|---|---|---|
-| 🔴 **배당 백필 Stage A** | 범용 배당 백필 재설계(price-return+명시 배당). 주식형 먼저 | 없음 — **지금** | `ETF_BACKFILL § Phase 6.0 Stage A 구현해줘` |
+| ⏳ **배당 백필 Stage A** | 1~2 완료(proxy raw 재구축 + SCHD/458730 재백필+배당주입, 배당지표 0→정상 검증). 남음: UI 실측/추정 구분, 총수익 보존 검증, 다른 US배당 ETF 재백필, **서버 적용** | 로컬 검증 완료 | `Stage A 나머지(UI/검증/서버) 진행해줘` |
 | 🔁 세금 2c/2e 재검증 | 정상 배당으로 배당역산·금종세 재확인 | Stage A | `Phase 2c/2e 재검증해줘` |
 | 🔴 배당 백필 Stage B | 채권/MMF 금리→가격+쿠폰 분배금 (필수) | Stage A | `ETF_BACKFILL § Phase 7 + 6.0 Stage B` |
 | ⏸️ Track G | 다중계좌 — G1 ✅(Codex, 배당0은 Stage A로 해소). ② 커서 ③ UI + G2 자금이동 | 배당 토대 완성 | `Track G 재개해줘` |

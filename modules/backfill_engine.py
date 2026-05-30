@@ -28,12 +28,19 @@ import numpy as np
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 # 배당 없는 지수 — 배당 주입 제외
-# DJUSDIV_PROXY: adj close chain (SCHD/SDY/DVY/^GSPC) - dividends already embedded
+# (원자재·FX·금리수치는 무배당 또는 별도 모델. DJUSDIV_PROXY는 Phase 6.0에서 price-return
+#  체인으로 재구축되어 배당을 분리 주입하므로 더 이상 제외하지 않음.)
+# 채권 금리(DGS*)는 Stage B(Phase 7)에서 가격 모델 + 쿠폰 분배금으로 처리 예정.
 _NO_DIVIDEND_INDICES: set[str] = {
     "DGS30", "DGS10", "DGS3MO",
     "GC=F", "SI=F", "CL=F", "HG=F",
     "USD/KRW", "USD/JPY",
-    "DJUSDIV_PROXY",
+}
+
+# 프록시 지수 → 배당수익률 테이블(index_div_yield) 별칭.
+# DJUSDIV_PROXY 가격 체인의 배당은 DJUSDIV100 실측 yield(2011~2026)로 주입.
+_YIELD_TABLE_ALIAS: dict[str, str] = {
+    "DJUSDIV_PROXY": "DJUSDIV100",
 }
 
 BASE_DIR      = Path(__file__).resolve().parent.parent
@@ -246,11 +253,16 @@ class BackfillEngine:
     # ── 배당수익률 DB 조회 (Tier 1+2) ────────────────────
 
     def _load_div_yield_table(self, index_code: str) -> dict[int, float] | None:
-        """index_master.db의 index_div_yield에서 연도별 수익률 조회."""
+        """index_master.db의 index_div_yield에서 연도별 수익률 조회.
+
+        프록시 지수에 자체 yield 테이블이 없으면 _YIELD_TABLE_ALIAS로 대체 조회.
+        (예: DJUSDIV_PROXY → DJUSDIV100 실측 yield)
+        """
+        lookup = _YIELD_TABLE_ALIAS.get(index_code, index_code)
         rows = self.index_conn.execute(
             "SELECT year, annual_yield FROM index_div_yield "
             "WHERE index_code=? ORDER BY year",
-            (index_code,),
+            (lookup,),
         ).fetchall()
         return {int(yr): float(val) for yr, val in rows} if rows else None
 

@@ -15,7 +15,7 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 | File | Role | Status |
 |---|---|---|
 | `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed (A1/A2/A3/A5/A6/B5/C3/C5/D3 done) |
-| `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 1~3 + 2d 완료. ⚠️ **2c/2e는 배당 데이터 의존 — Phase 6.0 후 재검증 필요** (이전 통과는 가격 수렴 기준). |
+| `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 1~3 + 2d 완료. ⚠️ **2c 재검증 필요**(배당 데이터 의존). ⚠️ **2e 부분 구현** — 종합과세 엔진+백테스트 배선만. 자동산출/전탭배선/`_ytd_income` 주입 미완 (상세는 owner plan 갭 섹션). 전부 Phase 6.0 선행. |
 | `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | Phase 0~2 스키마 존재. 🔴 **Phase 6.0(범용 배당 백필 재설계) = 현재 최우선.** Phase 3+ (etf_master, etf_proxy_map, confidence grading)는 이후. |
 | `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | ✅ Complete (Phase 1~10, all screens). |
 | `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | **Backend complete (e8b7c1e). Frontend partially done. BUG-1~5 remain.** |
@@ -34,8 +34,9 @@ Phase 2c/2e가 이 데이터에 의존하므로 선결 과제. 현재 위치 = P
 
 완료 (가격/구조 레벨 — 단, 배당 액수 정확성은 별개):
 
-- ✅ Tax Phase 1~3, Phase 2a/2b/2d — Gates passed. ⚠️ **2c/2e는 배당 데이터 의존 →
-  Phase 6.0 후 재검증 필요** (이전 통과는 가격 수렴 기준).
+- ✅ Tax Phase 1~3, Phase 2a/2b/2d — Gates passed. 종합과세 **계산 엔진**도 완전(단위검증 OK).
+  ⚠️ **2c: 재검증 필요**(배당 데이터 의존). ⚠️ **2e: 부분 구현** — 백테스트만 배선, 기존
+  금융소득 자동산출·전탭 배선·`_ytd_income` 주입 미완. 둘 다 Phase 6.0 선행.
 - ⚠️ Track A: DJUSDIV_PROXY chain built — **단 total-return(adj-close)이라 배당 액수가
   안 나옴.** 가격(CAGR)은 수렴하나 배당 itemize 실패. Phase 6.0에서 raw-close 교체로 재작업.
 - ⚠️ Track B: Phase 2c Gate "passed" — 가격 기준. 배당 정상화 후 재검증 대상.

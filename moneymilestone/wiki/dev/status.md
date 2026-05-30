@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> ✅ **2026-05-31 업데이트 8 (Stage B 채권 완성):** US 국채(10종 검증) + 한국(국고채 3Y/10Y/30Y·종합채권·회사채·CD/MMF carry) 채권 백필 = 듀레이션 가격모델 + 월쿠폰. 한국금리 ECOS 수집(KTB/CD/KOFR/회사채). 듀레이션 실측보정(국채 운용사 일관→단일값). 스트립=×1.6, 레버리지=기존 _apply_leverage, 만기형 회사채=단일값(롤오버 프록시). 한국 미국채 R²≈0은 한미 거래시차(누적 백필 정상). **전 채권 백필 클리어 → on-demand 재생성**(미리 안 함). 한계: 헤지비용/신용스프레드/30년변형 후속. gate 2c PASS.
+
 > ✅ **2026-05-31 업데이트 7 (Stage B 모델타입 일반화 + 전수검증):** US 채권 10종 `stage_b_full_verify`(가격/쿠폰/총수익보존/시변듀레이션). 듀레이션 실측 보정(GOVT 5.3·AGG/BND 4.4·SHY/SCHO 0.8), `model` 필드(duration|carry), 쿠폰 book_factor 0.87. **carry 모델 BIL 검증**(총수익 상관 0.945·CAGR차 0.14%p) → 한국 CD/MMF 모델타입 입증. 총수익 보존 전 10종 CAGR차 0.03~0.86%p. 한계(Grade C): SHY/SCHO 가격상관 0.4·AGG/BND 0.88·장기채 TE~5%. gate 2c PASS. **다음=한국 금리수집(KOFR/KTB/CD)→config 행추가+FX.**
 
 > ✅ **2026-05-31 업데이트 6 (배당 백필 Stage B — US 국채):** 채권이 `DGS*` 금리를 가격으로 쓰던(가짜) 문제 + 쿠폰 0 해소. `bond_model.build_bond_price_series`(yield→price = -duration×Δyield) + `inject_monthly_coupons`. ETF별 듀레이션 명시 매핑(TLT/IEF/SHY…→DGS30/10/3MO). 검증: 모델 vs 실측 TLT 월상관 **0.986**, Grade C. TLT 백필 1977~2002(6461행+쿠폰311) + 계산기 total_dividend 0→35.2M. gate 2c PASS·SCHD 불변. **다음=한국 국채/회사채/MMF (KOFR/KTB·CD 금리 수집 선행).**

@@ -176,12 +176,13 @@ tags: [dev]
 
 ## 현재 블로커 ❌
 
-> 현재 블로커 없음. Track A/B 완료로 기존 블로커 전부 해소.
+> 🔴 **배당 데이터 근본 버그가 현재 블로커.** 배당 액수 0 → 세금 2c/2e·Track G 검증 불가. owner: `ETF_BACKFILL § Phase 6.0`.
 
 | 블로커 | 상태 |
 |---|---|
-| SCHD vs TIGER 배당 결과 불일치 | ✅ DJUSDIV_PROXY 체인으로 해결 |
-| Phase 2c Gate 미통과 | ✅ Gate 2c PASSED (2026-05-28) |
+| **배당 액수 0 (total-return 백필 + 배당 row 부재)** | ❌ 미해결 — 최우선. Phase 6.0 범용 배당 백필 재설계 |
+| SCHD vs TIGER 배당 결과 불일치 | ⚠️ 가격만 수렴(DJUSDIV_PROXY adj-close). 배당은 0 — 위 블로커로 재정의 |
+| Phase 2c Gate | ⚠️ 가격 기준 통과. 배당 정상화 후 재검증 필요 |
 | `_fetch_fred()` 메서드 없음 | ✅ def 선언 추가 (e1a4d6e) |
 | 백필 실패 코드가 완료 처리됨 | ✅ _backfill_skip_codes 분리 (a761750) |
 
@@ -193,9 +194,9 @@ tags: [dev]
 - Phase 1: 공통 세금 코어, 절세매도 12월 분리, 청산세 통일 (Gate 1 ✅)
 - Phase 2a: `TaxableSimulationRunner` 구현, 백테스트 전환 (Gate 2a ✅)
 - Phase 2b: 투자계산기 + 은퇴 적립 Runner 전환 (Gate 2b ✅)
-- Phase 2c: 배당 역산 Runner 구현 완료 (Gate 2c ✅)
+- Phase 2c: 배당 역산 Runner 구현 ✅ / 🔴 Gate 재검증 필요 (배당 데이터 0 버그)
 - Phase 2d: 은퇴 인출 세금 주입 (Gate 2d ✅ 5/5)
-- Phase 2e: 종합과세 경고 + 분할매도 절세 패널 (backtest에 노출) ✅
+- Phase 2e: ⚠️ 부분 구현 — 종합과세 엔진+백테스트 배선만. 자동산출/전탭배선/_ytd_income 미완
 - Phase 3: ISA 풍차돌리기 Runner 통일 ✅
 - 버그픽스: KR_FOREIGN 청산 손익통산 제거 (개별 15.4% 분리과세)
 - 버그픽스: US_DIRECT 리밸런싱 손실 손익통산 반영
@@ -224,14 +225,14 @@ tags: [dev]
 
 | 트랙 | 내용 | 선행 조건 | 실행 명령어 |
 |---|---|---|---|
-| **Track F** | ISA/계좌 규제 정합성 — 백엔드 ✅, 프론트 미완 (BUG-1/2/3/4/5 해결 필요) | 없음 | `BUG-1,2,3,4,5 수정해줘` |
-| Track F 병렬 | PHASE4 빠른 항목: D4 남음 (F1/B2-c/D5/B2-b/B3 완료) | 없음 | `PHASE4 다음 안전한 항목 진행해줘` |
-| Track G | 다중 계좌 시뮬 엔진 — G1 투자계산기 탭 1차 완료 ✅ (Codex), 은퇴/백테스트 확장 및 G2 자금이동 대기 | G1 운영 검증 | `Track G 다음 단계 진행해줘` |
-| ETF_BACKFILL V2 Ph.3+ | etf_master/etf_proxy_map 정밀 매핑, confidence A~F | Track G 시작 후 병렬 가능 | `ETF_BACKFILL_ARCHITECTURE_PLAN.md Phase 3부터 진행해줘` |
-| PHASE4 핵심 | D1/D2/B1/A4/C1/C2/B4 | Track G 이후 또는 병렬 | `PHASE4 다음 안전한 항목 진행해줘` |
-| E1 모바일 | 반응형 디자인 | 전체 기능 안정화 후 | — |
-| C4 온보딩 | 튜토리얼 | B4 + 전체 | — |
-| Track E | PHASE4 잔여 기능 | Track A 완료 후 안전한 것부터 | `PHASE4 다음 안전한 항목 진행해줘` |
+| 🔴 **배당 백필 Stage A** | 범용 배당 백필 재설계(price-return+명시 배당). 주식형 먼저 | 없음 — **지금** | `ETF_BACKFILL § Phase 6.0 Stage A 구현해줘` |
+| 🔁 세금 2c/2e 재검증 | 정상 배당으로 배당역산·금종세 재확인 | Stage A | `Phase 2c/2e 재검증해줘` |
+| 🔴 배당 백필 Stage B | 채권/MMF 금리→가격+쿠폰 분배금 (필수) | Stage A | `ETF_BACKFILL § Phase 7 + 6.0 Stage B` |
+| ⏸️ Track G | 다중계좌 — G1 ✅(Codex, 배당0은 Stage A로 해소). ② 커서 ③ UI + G2 자금이동 | 배당 토대 완성 | `Track G 재개해줘` |
+| ✅ Track F | ISA/계좌 규제 — 백엔드 + BUG-1~5 완료 | — | (완료, 미관 잔여만) |
+| PHASE4 핵심 | D4 D1/D2/B1/A4/C1/C2/B4 (D5 버그 수정 포함) | 배당 토대 후/병렬 | `PHASE4 다음 안전한 항목 진행해줘` |
+| ETF_BACKFILL V2 Ph.3+ | etf_master/etf_proxy_map, confidence A~F | Stage A/B 후 | `ETF_BACKFILL Phase 3부터` |
+| E1 모바일 / C4 온보딩 | 반응형 / 튜토리얼 | 전체 기능 안정화 후 | — |
 
 ---
 

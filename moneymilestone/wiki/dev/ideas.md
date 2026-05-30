@@ -37,6 +37,19 @@ tags: [dev, idea]
 
 정본 계획은 `세금에서시작된완전리팩토링계획.plan.md`의 **Phase 2e — 금융소득 종합과세 패널**에 기록. 핵심 결정: 세금설정 탭에서는 금융소득을 묻지 않고, 계산기별 시뮬레이션에서 직전/최근 완료년도 gross 배당·이자를 자동 산출해 런타임으로만 주입한다.
 
+> ⚠️ 2026-05-30 상태: 위 자동 산출은 **아직 미구현**. backtest_logic이 `user_settings`에서 수동값(또는 0)을 읽는 plan-금지 방식으로만 동작. 자동 산출은 배당 데이터 정확화(ETF_BACKFILL Phase 6.0) 후에야 구현 가능(입력이 직전년도 gross 배당이므로). 상세: 세금 plan 갭 섹션.
+
+### 2026-05-30 배당 백필 범용 재설계 (결정)
+
+- 모든 백필을 'price-return 가격 + 명시적 배당' 표준으로 통일. total-return(adj-close) 임베딩 폐기 → 배당 액수 itemize + 이중계산 차단.
+- DJUSDIV_PROXY 등 adj-close 체인은 raw-close로 교체. 단계적: Stage A 주식형 → Stage B 채권/MMF(필수). 원자재·FX는 무배당 유지.
+- 정본 계획: `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0` + Phase 7. → [[dev/status]]
+- 위 2026-05-27 "동일 underlying index 통계 pooling" 아이디어는 이 재설계로 상당부분 자연 해소(같은 프록시 지수 yield 공유).
+
+> ⚠️ **이 파일 인코딩 손상 주의:** 위쪽 일부 표·제목이 mojibake(`?꾩씠?붿뼱` 등)로 깨져 있음. 원본 한글 복구 전까지 손상 라인은 수정하지 말 것(더 악화 위험). 새 항목은 이 아래 UTF-8로만 추가. 복구는 별도 작업으로.
+
+_작성: Claude (Opus 4.8), 2026-05-30_
+
 ## 誘멸껐 寃곗젙 ?쨺
 
 | 寃곗젙 ?ы빆 | ?듭뀡 | ?꾩옱 ?앷컖 | 寃곗젙 ?꾩슂 ?쒓린 |

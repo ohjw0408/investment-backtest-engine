@@ -1,5 +1,24 @@
 # Log
 
+## [2026-05-30] sync | 전 계획 파일 + 위키 진행상황 일괄 최신화 + README 규칙 추가
+
+- **배경:** 계획 파일들이 서로 stale·모순 (로드맵은 "Phase 2c/2e 완료·블로커 없음", 세금 plan은 "2e pending", phases.md는 "SCHD/TIGER 수렴"). 실제 진행과 불일치.
+- **전 파일 정독 후 실제 상태로 통일** (일관된 through-line = 배당 데이터 0 버그가 현재 블로커):
+  - `PROJECT_MASTER_ROADMAP.md`: Current Situation/Source Plans/Dependency Order/Next Action 4곳 정정 (이전 커밋들).
+  - `세금...리팩토링계획.plan.md`: Phase 2d→완료, 2e→부분구현(갭 명시), 2c→재검증 필요.
+  - `ETF_BACKFILL`: Phase 6.0 범용 배당 백필 재설계 + Phase 7 쿠폰.
+  - `PHASE4_PLAN.md`: 상단 진행상태 블록(완료/이슈/미착수/4G 보류).
+  - `SYNTHETIC`: 완료 헤더 + 배당백필과 별개 명시. `isafix.md`: 완료 헤더 + 잔여.
+  - `handoff.md`: 2026-05-30 정리 배너(해결/미해결 구분).
+  - wiki: `product/dev-status.md`(전면 갱신), `phases.md`(3테이블 동기화), `features.md`, `status.md`(블로커/완료/진행중 정정), `index.md`(날짜), `ideas.md`(배당 결정 추가 + 인코딩 손상 flag).
+- **README 규칙 추가:** 오너가 "정리할 거 정리해"라고 하면 모든 계획+위키 정독 → 실제 상태 대조 → 전부 최신화 → 로드맵 → commit/push 하는 절차를 README 필수 규칙으로 명시.
+- **⚠️ 발견:** `wiki/dev/ideas.md` 일부 한글 mojibake 손상. 손상부 미수정(악화 위험), 복구는 별도 작업.
+- **코드 변경 없음.** 문서 동기화만.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-30] diagnosis+planning | 배당 0 버그 근본원인 규명 + 배당 백필 계획 추가
 
 - **버그 재정의:** "다중계좌 배당 0"은 다중계좌 문제 아님. 단일계좌 458730/SCHD도 동일. `debug_dividend.py`로 실측(추정 아님).

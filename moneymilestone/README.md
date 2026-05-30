@@ -85,6 +85,25 @@ moneymilestone/
 4. `wiki/index.md` 업데이트 (새 페이지 생성했을 경우)
 5. **wiki 변경사항 git commit + push (코드 커밋에 포함하거나 별도 커밋)**
 
+### 오너가 "정리할 거 정리해"라고 하면 (세션 마무리 동기화 — **필수 규칙**)
+
+오너가 세션 끝나기 전 **"정리할 거 정리해"** (또는 유사 표현)라고 말하면, 다음을 **전부** 수행한다. 부분 동기화 금지.
+
+1. **모든 계획 파일 정독** (코드 repo 루트):
+   - `PROJECT_MASTER_ROADMAP.md`, `PHASE4_PLAN.md`, `세금에서시작된완전리팩토링계획.plan.md`,
+     `ETF_BACKFILL_ARCHITECTURE_PLAN.md`, `SYNTHETIC_DATA_INTEGRATION_PLAN.md`, `isafix.md`,
+     `trackG_multiaccount_plan.md`, `handoff.md` 등 활성 계획 전부.
+2. **모든 wiki 파일 정독**: `wiki/dev/*` (status/phases/bugs/ideas), `wiki/product/*`,
+   `wiki/log.md`, `wiki/index.md`.
+3. **실제 코드/진행 상황과 대조**해 각 파일의 진행상태를 **정확히** 최신화한다:
+   - 거짓 "완료" 주장 금지. done / 부분구현 / 미검증 / 블로커를 사실대로 표기.
+   - 파일 간 모순(한 파일은 완료, 다른 파일은 대기)을 발견하면 실제 상태로 통일.
+   - 새로 발견된 블로커·갭을 owner 계획 파일에 기록.
+4. **그 다음** `PROJECT_MASTER_ROADMAP.md`를 같은 방식으로 최신화 (현재 위치 + 다음 할 일 + 블로커).
+5. `wiki/log.md`에 동기화 항목 추가 + 변경사항 git commit + push.
+
+> 목적: 다음 세션(또는 다른 에이전트)이 어느 파일을 봐도 **일관되고 정확한** 현재 상태를 알 수 있게. 계획 파일이 서로 stale·모순되는 상태를 방지.
+
 ### 새 소스 ingest 시
 
 1. 소스 읽기
@@ -149,18 +168,19 @@ _검토/추가: Codex, 2026-05-28_
 
 ---
 
-## 현재 프로젝트 컨텍스트 (2026-05-27)
+## 현재 프로젝트 컨텍스트 (2026-05-30 갱신)
 
 **앱**: Flask 웹앱 + Celery 비동기 계산 + Redis + SQLite × 4개 DB.  
 **배포**: Hetzner VPS Ubuntu, SSH키 `~/.ssh/hetzner_ed25519`, IP `5.78.209.211`.  
 **언어**: Python (백엔드) + HTML/JS (프론트, 프레임워크 없음).
 
-**현재 블로커**:
-- SCHD vs TIGER 미국배당다우존스 배당 시뮬 결과 불일치
-- DJUSDIV100 인덱스 데이터 부족
-- → `wiki/dev/status.md` 참고
+**현재 블로커**: 배당 데이터 근본 버그.
+- 백필 가격은 1928년까지 있으나 실측 배당은 ETF 상장 후만 존재 + DJUSDIV_PROXY가
+  total-return(adj-close)이라 배당이 가격에 임베딩 → 배당 액수 0 → 배당 지표 전부 0.
+- Track G(다중계좌 세금)·세금 Phase 2c(배당 역산)·2e(금종세)가 모두 이 데이터에 의존.
+- → `wiki/dev/status.md`, `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0` 참고.
 
 **다음 액션**:
 ```
-마스터 로드맵의 Immediate Track A 진행해줘
+ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0 Stage A 구현해줘
 ```

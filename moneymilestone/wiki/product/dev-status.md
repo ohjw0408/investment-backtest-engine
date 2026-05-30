@@ -1,16 +1,16 @@
 ---
-updated: 2026-05-27
-sources: [PROJECT_MASTER_ROADMAP.md, 세금에서시작된완전리팩토링계획.plan.md]
+updated: 2026-05-30
+sources: [PROJECT_MASTER_ROADMAP.md, 세금에서시작된완전리팩토링계획.plan.md, ETF_BACKFILL_ARCHITECTURE_PLAN.md]
 tags: [product, tech]
 ---
 
 # 개발 현황 + 블로커
 
-마지막 업데이트: 2026-05-27 기준.
+마지막 업데이트: 2026-05-30 기준.
 
 ## 현재 상태 한 줄 요약
 
-> 배당금 계산기 세금 연동(Phase 2c)까지 구현 완료했으나, ETF 데이터 품질 문제로 검증 게이트 통과 못 함. 데이터 안정화가 현재 1순위.
+> 🔴 **배당 데이터 근본 버그가 현재 블로커.** 세금 리팩토링(Phase 1~3, 2a/2b/2d)·Track F·Track G G1·합성데이터까지 진행됐으나, 배당 액수가 0으로 깨져 있어 세금 Phase 2c(배당 역산)/2e(금종세)와 Track G(다중계좌 세금)를 검증·완성할 수 없음. **배당 백필 재설계(ETF_BACKFILL Phase 6.0)가 1순위.**
 
 ## 세금 리팩토링 진행 상황
 
@@ -19,47 +19,48 @@ tags: [product, tech]
 | Phase 1 | 세금 공통 코어, 절세매도 분리, 청산세 통일 | ✅ 완료 (Gate 1 통과) |
 | Phase 2a | TaxableSimulationRunner + 백테스트 | ✅ 완료 (Gate 2a 통과) |
 | Phase 2b | 투자계산기 + 은퇴 적립 Runner 전환 | ✅ 완료 (Gate 2b 통과) |
-| Phase 2c | 배당 역산 Runner 전환 | ✅ 구현 완료 / ❌ Gate 블로커 |
-| Phase 2d | 은퇴 인출 세금 주입 | ⏳ 대기 (2c 선행 필요) |
-| Phase 2e | 금융소득 종합과세 경고 + 분할매도 패널 | ⏳ 대기 |
-| Phase 3 | 정리, ISA Runner 통일, 문서화 | ⏳ 대기 (Phase 2 전체 완료 후) |
+| Phase 2c | 배당 역산 Runner 전환 | ✅ 구현 / 🔴 Gate 재검증 필요 (배당 데이터 0 버그) |
+| Phase 2d | 은퇴 인출 세금 주입 | ✅ 완료 (Gate 2d 5/5) |
+| Phase 2e | 금융소득 종합과세 경고 + 분할매도 패널 | ⚠️ 부분 구현 (엔진+백테스트만, 아래) |
+| Phase 3 | 정리, ISA Runner 통일, 문서화 | ✅ 완료 |
+| phase1-api | TaxProfile API 통일 (other_financial_income 주입) | ⏳ 미완료 |
 
-## ❌ 현재 블로커: ETF 데이터 불일치
+**종합과세(Phase 2e) 실제 상태** (코드 확인 2026-05-30):
+- ✅ 계산 엔진 (`base_tax._comprehensive_tax`/2천만 임계/비례공제) — 완전, `tax_truth_test` 단위검증 통과
+- ✅ 시뮬 내 당해연도 배당 YTD 누적 트리거 (`account_tax.TaxedDividendEngine`)
+- ⚠️ 분할매도/종합과세 패널 — `backtest_logic.py`에만 배선. 계산기/배당/연금 미배선
+- ❌ `other_financial_income` 자동산출 미구현 (backtest가 user_settings 수동값/0 — plan 금지 방식)
+- ❌ `_ytd_income` 0 고정 — 기존 금융소득 미주입
+- 🔴 종합과세 입력 = 배당인데 배당 데이터 0 → 실전 발동 안 함
 
-**증상**: SCHD와 TIGER 미국배당다우존스(458730)가 같은 입력으로 완전히 다른 배당 시뮬 결과 반환.
+## 🔴 현재 블로커: 배당 데이터 근본 버그
 
-**근본 원인** (4가지):
-1. `DJUSDIV100` 인덱스 데이터가 불완전하거나 너무 짧음
-2. 한국 상장 U.S. Dividend ETF들이 실제 데이터가 짧아서 합성 통계로 너무 빨리 fallback
-3. `DividendSimulator._calc_div_stats()`가 현재 미완료 연도를 통계에 포함 (가격수익률 왜곡)
-4. 백필/합성 row 구분 weak (`volume=0`만으로는 부족, provenance 테이블 없음)
+**증상**: TIGER 미국배당다우존스(458730) 배당 지표 전부 0, SCHD 다수 0. 단일·다중계좌 공통.
 
-**해결 방향** (Track A: ETF 백필 안정화):
-1. 진단 스크립트로 현재 백필 현황 파악
-2. `DJUSDIV100` 인덱스 데이터 보강 (신뢰할 수 있는 소스로)
-3. `index_loader_develop.py` `_fetch_fred()` 메서드 수정
-4. `PriceLoader` 실패한 백필을 세션에서 완료 처리하지 않도록 수정
-5. `dividend_simulator._calc_div_stats()` 미완료 연도 제외
-6. SCHD vs TIGER 비교 재실행
+**근본 원인** (`debug_dividend.py` 실측 2026-05-30):
+1. 백필 가격은 프록시 체인으로 1928년까지 존재(458730 97%, SCHD 85%가 volume=0 백필).
+2. 실측 배당(`corporate_actions`)은 ETF 상장 후만(SCHD 2011~, 458730 2023~). 백필 가격 구간에 배당 row 없음.
+3. DJUSDIV_PROXY가 **adj-close(total-return)**라 배당이 가격에 임베딩 → 별도 액수 안 나옴 (`_NO_DIVIDEND_INDICES`에 의도적 제외).
+4. `data_start`=1928 → 20년 롤링 윈도우 대부분 배당 이전 시대 → `_fit_distribution` p50=0.
+5. 백필 provenance 전부 0행 (가격 백필이 `BackfillEngine` 우회).
+
+**해결 방향** (`ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0` — 범용 배당 백필 재설계):
+- 모든 백필을 'price-return 가격 + 명시적 배당' 표준으로 통일 (total-return 임베딩 폐기, 이중계산 차단).
+- Stage A 주식/배당형 먼저 → Stage B 채권/MMF(필수, Phase 7).
 
 ## 다음 실행 트랙 (의존성 순서)
 
 ```
-Track A: ETF 데이터 안정화 (현재 최우선)
-  → Track B: Phase 2c Gate 재검증
-  → Track C: 합성 데이터 공통 facade
-  → Track D: 세금 Phase 2d (은퇴 인출)
-  → Track E: PHASE4 제품 기능 계속
+[1] 배당 백필 범용 재설계 Stage A (ETF_BACKFILL Phase 6.0) — 현재 최우선
+  → [2] 세금 Phase 2c/2e 재검증 (정상 배당 데이터로)
+  → [3] 배당 백필 Stage B (채권/MMF, Phase 7)
+  → [4] Track G 재개 (다중계좌 세금)
+  → [5] PHASE4 잔여 (D4/D1/D2/B1/A4/C1/C2/B4)
 ```
 
-### Track A 실행 명령어
+### 다음 실행 명령어
 ```
-마스터 로드맵의 Immediate Track A 진행해줘
-```
-
-### Track B 실행 명령어
-```
-Phase 2c Gate 재검증해줘
+ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0 Stage A 구현해줘
 ```
 
 ## 사업 일정 대비 현재 위치

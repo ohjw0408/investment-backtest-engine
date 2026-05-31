@@ -92,13 +92,16 @@ def _actual_tr(px, dv):
     return (1 + ret).cumprod()
 
 
-def _model_tr(px_index, rate_s, dur, model, lev):
+def _model_tr(px_index, rate_s, dur, model, lev, hedge_cost=None):
     y = rate_s.reindex(px_index).ffill()
     if model == "carry":
         ret = (y.shift(1) / 100.0 / 252.0) * COUPON_BOOK_FACTOR
     else:
         dy = y.diff() / 100.0
         ret = (-dur) * dy + (y.shift(1) / 100.0 / 252.0) * COUPON_BOOK_FACTOR
+    # 환헤지 비용 = 미-한 단기금리차(연율 %)/252 차감 (production build_bond_price_series 동일).
+    if hedge_cost is not None:
+        ret = ret - hedge_cost.reindex(px_index).ffill().fillna(0.0) / 100.0 / 252.0
     ret = (ret.fillna(0.0) * lev).clip(-0.3, 0.3)
     return (1 + ret).cumprod()
 
@@ -136,8 +139,12 @@ def check(code):
     if px is None or len(px) < 120:
         print(f"  {code} [{r['name'][:16]}]: 실데이터 부족"); return
     rate_s = _yield(r["rate"])
+    # 환헤지 ETF(hedge="hedge")는 헤지비용(DGS3MO−CD91) 차감 — production과 동일.
+    hedge_cost = None
+    if META.get(code, {}).get("hedge") == "hedge":
+        hedge_cost = _yield("DGS3MO") - _yield("CD91").reindex(_yield("DGS3MO").index).ffill()
     atr = _actual_tr(px, dv)
-    mtr = _model_tr(px.index, rate_s, r["duration"], r["model"], r["lev"])
+    mtr = _model_tr(px.index, rate_s, r["duration"], r["model"], r["lev"], hedge_cost=hedge_cost)
     j = atr.index.intersection(mtr.index)
     atr, mtr = atr.reindex(j).ffill(), mtr.reindex(j).ffill()
     c_corr = _corr_m(mtr, atr)

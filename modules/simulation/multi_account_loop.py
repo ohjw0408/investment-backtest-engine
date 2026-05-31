@@ -8,7 +8,8 @@ G1에서는 transfers_enabled=False만 지원하며, 계좌 간 이동 단계는
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
@@ -19,6 +20,7 @@ class MultiAccountRunResult:
     combined_history_df: pd.DataFrame
     combined_end_value: float
     account_results: list[dict[str, Any]]
+    transfer_log: list[dict[str, Any]] = field(default_factory=list)
 
 
 class MultiAccountSimulationLoop:
@@ -36,19 +38,42 @@ class MultiAccountSimulationLoop:
         user_settings: dict | None = None,
         progress_callback=None,
         record_history: bool = True,
+        distribution_policy=None,
     ) -> MultiAccountRunResult:
-        if self.transfers_enabled:
-            raise NotImplementedError("G1은 transfers_enabled=False만 지원합니다.")
         if not accounts:
             raise ValueError("계좌가 없습니다.")
         if not dates:
             raise ValueError("시뮬레이션 날짜가 없습니다.")
 
         user_settings = user_settings or {}
+
+        # G2: 정책 목적지가 없는 계좌를 가리키면 위탁 자동 싱크(첫 ISA 미러) 생성
+        if self.transfers_enabled and distribution_policy is not None:
+            accounts, distribution_policy = self._ensure_sync_accounts(
+                accounts, distribution_policy
+            )
+
         runtimes = [
             self._build_runtime(i, account, tax_enabled, user_settings, dates)
             for i, account in enumerate(accounts)
         ]
+
+        # G2 라우팅 상태(transfers OFF면 전부 미사용 → G1 동작 그대로)
+        tracker = None
+        account_types: dict[int, str] = {}
+        transfer_log: list[dict[str, Any]] = []
+        loop_last_month = None
+        self._transfer_month_idx = 0
+        if self.transfers_enabled:
+            from modules.tax.account_tax import ContributionLimitTracker
+            tracker = ContributionLimitTracker()
+            tracker.touch(dates[0])
+            account_types = {rt["account_id"]: rt["account_type"] for rt in runtimes}
+            # 초기자본도 한도 소비(ISA 연/총)
+            for rt in runtimes:
+                init = float(getattr(rt["config"], "initial_capital", 0.0) or 0.0)
+                if init > 0:
+                    tracker.record(rt["account_id"], rt["account_type"], init)
 
         price_array: dict[str, Any] = {}
         valid_index: dict[str, Any] = {}
@@ -71,6 +96,19 @@ class MultiAccountSimulationLoop:
             active_accounts = 0
             account_values: dict[str, float] = {}
 
+            # G2: 월 경계에서만 납입 라우팅(상한+cascade) 계산. 비경계 = 납입 0.
+            injections: dict[int, float] | None = None
+            if self.transfers_enabled:
+                cur_m = (date.year, date.month)
+                if cur_m != loop_last_month:
+                    loop_last_month = cur_m
+                    injections = self._compute_injections(
+                        runtimes, tracker, account_types,
+                        distribution_policy, date, transfer_log,
+                    )
+                else:
+                    injections = {}
+
             for rt in runtimes:
                 price_dict = self._price_dict_for_account(
                     rt["config"].tickers, price_array, valid_index, i, date
@@ -78,7 +116,13 @@ class MultiAccountSimulationLoop:
                 if not price_dict:
                     continue
 
-                dividend_by_ticker, cash_flow = self._step_account(rt, price_data, price_dict, date)
+                override = None
+                if self.transfers_enabled:
+                    override = float(injections.get(rt["account_id"], 0.0)) if injections else 0.0
+
+                dividend_by_ticker, cash_flow = self._step_account(
+                    rt, price_data, price_dict, date, contribution_override=override
+                )
                 portfolio = rt["portfolio"]
                 total_value = float(portfolio.total_value(price_dict))
 
@@ -126,7 +170,119 @@ class MultiAccountSimulationLoop:
             combined_history_df=combined_history_df,
             combined_end_value=float(sum(r["end_value"] for r in account_results)),
             account_results=account_results,
+            transfer_log=transfer_log,
         )
+
+    def _compute_injections(
+        self,
+        runtimes: list[dict[str, Any]],
+        tracker,
+        account_types: dict[int, str],
+        distribution_policy,
+        date,
+        transfer_log: list[dict[str, Any]],
+    ) -> dict[int, float]:
+        """월 경계 1회: 각 계좌의 실제 납입액 계산.
+
+        - ISA: 연 2천만/총 1억 한도까지만 흡수. 초과분은 정책대로 cascade.
+        - 연금/IRP: 합산 연 1800만 한도 내 base 납입.
+        - 위탁: 무제한.
+        반환 = {account_id: 이번 달 실제 주입액}
+        """
+        from modules.tax.account_tax import route_overflow
+
+        idx = self._transfer_month_idx
+        self._transfer_month_idx += 1
+        tracker.touch(date)
+
+        injections: dict[int, float] = defaultdict(float)
+        isa_overflow_total = 0.0
+        for rt in runtimes:
+            config = rt["config"]
+            cap_m = getattr(config, "contribution_end_months", None)
+            base = (
+                0.0
+                if (cap_m is not None and idx >= cap_m)
+                else float(config.monthly_contribution or 0.0)
+            )
+            if base <= 0:
+                continue
+            aid = rt["account_id"]
+            atype = rt["account_type"]
+            if atype == "ISA":
+                cap = tracker.capacity(aid, "ISA")
+                absorbed = min(base, cap)
+                tracker.record(aid, "ISA", absorbed)
+                injections[aid] += absorbed
+                overflow = base - absorbed
+                if overflow > 1e-9:
+                    isa_overflow_total += overflow
+            else:
+                cap = tracker.capacity(aid, atype)
+                give = min(base, cap)
+                tracker.record(aid, atype, give)
+                injections[aid] += give
+
+        if isa_overflow_total > 1e-9 and distribution_policy is not None:
+            allocs, leftover = route_overflow(
+                isa_overflow_total, distribution_policy, tracker, account_types
+            )
+            for dest_id, amt in allocs:
+                injections[dest_id] += amt
+            transfer_log.append({
+                "date": str(getattr(date, "date", lambda: date)()),
+                "overflow": isa_overflow_total,
+                "allocations": allocs,
+                "leftover": leftover,
+            })
+
+        return dict(injections)
+
+    def _ensure_sync_accounts(self, accounts, distribution_policy):
+        """정책 목적지가 없는 계좌(account_id >= len)를 가리키면 위탁 자동 싱크 생성.
+
+        싱크 계좌 = 첫 ISA의 종목·비중 미러(같은 전략으로 굴림), 초기·월납입 0.
+        라우팅 수신액만으로 운용되어 위탁 세율이 청산 시 적용된다.
+        """
+        from modules.config.simulation_config import SimulationConfig
+        from modules.rebalance.periodic import PeriodicRebalance
+        from modules.tax.account_tax import DistributionPolicy, DistributionDestination
+
+        accounts = list(accounts)
+        isa = next((a for a in accounts if a.get("type") == "ISA"), None)
+        resolved: list = []
+        for dest in distribution_policy.destinations:
+            if dest.account_id < len(accounts):
+                resolved.append(dest)
+                continue
+            if isa is None:
+                resolved.append(dest)  # 미러 소스 없음 → 흡수 0(존재 안 함)
+                continue
+            src = isa["config"]
+            weights = dict(src.target_weights)
+            rebal = getattr(src, "rebalance_frequency", None)
+            cfg = SimulationConfig(
+                start_date=src.start_date,
+                end_date=src.end_date,
+                tickers=list(src.tickers),
+                target_weights=weights,
+                initial_capital=0.0,
+                monthly_contribution=0.0,
+                withdrawal_amount=0,
+                dividend_mode=src.dividend_mode,
+                rebalance_frequency=rebal,
+                inflation=0.0,
+            )
+            new_id = len(accounts)
+            accounts.append({
+                "type": "위탁",
+                "config": cfg,
+                "strategy": PeriodicRebalance(weights, rebalance_frequency=rebal),
+                "gain_harvesting": False,
+            })
+            resolved.append(DistributionDestination(account_id=new_id, cap=dest.cap))
+
+        return accounts, DistributionPolicy(destinations=resolved)
 
     def _build_runtime(
         self,
@@ -210,7 +366,10 @@ class MultiAccountSimulationLoop:
             price_dict[ticker] = float(price)
         return price_dict
 
-    def _step_account(self, rt: dict[str, Any], price_data, price_dict, date) -> tuple[dict, float]:
+    def _step_account(
+        self, rt: dict[str, Any], price_data, price_dict, date,
+        contribution_override: float | None = None,
+    ) -> tuple[dict, float]:
         portfolio = rt["portfolio"]
         config = rt["config"]
         strategy = rt["strategy"]
@@ -254,24 +413,34 @@ class MultiAccountSimulationLoop:
         if config.dividend_mode == "withdraw" and dividend_total > 0:
             portfolio.cash -= dividend_total
 
-        effective_monthly = (
-            0.0
-            if (
-                getattr(config, "contribution_end_months", None) is not None
-                and rt["elapsed_months"] >= config.contribution_end_months
+        if contribution_override is not None:
+            # transfers 경로: 루프가 월 경계에서 계산한 실제 납입액(상한+라우팅 반영).
+            # 월 1회 게이팅은 루프가 책임지므로 ContributionEngine 우회.
+            effective_monthly = float(contribution_override)
+            if effective_monthly > 0:
+                portfolio.cash += effective_monthly
+                cash_target = config.target_weights.get("CASH", 0)
+                if cash_target == 0:
+                    rt["cash_allocator"].allocate_cash(portfolio, price_dict, config.target_weights)
+        else:
+            effective_monthly = (
+                0.0
+                if (
+                    getattr(config, "contribution_end_months", None) is not None
+                    and rt["elapsed_months"] >= config.contribution_end_months
+                )
+                else config.monthly_contribution
             )
-            else config.monthly_contribution
-        )
-        rt["last_month"] = rt["contribution_engine"].process(
-            portfolio,
-            effective_monthly,
-            date,
-            rt["last_month"],
-        )
-        if effective_monthly > 0:
-            cash_target = config.target_weights.get("CASH", 0)
-            if cash_target == 0:
-                rt["cash_allocator"].allocate_cash(portfolio, price_dict, config.target_weights)
+            rt["last_month"] = rt["contribution_engine"].process(
+                portfolio,
+                effective_monthly,
+                date,
+                rt["last_month"],
+            )
+            if effective_monthly > 0:
+                cash_target = config.target_weights.get("CASH", 0)
+                if cash_target == 0:
+                    rt["cash_allocator"].allocate_cash(portfolio, price_dict, config.target_weights)
 
         rt["last_withdrawal_month"] = rt["withdrawal_engine"].process(
             portfolio,

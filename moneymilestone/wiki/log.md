@@ -1,5 +1,37 @@
 # Log
 
+## [2026-05-31] feature | Track G2 토대 — transfer 엔진 + ISA 월 한도초과 라우팅(2-1)
+
+플랜 `trackG_multiaccount_plan.md §2-1` 구현. G1 통합루프에 `transfers_enabled=True` 경로 신설. **범위 한정:** 월 한도초과 라우팅 + L0~L4 검증까지. 만기분배(2-2)·풍차중단(2-4)·G3·공유세션 멀티배선·프론트 UI = 다음 세션.
+
+### 구현
+- **`modules/tax/account_tax.py`** (append):
+  - `ContributionLimitTracker` — 동적(상태추적) 납입 한도. ISA 연 2천만 AND 총 1억(둘 중 작은 잔여), 연금+IRP 합산 연 1800만, 위탁 ∞. `touch`(연 리셋)/`capacity`/`record`. 기존 정적 `check_contribution_limits`는 경고만 내서 라우팅에 부적합 → 동적판 신규.
+  - `DistributionPolicy`/`DistributionDestination` + `from_dict` — 우선순위 순 목적지 목록(+정책 상한).
+  - `route_overflow(amount, policy, tracker, types)` — 초과분을 정책 순서대로 capacity까지 cascade 배분, `(allocations, leftover)` 반환.
+- **`modules/simulation/multi_account_loop.py`**:
+  - `run(..., distribution_policy=None)` 추가. `transfers_enabled=False` 경로는 100% 불변(G1 회귀 보존).
+  - 월 경계 1회 `_compute_injections` — ISA 흡수(한도까지)+초과분 라우팅 계산. `_step_account(contribution_override=)` 로 실제 납입액 주입(월 게이팅은 루프가 책임, ContributionEngine 우회).
+  - `_ensure_sync_accounts` — 정책 목적지가 없는 계좌 가리키면 **위탁 자동 싱크**(첫 ISA 종목·비중 미러) 생성. (오너 결정)
+  - `MultiAccountRunResult.transfer_log` 추가.
+- **`modules/retirement/multi_account_analyzer.py`**: `transfers_enabled`/`distribution_policy` 패스스루.
+
+### 오너 결정 (2026-05-31)
+- 종합과세 판정 = **개인** 기준 / 분배정책 UI = **풀 커스텀**(다음 세션) / 행선지 부재 = **위탁 자동싱크** / 위탁 배분 = **ISA 원계좌 미러** / ISA 한도 = **연 2천만 + 총 1억 둘 다**.
+
+### 검증 (결정론적 픽스처, 손계산)
+- `tests/test_track_g_multi_account.py` **8/8** (기존 L0~L3 4개 + 신규 L4 4개):
+  - L4 cascade: ISA 월500만/1년 → ISA 20M(연한도)·연금 18M·위탁 22M·합산 60M, 자금보존, transfer_log 8회/초과 40M.
+  - 연한도 연 리셋(2년→ISA 40M)·총한도 1억 캡(6년 누적→ISA 100M·위탁 260M)·위탁 자동싱크 생성.
+- 회귀: tax_truth·Gate 2a/2b/2c·phase2f·cagr 포함 **37/37**. G1 L0~L3 불변.
+
+### 다음 세션
+- 2-2 만기 목돈분배 + 2-4 풍차중단(금종세자, 공유세션 멀티배선 선행) + G3 연금이전공제 + `calculator_logic` 수신 + 풀 커스텀 분배정책 프론트 UI.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-31] feature | 투자계산기 전체 롤링 케이스 가격 출처 표시
 
 - 커밋: `afd37b4 feat(calc): show rolling price provenance`

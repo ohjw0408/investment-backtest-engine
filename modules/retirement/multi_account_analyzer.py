@@ -173,6 +173,8 @@ class MultiAccountAnalyzer:
         price_provider: Callable | None = None,
         use_synthetic: bool = False,
         div_start: str | None = None,
+        transfers_enabled: bool = False,
+        distribution_policy=None,
     ):
         self.portfolio_engine = portfolio_engine
         self.accounts = accounts
@@ -187,6 +189,8 @@ class MultiAccountAnalyzer:
         self.price_provider = price_provider
         self.use_synthetic = use_synthetic
         self.div_start = div_start
+        self.transfers_enabled = transfers_enabled
+        self.distribution_policy = distribution_policy
         self._synth_params: dict = {}
 
     def run(self) -> dict:
@@ -306,12 +310,15 @@ class MultiAccountAnalyzer:
                     "isa_years_held": account.get("isa_years_held", 3),
                 })
 
-            run_result = MultiAccountSimulationLoop(transfers_enabled=False).run(
+            run_result = MultiAccountSimulationLoop(
+                transfers_enabled=self.transfers_enabled,
+            ).run(
                 accounts=loop_accounts,
                 price_data=price_data,
                 dates=dates,
                 tax_enabled=self.tax_enabled,
                 user_settings=self.user_settings,
+                distribution_policy=self.distribution_policy,
             )
 
             history_df = run_result.combined_history_df

@@ -13,6 +13,7 @@ from modules.retirement.multi_account_analyzer import (
 from modules.rebalance.periodic import PeriodicRebalance
 from modules.simulation.multi_account_loop import MultiAccountSimulationLoop
 from modules.simulation.taxable_runner import TaxableSimulationRunner
+from modules.tax.account_tax import DistributionDestination, DistributionPolicy
 from modules.tax.base_tax import TaxEngine
 
 
@@ -213,3 +214,124 @@ def test_l3_dividend_tax_capital_gain_tax_and_isa_liquidation():
     )
     assert abs(isa_result.account_results[0]["end_value"] - 19_208_000.0) < 1e-6
     assert abs(isa_result.account_results[0]["liquidation_tax_paid"] - 792_000.0) < 1e-6
+
+
+def _flat_year_data():
+    # 2020 한 해(12개월), 플랫가격 100, 배당 0
+    return {"AAA": _price_frame("2020-01-01", "2020-12-31", 100.0)}
+
+
+def test_l4_monthly_overflow_routing_cascade():
+    """ISA 연 2천만 초과분이 정책대로 연금(1800만)→위탁(∞)으로 cascade.
+
+    손계산(플랫가격 100, 세금 OFF, 월납입 ISA 500만):
+      ISA  연한도 20M → m0~m3 흡수(20M). m4~m11 초과 500만 × 8 = 40M.
+      정책 [연금, 위탁]:
+        연금 18M 채움(m4~m6 각 5M=15M, m7 3M) → 18M
+        나머지(m7 2M + m8~m11 각 5M) → 위탁 22M
+      ∴ ISA 20M / 연금 18M / 위탁 22M / 합산 60M, 자금보존.
+    """
+    price_data = _flat_year_data()
+    dates = list(price_data["AAA"].index)
+    accounts = [
+        _loop_account("AAA", initial=0.0, monthly=5_000_000.0, account_type="ISA"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="연금저축"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="위탁"),
+    ]
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=1),  # 연금
+        DistributionDestination(account_id=2),  # 위탁
+    ])
+
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        accounts, price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+
+    isa_end = result.account_results[0]["end_value"]
+    pension_end = result.account_results[1]["end_value"]
+    broker_end = result.account_results[2]["end_value"]
+
+    assert abs(isa_end - 20_000_000.0) < 1.0
+    assert abs(pension_end - 18_000_000.0) < 1.0
+    assert abs(broker_end - 22_000_000.0) < 1.0
+    # 자금 보존: 총 납입 = 12개월 × 500만 = 6천만
+    assert abs((isa_end + pension_end + broker_end) - 60_000_000.0) < 1.0
+    assert abs(result.combined_end_value - 60_000_000.0) < 1.0
+    # 음수 잔액 없음
+    assert (result.combined_history_df["cash"] >= -1e-6).all()
+    # 라우팅 발생: m4~m11 = 8회, 총 초과 4천만
+    assert len(result.transfer_log) == 8
+    assert abs(sum(t["overflow"] for t in result.transfer_log) - 40_000_000.0) < 1.0
+
+
+def test_l4_annual_limit_resets_next_year():
+    """ISA 연한도는 해가 바뀌면 리셋(총 1억은 유지)."""
+    price_data = {"AAA": _price_frame("2020-01-01", "2021-12-31", 100.0)}
+    dates = list(price_data["AAA"].index)
+    accounts = [
+        _loop_account("AAA", initial=0.0, monthly=5_000_000.0, account_type="ISA"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="위탁"),
+    ]
+    policy = DistributionPolicy(destinations=[DistributionDestination(account_id=1)])
+
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        accounts, price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    # 2년 × 12개월 × 500만 = 1.2억 납입.
+    # 각 해 ISA 흡수 = 연한도 20M (총 한도 1억 미도달) → ISA 40M, 위탁 80M.
+    isa_end = result.account_results[0]["end_value"]
+    broker_end = result.account_results[1]["end_value"]
+    assert abs(isa_end - 40_000_000.0) < 1.0
+    assert abs(broker_end - 80_000_000.0) < 1.0
+
+
+def test_l4_total_limit_caps_isa():
+    """ISA 총 1억 한도 도달 후에는 연한도 잔여와 무관하게 전액 라우팅.
+
+    총한도는 여러 해에 걸쳐 연한도(20M)를 누적해야 도달하므로 6년으로 검증
+    (초기 90M ISA 같은 단년 투입은 연 2천만 한도 자체를 위반 → 비현실).
+
+    플랫가격, 세금 OFF, ISA 월 500만(연 6천만이나 연한도 20M가 binding):
+      1~5년차: 연 20M 흡수 → 5년 후 ISA 총 1억(총한도 도달). 위탁 연 40M.
+      6년차: 연한도 20M 남아도 총한도 0 → 전액(60M) 위탁.
+      ∴ ISA 100M / 위탁 200M+60M=260M / 합산 360M.
+    """
+    price_data = {"AAA": _price_frame("2020-01-01", "2025-12-31", 100.0)}
+    dates = list(price_data["AAA"].index)
+    accounts = [
+        _loop_account("AAA", initial=0.0, monthly=5_000_000.0, account_type="ISA"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="위탁"),
+    ]
+    policy = DistributionPolicy(destinations=[DistributionDestination(account_id=1)])
+
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        accounts, price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    isa_end = result.account_results[0]["end_value"]
+    broker_end = result.account_results[1]["end_value"]
+    assert abs(isa_end - 100_000_000.0) < 1.0
+    assert abs(broker_end - 260_000_000.0) < 1.0
+    assert abs(result.combined_end_value - 360_000_000.0) < 1.0
+
+
+def test_l4_auto_sync_brokerage_created():
+    """정책 목적지가 없는 계좌를 가리키면 위탁 자동 싱크(첫 ISA 미러) 생성."""
+    price_data = _flat_year_data()
+    dates = list(price_data["AAA"].index)
+    accounts = [
+        _loop_account("AAA", initial=0.0, monthly=5_000_000.0, account_type="ISA"),
+    ]
+    # account_id=1은 존재하지 않음 → 위탁 자동 싱크
+    policy = DistributionPolicy(destinations=[DistributionDestination(account_id=1)])
+
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        accounts, price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    # 싱크 계좌 추가됨
+    assert len(result.account_results) == 2
+    assert result.account_results[1]["type"] == "위탁"
+    isa_end = result.account_results[0]["end_value"]
+    sync_end = result.account_results[1]["end_value"]
+    assert abs(isa_end - 20_000_000.0) < 1.0
+    assert abs(sync_end - 40_000_000.0) < 1.0  # 초과분 전부 싱크 위탁
+    assert abs(result.combined_end_value - 60_000_000.0) < 1.0

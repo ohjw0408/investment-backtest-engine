@@ -295,3 +295,114 @@ class TaxedDividendEngine:
         if self._session is not None:
             return self._session.ytd_financial_income
         return self._ytd_income
+
+
+# ── Track G G2: 분배 정책 + 동적 납입 한도 추적 ──────────────────
+# 월 납입 초과분을 정책 순서대로 다른 계좌에 라우팅(cascade)할 때 사용한다.
+# 한도 상수는 ACCOUNT_LIMITS와 일치(ISA 연 2천만/총 1억, 연금+IRP 합산 연 1800만).
+
+from dataclasses import dataclass as _dataclass, field as _field
+
+_ISA_TOTAL_LIMIT = 100_000_000
+_PENSION_ANNUAL_LIMIT = 18_000_000   # 연금저축 + IRP 합산
+
+
+class ContributionLimitTracker:
+    """계좌별 납입 한도의 동적(상태 추적) 버전.
+
+    check_contribution_limits는 정적 경고만 내지만, G2 라우팅은 매 시점
+    "이 계좌가 지금 얼마를 더 받을 수 있나(capacity)"를 알아야 한다.
+    - ISA: 연 2천만 AND 총 1억 (둘 중 작은 잔여)
+    - 연금저축/IRP: 합산 연 1800만 (두 유형이 풀 공유)
+    - 위탁: 무제한
+    """
+
+    def __init__(self):
+        self._isa_annual: dict[int, float] = {}   # account_id → 올해 누적
+        self._isa_total: dict[int, float] = {}     # account_id → 총 누적
+        self._pension_annual: float = 0.0          # 연금+IRP 합산 올해 누적
+        self._year: int | None = None
+
+    def touch(self, date) -> None:
+        """해가 바뀌면 연한도 리셋(총한도는 유지)."""
+        y = date.year
+        if self._year is None:
+            self._year = y
+        elif y != self._year:
+            self._year = y
+            self._isa_annual = {}
+            self._pension_annual = 0.0
+
+    def capacity(self, account_id: int, account_type: str) -> float:
+        """이 계좌가 추가로 받을 수 있는 최대 금액(무제한이면 inf)."""
+        if account_type == "ISA":
+            annual = _ISA_ANNUAL_LIMIT - self._isa_annual.get(account_id, 0.0)
+            total = _ISA_TOTAL_LIMIT - self._isa_total.get(account_id, 0.0)
+            return max(0.0, min(annual, total))
+        if account_type in ("연금저축", "IRP"):
+            return max(0.0, _PENSION_ANNUAL_LIMIT - self._pension_annual)
+        return float("inf")  # 위탁
+
+    def record(self, account_id: int, account_type: str, amount: float) -> None:
+        """실제 납입 반영(capacity 차감)."""
+        if amount <= 0:
+            return
+        if account_type == "ISA":
+            self._isa_annual[account_id] = self._isa_annual.get(account_id, 0.0) + amount
+            self._isa_total[account_id] = self._isa_total.get(account_id, 0.0) + amount
+        elif account_type in ("연금저축", "IRP"):
+            self._pension_annual += amount
+
+
+@_dataclass
+class DistributionDestination:
+    account_id: int                # 목적지 계좌 id (없으면 위탁 자동 싱크)
+    cap: float = float("inf")      # 정책 레벨 추가 상한(사용자 지정). None/inf=무제한
+
+
+@_dataclass
+class DistributionPolicy:
+    """우선순위 순 목적지 목록. ISA 초과분을 위에서부터 cap까지 채우고 cascade."""
+    destinations: list = _field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, raw: dict | None) -> "DistributionPolicy | None":
+        if not raw:
+            return None
+        dests = []
+        for d in raw.get("destinations", []):
+            cap = d.get("cap")
+            dests.append(DistributionDestination(
+                account_id=int(d["account_id"]),
+                cap=float(cap) if cap is not None else float("inf"),
+            ))
+        return cls(destinations=dests) if dests else None
+
+
+def route_overflow(
+    amount: float,
+    policy: DistributionPolicy,
+    tracker: ContributionLimitTracker,
+    account_types: dict[int, str],
+) -> tuple[list[tuple[int, float]], float]:
+    """초과분(amount)을 정책 순서대로 capacity까지 배분. cascade.
+
+    Returns
+    -------
+    (allocations, leftover)
+      allocations : [(account_id, 배분액), ...] (배분 즉시 tracker에 record됨)
+      leftover    : 정책이 다 흡수 못한 잔액(보통 위탁 무제한이 마지막이면 0)
+    """
+    allocations: list[tuple[int, float]] = []
+    remaining = float(amount)
+    for dest in policy.destinations:
+        if remaining <= 1e-9:
+            break
+        acc_type = account_types.get(dest.account_id, "위탁")
+        cap = min(tracker.capacity(dest.account_id, acc_type), dest.cap)
+        give = min(remaining, cap)
+        if give > 1e-9:
+            allocations.append((dest.account_id, give))
+            tracker.record(dest.account_id, acc_type, give)
+            remaining -= give
+    return allocations, remaining

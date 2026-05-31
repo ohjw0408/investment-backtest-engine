@@ -636,6 +636,34 @@ function renderMultiAccountSummary(multiAccount) {
   wrap.style.display = 'block';
 }
 
+// 종합과세 분할매도 슬라이더 (Phase 2f)
+function calcUpdateSplitPlan(years) {
+  years = parseInt(years);
+  const label = document.getElementById('calcSplitYearsLabel');
+  if (label) label.textContent = years + '년';
+  const plan = window._calcSplitSaleData;
+  if (!plan) return;
+  const byYear = plan.plan_by_year || {};
+  const afterTaxByYear = plan.after_tax_by_year || {};
+  const splitTax = byYear[String(years)] ?? plan.lump_sum_tax;
+  const splitAfterTax = afterTaxByYear[String(years)] ?? (plan.gain - splitTax);
+  const lumpAfterTax = plan.lump_sum_after_tax ?? (plan.gain - plan.lump_sum_tax);
+  const saving = plan.lump_sum_tax - splitTax;
+  const el = document.getElementById('calcSplitMetrics');
+  if (!el) return;
+  el.innerHTML = [
+    { label: '일괄 청산 세금',     value: fmtKRW(plan.lump_sum_tax), cls: 'down' },
+    { label: years + '년 분할 세금', value: fmtKRW(splitTax),          cls: '' },
+    { label: '일괄 세후 이익',     value: fmtKRW(lumpAfterTax),      cls: '' },
+    { label: years + '년 세후 이익', value: fmtKRW(splitAfterTax),     cls: 'up' },
+    { label: '절감액',             value: fmtKRW(saving),            cls: saving > 0 ? 'up' : '' },
+    { label: '최적 연수',          value: plan.optimal_years + '년 (세후 ' + fmtKRW(plan.optimal_after_tax ?? (plan.gain - plan.optimal_tax)) + ')', cls: '' },
+  ].map(item => `<div style="background:#fff;border:1px solid #eee;border-radius:6px;padding:8px 10px;">
+      <div style="font-size:0.68rem;color:var(--text-muted);">${item.label}</div>
+      <div style="font-size:0.82rem;font-weight:800;" class="${item.cls}">${item.value}</div>
+    </div>`).join('');
+}
+
 // ── 결과 렌더링 ──
 function renderResult(data, payload) {
   document.getElementById('resultEmpty').style.display   = 'none';
@@ -715,6 +743,19 @@ function renderResult(data, payload) {
       isaPartialBanner.style.display = 'block';
     } else {
       isaPartialBanner.style.display = 'none';
+    }
+  }
+
+  // 금융소득 종합과세 분할매도 패널 (Phase 2f)
+  window._calcSplitSaleData = data.split_sale_plan || null;
+  const calcSplitPanel = document.getElementById('calcSplitSalePanel');
+  if (calcSplitPanel) {
+    if (data.split_sale_plan && data.split_sale_plan.gain > 20000000) {
+      document.getElementById('calcKrForeignGain').textContent = fmtKRW(data.split_sale_plan.gain);
+      calcSplitPanel.style.display = 'block';
+      calcUpdateSplitPlan(document.getElementById('calcSplitYearsSlider')?.value || 5);
+    } else {
+      calcSplitPanel.style.display = 'none';
     }
   }
 

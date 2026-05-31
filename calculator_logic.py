@@ -537,6 +537,30 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
 
     has_partial_isa = result.get('distribution_early_cancel') is not None
 
+    # Phase 2f: 금융소득 종합과세 분할매도 패널 (위탁 KR_FOREIGN 청산이익 case별 중앙값 기준)
+    split_sale_plan = None
+    comprehensive_flag = False
+    if tax_enabled and account_type == '위탁':
+        import statistics as _stats
+        _krf = [c.get('kr_foreign_unrealized_gain', 0.0) or 0.0 for c in result['cases']]
+        _krf = [g for g in _krf if g > 0]
+        comprehensive_flag = any(c.get('comprehensive_years') for c in result['cases'])
+        if _krf:
+            _median_krf = _stats.median(_krf)
+            if _median_krf > 20_000_000:
+                from modules.tax.split_sale_planner import (
+                    compute_split_sale_plan, recurring_financial_income,
+                )
+                _fin_years = next(
+                    (c.get('financial_income_by_year') for c in result['cases']
+                     if c.get('financial_income_by_year')), {},
+                )
+                split_sale_plan = compute_split_sale_plan(
+                    kr_foreign_gain        = _median_krf,
+                    earned_income          = user_settings.get('earned_income', 0),
+                    other_financial_income = recurring_financial_income(_fin_years),
+                )
+
     return {
         'cases':                    cases_summary,
         'cases_count':              len(cases_summary),
@@ -545,6 +569,8 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
         'isa_partial_cycle':        has_partial_isa,
         'isa_remainder_years':      years % 3 if has_partial_isa else 0,
         'isa_cap_info':             _isa_cap_info,
+        'split_sale_plan':          split_sale_plan,
+        'comprehensive_flag':       comprehensive_flag,
         'used_synthetic':           _prep_meta.get('used_synthetic', False),
         'synthetic_info':           _prep_meta.get('synthetic_info', {}),
         'backfilled':               _prep_meta.get('backfilled', []),

@@ -106,15 +106,18 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
     history_df                 = result.history_df
     end_value                  = result.end_value
     kr_foreign_unrealized_gain = getattr(result, 'kr_foreign_unrealized_gain', 0.0)
+    financial_income_by_year   = getattr(result, 'financial_income_by_year', None) or {}
+    comprehensive_years        = list(getattr(result, 'comprehensive_years', ()) or ())
 
-    # Phase 2e: 분할매도 절세 계획 (KR_FOREIGN > 2천만 시)
+    # Phase 2e/2f: 분할매도 절세 계획 (KR_FOREIGN > 2천만 시)
+    # other_financial_income은 Phase 2f 자동산출(직전 완료년도 gross 배당·이자) — 수동입력 대체.
     split_sale_plan = None
     if tax_enabled and kr_foreign_unrealized_gain > 20_000_000:
-        from modules.tax.split_sale_planner import compute_split_sale_plan
+        from modules.tax.split_sale_planner import compute_split_sale_plan, recurring_financial_income
         split_sale_plan = compute_split_sale_plan(
             kr_foreign_gain        = kr_foreign_unrealized_gain,
             earned_income          = user_settings.get("earned_income", 0),
-            other_financial_income = user_settings.get("other_financial_income", 0),
+            other_financial_income = recurring_financial_income(financial_income_by_year),
         )
 
     pv             = history_df['portfolio_value']
@@ -162,6 +165,8 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         'data_confidence': _prep_meta.get('data_confidence', 'actual'),
         'kr_foreign_unrealized_gain': round(kr_foreign_unrealized_gain),
         'split_sale_plan': split_sale_plan,
+        'comprehensive_years': comprehensive_years,
+        'financial_income_by_year': {int(y): round(v) for y, v in financial_income_by_year.items()},
         'metrics': {
             'end_value':      round(end_value),
             'total_invested': round(total_invested),

@@ -1,5 +1,32 @@
 # Log
 
+## [2026-05-31] feature | Phase 2f 완성 — 중간실현 합산 + 자동산출 + 분할매도 슬라이더 전탭 배선
+
+2f 핵심(청산 합산) 이후 오너 지시로 남은 3개 완료.
+
+### 1. 중간 실현 KR_FOREIGN 합산 (공유 세션)
+- **`TaxSessionState` 확장:** `ytd_financial_income`(배당+KR_FOREIGN 실현차익+외부) 단일 풀 + `ytd_us_realized_gains` 분리 + 연도별 트래킹 + `touch/add_financial_income/add_us_gain/finalize`.
+- **`TaxedDividendEngine`·`TaxedOrderExecutor`가 공유 세션 사용**(`session=` 인자). 배당과 리밸/절세매도 KR_FOREIGN 실현차익이 **같은 풀**로 합산돼 종합과세. 세션 없으면 기존 동작(multi_account 등 backward compat).
+- `order_executor._calc_cg_tax` KR_FOREIGN: 세션 있으면 그 해 ytd와 합산 종합과세, 풀에 가산. US는 세션 us_gains.
+- `taxable_runner`: 단일 세션 생성→두 엔진 주입, 청산/트래킹 세션 사용.
+
+### 2. other_financial_income 자동산출
+- `split_sale_planner.recurring_financial_income(financial_income_by_year)` — 청산연도 제외 직전 완료년도 금융소득을 패널 baseline으로 자동 사용(수동입력 대체).
+
+### 3. 분할매도 슬라이더 전탭 배선
+- **backtest:** 자동산출 적용 + 패널 텍스트 정정(end_value가 일괄 종합과세 반영). `comprehensive_years`/`financial_income_by_year` API 노출.
+- **calculator:** `AccumulationAnalyzer`가 case별 kr_foreign_gain/financial_income/comprehensive 수집 → `calculator_logic`이 중앙값 기준 `split_sale_plan` 빌드 → `calculator.html`+`calculator.js` 슬라이더 패널.
+- **retirement:** 동일(적립 종료 기준 중앙값) → `retirement.html` 슬라이더 패널.
+- 배당금 계산기: 별도 엔진(DividendSimulator)·최하위 우선순위 → 제외(노트).
+
+### 검증
+- `test_phase2f_comprehensive` **7/7**(중간실현 합산 + 무세션 flat 회귀 추가). tax_truth 64/64, Gate 2a/2b/2c 각 4/4.
+- 프론트 패널은 서버 배포 후 브라우저 스모크 권장(백엔드 split_sale_plan 응답은 검증).
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-31] feature | Phase 2f 핵심 구현 — 청산 시세차익+배당 합산 종합과세 + 트래킹
 
 오너 핵심 갭(청산 KR_FOREIGN을 그 해 배당과 합산 종합과세) 구현. 순서 = 2f 먼저 → G2 나중(플랜 명시).

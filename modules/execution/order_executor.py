@@ -108,16 +108,33 @@ class TaxedOrderExecutor(OrderExecutor):
         tax_engine,
         account_type: str = "위탁",
         gain_harvesting: bool = False,
+        session=None,
     ):
         self.tax_engine        = tax_engine
         self.account_type      = account_type
         self.gain_harvesting   = gain_harvesting  # 연간 250만 공제 소진 절세 매도
-        self._ytd_us_gains     = 0.0
+        # 공유 세션(TaxSessionState) — 있으면 배당엔진과 금융소득 풀 공유(KR_FOREIGN 중간실현 합산).
+        self._session          = session
+        self._ytd_us_gains     = 0.0   # 세션 없을 때만 사용
         self._current_year     = None
         self.total_cg_tax_paid = 0.0
         self._harvested_year   = None  # 올해 이미 harvest 했으면 스킵
 
+    # ── US 양도차익 YTD (세션 있으면 세션, 없으면 자체) ──
+    def _ytd_us(self) -> float:
+        return self._session.ytd_us_realized_gains if self._session is not None else self._ytd_us_gains
+
+    def _add_us(self, amount: float) -> None:
+        if self._session is not None:
+            self._session.add_us_gain(amount)
+        else:
+            self._ytd_us_gains += amount
+
     def _update_year(self, date) -> None:
+        if self._session is not None:
+            if date:
+                self._session.touch(date)
+            return
         if date and (self._current_year is None or date.year != self._current_year):
             self._current_year = date.year
             self._ytd_us_gains = 0.0
@@ -170,7 +187,7 @@ class TaxedOrderExecutor(OrderExecutor):
             if realized_gain < 0 and avg_cost != price:
                 asset_type = self.tax_engine.classify_asset(ticker)
                 if asset_type == "US_DIRECT":
-                    self._ytd_us_gains += realized_gain  # 음수 → 공제 여유 증가
+                    self._add_us(realized_gain)  # 음수 → 공제 여유 증가
 
             if realized_gain > 0:
                 cg_tax = self._calc_cg_tax(ticker, realized_gain)
@@ -227,7 +244,7 @@ class TaxedOrderExecutor(OrderExecutor):
         남은 공제 여유가 없거나 미실현 차익이 없으면 아무 것도 안 함.
         """
         self._harvested_year = date.year
-        remaining_exempt = max(0.0, self.OVERSEAS_EXEMPT - self._ytd_us_gains)
+        remaining_exempt = max(0.0, self.OVERSEAS_EXEMPT - self._ytd_us())
         if remaining_exempt <= 0:
             return
 
@@ -252,7 +269,7 @@ class TaxedOrderExecutor(OrderExecutor):
                 continue
 
             harvest_gain = gain_per_share * harvest_shares
-            self._ytd_us_gains += harvest_gain
+            self._add_us(harvest_gain)
             remaining_exempt   -= harvest_gain
 
             # 매도 후 즉시 재매수 (취득단가 현재가로 리셋)
@@ -273,17 +290,27 @@ class TaxedOrderExecutor(OrderExecutor):
         asset_type = self.tax_engine.classify_asset(ticker)
 
         if asset_type == "KR_FOREIGN":
+            # 배당소득세: 15.4% 분리. 단 세션 있으면 그 해 금융소득 풀과 합산 → 2천만 초과분 종합과세.
+            if self._session is not None:
+                ytd = self._session.ytd_financial_income
+                withheld = realized_gain * self.KR_FOREIGN_RATE
+                tax = withheld
+                if ytd + realized_gain > self.tax_engine.DIVIDEND_THRESHOLD:
+                    tax += self.tax_engine._comprehensive_extra_tax(realized_gain, ytd, withheld)
+                self._session.add_financial_income(realized_gain)  # 실현차익을 금융소득 풀에 가산
+                return tax
             return realized_gain * self.KR_FOREIGN_RATE
 
         elif asset_type == "US_DIRECT":
-            self._ytd_us_gains += realized_gain
-            if self._ytd_us_gains <= self.OVERSEAS_EXEMPT:
+            self._add_us(realized_gain)
+            ytd_us = self._ytd_us()
+            if ytd_us <= self.OVERSEAS_EXEMPT:
                 return 0.0
-            prev = self._ytd_us_gains - realized_gain
+            prev = ytd_us - realized_gain
             if prev >= self.OVERSEAS_EXEMPT:
                 taxable = realized_gain
             else:
-                taxable = self._ytd_us_gains - self.OVERSEAS_EXEMPT
+                taxable = ytd_us - self.OVERSEAS_EXEMPT
             return max(0.0, taxable) * self.OVERSEAS_RATE
 
         return 0.0  # KR_DOMESTIC: 비과세

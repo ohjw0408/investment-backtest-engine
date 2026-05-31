@@ -40,6 +40,19 @@ def _comprehensive_tax(taxable_income: float) -> float:
 _DIVIDEND_THRESHOLD = 20_000_000
 
 
+def recurring_financial_income(financial_income_by_year: dict) -> float:
+    """분할매도 패널용 '연간 반복 금융소득' 자동 추정.
+
+    청산 연도(마지막)는 청산차익 스파이크 포함이라 제외 → 직전 완료년도 금융소득 사용.
+    1개 연도뿐이면 그 값. 비어있으면 0. (Phase 2f 자동산출 — 수동입력 대체)
+    """
+    if not financial_income_by_year:
+        return 0.0
+    years = sorted(financial_income_by_year)
+    key = years[-2] if len(years) >= 2 else years[-1]
+    return float(financial_income_by_year.get(key, 0.0))
+
+
 def _year_tax(
     gain_this_year: float,
     other_financial_income: float,

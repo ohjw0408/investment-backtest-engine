@@ -223,30 +223,35 @@ class TaxedDividendEngine:
     """
 
     def __init__(self, base_engine, tax_engine, account_type: str,
-                 other_financial_income: float = 0.0):
+                 other_financial_income: float = 0.0, session=None):
         self.base_engine  = base_engine
         self.tax_engine   = tax_engine
         self.account_type = account_type
 
+        # 공유 세션(TaxSessionState) — 있으면 주문실행기와 금융소득 풀 공유(중간실현 합산).
+        self._session = session
         # 외부 금융소득(시뮬 밖, 예: 보유 타 자산 이자·배당). 매년 ytd 베이스라인으로 주입.
         self.other_financial_income = float(other_financial_income or 0.0)
         self._ytd_income  = self.other_financial_income
         self._current_year: int | None = None
-        # 연도별 종합과세 트래킹: year → 그 해 위탁 금융소득(외부 + 시뮬 발생 배당 gross).
+        # 세션 없을 때만 쓰는 자체 연도별 트래킹.
         self.financial_income_by_year: dict[int, float] = {}
         self._sim_div_this_year = 0.0
 
     def process(self, portfolio, price_data, price_dict, date, dividend_mode):
         """DividendEngine.process() 시그니처와 동일."""
-        # 연도 바뀌면: 직전 연도 금융소득 기록 후 누계 리셋(외부 금융소득부터 재시작)
-        if self._current_year != date.year:
-            if self._current_year is not None:
-                self.financial_income_by_year[self._current_year] = (
-                    self.other_financial_income + self._sim_div_this_year
-                )
-            self._current_year = date.year
-            self._ytd_income   = self.other_financial_income
-            self._sim_div_this_year = 0.0
+        if self._session is not None:
+            self._session.touch(date)
+        else:
+            # 세션 없을 때 자체 연도 리셋(외부 금융소득부터 재시작)
+            if self._current_year != date.year:
+                if self._current_year is not None:
+                    self.financial_income_by_year[self._current_year] = (
+                        self.other_financial_income + self._sim_div_this_year
+                    )
+                self._current_year = date.year
+                self._ytd_income   = self.other_financial_income
+                self._sim_div_this_year = 0.0
 
         # 원본 배당 계산
         gross_by_ticker = self.base_engine.process(
@@ -257,16 +262,18 @@ class TaxedDividendEngine:
         net_by_ticker = {}
         for ticker, gross_div in gross_by_ticker.items():
             if gross_div > 0:
+                ytd = (self._session.ytd_financial_income
+                       if self._session is not None else self._ytd_income)
                 net_div = self.tax_engine.after_tax_dividend(
-                    gross_div,
-                    ticker,
-                    self.account_type,
-                    self._ytd_income,
+                    gross_div, ticker, self.account_type, ytd,
                 )
                 # 위탁 계좌의 금융소득만 누계에 포함
                 if self.account_type == "위탁":
-                    self._ytd_income       += gross_div
-                    self._sim_div_this_year += gross_div
+                    if self._session is not None:
+                        self._session.add_financial_income(gross_div)
+                    else:
+                        self._ytd_income       += gross_div
+                        self._sim_div_this_year += gross_div
                 net_by_ticker[ticker] = net_div
             else:
                 net_by_ticker[ticker] = gross_div
@@ -274,10 +281,9 @@ class TaxedDividendEngine:
         return net_by_ticker
 
     def finalize_year_tracking(self, extra_final_year_income: float = 0.0) -> dict[int, float]:
-        """마지막 연도 금융소득 flush + (선택) 청산 KR_FOREIGN 차익을 마지막 연도에 가산.
-
-        반환: year → 그 해 총 위탁 금융소득(종합과세 대상 판정용).
-        """
+        """마지막 연도 금융소득 flush + (선택) 청산 KR_FOREIGN 차익 가산. year → 총 금융소득."""
+        if self._session is not None:
+            return self._session.finalize(extra_final_year_income)
         if self._current_year is not None:
             self.financial_income_by_year[self._current_year] = (
                 self.other_financial_income + self._sim_div_this_year + extra_final_year_income
@@ -286,4 +292,6 @@ class TaxedDividendEngine:
 
     @property
     def ytd_income(self) -> float:
+        if self._session is not None:
+            return self._session.ytd_financial_income
         return self._ytd_income

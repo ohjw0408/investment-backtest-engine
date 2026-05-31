@@ -237,7 +237,33 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     if progress_callback:
         progress_callback(current=100, total=100, elapsed=time.time() - _acc_start)
 
+    # Phase 2f: 금융소득 종합과세 분할매도 패널 (적립 종료 시 위탁 KR_FOREIGN 청산이익 중앙값)
+    _split_sale_plan = None
+    _comprehensive_flag = False
+    if tax_enabled and account_type == '위탁':
+        import statistics as _stats
+        _krf = [c.get('kr_foreign_unrealized_gain', 0.0) or 0.0 for c in acc_result["cases"]]
+        _krf = [g for g in _krf if g > 0]
+        _comprehensive_flag = any(c.get('comprehensive_years') for c in acc_result["cases"])
+        if _krf:
+            _median_krf = _stats.median(_krf)
+            if _median_krf > 20_000_000:
+                from modules.tax.split_sale_planner import (
+                    compute_split_sale_plan, recurring_financial_income,
+                )
+                _fin_years = next(
+                    (c.get('financial_income_by_year') for c in acc_result["cases"]
+                     if c.get('financial_income_by_year')), {},
+                )
+                _split_sale_plan = compute_split_sale_plan(
+                    kr_foreign_gain        = _median_krf,
+                    earned_income          = user_settings.get('earned_income', 0),
+                    other_financial_income = recurring_financial_income(_fin_years),
+                )
+
     return {
+        "split_sale_plan":       _split_sale_plan,
+        "comprehensive_flag":    _comprehensive_flag,
         "accumulation_summary": report["accumulation_summary"],
         "sample_results": [
             {

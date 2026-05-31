@@ -130,11 +130,45 @@ def test_year_tracking():
         fails.append(f"5) 종합과세 대상연도 {targets} != [2024]")
 
 
+# ── 6) 중간 실현 KR_FOREIGN이 그 해 배당과 합산 종합과세 (공유 세션) ──
+def test_mid_sim_kr_foreign_pools():
+    import datetime
+    from modules.tax.session import TaxSessionState
+    from modules.execution.order_executor import TaxedOrderExecutor
+    # earned 1억 → 종합 한계세율 > 15.4% 라 종합과세 추가분 발생(합산 효과 가시화)
+    eng = _engine(earned=100_000_000)
+    sess = TaxSessionState(other_financial_income=0)
+    sess.touch(datetime.date(2024, 1, 1))
+    sess.add_financial_income(15_000_000)   # 그 해 배당 1,500만 이미 발생
+    ex = TaxedOrderExecutor(eng, "위탁", session=sess)
+    tax = ex._calc_cg_tax("KRF", 10_000_000)   # KR_FOREIGN 실현차익 1,000만 → 합산 2,500만
+    withheld = 10_000_000 * 0.154
+    expected = withheld + eng._comprehensive_extra_tax(10_000_000, 15_000_000, withheld)
+    if not approx(tax, expected, tol=2.0):
+        fails.append(f"6) 중간실현 세금 {tax:.0f} != 합산 종합 {expected:.0f}")
+    if not approx(sess.ytd_financial_income, 25_000_000, tol=2.0):
+        fails.append(f"6) 풀 가산 {sess.ytd_financial_income:.0f} != 2500만")
+    # 고소득 합산이라 flat(154만)보다 커야 — 종합과세 추가분 확인
+    if not (tax > 10_000_000 * 0.154 + 1.0):
+        fails.append(f"6) 중간실현 {tax:.0f} flat 이하 — 합산 안 됨")
+
+
+# ── 7) 세션 없으면 중간실현 KR_FOREIGN flat 15.4% (회귀) ──
+def test_mid_sim_no_session_flat():
+    from modules.execution.order_executor import TaxedOrderExecutor
+    eng = _engine(earned=0)
+    ex = TaxedOrderExecutor(eng, "위탁")   # 세션 없음
+    tax = ex._calc_cg_tax("KRF", 50_000_000)
+    if not approx(tax, 50_000_000 * 0.154, tol=2.0):
+        fails.append(f"7) 무세션 중간실현 {tax:.0f} != flat {50_000_000*0.154:.0f}")
+
+
 if __name__ == "__main__":
     for fn in [test_liquidation_combines_with_dividends, test_liquidation_no_dividends,
-               test_small_gain_flat, test_ytd_injection, test_year_tracking]:
+               test_small_gain_flat, test_ytd_injection, test_year_tracking,
+               test_mid_sim_kr_foreign_pools, test_mid_sim_no_session_flat]:
         fn()
-    total = 5
+    total = 7
     print(f"[Phase 2f] {total - len(fails)}/{total} PASS")
     for f in fails:
         print("  ✗", f)

@@ -482,6 +482,24 @@
 
     <div id="retResultContent" style="display:none;">
 
+      <!-- 금융소득 종합과세 분할매도 패널 (Phase 2f) -->
+      <div id="retSplitSalePanel" style="display:none;background:#FFEBEE;border:1px solid #EF9A9A;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+        <div style="font-weight:700;color:#b71c1c;margin-bottom:6px;">⚠ 금융소득 종합과세 주의 (중앙값 케이스)</div>
+        <div style="font-size:0.82rem;color:#555;margin-bottom:10px;">
+          적립 종료 시 KR_FOREIGN 미실현 이익이 2천만원을 초과합니다.
+          <strong>최종 자산은 일괄 청산 기준 그 해 배당과 합산한 종합과세를 반영합니다.</strong>
+          분할 매도 효과는 소득 구간에 따라 다릅니다.
+        </div>
+        <div style="font-size:0.82rem;margin-bottom:8px;">KR_FOREIGN 미실현 이익: <strong id="retKrForeignGain">—</strong></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+          <label style="font-size:0.82rem;white-space:nowrap;">분할 연수:</label>
+          <input type="range" id="retSplitYearsSlider" min="1" max="20" value="5" style="flex:1;" oninput="retUpdateSplitPlan(this.value)">
+          <span id="retSplitYearsLabel" style="font-size:0.85rem;font-weight:700;min-width:30px;">5년</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;" id="retSplitMetrics"></div>
+        <div style="font-size:0.72rem;color:#90A4AE;margin-top:8px;">※ 참고용. 실제 세무 처리는 세무사와 확인하세요.</div>
+      </div>
+
       <!-- 생존율 -->
       <div class="acc-dist-card">
         <div class="acc-dist-title" style="display:flex;align-items:center;justify-content:space-between;">
@@ -1097,9 +1115,49 @@ function updateRetTaxInfo() {
 }
 
 // ── 결과 렌더링 ──
+function retUpdateSplitPlan(years) {
+  years = parseInt(years);
+  const label = document.getElementById('retSplitYearsLabel');
+  if (label) label.textContent = years + '년';
+  const plan = window._retSplitSaleData;
+  if (!plan) return;
+  const byYear = plan.plan_by_year || {};
+  const afterTaxByYear = plan.after_tax_by_year || {};
+  const splitTax = byYear[String(years)] ?? plan.lump_sum_tax;
+  const splitAfterTax = afterTaxByYear[String(years)] ?? (plan.gain - splitTax);
+  const lumpAfterTax = plan.lump_sum_after_tax ?? (plan.gain - plan.lump_sum_tax);
+  const saving = plan.lump_sum_tax - splitTax;
+  const el = document.getElementById('retSplitMetrics');
+  if (!el) return;
+  el.innerHTML = [
+    { label: '일괄 청산 세금',     value: fmtKRW(plan.lump_sum_tax), cls: '' },
+    { label: years + '년 분할 세금', value: fmtKRW(splitTax),          cls: '' },
+    { label: '일괄 세후 이익',     value: fmtKRW(lumpAfterTax),      cls: '' },
+    { label: years + '년 세후 이익', value: fmtKRW(splitAfterTax),     cls: '' },
+    { label: '절감액',             value: fmtKRW(saving),            cls: '' },
+    { label: '최적 연수',          value: plan.optimal_years + '년 (세후 ' + fmtKRW(plan.optimal_after_tax ?? (plan.gain - plan.optimal_tax)) + ')', cls: '' },
+  ].map(item => `<div style="background:#fff;border:1px solid #eee;border-radius:6px;padding:8px 10px;">
+      <div style="font-size:0.68rem;color:var(--text-muted);">${item.label}</div>
+      <div style="font-size:0.82rem;font-weight:800;">${item.value}</div>
+    </div>`).join('');
+}
+
 function renderRetirement(data, body) {
   document.getElementById('retResultEmpty').style.display   = 'none';
   document.getElementById('retResultContent').style.display = 'block';
+
+  // 금융소득 종합과세 분할매도 패널 (Phase 2f)
+  window._retSplitSaleData = data.split_sale_plan || null;
+  const retSplitPanel = document.getElementById('retSplitSalePanel');
+  if (retSplitPanel) {
+    if (data.split_sale_plan && data.split_sale_plan.gain > 20000000) {
+      document.getElementById('retKrForeignGain').textContent = fmtKRW(data.split_sale_plan.gain);
+      retSplitPanel.style.display = 'block';
+      retUpdateSplitPlan(document.getElementById('retSplitYearsSlider')?.value || 5);
+    } else {
+      retSplitPanel.style.display = 'none';
+    }
+  }
 
   const combined  = data.combined_summary || data;
   const survival  = combined.survival_rate;

@@ -132,6 +132,7 @@ class AccumulationAnalyzer:
             if end > self.data_end:
                 break
             strategy = self.strategy_factory()
+            _krf_gain, _fin_by_yr, _comp_yrs = 0.0, {}, []   # Phase 2f 기본값
 
             # ── ISA 풍차돌리기 (특수 경로 — 주기별 수동 청산·재가입) ────
             if self.isa_renewal and self.tax_engine:
@@ -199,6 +200,10 @@ class AccumulationAnalyzer:
                 history_df  = run_result.history_df
                 final_value = run_result.end_value
                 raw_final   = float(history_df['portfolio_value'].iloc[-1]) if not history_df.empty else 0.0
+                # Phase 2f: 종합과세 패널/트래킹 정보 (case별)
+                _krf_gain   = getattr(run_result, 'kr_foreign_unrealized_gain', 0.0)
+                _fin_by_yr  = getattr(run_result, 'financial_income_by_year', None) or {}
+                _comp_yrs   = list(getattr(run_result, 'comprehensive_years', ()) or ())
 
             if history_df is None or history_df.empty:
                 cur    += relativedelta(months=self.step_months)
@@ -210,6 +215,9 @@ class AccumulationAnalyzer:
             metrics["start"]     = cur.strftime("%Y-%m-%d")
             metrics["end"]       = end.strftime("%Y-%m-%d")
             metrics["end_value"] = final_value
+            metrics["kr_foreign_unrealized_gain"] = _krf_gain
+            metrics["financial_income_by_year"]   = _fin_by_yr
+            metrics["comprehensive_years"]        = _comp_yrs
             if self.isa_renewal and self.tax_engine and _early is not None:
                 metrics["end_value_early_cancel"] = _early
 

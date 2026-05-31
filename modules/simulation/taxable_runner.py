@@ -53,11 +53,16 @@ class TaxableSimulationRunner:
             from modules.tax.account_tax           import TaxedDividendEngine
             from modules.execution.order_executor  import TaxedOrderExecutor
             from modules.core.portfolio            import TaxTrackedPortfolio
+            from modules.tax.session                import TaxSessionState
             other_financial_income = float(user_settings.get("other_financial_income", 0.0) or 0.0)
+            # 공유 세션 — 배당·중간실현·청산을 한 금융소득 풀로 합산(종합과세 정확도).
+            tax_session = TaxSessionState(other_financial_income=other_financial_income)
             div_engine  = TaxedDividendEngine(DividendEngine(), tax_engine, account_type,
-                                              other_financial_income=other_financial_income)
+                                              other_financial_income=other_financial_income,
+                                              session=tax_session)
             exec_engine = TaxedOrderExecutor(tax_engine, account_type,
-                                             gain_harvesting=gain_harvesting)
+                                             gain_harvesting=gain_harvesting,
+                                             session=tax_session)
             portfolio   = TaxTrackedPortfolio(config.initial_capital)
         else:
             tax_engine  = None
@@ -98,9 +103,9 @@ class TaxableSimulationRunner:
                             if gain > 0:
                                 kr_foreign_unrealized_gain += gain
 
-            # 청산 연도 기 발생 금융소득(외부 + 위탁 배당 gross) — KR_FOREIGN 청산이익과 합산 종합과세
-            ytd_financial_income = getattr(div_engine, 'ytd_income', 0.0)
-            ytd_us_gains = getattr(exec_engine, '_ytd_us_gains', 0.0)
+            # 청산 연도 기 발생 금융소득(외부 + 위탁 배당 + KR_FOREIGN 중간실현) — 청산이익과 합산 종합과세
+            ytd_financial_income = tax_session.ytd_financial_income
+            ytd_us_gains = tax_session.ytd_us_realized_gains
             end_value = apply_liquidation_tax(
                 end_value=end_value,
                 portfolio=portfolio,
@@ -114,15 +119,14 @@ class TaxableSimulationRunner:
                 ytd_financial_income=ytd_financial_income,
             )
 
-            # 연도별 종합과세 트래킹 (마지막 연도에 청산 KR_FOREIGN 차익 가산)
-            if hasattr(div_engine, 'finalize_year_tracking'):
-                financial_income_by_year = div_engine.finalize_year_tracking(
-                    extra_final_year_income=kr_foreign_unrealized_gain
-                )
-                threshold = getattr(tax_engine, 'DIVIDEND_THRESHOLD', 20_000_000)
-                comprehensive_years = tuple(
-                    sorted(y for y, inc in financial_income_by_year.items() if inc > threshold)
-                )
+            # 연도별 종합과세 트래킹 (마지막 연도에 청산 KR_FOREIGN 미실현차익 가산)
+            financial_income_by_year = tax_session.finalize(
+                extra_final_year_income=kr_foreign_unrealized_gain
+            )
+            threshold = getattr(tax_engine, 'DIVIDEND_THRESHOLD', 20_000_000)
+            comprehensive_years = tuple(
+                sorted(y for y, inc in financial_income_by_year.items() if inc > threshold)
+            )
 
         return RunResult(
             history_df=history_df,

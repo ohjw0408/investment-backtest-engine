@@ -321,6 +321,7 @@ class ContributionLimitTracker:
         self._isa_annual: dict[int, float] = {}   # account_id → 올해 누적
         self._isa_total: dict[int, float] = {}     # account_id → 총 누적
         self._pension_annual: float = 0.0          # 연금+IRP 합산 올해 누적
+        self._policy_routed: dict[int, float] = {} # account_id → 정책 라우팅 누적(cap용, 전기간)
         self._year: int | None = None
 
     def touch(self, date) -> None:
@@ -399,10 +400,14 @@ def route_overflow(
         if remaining <= 1e-9:
             break
         acc_type = account_types.get(dest.account_id, "위탁")
-        cap = min(tracker.capacity(dest.account_id, acc_type), dest.cap)
+        # dest.cap = 전기간 누적 상한(정책 레벨). 이미 라우팅된 만큼 차감.
+        routed = tracker._policy_routed.get(dest.account_id, 0.0)
+        policy_room = dest.cap - routed
+        cap = min(tracker.capacity(dest.account_id, acc_type), policy_room)
         give = min(remaining, cap)
         if give > 1e-9:
             allocations.append((dest.account_id, give))
             tracker.record(dest.account_id, acc_type, give)
+            tracker._policy_routed[dest.account_id] = routed + give
             remaining -= give
     return allocations, remaining

@@ -95,6 +95,53 @@ def _loop_account(ticker, initial=100.0, monthly=0.0, account_type="위탁", sto
     return {"type": account_type, "config": config, "strategy": strategy}
 
 
+_ISA_TOTAL = 100_000_000
+_PENSION_ANNUAL = 18_000_000
+
+
+def assert_invariants(result, expected_total_in=None, flat_price=False):
+    """전 L케이스 공통 불변식.
+
+    - 음수 잔액 없음
+    - ISA 납입(total_contribution) ≤ 총 1억
+    - (expected_total_in 주어지면) Σ계좌 납입 = 실제 투입 총액
+      → 라우팅은 재분배일 뿐 보존(ISA가 못 받은 건 다른 계좌가 받음)
+    - (flat_price면) Σ raw_end_value = Σ투입 (수익 0이므로 자금 보존 직접 확인)
+    """
+    df = result.combined_history_df
+    if not df.empty:
+        assert (df["cash"] >= -1e-6).all(), "음수 잔액 발생"
+
+    total_contrib = 0.0
+    for ar in result.account_results:
+        tc = float(ar.get("total_contribution", 0.0))
+        total_contrib += tc
+        if ar["type"] == "ISA":
+            assert tc <= _ISA_TOTAL + 1.0, f"ISA 납입 {tc} > 1억"
+
+    if expected_total_in is not None:
+        assert abs(total_contrib - expected_total_in) < 1.0, (
+            f"자금보존 위반: Σ납입 {total_contrib} != 투입 {expected_total_in}"
+        )
+    if flat_price:
+        raw = sum(float(ar.get("raw_end_value", 0.0)) for ar in result.account_results)
+        assert abs(raw - total_contrib) < 1.0, (
+            f"플랫가격 자금보존 위반: Σraw_end {raw} != Σ납입 {total_contrib}"
+        )
+
+
+def _two_year_step_data(rise_code, flat_code):
+    """1년차 100 고정 → 2년차 100→200 상승(rise_code), flat_code는 2년 내내 100.
+
+    라우팅 매수가 1년차 100으로 결정되고 2년차 청산가 200 → 수익 손계산 가능.
+    """
+    y1 = _price_frame("2020-01-01", "2020-12-31", 100.0, 100.0)
+    y2 = _price_frame("2021-01-01", "2021-12-31", 100.0, 200.0)
+    rise = pd.concat([y1, y2])
+    flat = _price_frame("2020-01-01", "2021-12-31", 100.0, 100.0)
+    return {rise_code: rise, flat_code: flat}
+
+
 def test_l0_single_account_loop_matches_taxable_runner():
     price_data = {"AAA": _price_frame("2020-01-01", "2021-01-01", 100.0, 125.0)}
     dates = list(price_data["AAA"].index)
@@ -125,6 +172,31 @@ def test_l0_single_account_loop_matches_taxable_runner():
     m_multi = calc_metrics_from_history(multi.combined_history_df, 1, 10_000.0, 0.0)
     assert abs(m_multi["cagr"] - m_single["cagr"]) <= 0.0001
     assert abs(m_multi["mdd"] - m_single["mdd"]) <= 0.0001
+
+
+def test_l0_single_account_loop_matches_taxable_runner_tax_on():
+    """세금 ON 골든: 1계좌 위탁(458730 상승) 청산세까지 Runner와 ±1원 일치."""
+    price_data = {"458730": _price_frame("2020-01-01", "2021-01-01", 100.0, 200.0)}
+    dates = list(price_data["458730"].index)
+    config = SimulationConfig(
+        start_date="2020-01-01", end_date="2021-01-01",
+        tickers=["458730"], target_weights={"458730": 1.0},
+        initial_capital=10_000_000.0, monthly_contribution=0.0,
+        withdrawal_amount=0, dividend_mode="hold",
+        rebalance_frequency=None, inflation=0.0,
+    )
+    us = {"earned_income": 0, "age": 40}
+    single = TaxableSimulationRunner().run(
+        config, price_data, dates, PeriodicRebalance({"458730": 1.0}, rebalance_frequency=None),
+        tax_enabled=True, account_type="위탁", user_settings=us,
+    )
+    multi = MultiAccountSimulationLoop().run(
+        [{"type": "위탁", "config": config,
+          "strategy": PeriodicRebalance({"458730": 1.0}, rebalance_frequency=None)}],
+        price_data, dates, tax_enabled=True, user_settings=us,
+    )
+    assert abs(multi.combined_end_value - single.end_value) <= 1
+    assert_invariants(multi)
 
 
 def test_l1_scenario_level_sum_not_percentile_sum():
@@ -159,6 +231,9 @@ def test_l1_scenario_level_sum_not_percentile_sum():
         assert case["end_value"] == sum(a["end_value"] for a in case["accounts"])
     assert combined_values == [300.0, 300.0]
     assert result["combined"]["distribution"]["end_value"]["p10"] != account_a["p10"] + account_b["p10"]
+    # 합산은 시나리오 단위 — 두 계좌 모두 같은 시나리오에서 200+100=300
+    for case in result["cases"]:
+        assert case["end_value"] == 300.0
 
 
 def test_l2_flat_price_contribution_and_isa_stop_months():
@@ -176,6 +251,8 @@ def test_l2_flat_price_contribution_and_isa_stop_months():
     assert result.account_results[0]["end_value"] == 100_000_000.0
     assert result.account_results[0]["total_contribution"] == 100_000_000.0
     assert (result.combined_history_df["cash"] >= 0).all()
+    # 초기 9900만 + 월 100만 × 1개월(stop) = 1억 정확
+    assert_invariants(result, expected_total_in=100_000_000.0, flat_price=True)
 
 
 def test_l3_dividend_tax_capital_gain_tax_and_isa_liquidation():
@@ -214,6 +291,19 @@ def test_l3_dividend_tax_capital_gain_tax_and_isa_liquidation():
     )
     assert abs(isa_result.account_results[0]["end_value"] - 19_208_000.0) < 1e-6
     assert abs(isa_result.account_results[0]["liquidation_tax_paid"] - 792_000.0) < 1e-6
+
+    # ISA 비과세한도 경계: 순이익이 일반형 비과세 200만 이하면 청산세 0.
+    # 초기 1000만 → 1.2배(1200만), 순이익 200만 = 비과세한도 정확 → 세금 0.
+    isa_edge_data = {"AAA": _price_frame("2020-01-01", "2023-01-02", 100.0, 120.0)}
+    isa_edge_result = MultiAccountSimulationLoop().run(
+        [_loop_account("AAA", initial=10_000_000.0, monthly=0.0, account_type="ISA")],
+        isa_edge_data,
+        list(isa_edge_data["AAA"].index),
+        tax_enabled=True,
+        user_settings={"earned_income": 0, "age": 40, "isa_type": "general"},
+    )
+    assert abs(isa_edge_result.account_results[0]["liquidation_tax_paid"] - 0.0) < 1e-6
+    assert abs(isa_edge_result.account_results[0]["end_value"] - 12_000_000.0) < 1e-6
 
 
 def _flat_year_data():
@@ -262,6 +352,7 @@ def test_l4_monthly_overflow_routing_cascade():
     # 라우팅 발생: m4~m11 = 8회, 총 초과 4천만
     assert len(result.transfer_log) == 8
     assert abs(sum(t["overflow"] for t in result.transfer_log) - 40_000_000.0) < 1.0
+    assert_invariants(result, expected_total_in=60_000_000.0, flat_price=True)
 
 
 def test_l4_annual_limit_resets_next_year():
@@ -283,6 +374,7 @@ def test_l4_annual_limit_resets_next_year():
     broker_end = result.account_results[1]["end_value"]
     assert abs(isa_end - 40_000_000.0) < 1.0
     assert abs(broker_end - 80_000_000.0) < 1.0
+    assert_invariants(result, expected_total_in=120_000_000.0, flat_price=True)
 
 
 def test_l4_total_limit_caps_isa():
@@ -312,6 +404,7 @@ def test_l4_total_limit_caps_isa():
     assert abs(isa_end - 100_000_000.0) < 1.0
     assert abs(broker_end - 260_000_000.0) < 1.0
     assert abs(result.combined_end_value - 360_000_000.0) < 1.0
+    assert_invariants(result, expected_total_in=360_000_000.0, flat_price=True)
 
 
 def test_l4_auto_sync_brokerage_created():
@@ -335,3 +428,121 @@ def test_l4_auto_sync_brokerage_created():
     assert abs(isa_end - 20_000_000.0) < 1.0
     assert abs(sync_end - 40_000_000.0) < 1.0  # 초과분 전부 싱크 위탁
     assert abs(result.combined_end_value - 60_000_000.0) < 1.0
+    assert_invariants(result, expected_total_in=60_000_000.0, flat_price=True)
+
+
+# ── L4 구멍 메꿈 (2026-06-01): cap·leftover·연금IRP합산·세금ON ──
+
+def test_l4_policy_cap_caps_destination():
+    """정책 destination.cap(전기간 누적 상한)이 capacity보다 작으면 cap까지만 받고 cascade.
+
+    ISA 월500만/1년 → 초과 40M. 정책 [연금(cap=1000만 누적), 위탁]:
+      연금은 한도 1800만 있어도 정책 누적 cap 1000만까지만 → 1000만.
+      나머지 30M → 위탁.
+    ∴ ISA 20M / 연금 10M / 위탁 30M / 합산 60M.
+    """
+    price_data = _flat_year_data()
+    dates = list(price_data["AAA"].index)
+    accounts = [
+        _loop_account("AAA", initial=0.0, monthly=5_000_000.0, account_type="ISA"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="연금저축"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="위탁"),
+    ]
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=1, cap=10_000_000.0),
+        DistributionDestination(account_id=2),
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        accounts, price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    assert abs(result.account_results[0]["end_value"] - 20_000_000.0) < 1.0
+    assert abs(result.account_results[1]["end_value"] - 10_000_000.0) < 1.0
+    assert abs(result.account_results[2]["end_value"] - 30_000_000.0) < 1.0
+    assert_invariants(result, expected_total_in=60_000_000.0, flat_price=True)
+
+
+def test_l4_leftover_when_policy_cannot_absorb():
+    """정책에 무제한(위탁) 목적지가 없으면 흡수 못한 잔액 = leftover.
+
+    ISA 월500만/1년 → 초과 40M. 정책 [연금만(한도 1800만)]:
+      연금 18M 흡수, 나머지 22M 흡수 불가 → leftover 누적 22M.
+      leftover는 어느 계좌에도 안 들어감(현금 미주입) → 합산 = ISA20 + 연금18 = 38M.
+    """
+    price_data = _flat_year_data()
+    dates = list(price_data["AAA"].index)
+    accounts = [
+        _loop_account("AAA", initial=0.0, monthly=5_000_000.0, account_type="ISA"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="연금저축"),
+    ]
+    policy = DistributionPolicy(destinations=[DistributionDestination(account_id=1)])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        accounts, price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    assert abs(result.account_results[0]["end_value"] - 20_000_000.0) < 1.0
+    assert abs(result.account_results[1]["end_value"] - 18_000_000.0) < 1.0
+    total_leftover = sum(t["leftover"] for t in result.transfer_log)
+    assert abs(total_leftover - 22_000_000.0) < 1.0
+    # leftover는 투입에서 빠진 게 아니라 "어디에도 안 간" 돈 → 계좌합 < 실투입
+    assert abs(result.combined_end_value - 38_000_000.0) < 1.0
+    # 들어간 돈 기준 불변식(누락분 제외)
+    assert_invariants(result, flat_price=True)
+
+
+def test_l4_pension_irp_share_annual_limit():
+    """연금저축 + IRP는 합산 연 1800만 풀을 공유.
+
+    ISA 월500만/1년 → 초과 40M. 정책 [연금, IRP, 위탁]:
+      연금+IRP 합산 1800만까지만(풀 공유). 연금 먼저 1800만 → IRP 0.
+      나머지 22M → 위탁.
+    ∴ ISA 20M / 연금 18M / IRP 0 / 위탁 22M.
+    """
+    price_data = _flat_year_data()
+    dates = list(price_data["AAA"].index)
+    accounts = [
+        _loop_account("AAA", initial=0.0, monthly=5_000_000.0, account_type="ISA"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="연금저축"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="IRP"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="위탁"),
+    ]
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=1),
+        DistributionDestination(account_id=2),
+        DistributionDestination(account_id=3),
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        accounts, price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    assert abs(result.account_results[1]["end_value"] - 18_000_000.0) < 1.0
+    assert abs(result.account_results[2]["end_value"] - 0.0) < 1.0
+    assert abs(result.account_results[3]["end_value"] - 22_000_000.0) < 1.0
+    assert_invariants(result, expected_total_in=60_000_000.0, flat_price=True)
+
+
+def test_l4_tax_on_routing_liquidation():
+    """L4-tax: 세금 ON 라우팅. ISA 고정종목(청산세0) + 위탁 수신분 상승 → 15.4% 청산세.
+
+    종목: AAA=ISA 보유(2년 100 고정), 458730=위탁 보유(1년차100→2년차200).
+    ISA 월200만/1년(stop 12) → 연한도 2000만은 m0~m9(10개월) 흡수, m10·m11 각200만 초과.
+      초과 400만 → 위탁(458730) 1년차 가격100에 매수 = 4만주.
+    2년차: 납입 stop → 라우팅 0. 가격 458730 100→200.
+      위탁 청산수익 = 4만주×(200-100) = 400만. KR_FOREIGN 15.4% → 청산세 61.6만.
+    ∴ ISA 2000만(세금0) / 위탁 800만-61.6만=738.4만.
+    """
+    price_data = _two_year_step_data(rise_code="458730", flat_code="AAA")
+    dates = sorted(set(price_data["458730"].index) | set(price_data["AAA"].index))
+    isa = _loop_account("AAA", initial=0.0, monthly=2_000_000.0, account_type="ISA", stop_months=12)
+    broker = _loop_account("458730", initial=0.0, monthly=0.0, account_type="위탁")
+    policy = DistributionPolicy(destinations=[DistributionDestination(account_id=1)])
+
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates,
+        tax_enabled=True, user_settings={"earned_income": 0, "age": 40},
+        distribution_policy=policy,
+    )
+    isa_res = result.account_results[0]
+    broker_res = result.account_results[1]
+    assert abs(isa_res["end_value"] - 20_000_000.0) < 1.0       # ISA 수익0 → 청산세0
+    assert abs(isa_res["liquidation_tax_paid"] - 0.0) < 1.0
+    assert abs(broker_res["liquidation_tax_paid"] - 616_000.0) < 1.0
+    assert abs(broker_res["end_value"] - 7_384_000.0) < 1.0
+    assert_invariants(result)

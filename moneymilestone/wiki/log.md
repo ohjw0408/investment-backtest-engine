@@ -1,5 +1,38 @@
 # Log
 
+## [2026-06-01] test | Track G2 L시리즈 검증 엄밀화 — assert_invariants + L4 구멍 메꿈 + L0~L3 보강
+
+오너 지시(검증 빈틈 없이) 수행. 코드 1줄(cap 의미 명확화) 외 전부 테스트.
+
+### 1. `assert_invariants` 공통 헬퍼 신설
+- 음수잔액0 + ISA납입≤1억 + (옵션) 자금보존(Σ납입=실투입) + (flat_price) Σraw_end=Σ납입.
+- L0(tax)·L2·L4 전 케이스에 적용.
+
+### 2. L4 구멍 4개 메꿈 (신규 테스트 4)
+- `test_l4_policy_cap_caps_destination` — 정책 `cap`(전기간 누적 상한) 적중→cascade. ISA20/연금10/위탁30.
+- `test_l4_leftover_when_policy_cannot_absorb` — 무제한 목적지 없으면 leftover 누적(22M), 계좌합<실투입.
+- `test_l4_pension_irp_share_annual_limit` — 연금+IRP 합산 1800만 풀 공유(연금18/IRP0/위탁22).
+- `test_l4_tax_on_routing_liquidation` — 세금ON 라우팅. ISA고정(청산세0)+위탁 수신분 458730 2배→KR_FOREIGN 15.4% 청산세 61.6만 정확.
+
+### 3. 코드 수정 (account_tax.py)
+- `route_overflow`의 `dest.cap`을 **월별→전기간 누적 상한**으로 변경(`tracker._policy_routed` 추가). 기존 테스트는 cap=inf라 무영향, 신규 cap 테스트 위해 의미 확정.
+
+### 4. L0~L3 보강
+- `test_l0..._tax_on` 신규(세금ON 골든: 멀티루프 청산세 = Runner ±1원).
+- L1에 시나리오 합산 어서트 추가, L2에 invariants, L3에 비과세한도 경계(순이익=200만 정확→세금0).
+
+### 5. 플랜 갱신(전 세션) 반영 확인 — L5/L5b/L5c(2-4 신규)/L6 검증항목 정의됨.
+
+### 검증
+- `tests/test_track_g_multi_account.py` **13/13**(L0×2·L1·L2·L3·L4×8). 회귀 phase2f·Gate·cagr·tax_truth 포함 **40/40**.
+
+### 발견한 갭 (G2 범위 아님 → bugs.md BUG-TAX-1)
+- **ISA 서민형 비과세 400만 미구현** — `isa_type` 분기가 전부 일반형 200만으로 청산세 계산. 별도 수정.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-31] feature | Track G2 토대 — transfer 엔진 + ISA 월 한도초과 라우팅(2-1)
 
 플랜 `trackG_multiaccount_plan.md §2-1` 구현. G1 통합루프에 `transfers_enabled=True` 경로 신설. **범위 한정:** 월 한도초과 라우팅 + L0~L4 검증까지. 만기분배(2-2)·풍차중단(2-4)·G3·공유세션 멀티배선·프론트 UI = 다음 세션.

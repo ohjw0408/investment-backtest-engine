@@ -21,6 +21,13 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> 🎯 **2026-05-31 업데이트 16 (다음 세션 작업 확정 = L시리즈 검증 엄밀화):** 오너 지시 — 모든 L계층이 "완전 검증"(정상경로 손계산+경계/엣지+세금ON/OFF+불변식 4종)이어야 하고, 검증계획 없는 기능(2-4 누락 같은 것) 금지. **▶ 다음 세션 = 「L4 구멍 다 메꾸고 앞으로 모든 L시리즈 테스트는 전부 완전한 검증을 할 수 있게 짜. 검증에 빈틈이 없도록 수정해.」** 구체:
+> 1. **`assert_invariants` 공통 헬퍼 신설**(자금보존·음수0·한도위반0) → 전 L케이스 적용.
+> 2. **L4 구멍 4개 메꿈:** ④정책 cap 적중 ⑤leftover>0(위탁 미포함 정책) ⑥연금+IRP 동시 1800만 풀공유 + **L4-tax(세금ON 라우팅: 위탁 수신분 KR_FOREIGN 22%/국내 15.4% 정확)**.
+> 3. **L0~L3도 4종 충족 점검**(L0 세금ON 골든, L1 그대로, L3 비과세경계 등) — 누락분 보강.
+> 4. 플랜 `trackG_multiaccount_plan.md §테스트 설계`에 **L5/L5b/L5c(2-4 신규)/L6 검증항목 이미 정의됨** — 구현 시 이 표대로. **L5c(금종세 풍차중단)는 공유세션 멀티배선 선행.**
+> 실행: 「L4 구멍 메꾸고 전 L시리즈 완전검증으로 짜줘」. 이거 끝→그 다음 2-2/2-4/G3 구현+calculator_logic 배선+프론트.
+
 > ✅➡️ **2026-05-31 업데이트 15 (Track G2 토대 — transfer 엔진 + ISA 월 라우팅 2-1 완료 → 다음=2-2/2-4/G3+프론트):** 플랜 §2-1 구현·검증. `MultiAccountSimulationLoop`에 `transfers_enabled=True` 신설(G1 회귀 100% 보존). ① `ContributionLimitTracker`(동적 ISA 연2천만+총1억, 연금/IRP 합산 1800만) ② `DistributionPolicy`+`route_overflow`(cascade) ③ 월경계 `_compute_injections`(ISA 흡수→초과분 정책 라우팅)+`_step_account(contribution_override=)` ④ 위탁 자동싱크(`_ensure_sync_accounts` 첫ISA미러) ⑤ analyzer 패스스루. 검증 **8/8**(L0~L3 회귀 + L4 신규 4: cascade/연리셋/총한도캡/자동싱크) + 회귀 37/37(tax_truth·Gate·2f·cagr). 오너결정: 개인기준·풀커스텀UI·위탁자동싱크·ISA연+총둘다. ⚠️미구현(다음): 2-2 만기분배·2-4 풍차중단(공유세션 멀티배선 선행)·G3 연금이전·calculator_logic 수신·풀커스텀 분배정책 프론트UI. 상세 [[log]].
 
 > ✅➡️ **2026-05-31 업데이트 14 (금융소득 종합과세 Phase 2f 완성 → 다음=Track G2):** 2f 전부 구현·서버검증(4100ecd). ① 청산+**중간실현** KR_FOREIGN 시세차익을 그 해 배당과 합산 종합과세(공유 `TaxSessionState`) ② `_ytd_income` 외부소득 주입 ③ 연도별 종합과세 대상 트래킹(`comprehensive_years`) ④ other_financial_income 자동산출 ⑤ 분할매도 슬라이더 패널 backtest/calculator/retirement 전탭(배당금탭 제외). 검증 7/7+tax_truth 64/64+Gate 2a/b/c 4/4+페이지200. ⚠️잔여=프론트 슬라이더 브라우저 스모크 미확인. **▶ 다음 작업 = Track G2:** transfer 엔진(현 `multi_account_loop` transfers_enabled→NotImplementedError) 신규 + **금종세자 ISA 풍차 중단·만기∞ 무한유지**(`comprehensive_years` 입력) + ISA 1억 한도 리라우팅(연금→위탁) + 3년연속 비대상시 재가입. 플랜 = `trackG_multiaccount_plan.md §2-4` + `§G2`. 실행: 「Track G2 구현해줘」.

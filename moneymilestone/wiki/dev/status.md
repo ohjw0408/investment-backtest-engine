@@ -21,7 +21,7 @@ tags: [dev]
 
 ## 한 줄 요약
 
-> 🔧 **2026-05-31 업데이트 10 (Stage B 헤지비용·회사채·KR금리복구 — 서버검증 대기):** 핸드오프 2문제 구현. ❶ **헤지비용:** `build_bond_price_series(hedge_cost_pct=)` + backfill에서 `hedge=="hedge"` ETF에 `(DGS3MO−CD91)/100/252` 일일 차감(covered interest parity). 부호 시대별 자동(2023~25 +1.5%=과대수정 / 과거 한국금리>미국 −2.2%=프리미엄가산 → 금리역전 무관). ❷ **회사채 듀레이션 2.6→2.0.** ❸ **부수: KR금리(KTB/CD91/CORPAA3Y/KOFR) index_master에서 소실 발견→`fetch_kr_rates.py` ECOS 재수집 복구.** 한계: 갭 2.5p 중 ~1.5p만 금리차로 설명, 나머지=FX베이시스(Grade C). py_compile+로컬sanity PASS. **❗서버 검증 필요**(KR ETF 실가격 로컬無, Hetzner有). 상세 [[log]] 최상단.
+> ✅ **2026-05-31 업데이트 10 (Stage B 헤지비용·회사채·KR금리복구 — 서버검증 완료, f175b8a 배포):** 핸드오프 2문제 구현+검증. ❶ **헤지비용:** `build_bond_price_series(hedge_cost_pct=)` + backfill `hedge=="hedge"` ETF에 `(DGS3MO−CD91)/100/252` 일일차감(covered interest parity). 부호 시대별 자동(금리역전 무관). **서버검증: 헤지 ETF CAGR차 2.5p→1.0~1.5p ✅**(잔여~1p=FX베이시스 Grade C). ❷ **회사채 dur 2.6→2.0** — 갭 1.0~1.6p, 듀레이션은 갭에 무영향(주원인 carry 드리프트), Grade C 유지. ❸ KR금리 index_master 소실(로컬만)→ECOS 재수집. 회귀 없음(국채/종합채권/스트립/MMF 핸드오프와 동일). 상세 [[log]] 최상단.
 
 > 🔁 **2026-05-31 업데이트 9 (Stage B 종합검증 — 다음 세션 시작점):** 한국 채권 전 유형 C(총수익보존, DB로 TR재구성)+D(듀레이션) 검증. 국채/스트립/종합채권/레버리지/CD·MMF = ✅ 확실(CAGR차 ≤1p). **다음 세션 = 검증이 잡은 2문제:** ❶ **한국 미국채(헤지) CAGR 2.5%p 과대 = 헤지비용 누락** → (DGS3MO−CD91)/252 차감 구현(우선). ❷ 회사채 CAGR차 1~2p(만기형, Grade C 경계). 상세 해결방향 + 파일 = [[log]] 최상단 핸드오프. 백필 전부 클리어(on-demand), 실데이터·KR금리 보존, gate 2c PASS.
 

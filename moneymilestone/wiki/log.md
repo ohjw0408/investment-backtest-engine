@@ -20,9 +20,11 @@
 ### 한계 (Grade C)
 핸드오프 갭 2.5%p 중 **금리차로 ~1.5%p 설명**. 나머지 ~1%p = FX 베이시스(선물환 수급 프리미엄, 단기금리차로 미포착). 2.5p→~1p 개선 예상. 수용 범위.
 
-### 검증 상태
-- py_compile OK (bond_model, backfill_engine). 로컬 공식 sanity(크기·부호) PASS.
-- ❗ **CAGR갭 최종 축소 = 서버 검증 필요** (`stage_b_verify_kr.py`는 서버 실행 — KR ETF 실가격 필요). 백필 on-demand라 서버에서 헤지/회사채 ETF 사용 시 새 config로 재생성.
+### 검증 상태 — ✅ 서버 검증 완료 (f175b8a 배포, stage_b_verify_kr.py 모델에 헤지비용 반영)
+- **헤지 ETF CAGR차: 2.5p → 1.0~1.5p ✅** (453850=1.23p / 484790=1.03p / 458250스트립=1.46p / 267490레버=0.43p). 금리차 ~1.5p 메움, 잔여 ~1p=FX베이시스(Grade C). 월상관 0.93~0.97 유지.
+- **회사채(dur 2.0): 갭 1.0~1.6p** (438330=1.03 / 473290=1.05 / 0016X0=1.63). 듀레이션 하향은 갭에 거의 무영향 — 갭 주원인은 carry(CORPAA3Y yield) 드리프트(model<actual). dur는 요청대로 적용. Grade C 유지.
+- **회귀 없음:** 국채 0.13~0.88p / 종합채권 0.45~0.52p / 스트립 0.25p / MMF 0.13~0.57p — 핸드오프와 동일.
+- 서버 services(domino/celery/beat) 전부 active. 서버 index_master KR금리 정상(소실은 로컬만).
 
 _작성: Claude (Opus 4.8)_
 

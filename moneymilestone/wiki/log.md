@@ -1,5 +1,38 @@
 # Log
 
+## [2026-05-31] feature | 투자계산기 전체 롤링 케이스 가격 출처 표시
+
+- 커밋: `afd37b4 feat(calc): show rolling price provenance`
+- 배경: 배당 히스토그램에는 실측/백필 시작점이 보였지만, 결과창 우측 상단의 `N년 | M개 롤링 케이스`가 가격 데이터 기준으로 몇 케이스가 실측이고 몇 케이스가 지수 기반 프록시/백필인지 설명하지 못했다.
+- 구현:
+  - `calculator_logic.py`
+    - `price_provenance` 응답 필드 추가.
+    - 단일 계좌/다중 계좌 모두 동일하게 포함.
+    - 케이스 분류 기준: 모든 종목의 `volume > 0` 실측 가격 시작일 중 가장 늦은 날짜 이후에 시작하는 롤링 케이스만 `actual_cases`; 그 이전부터 시작하는 케이스는 `backfilled_cases`.
+    - 종목별 `data_start`, `real_start`, `proxy`, `sources` 제공.
+  - `templates/calculator.html`
+    - 결과 헤더 아래 `priceProvenanceNote` 영역 추가.
+  - `static/js/calculator.js`
+    - `renderPriceProvenance()` 추가.
+    - 예: `가격 데이터: 실측 0개 / 프록시·백필 221개 (총 221개 롤링 케이스)`.
+    - 펼치면 종목별 실측 시작일과 백필 프록시/구간/행 수 표시.
+  - `static/css/calculator.css`
+    - 결과 헤더용 작은 provenance 안내 스타일 추가.
+- 로컬 검증:
+  - `python -m py_compile calculator_logic.py` PASS
+  - `node --check static/js/calculator.js` PASS
+  - `458730`, 7년, 10억원, 월적립 0원 샘플: `cases=221`, `actual_cases=0`, `backfilled_cases=221`, `proxy=DJUSDIV_PROXY`, `real_start=2023-06-20`
+  - `360750`, 7년 샘플: `cases=221`, `actual_cases=0`, `backfilled_cases=221`, `proxy=^GSPC`, `real_start=2020-08-07`
+  - `SCHD`, 7년 샘플: `actual_cases=31`, `backfilled_cases=190`, `proxy=DJUSDIV_PROXY`
+  - `SPY`, 7년 샘플: `actual_cases=106`, `backfilled_cases=115`
+- 주의:
+  - 이 기능은 수익률 계산 로직을 바꾸지 않고, 결과의 데이터 출처 투명성만 추가한다.
+  - 프론트 캐시 무효화를 위해 `calculator.js?v=20260531b`로 변경했다.
+
+_작성: Codex_
+
+---
+
 ## [2026-05-31] feature | Phase 2f 완성 — 중간실현 합산 + 자동산출 + 분할매도 슬라이더 전탭 배선
 
 2f 핵심(청산 합산) 이후 오너 지시로 남은 3개 완료.

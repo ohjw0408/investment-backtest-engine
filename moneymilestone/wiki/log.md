@@ -1,5 +1,28 @@
 # Log
 
+## [2026-05-31] feature | Phase 2f 핵심 구현 — 청산 시세차익+배당 합산 종합과세 + 트래킹
+
+오너 핵심 갭(청산 KR_FOREIGN을 그 해 배당과 합산 종합과세) 구현. 순서 = 2f 먼저 → G2 나중(플랜 명시).
+
+### 구현 (단일계좌, transfer 불필요분)
+- **`liquidation.py`:** KR_FOREIGN 청산이익 flat 15.4% → **그 해 금융소득(ytd_financial_income)과 합산 종합과세.** 2천만 이하 15.4% 분리, 초과분 종합과세(배당과 동일 `_comprehensive_extra_tax` 재사용). 오너 1.3억 케이스 동작.
+- **`account_tax.py` TaxedDividendEngine:** `other_financial_income` 인자 추가 → `_ytd_income` 매년 외부 금융소득부터 시작(현 0 고정 해소). 연도별 금융소득 트래킹(`financial_income_by_year`) + `finalize_year_tracking`(마지막 연도에 청산차익 가산).
+- **`taxable_runner.py`:** user_settings에서 other_financial_income 주입, 청산에 ytd_financial_income 전달, 연도별 종합과세 대상(`comprehensive_years`) 산출 → `RunResult`에 추가.
+- US_DIRECT 양도차익은 22% 별도 유지(미합산, Q2 결정대로).
+
+### 검증
+- **신규 `test_phase2f_comprehensive.py` 5/5 PASS:** ① 청산 1억+배당 3천=1.3억 합산 종합과세(=`_year_tax` 일치) ② ytd0 단독 ③ 소액(1천만) flat 15.4% 회귀 ④ `_ytd_income` 주입 ⑤ 연도별 트래킹+대상 flag.
+- **회귀 무손상:** tax_truth 64/64, Gate 2a/2b/2c/phase1 각 4/4 PASS.
+
+### 남은 것 (후속 보고)
+- ❌ 중간 실현 KR_FOREIGN(리밸/절세매도, `order_executor._calc_cg_tax`)은 아직 flat 15.4% — 배당풀 미합산(매수후보유 배당ETF는 드묾).
+- ❌ `other_financial_income` 자동산출(직전 완료년도 sim 배당) — 현재 user_settings 주입값 사용.
+- ❌ 분할매도 슬라이더 패널 전탭 배선(계산기/배당/연금) + `comprehensive_years` UI/API 노출.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-31] plan | 금융소득 종합과세 상세 설계 (오너 디테일 결정 → Phase 2f + Track G 2-4)
 
 오너와 디테일 확정 후 플랜 구체화. 코드 실상 확인 = 매년 배당 종합과세는 작동(단 _ytd_income 0 시작), **청산/실현 시세차익이 그 해 배당과 합산 안 됨(15.4% 분리)이 핵심 갭.**

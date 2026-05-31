@@ -14,6 +14,9 @@ class RunResult:
     history_df: pd.DataFrame
     end_value: float  # 청산세 적용 후 최종 자산
     kr_foreign_unrealized_gain: float = 0.0  # 청산 시 KR_FOREIGN 미실현 이익 (Phase 2e 패널용)
+    # Phase 2f: 연도별 종합과세 트래킹
+    financial_income_by_year: dict = None      # year → 그 해 위탁 금융소득(외부+배당+청산차익)
+    comprehensive_years: tuple = ()            # 금융소득 종합과세 대상 연도(>2천만)
 
 
 class TaxableSimulationRunner:
@@ -50,7 +53,9 @@ class TaxableSimulationRunner:
             from modules.tax.account_tax           import TaxedDividendEngine
             from modules.execution.order_executor  import TaxedOrderExecutor
             from modules.core.portfolio            import TaxTrackedPortfolio
-            div_engine  = TaxedDividendEngine(DividendEngine(), tax_engine, account_type)
+            other_financial_income = float(user_settings.get("other_financial_income", 0.0) or 0.0)
+            div_engine  = TaxedDividendEngine(DividendEngine(), tax_engine, account_type,
+                                              other_financial_income=other_financial_income)
             exec_engine = TaxedOrderExecutor(tax_engine, account_type,
                                              gain_harvesting=gain_harvesting)
             portfolio   = TaxTrackedPortfolio(config.initial_capital)
@@ -75,6 +80,8 @@ class TaxableSimulationRunner:
         end_value      = float(history_df['portfolio_value'].iloc[-1])
 
         kr_foreign_unrealized_gain = 0.0
+        financial_income_by_year = {}
+        comprehensive_years = ()
         if tax_enabled and tax_engine is not None:
             from modules.tax.liquidation import apply_liquidation_tax
             last_prices = {
@@ -82,6 +89,17 @@ class TaxableSimulationRunner:
                 for t in config.tickers
                 if t in price_data and not price_data[t].empty
             }
+            # KR_FOREIGN 청산 미실현 이익 집계 (종합과세 합산 + 분할매도 패널용) — 청산 전 산출
+            if account_type == "위탁" and hasattr(portfolio, 'positions'):
+                for ticker, pos in portfolio.positions.items():
+                    if ticker in last_prices and pos.quantity > 0:
+                        if tax_engine.classify_asset(ticker) == "KR_FOREIGN":
+                            gain = portfolio.unrealized_gain(ticker, last_prices[ticker])
+                            if gain > 0:
+                                kr_foreign_unrealized_gain += gain
+
+            # 청산 연도 기 발생 금융소득(외부 + 위탁 배당 gross) — KR_FOREIGN 청산이익과 합산 종합과세
+            ytd_financial_income = getattr(div_engine, 'ytd_income', 0.0)
             ytd_us_gains = getattr(exec_engine, '_ytd_us_gains', 0.0)
             end_value = apply_liquidation_tax(
                 end_value=end_value,
@@ -93,18 +111,23 @@ class TaxableSimulationRunner:
                 ytd_us_realized_gains=ytd_us_gains,
                 age=user_settings.get('age', 40),
                 isa_years_held=isa_years_held,
+                ytd_financial_income=ytd_financial_income,
             )
-            # KR_FOREIGN 미실현 이익 집계 (Phase 2e 분할매도 절세 패널용)
-            if account_type == "위탁" and hasattr(portfolio, 'positions'):
-                for ticker, pos in portfolio.positions.items():
-                    if ticker in last_prices and pos.quantity > 0:
-                        if tax_engine.classify_asset(ticker) == "KR_FOREIGN":
-                            gain = portfolio.unrealized_gain(ticker, last_prices[ticker])
-                            if gain > 0:
-                                kr_foreign_unrealized_gain += gain
+
+            # 연도별 종합과세 트래킹 (마지막 연도에 청산 KR_FOREIGN 차익 가산)
+            if hasattr(div_engine, 'finalize_year_tracking'):
+                financial_income_by_year = div_engine.finalize_year_tracking(
+                    extra_final_year_income=kr_foreign_unrealized_gain
+                )
+                threshold = getattr(tax_engine, 'DIVIDEND_THRESHOLD', 20_000_000)
+                comprehensive_years = tuple(
+                    sorted(y for y, inc in financial_income_by_year.items() if inc > threshold)
+                )
 
         return RunResult(
             history_df=history_df,
             end_value=end_value,
             kr_foreign_unrealized_gain=kr_foreign_unrealized_gain,
+            financial_income_by_year=financial_income_by_year,
+            comprehensive_years=comprehensive_years,
         )

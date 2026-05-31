@@ -305,6 +305,17 @@ def test_l3_dividend_tax_capital_gain_tax_and_isa_liquidation():
     assert abs(isa_edge_result.account_results[0]["liquidation_tax_paid"] - 0.0) < 1e-6
     assert abs(isa_edge_result.account_results[0]["end_value"] - 12_000_000.0) < 1e-6
 
+    # ISA 서민형(preferential): 순이익 1,000만 - 서민형 400만 = 600만 x 9.9% = 59.4만
+    isa_pref_result = MultiAccountSimulationLoop().run(
+        [_loop_account("AAA", initial=10_000_000.0, monthly=0.0, account_type="ISA")],
+        isa_data,
+        list(isa_data["AAA"].index),
+        tax_enabled=True,
+        user_settings={"earned_income": 0, "age": 40, "isa_type": "preferential"},
+    )
+    assert abs(isa_pref_result.account_results[0]["liquidation_tax_paid"] - 594_000.0) < 1e-6
+    assert abs(isa_pref_result.account_results[0]["end_value"] - 19_406_000.0) < 1e-6
+
 
 def _flat_year_data():
     # 2020 한 해(12개월), 플랫가격 100, 배당 0

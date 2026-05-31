@@ -26,8 +26,9 @@
 ### 검증
 - `tests/test_track_g_multi_account.py` **13/13**(L0×2·L1·L2·L3·L4×8). 회귀 phase2f·Gate·cagr·tax_truth 포함 **40/40**.
 
-### 발견한 갭 (G2 범위 아님 → bugs.md BUG-TAX-1)
-- **ISA 서민형 비과세 400만 미구현** — `isa_type` 분기가 전부 일반형 200만으로 청산세 계산. 별도 수정.
+### BUG-TAX-1 = 오진(버그 아님, 정정)
+- 처음 L3 서민형 케이스를 `isa_type="low_income"`(미인식 값)으로 작성 → general fallback(792,000원) → "서민형 미구현"으로 오판.
+- 실제 서민형 코드값은 `"preferential"`(base_tax.py:345). 그 값 쓰면 594,000원 정상. 코드 무수정. L3 케이스를 `"preferential"`로 교정.
 
 _작성: Claude (Opus 4.8)_
 

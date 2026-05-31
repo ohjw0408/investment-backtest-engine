@@ -1,5 +1,33 @@
 # Log
 
+## [2026-05-31] fix | Stage B 헤지비용 모델 + 회사채 듀레이션 하향 + KR금리 복구
+
+핸드오프 2문제 구현. **서버 검증 대기**(KR 채권 ETF 실가격은 로컬 없음, Hetzner에 있음).
+
+### 한 일
+1. **헤지비용 모델 (문제1):** `bond_model.build_bond_price_series`에 `hedge_cost_pct` 인자 추가 — `daily_ret − (DGS3MO−CD91)/100/252`. `backfill_engine.backfill`에서 `hedge=="hedge"` ETF에 DGS3MO/CD91 차를 그날그날 계산해 전달. covered interest parity.
+2. **회사채 듀레이션 2.6→2.0 (문제2):** `_BOND_CATEGORY_CONFIG["KR_CORPORATE"]`. 만기형 실측 0.7~1.0 반영, CAGR차 축소 목적.
+3. **부수발견·복구:** KR금리(KTB*/CD91/CORPAA3Y/KOFR)가 index_master에서 **전부 소실**(핸드오프는 "보존"이라 했으나 실제 0행). `scripts/fetch_kr_rates.py` ECOS 재수집으로 복구(CD91 7975행 1995~, CORPAA3Y 7975행 등 10종).
+
+### 핵심 통찰 — 헤지비용 부호 시대별 자동전환 (오너 우려 "금리역전 시 깨지나?" 해소)
+그날그날 역사적 금리 사용 → 부호 자동. 검증(로컬 DGS30 sanity):
+| 기간 | 헤지비용(연율) | 효과 |
+|---|---|---|
+| 2023~2025 (ETF 실거래) | +1.5~1.6% | CAGR 차감 → 과대 수정 (핸드오프 방향 일치) |
+| 1995~2020 (백필 과거, 한국금리>미국) | 평균 −2.2% | 헤지 프리미엄 가산 (시대 정확) |
+- 6181/7975일이 역전(US<KR) — 코드가 부호로 자동 처리. 금리역전돼도 안 깨짐.
+
+### 한계 (Grade C)
+핸드오프 갭 2.5%p 중 **금리차로 ~1.5%p 설명**. 나머지 ~1%p = FX 베이시스(선물환 수급 프리미엄, 단기금리차로 미포착). 2.5p→~1p 개선 예상. 수용 범위.
+
+### 검증 상태
+- py_compile OK (bond_model, backfill_engine). 로컬 공식 sanity(크기·부호) PASS.
+- ❗ **CAGR갭 최종 축소 = 서버 검증 필요** (`stage_b_verify_kr.py`는 서버 실행 — KR ETF 실가격 필요). 백필 on-demand라 서버에서 헤지/회사채 ETF 사용 시 새 config로 재생성.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-31] verify+handoff | Stage B 한국 채권 종합검증 완료 + 다음 세션 핸드오프 (헤지비용·회사채)
 
 **다음 세션 시작점 — 검증이 잡은 2문제 해결.** 아래 그대로 이어받으면 됨.

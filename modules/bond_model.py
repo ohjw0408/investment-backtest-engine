@@ -43,7 +43,7 @@ _BOND_CATEGORY_CONFIG: dict[str, dict] = {
     "KR_TREASURY_10Y":  {"rate": "KTB10Y",   "duration": 7.7,  "model": "duration"},  # 실측 7.42~8.08 중앙 7.68
     "KR_TREASURY_30Y":  {"rate": "KTB30Y",   "duration": 18.0, "model": "duration"},  # ⚠️ 흩어짐(순수17 vs 스트립/Enhanced 23~27) — 별도 검토
     "KR_BOND_AGGREGATE":{"rate": "KTB3Y",    "duration": 4.2,  "model": "duration"},  # 종합채권, 실측 3.63~4.89 중앙 4.17
-    "KR_CORPORATE":     {"rate": "CORPAA3Y", "duration": 2.6,  "model": "duration"},  # 상시형 실측 2.59; 만기형도 단일값(롤오버 프록시)
+    "KR_CORPORATE":     {"rate": "CORPAA3Y", "duration": 2.0,  "model": "duration"},  # 2.6→2.0 하향(만기형 실측 0.7~1.0 반영, CAGR차 축소). 상시형 실측 2.59
     # ── 한국 CD/KOFR/MMF/단기 — carry(가격 평평, 수익=이자) ──
     "KR_MONEY_MARKET":  {"rate": "CD91",     "duration": 0.0,  "model": "carry"},
     # ── 한국상장 미국채 (USD 금리 + FX/헤지는 meta가 처리) ──
@@ -76,11 +76,17 @@ def bond_config(code: str, index_category: str | None = None) -> dict | None:
 
 
 def build_bond_price_series(yield_series: pd.Series, duration: float,
-                            model: str = "duration") -> pd.Series:
+                            model: str = "duration",
+                            hedge_cost_pct: pd.Series | None = None) -> pd.Series:
     """yield(%, 예: 4.27) 시계열 → 상대 price-return 지수(시작값 1.0).
 
     model="duration": 일일 가격수익 = -duration × Δyield(decimal). 캐리(이자)는 제외(쿠폰 분리).
     model="carry":    가격 평평(NAV ~ 일정). 모든 수익은 쿠폰(이자)으로 — MMF·CD·초단기.
+
+    hedge_cost_pct: 환헤지 비용(연율 %, 예: 2.5) 시계열. 환헤지 ETF는 선물환 비용 =
+        미-한 단기금리차(DGS3MO − CD91)만큼 수익이 깎인다(covered interest parity).
+        일일 차감 = hedge_cost_pct/100/252. 금리 역전 시 음수 → 헤지 프리미엄(가산)으로 자동 처리.
+        None이면 무적용. 해당 날짜 데이터 없으면(예: CD91 시작 1995 이전) 0으로 채워 무적용.
     반환 시계열은 _scale_to_etf로 ETF 상장가에 앵커링해 사용한다.
     """
     y = yield_series.dropna().sort_index().astype(float)
@@ -90,6 +96,9 @@ def build_bond_price_series(yield_series: pd.Series, duration: float,
         return pd.Series(1.0, index=y.index, name="bond_price")
     dy = y.diff().fillna(0.0) / 100.0          # %p → decimal
     daily_ret = (-float(duration)) * dy
+    if hedge_cost_pct is not None:
+        hc = hedge_cost_pct.reindex(y.index).ffill().fillna(0.0) / 100.0 / 252.0
+        daily_ret = daily_ret - hc
     daily_ret = daily_ret.clip(-_DAILY_RET_CLIP, _DAILY_RET_CLIP)
     price = (1.0 + daily_ret).cumprod()
     return price.rename("bond_price")

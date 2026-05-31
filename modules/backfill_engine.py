@@ -553,8 +553,19 @@ class BackfillEngine:
         bond_yield = None
         if is_bond:
             bond_yield   = index_series.copy()
+            # 환헤지 ETF(hedge="hedge"): 선물환 비용 = 미-한 단기금리차(DGS3MO − CD91)만큼
+            # 수익 차감(covered interest parity). 그날그날 역사적 금리 사용 → 시대 무관.
+            hedge_cost_pct = None
+            if hedge == "hedge":
+                us_short = self._load_index("DGS3MO")
+                kr_short = self._load_index("CD91")
+                if us_short is not None and kr_short is not None:
+                    su = us_short.reindex(bond_yield.index).ffill()
+                    sk = kr_short.reindex(bond_yield.index).ffill()
+                    hedge_cost_pct = su - sk
             index_series = build_bond_price_series(
-                index_series, bcfg["duration"], bcfg.get("model", "duration"))
+                index_series, bcfg["duration"], bcfg.get("model", "duration"),
+                hedge_cost_pct=hedge_cost_pct)
 
         # ETF 상장일 이전 지수 데이터 확인
         pre_series = index_series[index_series.index < etf_start]

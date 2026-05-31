@@ -4,6 +4,7 @@ calculator_logic.py
 """
 
 import datetime
+import sqlite3
 from dateutil.relativedelta import relativedelta
 
 _portfolio_engine = None
@@ -26,6 +27,110 @@ def _get_price_start(portfolio_engine, ticker: str):
         return row[0] if row and row[0] else None
     except Exception:
         return None
+
+
+def _get_real_price_start(portfolio_engine, ticker: str):
+    try:
+        cur = portfolio_engine.loader.conn.execute(
+            "SELECT MIN(date) FROM price_daily WHERE code=? AND volume > 0",
+            (ticker,),
+        )
+        row = cur.fetchone()
+        return row[0] if row and row[0] else None
+    except Exception:
+        return None
+
+
+def _get_symbol_proxy_label(ticker: str):
+    try:
+        from pathlib import Path
+        db = Path(__file__).resolve().parent / "data" / "meta" / "symbol_master.db"
+        with sqlite3.connect(db) as conn:
+            row = conn.execute(
+                "SELECT index_name, category FROM symbols WHERE code=?",
+                (ticker,),
+            ).fetchone()
+        if not row:
+            return None
+        index_name, category = row
+        try:
+            from modules.backfill_engine import INDEX_MAP, US_CATEGORY_MAP
+            return INDEX_MAP.get(index_name) or US_CATEGORY_MAP.get(category) or index_name or category
+        except Exception:
+            return index_name or category
+    except Exception:
+        return None
+
+
+def _get_price_source_summary(portfolio_engine, ticker: str):
+    try:
+        rows = portfolio_engine.loader.conn.execute(
+            """
+            SELECT source_type, source_code, confidence, COUNT(*), MIN(date), MAX(date)
+            FROM price_daily_source
+            WHERE code=?
+            GROUP BY source_type, source_code, confidence
+            ORDER BY COUNT(*) DESC
+            """,
+            (ticker,),
+        ).fetchall()
+        return [
+            {
+                "source_type": r[0],
+                "source_code": r[1],
+                "confidence": r[2],
+                "rows": int(r[3] or 0),
+                "date_from": r[4],
+                "date_to": r[5],
+            }
+            for r in rows
+        ]
+    except Exception:
+        return []
+
+
+def _build_price_provenance(portfolio_engine, tickers, data_start, cases):
+    total_cases = len(cases)
+    real_starts = [_get_real_price_start(portfolio_engine, t) for t in tickers]
+    real_starts = [d for d in real_starts if d]
+    all_real_start = max(real_starts) if real_starts else None
+
+    actual_cases = 0
+    if all_real_start:
+        actual_cases = sum(1 for c in cases if str(c.get("start", "")) >= all_real_start)
+    backfilled_cases = max(0, total_cases - actual_cases)
+
+    ticker_info = []
+    for ticker in tickers:
+        price_start = _get_price_start(portfolio_engine, ticker)
+        real_start = _get_real_price_start(portfolio_engine, ticker)
+        sources = _get_price_source_summary(portfolio_engine, ticker)
+        proxy_label = None
+        for src in sources:
+            if src.get("source_type") != "actual" and src.get("source_code"):
+                proxy_label = src["source_code"]
+                break
+        if proxy_label is None:
+            proxy_label = _get_symbol_proxy_label(ticker)
+
+        ticker_info.append({
+            "code": ticker,
+            "data_start": price_start,
+            "real_start": real_start,
+            "is_backfilled": bool(real_start and price_start and real_start > price_start),
+            "proxy": proxy_label,
+            "sources": sources[:5],
+        })
+
+    return {
+        "data_start": data_start,
+        "real_start": all_real_start,
+        "total_cases": total_cases,
+        "actual_cases": actual_cases,
+        "backfilled_cases": backfilled_cases,
+        "is_backfilled": backfilled_cases > 0,
+        "tickers": ticker_info,
+    }
 
 
 def _get_dividend_start(portfolio_engine, ticker: str):
@@ -309,6 +414,12 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
         }
         for c in result['cases']
     ]
+    price_provenance = _build_price_provenance(
+        portfolio_engine,
+        all_tickers,
+        data_start,
+        cases_summary,
+    )
 
     if len(isa_cap_accounts) == 1:
         isa_cap_info = isa_cap_accounts[0]
@@ -321,6 +432,7 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
         'cases':              cases_summary,
         'cases_count':        len(cases_summary),
         'distribution':       distribution,
+        'price_provenance':   price_provenance,
         'multi_account':      {
             'enabled': True,
             'accounts': [
@@ -534,6 +646,12 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
         }
         for c in result['cases']
     ]
+    price_provenance = _build_price_provenance(
+        portfolio_engine,
+        ticker_codes,
+        data_start,
+        cases_summary,
+    )
 
     has_partial_isa = result.get('distribution_early_cancel') is not None
 
@@ -566,6 +684,7 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
         'cases_count':              len(cases_summary),
         'distribution':             result['distribution'],
         'distribution_early_cancel': result.get('distribution_early_cancel'),
+        'price_provenance':         price_provenance,
         'isa_partial_cycle':        has_partial_isa,
         'isa_remainder_years':      years % 3 if has_partial_isa else 0,
         'isa_cap_info':             _isa_cap_info,

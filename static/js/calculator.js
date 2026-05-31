@@ -665,6 +665,57 @@ function calcUpdateSplitPlan(years) {
 }
 
 // ── 결과 렌더링 ──
+function renderPriceProvenance(provenance) {
+  const el = document.getElementById('priceProvenanceNote');
+  if (!el) return;
+  el.replaceChildren();
+
+  if (!provenance || !Number.isFinite(Number(provenance.total_cases))) {
+    el.style.display = 'none';
+    return;
+  }
+
+  const total = Number(provenance.total_cases || 0);
+  const actual = Number(provenance.actual_cases || 0);
+  const backfilled = Number(provenance.backfilled_cases || 0);
+  const details = document.createElement('details');
+  const summary = document.createElement('summary');
+  summary.textContent = `가격 데이터: 실측 ${actual.toLocaleString()}개 / 프록시·백필 ${backfilled.toLocaleString()}개`;
+  if (total > 0) {
+    summary.textContent += ` (총 ${total.toLocaleString()}개 롤링 케이스)`;
+  }
+  details.appendChild(summary);
+
+  const tickers = Array.isArray(provenance.tickers) ? provenance.tickers : [];
+  if (tickers.length) {
+    const list = document.createElement('ul');
+    tickers.forEach(ticker => {
+      const item = document.createElement('li');
+      const sources = Array.isArray(ticker.sources) ? ticker.sources : [];
+      const source = sources.find(src => src.source_type !== 'actual' && src.source_code);
+      const proxy = ticker.proxy || source?.source_code || '프록시';
+
+      if (ticker.is_backfilled) {
+        let sourceText = proxy;
+        if (source?.date_from && source?.date_to) {
+          const rows = Number(source.rows || 0).toLocaleString();
+          sourceText = `${source.source_code || proxy} ${source.date_from}~${source.date_to}, ${rows}행`;
+        }
+        item.textContent = `${ticker.code}: 실측 ${ticker.real_start || '?'}~, 백필 ${sourceText}`;
+      } else if (ticker.real_start) {
+        item.textContent = `${ticker.code}: 실측 ${ticker.real_start}~`;
+      } else {
+        item.textContent = `${ticker.code}: 가격 출처 정보 없음`;
+      }
+      list.appendChild(item);
+    });
+    details.appendChild(list);
+  }
+
+  el.appendChild(details);
+  el.style.display = 'block';
+}
+
 function renderResult(data, payload) {
   document.getElementById('resultEmpty').style.display   = 'none';
   document.getElementById('resultContent').style.display = 'block';
@@ -717,6 +768,7 @@ function renderResult(data, payload) {
 
   document.getElementById('resultPeriodLabel').textContent =
     `${payload.years}년 | ${data.cases_count}개 롤링 케이스`;
+  renderPriceProvenance(data.price_provenance);
 
   // 가상 데이터 경고 배너
   const synthBanner = document.getElementById('synthWarningBanner');

@@ -209,6 +209,7 @@
           <h3 class="result-title">시뮬레이션 결과</h3>
           <span class="result-period" id="resultPeriodLabel"></span>
         </div>
+        <div class="price-provenance-note" id="priceProvenanceNote" style="display:none;"></div>
         <div id="calcShareBtns" style="display:none;flex-direction:column;gap:4px;margin-top:8px;">
           <div style="display:flex;gap:8px;">
             <button onclick="calcCopyLink()" class="share-pill">🔗 링크 복사</button>
@@ -349,5 +350,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260531a"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260531b"></script>
 {% endblock %}

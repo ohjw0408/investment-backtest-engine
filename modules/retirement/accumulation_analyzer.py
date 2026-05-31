@@ -531,8 +531,9 @@ class AccumulationAnalyzer:
         sortino = (daily_returns.mean() / dstd * np.sqrt(252)) if (dstd and dstd > 0) else 0.0
 
         # MWR (IRR) - 월납 타이밍을 정확히 반영한 수익률
+        # 초기 일시금만 있는 경우에는 IRR을 월수익률처럼 연율화하면 왜곡된다.
         mwr = 0.0
-        if "cash_flow" in history.columns:
+        if self.monthly_contribution > 0 and "cash_flow" in history.columns:
             cf = history.loc[history["cash_flow"] != 0, ["date", "cash_flow"]].copy()
             cf = pd.concat([cf, pd.DataFrame([{"date": history["date"].iloc[-1], "cash_flow": float(pv.iloc[-1])}])],
                            ignore_index=True)

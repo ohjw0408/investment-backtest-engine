@@ -1,5 +1,28 @@
 # Log
 
+## [2026-05-31] docs | 계획파일 전체 동기화 + 다음 작업 확정(금융소득 종합과세)
+
+배당 백필 Stage A/B 완료·세금 2c 재검증 완료를 전 계획파일에 반영. 다음 작업 = 금융소득 종합과세 완전 구현으로 확정.
+
+### 갱신한 계획파일
+- **ETF_BACKFILL_ARCHITECTURE_PLAN.md:** Phase 7에 Stage B 완료 addendum(한국 채권 전유형·환헤지비용·US 키워드 자동분류·통화가드·서버검증). Stage B 헤더 ✅.
+- **PROJECT_MASTER_ROADMAP.md:** 헤더·현재위치·블로커·다음액션·플랜인덱스 표 갱신. 블로커=없음, 다음=금융소득 종합과세.
+- **세금에서시작된완전리팩토링계획.plan.md:** "다음 액션" = 금융소득 종합과세(Phase 2e 배선 + phase1-api). 갭 3종 + 선행확인(gross/net) 명시.
+- **wiki status.md:** 진행중 표 갱신(Stage B ✅, 종합과세 = 다음), 한 줄 요약 업데이트 12.
+
+### 다음 작업 = 금융소득 종합과세 완전 구현 (확정)
+- 문제(오너): 올해 금융소득(이자·배당) 2천만 초과해도 15.4%(미국 15%)만 떼고 종합소득 누진 집계 안 됨.
+- 실상: 종합과세 **엔진 수학은 완료**(`base_tax._comprehensive_tax`/`after_tax_dividend`/`_comprehensive_extra_tax`, 2천만 임계, `tax_truth_test` 통과). 갭은 **배선·데이터:**
+  - ① `other_financial_income` 자동산출 미구현 — `backtest_logic.py:117` 수동값/0 fallback(plan 금지). case별 직전 완료년도 gross 배당·이자 집계 필요.
+  - ② 분할매도/종합과세 패널 백테스트 탭에만 배선 — 계산기/배당/연금 `*_logic.py` 미배선.
+  - ③ `TaxedDividendEngine._ytd_income` 0 고정(`account_tax.py:230`) — 기존 금융소득 미주입.
+  - + KR_FOREIGN 청산이익은 설계상 15.4% 기준선 유지, 종합과세는 분할매도 패널로 안내(end_value 불변).
+- 선행: 히스토리/breakdown `dividend_income` gross/net 여부 먼저 확인.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-31] feature | US 채권 ETF 자동백필(키워드 분류기) + 회사채 DBAA + 통화 가드
 
 수동 dict(TLT 등 10종)로만 되던 US 채권 백필을 **영문명 키워드 분류기로 자동화**. + 비USD/KRW 통화 노출 채권 안전차단.

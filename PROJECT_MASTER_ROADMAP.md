@@ -1,6 +1,6 @@
 # Project Master Roadmap
 
-Last updated: 2026-05-31 (✅ Stage A + ^GSPC 제거(proxy 2003 시작) + Phase 2c 재검증 완료, 배당역산 4x버그 수정, 투자계산기 가상보충 → 다음=Stage B 채권/MMF 쿠폰)
+Last updated: 2026-05-31 (✅ 배당 백필 Stage A + Stage B(채권/MMF·환헤지·US 채권 자동분류·통화가드) 서버검증 완료, Phase 2c 재검증 완료 → 다음=금융소득 종합과세 완전 구현(세금 Phase 2e 배선 + `_ytd_income` 주입))
 
 > ⚠️ **2026-05-30 정정:** 아래 "SCHD vs TIGER now converge" / "Phase 2c Gate 통과" / "Track A 완료"는 **가격(CAGR) 수렴만** 검증된 것이었음. `debug_dividend.py` 실측 결과, 배당 **액수**는 0임이 확인됨. 원인: Track A가 DJUSDIV_PROXY를 total-return(adj-close)로 구축 → 가격은 맞지만 배당이 가격에 임베딩되어 itemize 안 됨. 백필 가격 구간(1928~)에 배당 row 없음 + provenance 전부 0행. **이는 세금 Phase 2c(배당 역산)·2e(금종세)·Track G(다중계좌 세금)의 데이터 기반을 무효화한다.** 해결 owner: `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0`(범용 배당 백필 재설계). 우선순위는 아래 "Current Recommended Next Action" 참조.
 
@@ -15,8 +15,8 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 | File | Role | Status |
 |---|---|---|
 | `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed (A1/A2/A3/A5/A6/B5/C3/C5/D3 done) |
-| `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 1~3 + 2d 완료. 🔁 **2c/2e 재검증 필요**(Stage A 정상 배당 데이터 기준). ⚠️ **2e 부분 구현** — 종합과세 엔진+백테스트 배선만. 자동산출/전탭배선/`_ytd_income` 주입 미완 (상세는 owner plan 갭 섹션). |
-| `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | ✅ **Phase 6.0 Stage A 서버 적용 완료**(price-return DJUSDIV_PROXY + 명시 배당 + UI 실측/추정). 🔴 Stage B 채권/MMF는 후속 필수. Phase 3+ (etf_master, etf_proxy_map, confidence grading)는 이후. |
+| `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 1~3 + 2c/2d 완료. 🔴 **다음 = 금융소득 종합과세 완전 구현(Phase 2e 배선 + phase1-api).** 엔진 수학은 완료, 갭 = `other_financial_income` 자동산출·전탭배선·`_ytd_income` 주입(데이터 토대 완성돼 블로커 없음). |
+| `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | ✅ **Phase 6.0 Stage A + Stage B 완료**(주식 배당 + 채권/MMF·환헤지비용·US 채권 키워드 자동분류·통화가드, 서버검증). Phase 3+ (etf_master, etf_proxy_map, confidence grading)는 이후. |
 | `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | ✅ Complete (Phase 1~10, all screens). |
 | `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | **Backend complete (e8b7c1e). Frontend partially done. BUG-1~5 remain.** |
 | `PHASE4_PLAN.md § 4G` | Multi-account simulation engine + real ISA windmill (sequential/conditional flow). Requires Track F first. Key constraint: percentiles must be computed after per-scenario sum, not by summing individual percentiles. | Not started. Requires Track F first. |
@@ -36,8 +36,9 @@ UI 실측/추정 필드를 확인했다.
 
 현재 위치 (한눈에):
 - ✅ **완료:** 배당 백필 Stage A + ^GSPC 제거(2003) — `ETF_BACKFILL § Phase 6.0 Stage A`
+- ✅ **완료:** 배당 백필 Stage B(채권/MMF) — 한국 채권 전유형·환헤지비용·US 채권 자동분류·통화가드, 서버검증 — `ETF_BACKFILL § Phase 7 addendum`
 - ✅ **완료:** 세금 Phase 2c 재검증 (2e 엔진 검증 완료, 2e 배선 갭은 빌드 잔여)
-- 🔴 **지금/후속 필수:** 배당 백필 Stage B(채권/MMF 쿠폰 분배금) — `ETF_BACKFILL § Phase 7`
+- 🔴 **지금/다음:** 금융소득 종합과세 완전 구현(세금 Phase 2e 배선 + phase1-api `_ytd_income` 주입) — 데이터 토대 완성, 블로커 없음
 - ⏸️ **대기:** Track G(다중계좌 세금) — G1 ✅, 후속 ②커서 ③UI
 
 완료 (가격/구조 레벨 — 단, 배당 액수 정확성은 별개):
@@ -51,7 +52,7 @@ UI 실측/추정 필드를 확인했다.
 - ✅ ETF_BACKFILL Phase 0~2 provenance 스키마는 Stage A 백필 가격/배당 기록에 사용됨.
 - ✅ PHASE4: A1/A2/A3/A5/A6/B5/C3/C5/D3 done.
 
-Current blocker: **배당 백필 Stage B (채권/MMF 쿠폰 분배금).** (Phase 2c 재검증은 완료 — 2026-05-31.)
+Current blocker: **없음.** 배당 Stage A/B + Phase 2c 재검증 완료. 다음 = **금융소득 종합과세 완전 구현**(2e 배선 + `_ytd_income` 주입). (2026-05-31 갱신)
 
 ## Decision
 
@@ -291,21 +292,20 @@ Completion note - YYYY-MM-DD
 
 > ⚠️ **우선순위 전환 (2026-05-30):** 배당 데이터 근본 버그 발견. Track G는 다중계좌 **세금**(금종세·배당) 시뮬이라 배당/세율 데이터가 정확해야 테스트·구현이 의미 있음. 현재 배당 액수가 0이라 Track G 진행은 검증 불가능한 토대 위에 쌓는 셈. **따라서 데이터 토대부터 고친다.**
 
-**[1] ✅ 완료 (2026-05-31) — 세금 Phase 2c 재검증 + 배당역산 버그 수정:**
-^GSPC 제거(proxy 2003 시작) 후 Gate 2c PASSED 3/3, 투자·배당 계산기 양쪽 SCHD≈458730 수렴,
-2e 종합과세 엔진 `tax_truth_test` 64/64. 배당역산 4x 갈림 버그(`_find_real_data_start` 휴리스틱 +
-all-or-nothing) 수정. 배당계산기 UX(슬라이더 50%·p25~p75) + 투자계산기 가상보충 추가.
-잔여: **2e 배선 갭**(`other_financial_income` 자동산출·전탭 배선·`_ytd_income` 주입) = 빌드 작업.
+**[★ 지금 — 다음 작업] 금융소득 종합과세 완전 구현 (세금 Phase 2e + phase1-tax-profile-api):**
+데이터 토대(배당 Stage A + 채권 Stage B) 완성 → 더 이상 블로커 없음. 종합과세 **엔진 수학은
+구현·단위검증 완료**(`base_tax._comprehensive_tax`/`after_tax_dividend`/`_comprehensive_extra_tax`,
+2천만 임계). 남은 것 = **배선·데이터 갭 3종:**
+- ① `other_financial_income` 자동산출 미구현 — `backtest_logic.py:117`이 수동값/0 fallback(plan 금지).
+  case별 직전 완료년도 gross 배당·이자 자동집계 필요.
+- ② 분할매도/종합과세 패널이 **백테스트 탭에만** 배선 — 계산기/배당/연금 `*_logic.py` 미배선.
+- ③ `TaxedDividendEngine._ytd_income` **0 고정**(`account_tax.py:230`) — 기존 금융소득 미주입.
+실행 지시: 「금융소득 종합과세 구현해줘」. 상세 갭 = `세금에서시작된완전리팩토링계획.plan.md` Phase 2e.
 
-**[진행중 2026-05-31] Stage B 채권 — 대부분 완료, 검증이 잡은 2문제 남음:**
-US 국채(전수검증) + 한국(국고채/종합채권/회사채/CD·MMF carry/스트립/레버리지) 듀레이션 가격모델 + 월쿠폰 구현·검증 완료. 한국금리 ECOS 수집. 백필 전부 클리어(on-demand 재생성).
-**다음 세션 시작점 (검증이 잡은 2문제):** ❶ 한국상장 미국채(헤지) CAGR 2.5%p 과대 = 헤지비용 누락 → (DGS3MO−CD91)/252 차감(우선). ❷ 회사채 CAGR차 1~2p(만기형, Grade C 경계). 상세 = `wiki/log.md` 최상단 핸드오프.
-
-**[2] 옛 항목 — 배당 백필 Stage B (채권/MMF, 필수):**
-```text
-ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 7 + Phase 6.0 Stage B 진행해줘
-```
-채권/MMF 금리 수치 → 듀레이션 가격 모델 + 쿠폰을 분배금으로 명시 주입.
+**[✅ 완료 2026-05-31] 배당 백필 Stage A + Stage B (채권/MMF):**
+Stage A(주식 배당, price-return + 명시배당) + Stage B(한국 채권 전유형·환헤지비용·US 채권 키워드
+자동분류·통화가드) 구현·서버검증 완료. 세금 Phase 2c 재검증 PASS(Gate 2c 3/3). 상세 =
+`ETF_BACKFILL § Phase 7 완료 addendum` + `wiki/log.md`.
 
 **[3] 세금 재검증 후 — Track G 재개:**
 G1 후속 보완(② 입력 커서 유실 ③ UI 통일 — 배당 0(①)은 Stage A로 해소). 이후 은퇴/백테스트 탭 확장 → G2 자금이동.

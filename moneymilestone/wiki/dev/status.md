@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> ✅ **2026-05-31 업데이트 11 (US 채권 ETF 자동백필 + 통화가드):** 수동 dict(10종)→**영문명 키워드 분류기**로 US 채권 자동백필. `classify_us_bond_etf`(국채 만기버킷·회사채 DBAA·광범위본드, HY/TIPS/Muni/MBS/해외채=안전스킵). `bond_config` US Fixed Income 게이트(주식 오탐 방지). **회사채 yield=DBAA**(Moody's Baa, BAML은 FRED 3년제한). **통화가드** `unsupported_currency`(엔화/유로/위안)→채권백필 거부, **엔화노출 미국채 3종 차단 확인**(유저 우려 케이스). 검증: 유닛 34/34, 561종 중 300분류/261스킵, 실데이터 대부분 ≤0.7p(VCSH 1.56p·BLV 2.09p Grade C). **❗서버에 `fetch_us_credit_rates.py` 실행 필요**(DBAA). HY는 장기yield 없어 미구현(후속). 상세 [[log]].
+
 > ✅ **2026-05-31 업데이트 10 (Stage B 헤지비용·회사채·KR금리복구 — 서버검증 완료, f175b8a 배포):** 핸드오프 2문제 구현+검증. ❶ **헤지비용:** `build_bond_price_series(hedge_cost_pct=)` + backfill `hedge=="hedge"` ETF에 `(DGS3MO−CD91)/100/252` 일일차감(covered interest parity). 부호 시대별 자동(금리역전 무관). **서버검증: 헤지 ETF CAGR차 2.5p→1.0~1.5p ✅**(잔여~1p=FX베이시스 Grade C). ❷ **회사채 dur 2.6→2.0** — 갭 1.0~1.6p, 듀레이션은 갭에 무영향(주원인 carry 드리프트), Grade C 유지. ❸ KR금리 index_master 소실(로컬만)→ECOS 재수집. 회귀 없음(국채/종합채권/스트립/MMF 핸드오프와 동일). 상세 [[log]] 최상단.
 
 > 🔁 **2026-05-31 업데이트 9 (Stage B 종합검증 — 다음 세션 시작점):** 한국 채권 전 유형 C(총수익보존, DB로 TR재구성)+D(듀레이션) 검증. 국채/스트립/종합채권/레버리지/CD·MMF = ✅ 확실(CAGR차 ≤1p). **다음 세션 = 검증이 잡은 2문제:** ❶ **한국 미국채(헤지) CAGR 2.5%p 과대 = 헤지비용 누락** → (DGS3MO−CD91)/252 차감 구현(우선). ❷ 회사채 CAGR차 1~2p(만기형, Grade C 경계). 상세 해결방향 + 파일 = [[log]] 최상단 핸드오프. 백필 전부 클리어(on-demand), 실데이터·KR금리 보존, gate 2c PASS.

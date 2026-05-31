@@ -494,10 +494,17 @@ class BackfillEngine:
         # ETF 코드로 직접 키잉한다 (etf_proxy_map 씨앗).
         from modules.bond_model import (
             bond_config, build_bond_price_series, COUPON_FREQ_PER_YEAR,
-            COUPON_BOOK_FACTOR, STRIP_DURATION_MULT,
+            COUPON_BOOK_FACTOR, STRIP_DURATION_MULT, unsupported_currency,
         )
-        bcfg    = bond_config(code, index_nm)
+        etf_type = str(meta.get("etf_type", "KR"))
+        us_category = str(meta.get("category", "")) if etf_type == "US" else None
+        # US 채권은 코드 dict > 영문명 키워드 분류기(category=US Fixed Income일 때만). KR은 index 카테고리.
+        bcfg    = bond_config(code, index_nm, name=name, etf_type=etf_type, us_category=us_category)
         is_bond = bcfg is not None
+        # 통화 가드: 비USD/KRW 통화 노출 채권(엔화·유로 등)은 우리 FX엔진이 USD로 둔갑시켜
+        # 백필하면 환율 틀림 → 거부(안전스킵). 라벨이 'US Treasury'로 맞아도 차단.
+        if is_bond and unsupported_currency(name):
+            return {"code": code, "status": "currency_unsupported_skip"}
         # 스트립(무이표)은 듀레이션 ≈ 만기로 길다 → 이름 감지해 가산.
         # 레버리지/인버스는 meta.leverage로 아래 _apply_leverage가 기존 로직으로 처리.
         if is_bond and ("스트립" in name or "strip" in name.lower()):
@@ -506,7 +513,6 @@ class BackfillEngine:
         # 지수 코드 매핑
         # US ETF는 index 컬럼이 이미 index_master.db 코드 (^GSPC, DGS30 등)
         # KR ETF는 index 컬럼이 SP500, NASDAQ100 등 → INDEX_MAP으로 변환
-        etf_type = str(meta.get("etf_type", "KR"))
         if is_bond:
             index_code = bcfg["rate"]
         elif etf_type == "US":

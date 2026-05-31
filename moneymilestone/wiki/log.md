@@ -1,5 +1,29 @@
 # Log
 
+## [2026-05-31] feature | US 채권 ETF 자동백필(키워드 분류기) + 회사채 DBAA + 통화 가드
+
+수동 dict(TLT 등 10종)로만 되던 US 채권 백필을 **영문명 키워드 분류기로 자동화**. + 비USD/KRW 통화 노출 채권 안전차단.
+
+### 한 일
+1. **US 채권 키워드 분류기** `bond_model.classify_us_bond_etf(name)` — 결정론(LLM 아님). 국채 만기버킷(20+/10-20/7-10/3-7/1-3 → DGS30/DGS10dur9/7.5/4.5/DGS3MO), 회사채 IG(DBAA, 만기별 dur 2.7/6/8/13), 광범위본드(DGS10 만기별). 모델불가 유형(HY/TIPS/Muni/MBS/CLO/International/EM/Preferred/Convertible) = None **안전스킵**.
+2. **`bond_config` 확장 + 게이트:** `us_category=="US Fixed Income"`일 때만 이름분류 → 주식 ETF명 오탐 방지('Credit Suisse' 등). 우선순위 코드dict > KR카테고리 > US이름분류.
+3. **회사채 yield 소스 DBAA(Moody's Baa, 1986~ 10137행) 수집** `scripts/fetch_us_credit_rates.py`. ICE BofA(BAML)는 FRED 라이선스로 최근3년만 → 백필 불가하여 DBAA 채택. **HY는 장기 무료 yield 없어 미수집→안전스킵**(Grade D 스프레드 프록시는 후속 옵션).
+4. **통화 가드** `unsupported_currency(name)` — 엔화/JPY/유로/위안/파운드 마커 → 채권백필 거부. backfill_engine에 `is_bond and unsupported_currency(name)` 차단 추가. **라벨이 'US Treasury'로 맞아도 차단**(엔진이 USD/KRW만 모델링하는 한계 방어).
+
+### 검증 (철저)
+- **분류기 유닛 34/34 PASS** (`test_us_bond_classifier.py`): 만기/유형별 기대값 + 스킵 + 통화가드.
+- **커버리지:** US Fixed Income 561종 → **300 분류 / 261 안전스킵**(스킵=HY/TIPS/Muni/MBS/International 등 모델불가, 정확).
+- **통화가드 실효:** KR 채권류 중 **3종 차단** — `RISE/ACE 미국30년국채엔화노출(H)`, `PLUS 일본엔화초단기국채`. ★유저 우려 케이스(엔화→USD 둔갑) 차단 확인. 주식 엔화ETF는 is_bond=False라 미적용.
+- **실데이터 end-to-end** (`verify_us_bond_auto.py`, yfinance 총수익 vs 모델): 양호 ≤0.7p = LQD 0.69/VCIT 0.12/VCLT 0.51/TLH 0.54/IEI 0.36/SHY 0.55/BND 0.58/BSV 0.00 (월상관 0.81~0.97). **약점(Grade C):** VCSH 단기회사채 1.56p(DBAA 장기yield carry 과대), BLV 장기광범위 2.09p(국채 carry 과소) — 단일yield 프록시 만기극단 한계, 오버핏 회피해 수용.
+- 회귀: 기존 TLT(hand)/KR 카테고리/주식→None 경로 불변 확인.
+
+### 서버 적용 주의
+- **서버 index_master에 DBAA 필요** → 배포 후 서버에서 `fetch_us_credit_rates.py` 실행해야 US 회사채 백필 작동(db는 미커밋, Celery 충돌 방지).
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-05-31] fix | Stage B 헤지비용 모델 + 회사채 듀레이션 하향 + KR금리 복구
 
 핸드오프 2문제 구현. **서버 검증 대기**(KR 채권 ETF 실가격은 로컬 없음, Hetzner에 있음).

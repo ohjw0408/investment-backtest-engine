@@ -63,15 +63,96 @@ COUPON_BOOK_FACTOR = 0.87
 _DAILY_RET_CLIP = 0.10
 
 
-def bond_config(code: str, index_category: str | None = None) -> dict | None:
+# ── 미국 채권 ETF 키워드 분류기 ─────────────────────────────
+# us_etf_list category가 "US Fixed Income"으로 561종 뭉쳐 듀레이션 구분 불가 →
+# ETF 영문명 키워드로 카테고리·듀레이션 추론(결정론적). 모델 불가 유형(HY/TIPS/Muni/MBS/
+# 해외채)은 None=안전스킵(틀린 역사보다 없는 역사). rate는 index_master 코드.
+#   국채: DGS30/DGS10/DGS3MO,  회사채 IG: DBAA(Moody's Baa, 장기).
+_US_BOND_SKIP_KW = (
+    "high yield", "high-yield", "junk",
+    "tips", "inflation", "municipal", "muni", "tax-exempt", "tax exempt",
+    "mortgage", "mbs", "convertible", "preferred", "senior loan", "bank loan",
+    "emerging", "international", "global", "ex-u.s", "ex u.s", "world bond",
+    "local currency",
+)
+
+
+def classify_us_bond_etf(name: str) -> dict | None:
+    """미국 채권 ETF 영문명 → {rate, duration, model}. 모델 불가/미지면 None(안전스킵)."""
+    n = name.lower()
+    if any(k in n for k in _US_BOND_SKIP_KW):
+        return None
+    # 회사채(IG) — DBAA. 만기 키워드로 듀레이션 분기.
+    if "corporate" in n or "investment grade" in n or "credit" in n:
+        if any(k in n for k in ("short", "1-5", "1-3", "0-5")):
+            dur = 2.7
+        elif "long" in n:
+            dur = 13.0
+        elif "intermediate" in n or "5-10" in n:
+            dur = 6.0
+        else:
+            dur = 8.0
+        return {"rate": "DBAA", "duration": dur, "model": "duration"}
+    # 국채 — 만기 버킷(긴 것부터). 단기(1-3/0-3 등)만 DGS3MO, 중기는 DGS10 듀레이션 차등.
+    if "treasury" in n or "t-bill" in n or "tbill" in n or "t bill" in n:
+        if any(k in n for k in ("20+", "25+", "long", "30 year", "30-year")):
+            return {"rate": "DGS30", "duration": 17.0, "model": "duration"}
+        if any(k in n for k in ("10-20", "10-25", "15+")):
+            return {"rate": "DGS10", "duration": 9.0, "model": "duration"}
+        if any(k in n for k in ("7-10", "10 year", "10-year", "intermediate")):
+            return {"rate": "DGS10", "duration": 7.5, "model": "duration"}
+        if any(k in n for k in ("3-7", "5-10", "5-7")):
+            return {"rate": "DGS10", "duration": 4.5, "model": "duration"}
+        if any(k in n for k in ("1-3", "0-3", "0-1", "short", "ultra",
+                                "bill", "floating", "2 year", "2-year")):
+            return {"rate": "DGS3MO", "duration": 1.0, "model": "duration"}
+        return {"rate": "DGS10", "duration": 6.0, "model": "duration"}  # generic
+    # 종합/토탈 본드
+    if any(k in n for k in ("aggregate", "total bond", "core bond", "core total", "core u.s. bond")):
+        return {"rate": "DGS10", "duration": 6.0, "model": "duration"}
+    # 광범위 IG 본드펀드(국채+회사채 혼합, 예: Vanguard Short/Intermediate/Long-Term Bond) —
+    # 금리 프록시 DGS10 + 만기별 듀레이션(AGG와 동일 처리, Grade C).
+    if "bond" in n or "income" in n:
+        if "short" in n:
+            return {"rate": "DGS10", "duration": 2.7, "model": "duration"}
+        if "long" in n:
+            return {"rate": "DGS10", "duration": 13.0, "model": "duration"}
+        return {"rate": "DGS10", "duration": 6.0, "model": "duration"}  # intermediate/generic
+    return None
+
+
+# ── 통화 가드 ───────────────────────────────────────────────
+# 우리 엔진 FX/헤지는 USD/KRW만 모델링(DGS3MO−CD91). 비USD/비KRW 통화 노출 채권
+# (엔화·유로·위안 등)은 라벨이 'US Treasury'로 맞아도 USD로 둔갑 백필되면 FX 틀림 →
+# 이름에 외화 마커 있으면 채권백필 거부(안전스킵). 라벨 정확성과 무관한 엔진 한계 방어.
+_FOREIGN_CCY_KW = (
+    "엔화", "엔노출", "엔 노출", "엔(h)", "jpy", "yen",
+    "유로", "eur", "euro", "위안", "위안화", "cny", "yuan", "파운드", "gbp",
+)
+
+
+def unsupported_currency(name: str) -> bool:
+    """채권 ETF 이름에 비USD/KRW 통화 마커가 있으면 True(USD 백필 거부 대상)."""
+    n = name.lower()
+    return any(m in n for m in _FOREIGN_CCY_KW)
+
+
+def bond_config(code: str, index_category: str | None = None,
+                name: str | None = None, etf_type: str = "KR",
+                us_category: str | None = None) -> dict | None:
     """채권 ETF면 {rate, duration, model} 반환, 아니면 None.
 
-    우선순위: ETF 코드별 명시 매핑(US) > index 카테고리 매핑(한국). 둘 다 없으면 None.
+    우선순위: ETF 코드별 명시 매핑(US 수동) > index 카테고리 매핑(한국) >
+    US 영문명 키워드 분류기(자동, category="US Fixed Income"일 때만). 셋 다 없으면 None.
+
+    us_category로 게이트: 채권 카테고리 ETF만 이름 분류 → 주식 ETF명 오탐 방지.
     """
     if code in _BOND_ETF_CONFIG:
         return _BOND_ETF_CONFIG[code]
     if index_category and index_category in _BOND_CATEGORY_CONFIG:
         return _BOND_CATEGORY_CONFIG[index_category]
+    if etf_type == "US" and name and us_category == "US Fixed Income":
+        return classify_us_bond_etf(name)
     return None
 
 

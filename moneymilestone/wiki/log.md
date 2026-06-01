@@ -1,5 +1,31 @@
 # Log
 
+## [2026-06-01] feat | Track G2 2-4 금종세 ISA 풍차중단 (L5c) + 공유세션 멀티배선
+
+플랜 `§2-4` 구현·검증. ISA 풍차(2-2)의 "중단" 분기. 오너 결정(2026-06-01): 판정=자동(라이브)+수동 오버라이드 둘 다 / 과세단위=개인.
+
+### 구현
+- **공유세션 멀티배선** (`multi_account_loop.py`): `run`에서 `TaxSessionState` 1개 생성→전 계좌 `_build_runtime(tax_session=)`로 div_engine·executor에 주입. **전 위탁계좌 금융소득(배당 gross + KR_FOREIGN 실현차익)을 한 풀로 집계**(개인 과세단위, ISA/연금 제외). 기존 단일계좌 Phase 2f 세션 패턴을 멀티로 확장.
+- **`_isa_renewal_eligible(date)`**: 직전 3개 과세기간(year-1·-2·-3) 중 1회라도 종합과세 대상(>2천만)이면 풍차 자격 False. 종합과세 연도 = 라이브 세션 집계 ∪ `manual_comprehensive_years`(수동 오버라이드). 만기일에 `session.touch`로 직전연도 flush 후 판정.
+- **만기 블록 게이트**: `idx%36==0 and _isa_renewal_eligible(date)` → 비대상이면 만기 청산·재가입 **스킵**(기존 ISA 무한유지, 리셋 없음). 1억 한도는 리셋 안 되니 자연히 차고→2-1 리라우팅(기존 로직). **3년 롤링 재평가**라 대상연도가 창 밖으로 밀리면 풍차 자동 재개(별도 카운터 불필요).
+- **결과 노출**: `MultiAccountRunResult.financial_income_by_year`/`comprehensive_years` 추가(라이브∪수동). calculator_logic·검증용.
+- `run(manual_comprehensive_years=)` 파라미터 추가.
+
+### 검증 (`tests/test_track_g_multi_account.py` L5c 4종, Track G 26/26)
+- **정상(중단→재개)**: 수동 {2022}→2023 만기 정지·2026 만기 재개(롤링). 만기 1회(L5b는 2회), 종료 ISA 4천만/위탁 1.2억.
+- **경계 무한유지**: 수동 {2022,2025}→만기 0회, ISA 9년 통째 보유 1.6억, cycle_contribution 2천만(리셋無)≤1억.
+- **1억 리라우팅**: 정지+월납입→ISA 5년 1억 도달→초과 위탁(ISA 1억/위탁 2.6억). 무한유지 중 한도참 리라우팅 확인.
+- **세금ON 라이브**: 위탁 배당 gross 3천만(2022)→공유세션 2022 종합과세 판정→2023 풍차 정지. `comprehensive_years`에 2022 포함(멀티배선 입증).
+- 회귀: 공유세션 도입 후 Track G 26/26 + 전체 스위트 PASS(L0~L6 불변).
+
+### 남은 것
+- 연납입 세액공제(연금600+IRP300=900만) — G3 이전공제와 별개 큰 기능.
+- `calculator_logic.py` 배선(accounts+정책+isa_renewal+manual_comprehensive_years 수신) + 풀커스텀 분배정책 프론트 UI.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-01] feat | Track G2 2-2 만기분배 + G3 연금이전 세액공제 (L5/L5b/L6)
 
 플랜 `trackG_multiaccount_plan.md §2-2`(풍차 만기 목돈 분배) + `§G3`(ISA→연금 이전 공제) 구현·검증. 오너 결정: 분배정책=우선순위 리스트(옵션3, ISA도 목적지), 재가입 상한 2천만 연한도 고정, G3 이전공제 동봉(연납입 900만 세액공제·2-4 금종세는 다음).

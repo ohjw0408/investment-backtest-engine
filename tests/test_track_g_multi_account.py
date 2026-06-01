@@ -846,3 +846,125 @@ def test_l6_pension_transfer_credit_reinvested():
     assert abs(result.account_results[1]["end_value"] - 43_000_000.0) < 1.0
     assert abs(result.combined_end_value - 43_000_000.0) < 1.0
     assert_invariants(result)
+
+
+# ── L5c 금종세 ISA 풍차중단 (2-4): 종합과세 대상이면 풍차 정지·기존 ISA 무한유지 ──
+
+def _l5c_accounts(end_date="2029-01-01"):
+    isa = _loop_account("AAA", initial=20_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date=end_date, isa_renewal=True)
+    broker = _loop_account("AAA", initial=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date=end_date)
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    return isa, broker, policy
+
+
+def test_l5c_comprehensive_blocks_then_resumes():
+    """수동 오버라이드 2022 대상 → 2023 만기 풍차 정지(기존 ISA 유지),
+    직전 3년이 비대상으로 바뀌는 2026 만기엔 풍차 재개(롤링 재평가).
+
+    ∴ 만기 1회(2026)만 발생(L5b는 2회). 세금 OFF, ×2/사이클, 초기 2천만:
+      2020~2025 ISA 보유(200,000주@100) → 2026-01(@400) 가치 8천만 →
+      재가입 2천만 + 위탁 6천만(150,000주@400) → 2028 종료 ISA 4천만/위탁 1.2억.
+    """
+    price_data = _multi_cycle_x2("AAA")
+    dates = list(price_data["AAA"].index)
+    isa, broker, policy = _l5c_accounts()
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=False, distribution_policy=policy,
+        manual_comprehensive_years={2022},
+    )
+    maturities = [t for t in result.transfer_log if t.get("type") == "maturity"]
+    assert len(maturities) == 1
+    assert maturities[0]["date"].startswith("2026")
+    assert abs(result.account_results[0]["end_value"] - 40_000_000.0) < 1.0
+    assert abs(result.account_results[1]["end_value"] - 120_000_000.0) < 1.0
+    assert abs(result.combined_end_value - 160_000_000.0) < 1.0
+    assert_invariants(result)
+
+
+def test_l5c_always_comprehensive_holds_forever():
+    """경계(무한유지): 매 만기창에 대상연도 존재 → 풍차 0회, ISA 9년 통째 보유.
+
+    수동 {2022, 2025}: 2023 만기(2022 대상)·2026 만기(2025 대상) 모두 정지.
+      ISA 200,000주@100 → 종료 @800 = 1.6억. 위탁 0.
+    """
+    price_data = _multi_cycle_x2("AAA")
+    dates = list(price_data["AAA"].index)
+    isa, broker, policy = _l5c_accounts()
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=False, distribution_policy=policy,
+        manual_comprehensive_years={2022, 2025},
+    )
+    maturities = [t for t in result.transfer_log if t.get("type") == "maturity"]
+    assert len(maturities) == 0
+    assert abs(result.account_results[0]["end_value"] - 160_000_000.0) < 1.0
+    assert abs(result.account_results[1]["end_value"] - 0.0) < 1.0
+    # 무한유지 ISA 사이클 납입 = 초기 2천만(리셋 없음) ≤ 1억
+    assert abs(result.account_results[0]["cycle_contribution"] - 20_000_000.0) < 1.0
+    assert_invariants(result)
+
+
+def test_l5c_held_isa_total_limit_reroutes():
+    """무한유지 중 1억 한도 도달 → 추가납입 0 → 2-1 리라우팅(위탁).
+
+    풍차 정지(수동 2022) + 월납입 5백만(연 6천만, 연한도 2천만 binding), 플랫:
+      5년간 ISA 2천만/년 누적 → 1억(총한도). 매년 초과분 위탁.
+      6년차 총한도 도달 → 전액(6천만) 위탁.
+      ∴ ISA 1억 / 위탁 = 5×4천만 + 6천만 = 2.6억. 만기 0회(정지).
+    """
+    price_data = {"AAA": _price_frame("2020-01-01", "2025-12-31", 100.0)}
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=0.0, monthly=5_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2026-01-01", isa_renewal=True)
+    broker = _loop_account("AAA", initial=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2026-01-01")
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=False, distribution_policy=policy,
+        manual_comprehensive_years={2022},
+    )
+    maturities = [t for t in result.transfer_log if t.get("type") == "maturity"]
+    assert len(maturities) == 0
+    assert abs(result.account_results[0]["end_value"] - 100_000_000.0) < 1.0
+    assert abs(result.account_results[1]["end_value"] - 260_000_000.0) < 1.0
+    assert_invariants(result, expected_total_in=360_000_000.0, flat_price=True)
+
+
+def test_l5c_live_dividend_triggers_comprehensive():
+    """세금 ON 라이브 판정: 위탁 배당 gross 3천만(2022) → 공유세션이 2022 종합과세 판정
+    → 2023 만기 풍차 정지. comprehensive_years에 2022 포함(멀티배선 검증).
+
+    위탁 3억@100=3,000,000주, 2022-06-01 배당 10/주 = gross 3천만(>2천만).
+    ISA(AAA 플랫, 배당0)는 세션에 미가산. 4년 sim(2020~2023), 만기 후보 2023 1회 정지.
+    """
+    div_ticker = _price_frame("2020-01-01", "2023-12-31", 100.0,
+                              dividend_date="2022-06-01", dividend=10.0)
+    isa_ticker = _price_frame("2020-01-01", "2023-12-31", 100.0)
+    price_data = {"458730": div_ticker, "AAA": isa_ticker}
+    dates = sorted(set(div_ticker.index) | set(isa_ticker.index))
+    isa = _loop_account("AAA", initial=10_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2024-01-01", isa_renewal=True)
+    broker = _loop_account("458730", initial=300_000_000.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2024-01-01")
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 0, "age": 40},
+        distribution_policy=policy,
+    )
+    # 공유세션이 위탁 배당 3천만을 2022 금융소득으로 집계 → 종합과세 대상
+    assert 2022 in result.comprehensive_years
+    assert result.financial_income_by_year.get(2022, 0) >= 30_000_000.0 - 1.0
+    # 2023 만기 풍차 정지(기존 ISA 유지) → 만기 0회
+    maturities = [t for t in result.transfer_log if t.get("type") == "maturity"]
+    assert len(maturities) == 0
+    # ISA 플랫·수익0 보유 → 청산세 0, 종료 1천만
+    assert abs(result.account_results[0]["end_value"] - 10_000_000.0) < 1.0
+    assert_invariants(result)

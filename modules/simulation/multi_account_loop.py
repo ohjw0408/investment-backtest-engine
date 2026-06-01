@@ -21,6 +21,8 @@ class MultiAccountRunResult:
     combined_end_value: float
     account_results: list[dict[str, Any]]
     transfer_log: list[dict[str, Any]] = field(default_factory=list)
+    financial_income_by_year: dict = field(default_factory=dict)  # 개인 금융소득 합계(연도별)
+    comprehensive_years: tuple = ()                                # 종합과세 대상 연도(>2천만 ∪ 수동)
 
 
 class MultiAccountSimulationLoop:
@@ -39,6 +41,7 @@ class MultiAccountSimulationLoop:
         progress_callback=None,
         record_history: bool = True,
         distribution_policy=None,
+        manual_comprehensive_years=None,
     ) -> MultiAccountRunResult:
         if not accounts:
             raise ValueError("계좌가 없습니다.")
@@ -53,8 +56,19 @@ class MultiAccountSimulationLoop:
                 accounts, distribution_policy
             )
 
+        # 2-4: 계좌간 금융소득을 한 풀로 집계하는 공유 세션(개인 과세단위).
+        # 위탁 배당 gross + KR_FOREIGN 실현차익만 가산(ISA/연금 제외) → 연도별 종합과세 판정.
+        tax_session = None
+        if tax_enabled:
+            from modules.tax.session import TaxSessionState
+            other_fin = float((user_settings or {}).get("other_financial_income", 0.0) or 0.0)
+            tax_session = TaxSessionState(other_financial_income=other_fin)
+        self._tax_session = tax_session
+        self._manual_comprehensive_years = set(manual_comprehensive_years or ())
+        self._comprehensive_threshold = 20_000_000
+
         runtimes = [
-            self._build_runtime(i, account, tax_enabled, user_settings, dates)
+            self._build_runtime(i, account, tax_enabled, user_settings, dates, tax_session)
             for i, account in enumerate(accounts)
         ]
 
@@ -172,11 +186,23 @@ class MultiAccountSimulationLoop:
         if not combined_history_df.empty:
             combined_history_df = combined_history_df.sort_values("date").reset_index(drop=True)
 
+        # 2-4: 개인 금융소득 연도별 집계 + 종합과세 대상 연도(라이브 ∪ 수동)
+        financial_income_by_year: dict = {}
+        comprehensive_years: tuple = ()
+        if tax_session is not None:
+            financial_income_by_year = tax_session.finalize()
+            comp = set(self._manual_comprehensive_years)
+            comp |= {y for y, inc in financial_income_by_year.items()
+                     if inc > self._comprehensive_threshold}
+            comprehensive_years = tuple(sorted(comp))
+
         return MultiAccountRunResult(
             combined_history_df=combined_history_df,
             combined_end_value=float(sum(r["end_value"] for r in account_results)),
             account_results=account_results,
             transfer_log=transfer_log,
+            financial_income_by_year=financial_income_by_year,
+            comprehensive_years=comprehensive_years,
         )
 
     def _compute_injections(
@@ -212,8 +238,11 @@ class MultiAccountSimulationLoop:
         internal: dict[int, float] = defaultdict(float)
         rt_by_id = {rt["account_id"]: rt for rt in runtimes}
 
-        # ── 2-2: ISA 풍차 만기 (3년=36개월마다) ──
-        if idx > 0 and idx % 36 == 0 and distribution_policy is not None:
+        # ── 2-2/2-4: ISA 풍차 만기 (3년=36개월마다) ──
+        # 2-4: 직전 3개 과세기간 중 1회라도 금융소득종합과세 대상이면 풍차 중단
+        #      (청산·재가입 스킵 → 기존 ISA 무한유지). 3년 롤링 재평가로 자격 복귀.
+        if idx > 0 and idx % 36 == 0 and distribution_policy is not None \
+                and self._isa_renewal_eligible(date):
             for rt in runtimes:
                 if rt["account_type"] != "ISA" or not rt.get("isa_renewal"):
                     continue
@@ -292,6 +321,26 @@ class MultiAccountSimulationLoop:
             })
 
         return dict(external), dict(internal)
+
+    def _isa_renewal_eligible(self, date) -> bool:
+        """2-4: ISA 풍차(해지·재가입) 자격 판정 (개인 과세단위).
+
+        직전 3개 과세기간(year-1·-2·-3) 중 1회라도 금융소득종합과세 대상(>2천만)이면
+        신규가입·연장 불가 → 풍차 중단(False). 종합과세 연도 = 라이브 공유세션 집계
+        ∪ 수동 오버라이드(manual_comprehensive_years).
+        세션 없음(세금 OFF)·정보 부족이면 자격 있음(True) — 풍차 정상 진행.
+        """
+        session = getattr(self, "_tax_session", None)
+        threshold = getattr(self, "_comprehensive_threshold", 20_000_000)
+        comp_years = set(getattr(self, "_manual_comprehensive_years", ()) or ())
+        if session is not None:
+            # 직전 연도까지 기록되도록 현재 만기일로 세션 flush(연 경계 정산).
+            session.touch(date)
+            for y, inc in session.financial_income_by_year.items():
+                if inc > threshold:
+                    comp_years.add(y)
+        year = date.year
+        return not any((year - k) in comp_years for k in (1, 2, 3))
 
     def _mature_isa(self, rt, tracker, price_array, valid_index, i, date) -> float:
         """ISA 풍차 만기: 청산→만기세→계좌 초기화. 세후 목돈(재배분 대상) 반환.
@@ -400,6 +449,7 @@ class MultiAccountSimulationLoop:
         tax_enabled: bool,
         user_settings: dict,
         dates,
+        tax_session=None,
     ) -> dict[str, Any]:
         from modules.core.portfolio import Portfolio, TaxTrackedPortfolio
         from modules.execution.cash_allocator import CashAllocator
@@ -418,11 +468,14 @@ class MultiAccountSimulationLoop:
 
         if tax_enabled:
             tax_engine = account.get("tax_engine") or TaxEngine(user_settings)
-            div_engine = TaxedDividendEngine(DividendEngine(), tax_engine, account_type)
+            # 공유 세션 — 전 위탁계좌 금융소득을 한 풀로(개인 과세단위) 집계.
+            div_engine = TaxedDividendEngine(DividendEngine(), tax_engine, account_type,
+                                             session=tax_session)
             executor = TaxedOrderExecutor(
                 tax_engine,
                 account_type,
                 gain_harvesting=gain_harvesting,
+                session=tax_session,
             )
             portfolio = TaxTrackedPortfolio(config.initial_capital)
         else:

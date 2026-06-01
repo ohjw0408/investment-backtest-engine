@@ -648,6 +648,33 @@ def test_l5_maturity_distribution_normal():
     assert_invariants(result)
 
 
+def test_l5_no_renewal_at_final_month():
+    """sim 마지막 달에 떨어지는 만기는 풍차 재가입 스킵(굴릴 시간 0 잔재 방지) → 최종청산.
+
+    초기 1천만 @100 ×4, sim이 만기월(2023-01, idx36)에 끝남 → 재가입 안 하고
+    ISA가 전액(4천만) 보유한 채 최종청산. (재가입했으면 2천만 잔재 남았을 것)
+    """
+    y123 = _price_frame("2020-01-01", "2022-12-31", 100.0, 400.0)
+    jan = _price_frame("2023-01-01", "2023-01-31", 400.0, 400.0)
+    price_data = {"AAA": pd.concat([y123, jan])}
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=10_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2023-02-01", isa_renewal=True)
+    broker = _loop_account("AAA", initial=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2023-02-01")
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    maturities = [t for t in result.transfer_log if t.get("type") == "maturity"]
+    assert len(maturities) == 0                                    # 마지막 달 만기 스킵
+    assert abs(result.account_results[0]["end_value"] - 40_000_000.0) < 1.0  # ISA 전액 보유
+    assert abs(result.account_results[1]["end_value"] - 0.0) < 1.0
+    assert_invariants(result)
+
+
 def test_l5_maturity_below_isa_limit_all_to_isa():
     """경계: 만기액 < 2천만 → 전액 새 ISA 재가입(위탁 0)."""
     price_data = _grow_then_flat("AAA", mult=1.5, flat_end="2023-12-31")  # 1천만→1.5천만

@@ -422,7 +422,7 @@ async function runCalculator() {
             document.getElementById('resultEmpty').style.display = 'none';
             _handled = true;
           }
-        } else if (_errType === 'isa_contribution_limit' || _errType === 'isa_windmill_disabled' || _errType === 'initial_capital_limit') {
+        } else if (_errType === 'isa_contribution_limit' || _errType === 'isa_windmill_disabled' || _errType === 'initial_capital_limit' || _errType === 'pension_contribution_limit') {
           const banner = document.getElementById('isaLimitErrorBanner');
           const detail = document.getElementById('isaLimitErrorDetail');
           if (banner && detail) {

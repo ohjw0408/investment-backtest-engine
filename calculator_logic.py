@@ -668,6 +668,20 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
     else:
         _isa_cap_info = None
 
+    # 단일 연금저축/IRP 한도 하드체크 — 단일계좌는 초과분 이전할 대상이 없으므로 에러.
+    if tax_enabled and account_type in ('연금저축', 'IRP'):
+        _pension_year1 = initial_capital + monthly_contrib * 12
+        if _pension_year1 > 18_000_000:
+            raise ValueError(_json.dumps({
+                'error': 'pension_contribution_limit',
+                'violations': [
+                    f"{account_type} 연간 납입액(초기 {initial_capital:,.0f}원 + 월 "
+                    f"{monthly_contrib:,.0f}원×12 = {_pension_year1:,.0f}원)이 연금저축·IRP 합산 "
+                    f"연 납입한도 1,800만원을 초과합니다. 단일 계좌로는 한도 초과 납입이 불가합니다. "
+                    f"(초과분 운용을 원하면 위탁 계좌를 추가하세요.)"
+                ],
+            }, ensure_ascii=False))
+
     analyzer = AccumulationAnalyzer(
         portfolio_engine        = portfolio_engine,
         tickers                 = ticker_codes,

@@ -76,6 +76,8 @@ class MultiAccountSimulationLoop:
         self._irp_ext_by_year: dict[int, float] = {}
         self._annual_deduction_total = 0.0
         self._injection_year: int | None = None
+        # sim 마지막 월 인덱스 — 그 달엔 풍차 재가입 안 함(굴릴 시간 0 = 비현실적 잔재 방지).
+        self._last_month_idx = len({(d.year, d.month) for d in dates}) - 1
 
         runtimes = [
             self._build_runtime(i, account, tax_enabled, user_settings, dates, tax_session)
@@ -277,7 +279,8 @@ class MultiAccountSimulationLoop:
         # ── 2-2/2-4: ISA 풍차 만기 (3년=36개월마다) ──
         # 2-4: 직전 3개 과세기간 중 1회라도 금융소득종합과세 대상이면 풍차 중단
         #      (청산·재가입 스킵 → 기존 ISA 무한유지). 3년 롤링 재평가로 자격 복귀.
-        if idx > 0 and idx % 36 == 0 and distribution_policy is not None \
+        if idx > 0 and idx % 36 == 0 and idx != self._last_month_idx \
+                and distribution_policy is not None \
                 and self._isa_renewal_eligible(date):
             g3_credit = 0.0
             for rt in runtimes:

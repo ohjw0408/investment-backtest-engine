@@ -253,6 +253,56 @@ G3(ISA→연금 *전환* 10%/300만)와 **별개.** 매년 연금/IRP에 *납입
 
 ---
 
+## B — 배선 & UI 단계 (G2 엔진 → 화면) — 2026-06-01 설계
+
+엔진 계층(L0~L8)은 완료됐으나 `MultiAccountAnalyzer`/`*_logic.py`가 G2 기능
+(풍차·정책·금종세·재투자)을 **하나도 안 넘기고 있음** — 현재 logic은 transfers OFF(G1)만 작동.
+배선을 3단계로 나누고, 검증 강한 것(B1·B2)부터 한다. **투자계산기 탭 먼저 완성→은퇴/백테스트 복제**(§G1 탭 순서 동일).
+
+### 현재 배선 갭 (2026-06-01 코드 확인)
+- `multi_account_analyzer.py`: 루프 호출에 `isa_renewal`(계좌별)·`manual_comprehensive_years`·
+  `reinvest_tax_credit` 미전달. 결과(`transfer_log`/`comprehensive_years`/`financial_income_by_year`/
+  `annual_deduction_credit`/`pension_transfer_credit_total`) 윈도우 위로 미surfacing. `__init__` 신규 파라미터 없음.
+- `calculator_logic.py`: `_normalize_multi_accounts`가 `isa_renewal` 미독해. body→`DistributionPolicy`
+  미구성. `transfers_enabled`/신규 파라미터 미전달. 신규 결과필드 API 응답 미적재.
+
+### B1 — 백엔드 배선 (analyzer + calculator_logic 관통) **[검증 강함]**
+**범위:**
+- `MultiAccountAnalyzer.__init__`에 `manual_comprehensive_years`·`reinvest_tax_credit` 추가, `.run()` 호출에
+  전달. `loop_accounts`에 계좌별 `isa_renewal` 포함.
+- 결과 surfacing: 대표 윈도우(또는 case별) `transfer_log`·`comprehensive_years`·`annual_deduction_credit`·
+  `pension_transfer_credit_total`을 분석 결과 dict로 올림.
+- `_normalize_multi_accounts`: `isa_renewal` 독해. `_run_multi_account_calculator_logic`: body의
+  `distribution_policy`(→`DistributionPolicy.from_dict`)·`manual_comprehensive_years`·`reinvest_tax_credit`
+  파싱→analyzer 전달. `transfers_enabled` = (정책 有 or 임의 계좌 isa_renewal). 신규 결과필드 응답 적재.
+
+**검증 — L9 (logic 관통, 결정론):** 결정6(analyzer `price_provider` 주입) 활용. 4종:
+1. **정상경로 관통:** body(accounts+policy+isa_renewal+manual+reinvest)→`_run_multi_account_calculator_logic`
+   결과 dict에 만기이동·환급·종합과세연도가 **엔진 손계산값(L5/L6/L8/L5c 재현) ±1원**으로 도달.
+2. **경계:** ① policy 無 & isa_renewal 無 → G1과 동일(transfers OFF 회귀) ② isa_renewal=false → 만기 0
+   ③ manual_comprehensive_years 반영 ④ accounts 1개 → 단일계좌 경로 불변.
+3. **세금 ON/OFF:** 양쪽 관통(세금ON시 청산세·만기세·공제 결과 일치).
+4. **불변식:** 결과 combined = Σ account end_value, 자금보존(=L계층 헬퍼 재사용 or 동등 어서트).
+
+### B2 — API 응답 surfacing **[검증 강함]**
+**범위:** `/api/calculator/submit` 응답에 신규 필드(만기 이동 요약·종합과세 연도·연납입공제 환급·이전공제
+환급) 프론트 소비 가능 형태로 포함. (은퇴/백테스트는 복제 단계서.)
+**검증:** 서버 submit(결정론 or 실데이터 body, 다계좌+정책+풍차) → HTTP 200 + 응답 JSON에 신규 필드
+존재·타입·부호 확인. 회귀: 기존 단일계좌/G1 응답 불변(필드 누락·변경 없음). Hetzner 서버 검증.
+
+### B3 — 프론트 UI **[검증 약함 — 육안 스모크]**
+**범위:** ① 분배정책 우선순위 에디터(목적지 순서 지정) ② 계좌별 ISA 풍차(`isa_renewal`) 토글
+③ 금종세 수동 연도 입력(`manual_comprehensive_years`) ④ 세액공제 환급 재투자 토글(기존 `taxDeductionReinvest`
+재사용) ⑤ 결과 표시(만기 자금이동·연도별 환급·종합과세 대상연도). 계좌 1개=기존과 동일, 추가 시 점진 확장(§5).
+**검증:** 브라우저 스모크 — 계좌 2개+정책 입력→submit→결과 렌더 육안. **가능한 부분은 JS 단위 어서트**
+(정책 순서가 body에 정확히 직렬화되는지). UI 정확성(드래그·렌더)은 스모크 한계 명시.
+
+### 단계 순서 & 게이트
+B1(관통+L9 4종 통과) → B2(API+서버검증) → B3(UI 스모크). 각 단계 검증 통과 전 다음 금지.
+투자계산기 탭 B1~B3 완료 → 은퇴·백테스트 복제. **L7(실데이터 통합 불변식)은 B2 후 실데이터로 수행.**
+
+---
+
 ## 위험 / 우려사항
 
 1. **퍼센타일 합산 오류는 눈에 안 보인다.** 잘못 구현해도 그럴듯한 숫자. 합산은 시나리오 단위로. "독립 합산 ≠ 퍼센타일 덧셈" 단위 테스트로 명시 검증.
@@ -323,6 +373,7 @@ G3(ISA→연금 *전환* 10%/300만)와 **별개.** 매년 연금/IRP에 *납입
 | **L5c 금종세 ISA중단 (2-4)** | 풍차중단·무한유지 | `comprehensive_years` 주입→대상연도부터 풍차 정지·기존ISA 유지(만기∞), 한도참시 추가납입0→2-1 리라우팅 | ①3년연속 비대상→풍차재개(동적토글) ②대상↔비대상 전환경계 ③개인 과세단위 2천만 판정 | **L5c-tax: 위탁배당+KR_FOREIGN실현 합산이 2천만 판정 입력과 일치**(공유세션 멀티배선 검증) |
 | **L6 연금이전공제 (G3)** | ISA→연금 이전 | 공제=min(X·0.1,300만), 연금연한도 내 | 이전액 연한도 초과분 처리 | **L6-tax: 공제 환급금 재투자** |
 | **L8 연납입공제 (G4)** | 연금/IRP 매년 납입 | 연금600+IRP300·저소득→900만×16.5%=148.5만 | 연금단독 800만(600만만)·합산>900만·0납입·고소득13.2% | **L8-tax: 환급금 정책 cascade 재투입(ON/OFF), G3공제와 별도한도 합산** |
+| **L9 logic 관통 (B1)** | body→logic→analyzer→engine | 결과 dict의 만기·환급·종합과세연도 = 엔진 손계산(L5/L6/L8/L5c) ±1원 | policy無&renewal無→G1동일·renewal=false→만기0·manual반영·1계좌 불변 | **세금ON/OFF 양쪽 관통**(청산세·만기세·공제 결과 일치) |
 | **L7 통합** | 실데이터 다계좌 이동ON | (손계산 불가) | — | **불변식만**: 자금보존·음수0·ISA≤1억·연금+IRP≤1800만 |
 
 ### 전 계층 공통 불변식 (매 케이스 어서트 — `assert_invariants` 헬퍼)
@@ -330,8 +381,8 @@ G3(ISA→연금 *전환* 10%/300만)와 **별개.** 매년 연금/IRP에 *납입
 - 음수 잔액 없음 / 한도 위반 없음 (ISA ≤ 총 1억, 연금+IRP 연 ≤ 1800만)
 
 ### 검증 순서 (구현과 맞물림)
-L0 → L1 → L2 → L3 (G1) → L4(+tax) → L5 → L5b → L5c (G2) → L6 (G3) → L8 (G4) → L7 (통합).
-각 계층 4종 전부 통과 전 다음 단계 금지. L0~L3=G1 합격, L4~L5c=G2, L6=G3, L8=G4, L7=최종.
+L0 → L1 → L2 → L3 (G1) → L4(+tax) → L5 → L5b → L5c (G2) → L6 (G3) → L8 (G4) → **L9 (B1 배선)** → L7 (통합).
+각 계층 4종 전부 통과 전 다음 단계 금지. L0~L3=G1 합격, L4~L5c=G2, L6=G3, L8=G4, **L9=B1 배선**, L7=최종(B2 후 실데이터).
 
 ### 진행 상태 (2026-06-01 갱신)
 - ✅ **L0~L4 완료**(업데이트17): `assert_invariants` 헬퍼 신설, L4 구멍 4개 메꿈(정책cap·leftover·연금IRP합산·L4-tax).

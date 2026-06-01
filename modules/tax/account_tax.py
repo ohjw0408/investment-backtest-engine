@@ -385,8 +385,15 @@ def route_overflow(
     policy: DistributionPolicy,
     tracker: ContributionLimitTracker,
     account_types: dict[int, str],
+    pension_unlimited: bool = False,
 ) -> tuple[list[tuple[int, float]], float]:
     """초과분(amount)을 정책 순서대로 capacity까지 배분. cascade.
+
+    Parameters
+    ----------
+    pension_unlimited : ISA 만기 전환(2-2/G3) 경로 전용. 연금/IRP로의 ISA 만기 전환은
+        연 1800만 납입한도와 **별도**(전액 전환 가능)이므로 capacity=무제한으로 처리하고
+        납입 풀(`_pension_annual`)에 기록하지 않는다. 월 납입 라우팅(2-1)은 False.
 
     Returns
     -------
@@ -400,14 +407,17 @@ def route_overflow(
         if remaining <= 1e-9:
             break
         acc_type = account_types.get(dest.account_id, "위탁")
+        is_pension_conversion = pension_unlimited and acc_type in ("연금저축", "IRP")
+        base_cap = float("inf") if is_pension_conversion else tracker.capacity(dest.account_id, acc_type)
         # dest.cap = 전기간 누적 상한(정책 레벨). 이미 라우팅된 만큼 차감.
         routed = tracker._policy_routed.get(dest.account_id, 0.0)
         policy_room = dest.cap - routed
-        cap = min(tracker.capacity(dest.account_id, acc_type), policy_room)
+        cap = min(base_cap, policy_room)
         give = min(remaining, cap)
         if give > 1e-9:
             allocations.append((dest.account_id, give))
-            tracker.record(dest.account_id, acc_type, give)
+            if not is_pension_conversion:
+                tracker.record(dest.account_id, acc_type, give)
             tracker._policy_routed[dest.account_id] = routed + give
             remaining -= give
     return allocations, remaining

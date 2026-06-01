@@ -77,10 +77,12 @@ def _account(ticker, initial=100.0, monthly=0.0, account_type="위탁", stop_mon
     }
 
 
-def _loop_account(ticker, initial=100.0, monthly=0.0, account_type="위탁", stop_months=None):
+def _loop_account(ticker, initial=100.0, monthly=0.0, account_type="위탁", stop_months=None,
+                  start_date="2020-01-01", end_date="2021-01-01",
+                  isa_renewal=False, reinvest_tax_credit=False):
     config = SimulationConfig(
-        start_date="2020-01-01",
-        end_date="2021-01-01",
+        start_date=start_date,
+        end_date=end_date,
         tickers=[ticker],
         target_weights={ticker: 1.0},
         initial_capital=initial,
@@ -92,7 +94,10 @@ def _loop_account(ticker, initial=100.0, monthly=0.0, account_type="위탁", sto
         inflation=0.0,
     )
     strategy = PeriodicRebalance({ticker: 1.0}, rebalance_frequency=None)
-    return {"type": account_type, "config": config, "strategy": strategy}
+    return {
+        "type": account_type, "config": config, "strategy": strategy,
+        "isa_renewal": isa_renewal, "reinvest_tax_credit": reinvest_tax_credit,
+    }
 
 
 _ISA_TOTAL = 100_000_000
@@ -117,7 +122,10 @@ def assert_invariants(result, expected_total_in=None, flat_price=False):
         tc = float(ar.get("total_contribution", 0.0))
         total_contrib += tc
         if ar["type"] == "ISA":
-            assert tc <= _ISA_TOTAL + 1.0, f"ISA 납입 {tc} > 1억"
+            # 풍차 ISA는 만기마다 한도 리셋 → 평생 납입은 1억 초과 가능.
+            # 1억 불변식은 "현재 사이클" 납입 기준으로 검사.
+            basis = float(ar.get("cycle_contribution", tc))
+            assert basis <= _ISA_TOTAL + 1.0, f"ISA 사이클 납입 {basis} > 1억"
 
     if expected_total_in is not None:
         assert abs(total_contrib - expected_total_in) < 1.0, (
@@ -556,4 +564,285 @@ def test_l4_tax_on_routing_liquidation():
     assert abs(isa_res["liquidation_tax_paid"] - 0.0) < 1.0
     assert abs(broker_res["liquidation_tax_paid"] - 616_000.0) < 1.0
     assert abs(broker_res["end_value"] - 7_384_000.0) < 1.0
+    assert_invariants(result)
+
+
+# ── L5 만기분배 (2-2): 3년 풍차 만기 목돈을 정책대로 재배분 ──
+
+def _grow_then_flat(code, mult, start="2020-01-01", grow_end="2022-12-31",
+                    flat_end="2023-12-31", start_price=100.0):
+    """3년간 start_price→start_price*mult 선형상승 후 만기가격으로 평탄.
+
+    3년 보유 ISA가 만기에 정확히 start_price*mult배 가치가 되도록.
+    """
+    end_price = start_price * mult
+    grow = _price_frame(start, grow_end, start_price, end_price)
+    flat = _price_frame(pd.Timestamp(grow_end) + pd.Timedelta(days=1), flat_end,
+                        end_price, end_price)
+    return {code: pd.concat([grow, flat])}
+
+
+def test_l5_maturity_distribution_normal():
+    """풍차 만기(3년): ISA 청산→목돈을 정책 [ISA(재가입 2천만), 위탁(나머지)]로 배분.
+
+    손계산(세금 OFF, 초기 1천만 @100 = 100,000주, 3년 후 ×4 = 4천만):
+      만기 목돈 4천만 → ISA 재가입 2천만(연한도) + 위탁 2천만.
+      4년차 평탄(400) → ISA 2천만, 위탁 2천만 유지. 합산 4천만.
+    remainder(4년차 1년 부분 사이클)도 함께 검증 — 만기 1회 후 최종청산.
+    """
+    price_data = _grow_then_flat("AAA", mult=4.0, flat_end="2023-12-31")
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=10_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2024-01-01", isa_renewal=True)
+    broker = _loop_account("AAA", initial=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2024-01-01")
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0),  # 새 ISA(재가입)
+        DistributionDestination(account_id=1),  # 위탁(나머지)
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    isa_res = result.account_results[0]
+    broker_res = result.account_results[1]
+    assert abs(isa_res["end_value"] - 20_000_000.0) < 1.0
+    assert abs(broker_res["end_value"] - 20_000_000.0) < 1.0
+    assert abs(result.combined_end_value - 40_000_000.0) < 1.0
+
+    maturities = [t for t in result.transfer_log if t.get("type") == "maturity"]
+    assert len(maturities) == 1
+    assert abs(maturities[0]["lump"] - 40_000_000.0) < 1.0
+    allocs = dict(maturities[0]["allocations"])
+    assert abs(allocs[0] - 20_000_000.0) < 1.0
+    assert abs(allocs[1] - 20_000_000.0) < 1.0
+    assert abs(maturities[0]["leftover"]) < 1.0
+    assert_invariants(result)
+
+
+def test_l5_maturity_below_isa_limit_all_to_isa():
+    """경계: 만기액 < 2천만 → 전액 새 ISA 재가입(위탁 0)."""
+    price_data = _grow_then_flat("AAA", mult=1.5, flat_end="2023-12-31")  # 1천만→1.5천만
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=10_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2024-01-01", isa_renewal=True)
+    broker = _loop_account("AAA", initial=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2024-01-01")
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    assert abs(result.account_results[0]["end_value"] - 15_000_000.0) < 1.0
+    assert abs(result.account_results[1]["end_value"] - 0.0) < 1.0
+    maturities = [t for t in result.transfer_log if t.get("type") == "maturity"]
+    assert abs(dict(maturities[0]["allocations"])[0] - 15_000_000.0) < 1.0
+    assert 1 not in dict(maturities[0]["allocations"])
+    assert_invariants(result)
+
+
+def test_l5_maturity_above_total_limit_caps_isa():
+    """경계: 만기액 > 1억 → 새 ISA는 연한도 2천만까지만, 나머지 위탁."""
+    price_data = _grow_then_flat("AAA", mult=6.0, flat_end="2023-12-31")  # 2천만→1.2억
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=20_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2024-01-01", isa_renewal=True)
+    broker = _loop_account("AAA", initial=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2024-01-01")
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    assert abs(result.account_results[0]["end_value"] - 20_000_000.0) < 1.0    # 재가입 연한도
+    assert abs(result.account_results[1]["end_value"] - 100_000_000.0) < 1.0   # 나머지 1억
+    assert abs(result.combined_end_value - 120_000_000.0) < 1.0
+    assert_invariants(result)
+
+
+def test_l5_maturity_tax_on():
+    """L5-tax: 세금 ON 만기 청산세 후 목돈 분배.
+
+    초기 1천만 @100 → 만기 4천만(순이익 3천만). ISA 일반형 비과세 200만.
+      과세표준 2800만 × 9.9% = 277.2만 만기세 → 목돈 3722.8만.
+      재배분 [ISA 2천만, 위탁 1722.8만]. 4년차 평탄 → 추가 수익 0.
+    """
+    price_data = _grow_then_flat("AAA", mult=4.0, flat_end="2023-12-31")
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=10_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2024-01-01", isa_renewal=True)
+    broker = _loop_account("AAA", initial=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2024-01-01")
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 0, "age": 40, "isa_type": "general"},
+        distribution_policy=policy,
+    )
+    isa_res = result.account_results[0]
+    broker_res = result.account_results[1]
+    assert abs(isa_res["maturity_tax_paid"] - 2_772_000.0) < 1.0
+    assert abs(isa_res["end_value"] - 20_000_000.0) < 1.0       # 재가입분 추가수익0
+    assert abs(broker_res["end_value"] - 17_228_000.0) < 1.0
+    assert abs(result.combined_end_value - 37_228_000.0) < 1.0
+    assert_invariants(result)
+
+
+# ── L5b 다중사이클 풍차 (2-2): 9년 3사이클 ──
+
+def _multi_cycle_x2(code):
+    """3년마다 ×2: 100→200(2020-22) →400(2023-25) →800(2026-28)."""
+    c1 = _price_frame("2020-01-01", "2022-12-31", 100.0, 200.0)
+    c2 = _price_frame("2023-01-01", "2025-12-31", 200.0, 400.0)
+    c3 = _price_frame("2026-01-01", "2028-12-31", 400.0, 800.0)
+    return {code: pd.concat([c1, c2, c3])}
+
+
+def test_l5b_multi_cycle_windmill():
+    """9년 3사이클: 매 만기 ISA 2천만 재가입 + 위탁 누적. 비과세 리셋.
+
+    손계산(세금 OFF, 초기 2천만, 사이클당 ×2):
+      사이클1 만기(2023-01,@200): ISA 4천만→재가입2천만+위탁2천만(100,000주@200)
+      사이클2 만기(2026-01,@400): ISA 4천만→재가입2천만+위탁2천만
+        위탁: 100,000주→4천만(@400)+50,000주=150,000주
+      사이클3 최종(2028-12,@800): ISA 재가입2천만→4천만, 위탁 150,000주×800=1.2억
+      ∴ ISA 4천만 / 위탁 1.2억 / 합산 1.6억. 만기 2회.
+    """
+    price_data = _multi_cycle_x2("AAA")
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=20_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2029-01-01", isa_renewal=True)
+    broker = _loop_account("AAA", initial=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2029-01-01")
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    isa_res = result.account_results[0]
+    broker_res = result.account_results[1]
+    assert abs(isa_res["end_value"] - 40_000_000.0) < 1.0
+    assert abs(broker_res["end_value"] - 120_000_000.0) < 1.0
+    assert abs(result.combined_end_value - 160_000_000.0) < 1.0
+
+    maturities = [t for t in result.transfer_log if t.get("type") == "maturity"]
+    assert len(maturities) == 2
+    for m in maturities:
+        assert abs(m["lump"] - 40_000_000.0) < 1.0
+        assert abs(dict(m["allocations"])[0] - 20_000_000.0) < 1.0
+        assert abs(dict(m["allocations"])[1] - 20_000_000.0) < 1.0
+    assert_invariants(result)
+
+
+def test_l5b_multi_cycle_tax_accumulates():
+    """L5b-tax: 사이클별 청산세 누적. 매 사이클 순이익 2천만 동일(재가입 2천만 캡).
+
+    각 만기/최종: (2천만 − 비과세 200만) × 9.9% = 178.2만.
+      만기 2회 누적 = 356.4만, 최종청산 178.2만.
+    """
+    price_data = _multi_cycle_x2("AAA")
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=20_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2029-01-01", isa_renewal=True)
+    broker = _loop_account("AAA", initial=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2029-01-01")
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, broker], price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 0, "age": 40, "isa_type": "general"},
+        distribution_policy=policy,
+    )
+    isa_res = result.account_results[0]
+    maturities = [t for t in result.transfer_log if t.get("type") == "maturity"]
+    assert len(maturities) == 2
+    for m in maturities:
+        assert abs(m["maturity_tax"] - 1_782_000.0) < 1.0
+    assert abs(isa_res["maturity_tax_paid"] - 3_564_000.0) < 1.0
+    assert abs(isa_res["liquidation_tax_paid"] - 1_782_000.0) < 1.0
+    assert_invariants(result)
+
+
+# ── L6 연금이전 세액공제 (G3): ISA 만기 → 연금 전환 시 10%(연 300만) 공제 ──
+
+def test_l6_pension_transfer_credit_normal():
+    """만기 목돈 일부를 연금 이전 → 이전액 10% 세액공제(< 300만 상한).
+
+    손계산(세금 OFF, 초기 1천만 ×4 = 만기 4천만):
+      정책 [연금(cap 1800만), 위탁]: 연금 1800만 전환 → 공제 min(180만,300만)=180만.
+      나머지 2200만 → 위탁. (전환은 1800만 납입한도와 별도 — pension_unlimited)
+    """
+    price_data = _grow_then_flat("AAA", mult=4.0, flat_end="2023-12-31")
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=10_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2024-01-01", isa_renewal=True)
+    pension = _loop_account("AAA", initial=0.0, account_type="연금저축",
+                            start_date="2020-01-01", end_date="2024-01-01")
+    broker = _loop_account("AAA", initial=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2024-01-01")
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=1, cap=18_000_000.0),  # 연금 1800만까지
+        DistributionDestination(account_id=2),                    # 위탁 나머지
+    ])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, pension, broker], price_data, dates, tax_enabled=False,
+        distribution_policy=policy,
+    )
+    assert abs(result.account_results[0]["end_value"] - 0.0) < 1.0          # ISA 미재가입
+    assert abs(result.account_results[1]["end_value"] - 18_000_000.0) < 1.0  # 연금 전환분
+    assert abs(result.account_results[2]["end_value"] - 22_000_000.0) < 1.0  # 위탁 나머지
+    assert abs(result.account_results[1]["pension_transfer_credit"] - 1_800_000.0) < 1.0
+    assert_invariants(result)
+
+
+def test_l6_pension_transfer_credit_capped_full_transfer():
+    """경계+세금ON: 전액 연금이전 → 공제 300만 상한 적중.
+
+    세금 ON, 초기 1천만 ×4 = 만기 4천만, 만기세 277.2만 → 목돈 3722.8만.
+      정책 [연금만]: 전액(3722.8만) 연금 전환(무제한). 공제 base 3000만 cap →
+      공제 min(3722.8만×0.1, 300만) = 300만 (상한 적중).
+    """
+    price_data = _grow_then_flat("AAA", mult=4.0, flat_end="2023-12-31")
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=10_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2024-01-01", isa_renewal=True)
+    pension = _loop_account("AAA", initial=0.0, account_type="연금저축",
+                            start_date="2020-01-01", end_date="2024-01-01")
+    policy = DistributionPolicy(destinations=[DistributionDestination(account_id=1)])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, pension], price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 0, "age": 40, "isa_type": "general"},
+        distribution_policy=policy,
+    )
+    assert abs(result.account_results[0]["end_value"] - 0.0) < 1.0
+    assert abs(result.account_results[1]["pension_transfer_credit"] - 3_000_000.0) < 1.0
+    assert_invariants(result)
+
+
+def test_l6_pension_transfer_credit_reinvested():
+    """세액공제 환급금 재투자 옵션: 공제 300만이 연금 계좌에 추가 투입 → 종료값 증가.
+
+    세금 OFF, 만기 4천만 전액 연금이전(공제 300만 상한). reinvest ON →
+      연금 종료값 = 전환 4천만 + 재투자 300만 = 4300만.
+    """
+    price_data = _grow_then_flat("AAA", mult=4.0, flat_end="2023-12-31")
+    dates = list(price_data["AAA"].index)
+    isa = _loop_account("AAA", initial=10_000_000.0, account_type="ISA",
+                        start_date="2020-01-01", end_date="2024-01-01", isa_renewal=True)
+    pension = _loop_account("AAA", initial=0.0, account_type="연금저축",
+                            start_date="2020-01-01", end_date="2024-01-01",
+                            reinvest_tax_credit=True)
+    policy = DistributionPolicy(destinations=[DistributionDestination(account_id=1)])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [isa, pension], price_data, dates, tax_enabled=False,
+        distribution_policy=policy,
+    )
+    assert abs(result.account_results[1]["pension_transfer_credit"] - 3_000_000.0) < 1.0
+    assert abs(result.account_results[1]["end_value"] - 43_000_000.0) < 1.0
+    assert abs(result.combined_end_value - 43_000_000.0) < 1.0
     assert_invariants(result)

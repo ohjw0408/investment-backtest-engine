@@ -27,7 +27,6 @@ tags: [dev, bug]
 | BUG-DIV-2 | 배당 계산기 슬라이더 라벨/위치/계산 불일치 (라벨 50%인데 90% 동작) | `dtRestoreForm`이 stale localStorage(이전 90% 결과) 복원 시 슬라이더 value만 세팅하고 라벨 미갱신(input 이벤트 미발생) | `templates/dividend_target.html` | ✅ 수정 (06bd19f): 복원 시 라벨 수동 동기화 (Claude) |
 | BUG-DIV-3 | 투자계산기 가상보충 시 가격 폭발 (CAGR 860억배) | 합성 prefix anchor를 raw price_daily(USD)로 잡았는데 실 suffix는 `get_price`(USD ETF→KRW ×환율 ~1181) → 2003 경계에서 1181배 점프 | `modules/retirement/synthetic_price_generator.py` (`build_window_synth_params`) | ✅ 수정 (4f.. anchor를 get_price(FX)로 산출, 7af4c05까지): end_value 정상 검증 (Claude) |
 | BUG-MAA-1 | MultiAccountAnalyzer `cagr` 필드 garbage (1e10 수준) | `cagr=(final/positive_cf)**(1/years)-1`에서 positive_cf 비정상(초기금만·월납0 시) 추정. use_synthetic 무관(기존). 분포는 `end_value` 사용이라 화면 무영향 | `modules/retirement/multi_account_analyzer.py` | ⚠️ 미해결(낮음) — 화면 영향 없음, 추후 확인 (Claude) |
-| BUG-TAX-1 | ISA 서민형 비과세 400만 미적용 | `isa_type` = `low_income`/`seomin`/`general` 전부 일반형 비과세 200만으로 청산세 동일(순이익1천만→792,000원). 서민형은 400만 비과세→594,000원이어야 함. L3 검증 중 발견 | `modules/tax/liquidation.py` (추정) | ⚠️ 미해결 — G2 범위 아님, 별도 수정 (Claude, 2026-06-01) |
 
 **이전 "활성"에서 해결된 항목들:**
 

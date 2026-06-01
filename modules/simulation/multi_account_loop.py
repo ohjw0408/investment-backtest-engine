@@ -96,18 +96,21 @@ class MultiAccountSimulationLoop:
             active_accounts = 0
             account_values: dict[str, float] = {}
 
-            # G2: 월 경계에서만 납입 라우팅(상한+cascade) 계산. 비경계 = 납입 0.
-            injections: dict[int, float] | None = None
+            # G2: 월 경계에서만 납입 라우팅(상한+cascade)+만기분배 계산. 비경계 = 납입 0.
+            injections: dict[int, float] | None = None   # 외부 자금(cash_flow 기록)
+            transfers: dict[int, float] | None = None     # 내부 이동(만기 목돈 재배분, cash_flow 0)
             if self.transfers_enabled:
                 cur_m = (date.year, date.month)
                 if cur_m != loop_last_month:
                     loop_last_month = cur_m
-                    injections = self._compute_injections(
+                    injections, transfers = self._compute_injections(
                         runtimes, tracker, account_types,
                         distribution_policy, date, transfer_log,
+                        price_array, valid_index, i,
                     )
                 else:
                     injections = {}
+                    transfers = {}
 
             for rt in runtimes:
                 price_dict = self._price_dict_for_account(
@@ -117,11 +120,14 @@ class MultiAccountSimulationLoop:
                     continue
 
                 override = None
+                transfer_in = 0.0
                 if self.transfers_enabled:
                     override = float(injections.get(rt["account_id"], 0.0)) if injections else 0.0
+                    transfer_in = float(transfers.get(rt["account_id"], 0.0)) if transfers else 0.0
 
                 dividend_by_ticker, cash_flow = self._step_account(
-                    rt, price_data, price_dict, date, contribution_override=override
+                    rt, price_data, price_dict, date,
+                    contribution_override=override, transfer_override=transfer_in,
                 )
                 portfolio = rt["portfolio"]
                 total_value = float(portfolio.total_value(price_dict))
@@ -181,13 +187,20 @@ class MultiAccountSimulationLoop:
         distribution_policy,
         date,
         transfer_log: list[dict[str, Any]],
-    ) -> dict[int, float]:
-        """월 경계 1회: 각 계좌의 실제 납입액 계산.
+        price_array: dict[str, Any],
+        valid_index: dict[str, Any],
+        i: int,
+    ) -> tuple[dict[int, float], dict[int, float]]:
+        """월 경계 1회: 만기 분배(2-2) + 월 납입/초과 라우팅(2-1) 계산.
+
+        반환 = (external, internal)
+          external : 외부 신규 자금(월 납입·초과 라우팅) → cash_flow 기록
+          internal : 만기 목돈 재배분 → 내부 이동이므로 cash_flow 미기록(자금보존)
 
         - ISA: 연 2천만/총 1억 한도까지만 흡수. 초과분은 정책대로 cascade.
         - 연금/IRP: 합산 연 1800만 한도 내 base 납입.
         - 위탁: 무제한.
-        반환 = {account_id: 이번 달 실제 주입액}
+        - 풍차 만기(isa_renewal, 36개월마다): ISA 청산→만기세→리셋→목돈을 정책대로 재배분.
         """
         from modules.tax.account_tax import route_overflow
 
@@ -195,7 +208,46 @@ class MultiAccountSimulationLoop:
         self._transfer_month_idx += 1
         tracker.touch(date)
 
-        injections: dict[int, float] = defaultdict(float)
+        external: dict[int, float] = defaultdict(float)
+        internal: dict[int, float] = defaultdict(float)
+        rt_by_id = {rt["account_id"]: rt for rt in runtimes}
+
+        # ── 2-2: ISA 풍차 만기 (3년=36개월마다) ──
+        if idx > 0 and idx % 36 == 0 and distribution_policy is not None:
+            for rt in runtimes:
+                if rt["account_type"] != "ISA" or not rt.get("isa_renewal"):
+                    continue
+                lump = self._mature_isa(rt, tracker, price_array, valid_index, i, date)
+                if lump <= 1e-9:
+                    continue
+                # 만기 전환: 연금/IRP는 1800만 한도와 별도(전액 전환) → pension_unlimited
+                allocs, leftover = route_overflow(
+                    lump, distribution_policy, tracker, account_types,
+                    pension_unlimited=True,
+                )
+                for dest_id, amt in allocs:
+                    internal[dest_id] += amt
+                    dtype = account_types.get(dest_id, "위탁")
+                    if dtype == "ISA":
+                        rt_by_id[dest_id]["cycle_contribution"] += amt
+                    elif dtype in ("연금저축", "IRP"):
+                        # G3: 연금 이전 세액공제(이전액 10%, 연 300만 상한)
+                        credit = self._accrue_pension_credit(rt_by_id[dest_id], amt, date)
+                        if credit > 0 and rt_by_id[dest_id].get("reinvest_tax_credit"):
+                            # 환급금 재투자 = 외부 신규 자금(cash_flow 기록). 환급금은
+                            # 한도 외 재투자로 모델링(limit 미차감 — 단순화).
+                            external[dest_id] += credit
+                transfer_log.append({
+                    "date": str(getattr(date, "date", lambda: date)()),
+                    "type": "maturity",
+                    "account_id": rt["account_id"],
+                    "lump": lump,
+                    "maturity_tax": rt.get("_last_maturity_tax", 0.0),
+                    "allocations": allocs,
+                    "leftover": leftover,
+                })
+
+        # ── 2-1: 월 납입 + ISA 초과분 라우팅 (외부 자금) ──
         isa_overflow_total = 0.0
         for rt in runtimes:
             config = rt["config"]
@@ -213,7 +265,8 @@ class MultiAccountSimulationLoop:
                 cap = tracker.capacity(aid, "ISA")
                 absorbed = min(base, cap)
                 tracker.record(aid, "ISA", absorbed)
-                injections[aid] += absorbed
+                external[aid] += absorbed
+                rt["cycle_contribution"] += absorbed
                 overflow = base - absorbed
                 if overflow > 1e-9:
                     isa_overflow_total += overflow
@@ -221,14 +274,16 @@ class MultiAccountSimulationLoop:
                 cap = tracker.capacity(aid, atype)
                 give = min(base, cap)
                 tracker.record(aid, atype, give)
-                injections[aid] += give
+                external[aid] += give
 
         if isa_overflow_total > 1e-9 and distribution_policy is not None:
             allocs, leftover = route_overflow(
                 isa_overflow_total, distribution_policy, tracker, account_types
             )
             for dest_id, amt in allocs:
-                injections[dest_id] += amt
+                external[dest_id] += amt
+                if account_types.get(dest_id) == "ISA":
+                    rt_by_id[dest_id]["cycle_contribution"] += amt
             transfer_log.append({
                 "date": str(getattr(date, "date", lambda: date)()),
                 "overflow": isa_overflow_total,
@@ -236,7 +291,61 @@ class MultiAccountSimulationLoop:
                 "leftover": leftover,
             })
 
-        return dict(injections)
+        return dict(external), dict(internal)
+
+    def _mature_isa(self, rt, tracker, price_array, valid_index, i, date) -> float:
+        """ISA 풍차 만기: 청산→만기세→계좌 초기화. 세후 목돈(재배분 대상) 반환.
+
+        - 만기세 = after_tax_withdrawal(가치, ISA, 사이클납입액, isa_years_held=3).
+          순이익=가치−사이클납입, 비과세 한도(200/400만) 초과분에 9.9%.
+        - 포지션·평균단가 초기화 + tracker(연/총/policy_routed) 리셋 → 새 ISA 토대.
+        - cycle_contribution=0 (재배분 라우팅이 재가입분만큼 다시 채움).
+        """
+        price_dict = self._price_dict_for_account(
+            rt["config"].tickers, price_array, valid_index, i, date
+        )
+        portfolio = rt["portfolio"]
+        value = float(portfolio.total_value(price_dict))
+        tax = 0.0
+        tax_engine = rt.get("tax_engine")
+        if tax_engine is not None:
+            after = tax_engine.after_tax_withdrawal(
+                value, "ISA", rt["cycle_contribution"], isa_years_held=3,
+            )
+            tax = max(0.0, value - after)
+        lump = value - tax
+
+        portfolio.positions = {}
+        portfolio.cash = 0.0
+        if hasattr(portfolio, "_avg_costs"):
+            portfolio._avg_costs = {}
+
+        aid = rt["account_id"]
+        tracker._isa_annual.pop(aid, None)
+        tracker._isa_total.pop(aid, None)
+        tracker._policy_routed.pop(aid, None)
+        rt["cycle_contribution"] = 0.0
+        rt["maturity_tax_paid"] = rt.get("maturity_tax_paid", 0.0) + tax
+        rt["_last_maturity_tax"] = tax
+        return lump
+
+    def _accrue_pension_credit(self, rt, amount, date) -> float:
+        """G3: ISA→연금/IRP 이전 세액공제. 이전액의 10%(연 300만 상한) 환급액 반환.
+
+        누계(pension_transfer_credit)에 가산. 연 300만 상한은 연도별로 적용.
+        """
+        if rt is None:
+            return 0.0
+        year = date.year
+        credited = rt.setdefault("_credit_by_year", {})
+        used = credited.get(year, 0.0)
+        room = max(0.0, 3_000_000.0 - used)
+        credit = min(amount * 0.10, room)
+        if credit <= 0:
+            return 0.0
+        credited[year] = used + credit
+        rt["pension_transfer_credit"] = rt.get("pension_transfer_credit", 0.0) + credit
+        return credit
 
     def _ensure_sync_accounts(self, accounts, distribution_policy):
         """정책 목적지가 없는 계좌(account_id >= len)를 가리키면 위탁 자동 싱크 생성.
@@ -305,6 +414,7 @@ class MultiAccountSimulationLoop:
         config = account["config"]
         account_type = account.get("type", "위탁")
         gain_harvesting = bool(account.get("gain_harvesting", False))
+        init_capital = float(getattr(config, "initial_capital", 0.0) or 0.0)
 
         if tax_enabled:
             tax_engine = account.get("tax_engine") or TaxEngine(user_settings)
@@ -328,6 +438,12 @@ class MultiAccountSimulationLoop:
             "strategy": account["strategy"],
             "tax_engine": tax_engine,
             "isa_years_held": int(account.get("isa_years_held", 3)),
+            "isa_renewal": bool(account.get("isa_renewal", False)),
+            "reinvest_tax_credit": bool(account.get("reinvest_tax_credit", False)),
+            "cycle_contribution": init_capital,
+            "maturity_tax_paid": 0.0,
+            "_last_maturity_tax": 0.0,
+            "pension_transfer_credit": 0.0,
             "dividend_engine": div_engine,
             "contribution_engine": ContributionEngine(),
             "withdrawal_engine": WithdrawalEngine(),
@@ -369,6 +485,7 @@ class MultiAccountSimulationLoop:
     def _step_account(
         self, rt: dict[str, Any], price_data, price_dict, date,
         contribution_override: float | None = None,
+        transfer_override: float = 0.0,
     ) -> tuple[dict, float]:
         portfolio = rt["portfolio"]
         config = rt["config"]
@@ -416,9 +533,11 @@ class MultiAccountSimulationLoop:
         if contribution_override is not None:
             # transfers 경로: 루프가 월 경계에서 계산한 실제 납입액(상한+라우팅 반영).
             # 월 1회 게이팅은 루프가 책임지므로 ContributionEngine 우회.
+            # effective_monthly = 외부 신규 자금(cash_flow 기록), transfer_override = 만기 내부이동(미기록).
             effective_monthly = float(contribution_override)
-            if effective_monthly > 0:
-                portfolio.cash += effective_monthly
+            total_add = effective_monthly + float(transfer_override or 0.0)
+            if total_add > 0:
+                portfolio.cash += total_add
                 cash_target = config.target_weights.get("CASH", 0)
                 if cash_target == 0:
                     rt["cash_allocator"].allocate_cash(portfolio, price_dict, config.target_weights)
@@ -519,13 +638,17 @@ class MultiAccountSimulationLoop:
                 if t in price_data and not price_data[t].empty
             }
             ytd_us_gains = getattr(rt["executor"], "_ytd_us_gains", 0.0)
+            # 풍차 ISA: 최종 청산세 원가는 마지막 사이클 납입액(전 기간 누적 아님).
+            tc_for_tax = total_contribution
+            if rt["account_type"] == "ISA" and rt.get("isa_renewal"):
+                tc_for_tax = float(rt.get("cycle_contribution", total_contribution))
             end_value = apply_liquidation_tax(
                 end_value=raw_end_value,
                 portfolio=rt["portfolio"],
                 last_prices=last_prices,
                 tax_engine=tax_engine,
                 account_type=rt["account_type"],
-                total_contribution=total_contribution,
+                total_contribution=tc_for_tax,
                 ytd_us_realized_gains=ytd_us_gains,
                 age=getattr(tax_engine, "age", 40),
                 isa_years_held=rt.get("isa_years_held", 3),
@@ -541,6 +664,7 @@ class MultiAccountSimulationLoop:
 
         dividend_tax = float(rt.get("dividend_tax_paid", 0.0))
         realized_tax = float(getattr(rt["executor"], "total_cg_tax_paid", 0.0))
+        maturity_tax = float(rt.get("maturity_tax_paid", 0.0))
 
         return {
             "account_id": rt["account_id"],
@@ -549,10 +673,13 @@ class MultiAccountSimulationLoop:
             "raw_end_value": raw_end_value,
             "end_value": float(end_value),
             "total_contribution": total_contribution,
-            "tax_paid": dividend_tax + realized_tax + liquidation_tax,
+            "cycle_contribution": float(rt.get("cycle_contribution", total_contribution)),
+            "tax_paid": dividend_tax + realized_tax + liquidation_tax + maturity_tax,
             "dividend_tax_paid": dividend_tax,
             "realized_tax_paid": realized_tax,
             "liquidation_tax_paid": liquidation_tax,
+            "maturity_tax_paid": maturity_tax,
+            "pension_transfer_credit": float(rt.get("pension_transfer_credit", 0.0)),
             "kr_foreign_unrealized_gain": kr_foreign_unrealized_gain,
             "portfolio": rt["portfolio"],
         }

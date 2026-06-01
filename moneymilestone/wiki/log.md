@@ -1,5 +1,36 @@
 # Log
 
+## [2026-06-01] feat | Track G2 2-2 만기분배 + G3 연금이전 세액공제 (L5/L5b/L6)
+
+플랜 `trackG_multiaccount_plan.md §2-2`(풍차 만기 목돈 분배) + `§G3`(ISA→연금 이전 공제) 구현·검증. 오너 결정: 분배정책=우선순위 리스트(옵션3, ISA도 목적지), 재가입 상한 2천만 연한도 고정, G3 이전공제 동봉(연납입 900만 세액공제·2-4 금종세는 다음).
+
+### 구현 (`modules/simulation/multi_account_loop.py`)
+- **`_mature_isa`** — 3년(36개월)마다 ISA 풍차 만기: 청산→만기세(`after_tax_withdrawal`, 원가=**사이클 납입액**)→포지션·평균단가·tracker(연/총/policy_routed) 리셋→세후 목돈 반환.
+- **`_compute_injections` 확장** — 월경계에서 만기(2-2) 선처리 후 월납입(2-1). **외부/내부 자금 분리:** 월납입=external(cash_flow 기록), 만기목돈 재배분=internal(cash_flow 0) → 자금보존 불변식 보존. 반환 `(external, internal)`.
+- **`_step_account(transfer_override=)`** — 내부이동분은 현금 추가하되 cash_flow 미기록.
+- **사이클 원가추적** `cycle_contribution` — 만기세·최종청산·≤1억 사이클 불변식 기준. 풍차 ISA는 평생납입 1억 초과 가능하므로 불변식을 사이클 기준으로 변경.
+- **G3** `_accrue_pension_credit` — ISA→연금/IRP 이전 시 공제 `min(이전액×10%, 연 300만)`. 재투자 옵션(`reinvest_tax_credit`)이면 환급금을 연금에 외부 재투입.
+- **`route_overflow(pension_unlimited=)`** (`account_tax.py`) — 만기 전환 시 연금/IRP는 **1800만 납입한도와 별도**(전액 전환 가능, 한국 실제 규칙), capacity=무제한·납입풀 미기록. 월 라우팅(2-1)은 기존대로 1800만 cap. → 오너 "연금 우선이면 전액 연금이전"과 일치.
+- finalize: `maturity_tax_paid`·`cycle_contribution`·`pension_transfer_credit` 노출, tax_paid에 만기세 포함.
+
+### 검증 (`tests/test_track_g_multi_account.py` 22/22)
+- **L5(2-2)**: 정상경로(만기 4천만→재가입2천만+위탁2천만)·경계<2천만(전액ISA)·경계>1억(연한도캡)·세금ON(만기세 277.2만). remainder(4년 1부분사이클)=L5 정상경로가 겸함.
+- **L5b**: 9년 3사이클(만기 2회·재가입·비과세리셋·위탁누적 1.2억)·세금ON(사이클별 청산세 178.2만 누적).
+- **L6(G3)**: 정상(이전 1800만→공제180만+위탁cascade)·경계+세금ON(전액이전→300만 상한적중)·재투자(공제 300만 연금 재투입→종료값+300만).
+- 회귀: **전체 스위트 92/92 PASS**(tax_truth·Gate·phase2f·cagr·portfolio_accounting 포함). G1/2-1 L0~L4 100% 불변.
+
+### BUG-TAX-1 폐기
+- 오너 확인: ISA 서민형 비과세 미구현 = 버그 아님. `isa_type="preferential"`이 정상 코드값(base_tax.py:345 → 400만 비과세 정상). bugs.md 항목 삭제.
+
+### 미구현(다음)
+- **2-4 금종세 풍차중단(L5c)** — `comprehensive_years` 입력→대상연도 풍차정지·기존ISA 무한유지. 공유세션 멀티배선 선행.
+- **연납입 세액공제(900만, 13.2~16.5%)** — 매년 연금/IRP 납입 환급(G3 이전공제와 별개, 범위 큼).
+- `calculator_logic.py` 배선(만기/정책 수신) + 풀커스텀 분배정책 프론트 UI.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-01] test | Track G2 L시리즈 검증 엄밀화 — assert_invariants + L4 구멍 메꿈 + L0~L3 보강
 
 오너 지시(검증 빈틈 없이) 수행. 코드 1줄(cap 의미 명확화) 외 전부 테스트.

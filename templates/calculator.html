@@ -135,8 +135,13 @@
             <input type="checkbox" id="isaRenewalCheck" style="width:14px;height:14px;">
             <div>
               <span style="font-weight:700;color:#1B5E20;">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
-              <div style="color:#2E7D32;font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 200만원 갱신</div>
+              <div style="color:#2E7D32;font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 200만원 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다.</div>
             </div>
+          </label>
+          <label style="display:block;margin-top:8px;font-size:0.73rem;color:#2E7D32;">
+            금융소득종합과세 대상 연도(선택, 쉼표구분 — 해당 연도엔 풍차 중단·기존 ISA 유지)
+            <input type="text" id="manualComprehensiveYears" placeholder="예: 2026, 2027"
+              style="width:100%;margin-top:3px;border:1.5px solid #A5D6A7;border-radius:6px;padding:6px 8px;font-size:0.8rem;background:white;">
           </label>
         </div>
 
@@ -350,5 +355,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260531b"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260601b3"></script>
 {% endblock %}

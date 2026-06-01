@@ -273,6 +273,8 @@ function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
   const accs = window.taxAccounts || [];
   if (accs.length <= 1) return null;
 
+  const renewalOn = document.getElementById('isaRenewalCheck')?.checked ?? false;
+
   const primary = {
     type: accs[0]?.type || '위탁',
     initial_capital: Number(document.getElementById('initialCapital').value) || 0,
@@ -281,6 +283,8 @@ function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
     rebal_mode: rebalMode,
     band_width: bandWidth,
     dividend_mode: dividendMode,
+    isa_renewal: renewalOn && (accs[0]?.type === 'ISA'),
+    priority: Number(accs[0]?.priority ?? 1),
   };
 
   const accounts = [primary];
@@ -303,9 +307,21 @@ function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
       rebal_mode: rebalMode,
       band_width: bandWidth,
       dividend_mode: dividendMode,
+      isa_renewal: renewalOn && (accs[i].type === 'ISA'),
+      priority: Number(accs[i].priority ?? (i + 1)),
     });
   }
   return accounts;
+}
+
+// 계좌 우선순위 순서로 분배 정책(자금이동 목적지 cascade) 생성.
+function buildDistributionPolicy(accountsPayload) {
+  if (!accountsPayload || accountsPayload.length <= 1) return null;
+  const dests = accountsPayload
+    .map((a, idx) => ({ account_id: idx, p: Number(a.priority ?? (idx + 1)) }))
+    .sort((x, y) => x.p - y.p)
+    .map(d => ({ account_id: d.account_id }));
+  return { destinations: dests };
 }
 
 // ── 시뮬레이션 실행 ──
@@ -359,6 +375,13 @@ async function runCalculator() {
   };
   if (accountsPayload && accountsPayload.length > 1) {
     payload.accounts = accountsPayload;
+    // G2/G3/G4: 우선순위 분배정책 + 금종세 수동연도 + 세액공제 재투자
+    payload.distribution_policy = buildDistributionPolicy(accountsPayload);
+    payload.reinvest_tax_credit = taxEnabled && (document.getElementById('taxDeductionReinvest')?.checked ?? false);
+    const compRaw = (document.getElementById('manualComprehensiveYears')?.value || '').trim();
+    payload.manual_comprehensive_years = compRaw
+      ? compRaw.split(/[,\s]+/).map(y => parseInt(y, 10)).filter(y => !isNaN(y))
+      : [];
   }
 
   showProgressUI();
@@ -599,7 +622,7 @@ function toggleIsaEarlyCancel(checked) {
   renderRollingChart(cases);
 }
 
-function renderMultiAccountSummary(multiAccount) {
+function renderMultiAccountSummary(multiAccount, g2) {
   const wrap = document.getElementById('multiAccountSummary');
   if (!wrap) return;
   if (!multiAccount || !multiAccount.enabled || !multiAccount.accounts?.length) {
@@ -627,10 +650,33 @@ function renderMultiAccountSummary(multiAccount) {
       </div>`;
   }).join('');
 
+  // G2/G3/G4: 자금이동·세액공제 요약 (대표 중앙값 케이스 기준)
+  let g2Html = '';
+  if (g2 && g2.enabled) {
+    const tl = g2.transfer_log || [];
+    const maturity = tl.filter(t => t.type === 'maturity').length;
+    const reinvest = tl.filter(t => t.type === 'credit_reinvest').length;
+    const comp = (g2.comprehensive_years || []);
+    const items = [];
+    if (maturity) items.push(`ISA 풍차 만기 ${maturity}회 → 우선순위대로 분배`);
+    if (comp.length) items.push(`금융소득종합과세 대상연도: ${comp.join(', ')} (해당 연도 풍차 중단)`);
+    if (g2.annual_deduction_credit > 0) items.push(`연 납입 세액공제 환급: ${fmtKRW(g2.annual_deduction_credit)}`);
+    if (g2.pension_transfer_credit > 0) items.push(`ISA→연금 이전 세액공제: ${fmtKRW(g2.pension_transfer_credit)}`);
+    if (reinvest) items.push(`세액공제 환급금 재투자 ${reinvest}회`);
+    if (items.length) {
+      g2Html = `
+        <div style="margin-top:10px;padding:10px 12px;background:#F1F8E9;border:1px solid #C5E1A5;border-radius:8px;">
+          <div style="font-size:0.78rem;font-weight:800;color:#33691E;margin-bottom:6px;">자금 이동 · 세액공제 (대표 시나리오)</div>
+          ${items.map(t => `<div style="font-size:0.76rem;color:#33691E;margin-top:3px;">• ${t}</div>`).join('')}
+        </div>`;
+    }
+  }
+
   wrap.innerHTML = `
     <div class="result-card" style="margin-bottom:0;">
       <div class="result-card-title">계좌별 종료 자산</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">${rows}</div>
+      ${g2Html}
       ${warnings}
     </div>`;
   wrap.style.display = 'block';
@@ -815,7 +861,7 @@ function renderResult(data, payload) {
   document.getElementById('distP10').textContent = fmtKRW(dist.end_value.p10);
   document.getElementById('distP50').textContent = fmtKRW(dist.end_value.p50);
   document.getElementById('distP90').textContent = fmtKRW(dist.end_value.p90);
-  renderMultiAccountSummary(data.multi_account);
+  renderMultiAccountSummary(data.multi_account, data.g2);
 
   // 롤링 케이스 차트
   renderRollingChart(data.cases);
@@ -1085,6 +1131,7 @@ function addTaxAccount() {
     initial_capital: 0,
     monthly_contribution: 0,
     tickers: tickers.map(t => ({...t})),
+    priority: window.taxAccounts.length + 1,
   });
   renderTaxAccounts();
 }
@@ -1106,6 +1153,12 @@ function updateTaxAccountAmount(idx, field, val) {
   if (!window.taxAccounts[idx]) return;
   window.taxAccounts[idx][field] = Math.max(0, Number(val) || 0);
   renderTaxAccounts();
+}
+
+// 분배 우선순위 — 재렌더 없이 상태만 갱신(입력 커서 유지).
+function updateTaxAccountPriority(idx, val) {
+  if (!window.taxAccounts[idx]) return;
+  window.taxAccounts[idx].priority = Math.max(1, Number(val) || 1);
 }
 
 function ensureAccountTickers(idx) {
@@ -1244,6 +1297,10 @@ function renderTaxAccounts() {
               style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.85rem;background:white;">
               ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
             </select>
+            <label title="자금이동 우선순위(낮을수록 먼저 채움)" style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:3px;">순위
+              <input type="number" min="1" value="${Number(acc.priority ?? (i+1))}"
+                onchange="updateTaxAccountPriority(${i}, this.value)"
+                style="width:42px;border:1.5px solid var(--border);border-radius:6px;padding:4px 5px;font-size:0.8rem;background:white;"></label>
             <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
           </div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">
@@ -1260,6 +1317,10 @@ function renderTaxAccounts() {
             style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;background:white;">
             ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
           </select>
+          <label title="자금이동 우선순위(낮을수록 먼저 채움)" style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:3px;">순위
+            <input type="number" min="1" value="${Number(acc.priority ?? (i+1))}"
+              onchange="updateTaxAccountPriority(${i}, this.value)"
+              style="width:42px;border:1.5px solid var(--border);border-radius:6px;padding:4px 5px;font-size:0.8rem;background:white;"></label>
           <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">

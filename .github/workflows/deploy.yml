@@ -15,7 +15,11 @@ jobs:
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
           script: |
+            set -e
             cd /root/investment-backtest-engine
+            # 런타임이 쓰는 추적-이력 DB가 dirty면 git pull이 abort → 배포 무력화됨.
+            # pull 전 해당 파일 로컬변경 폐기(이후 .gitignore로 추적 안 됨). 그 뒤 pull 실패는 즉시 에러.
+            git checkout -- data/meta/index_master.db 2>/dev/null || true
             git pull origin main
             cp deploy/domino-celery-beat.service /etc/systemd/system/
             systemctl daemon-reload

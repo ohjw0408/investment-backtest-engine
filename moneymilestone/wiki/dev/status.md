@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> 🚨 **2026-06-01 긴급 (index_master.db 서버 손상 — 복구 대기):** 배포 fix(d581cc3)의 `git checkout -- index_master.db`가 서버 최신 지수DB를 레포 스텁본으로 덮어씀 → **서버 index_master.db 깨짐(`index_meta` 테이블 없음) → 홈 지수 그래프 죽음.** 로컬 index_master.db도 stale(대부분 3월 중순)+KRX_GOLD 갭(3/31→5/27) → **업로드 금지.** **price_daily.db(주식·금 가격)는 완전 무사**(서버 499,565행, 458730/SCHD ~5/29, 411060 ~5/22 — 계산기·백테스트 정상, 실측 확인). **복구 = 서버에서 재수집(로컬 업로드 X):** `python3 modules/index_loader_develop.py`(메인 지수+테이블 재생성) → `scripts/fetch_kr_rates.py` → `scripts/fetch_us_credit_rates.py` → `modules/krx/fetch_krx_gold.py`. ⚠️ 교훈: 런타임 데이터 DB는 deploy에서 절대 checkout/reset 금지.
+
 > ✅ **2026-06-01 업데이트 24 (배포 파이프 버그 수정 + B2 서버검증 완료):** **중대 발견 — 오늘 커밋 전부 서버 미배포 상태였음.** 원인: `data/meta/index_master.db`가 추적되는데 서버 런타임이 써서 `git pull` abort, deploy.yml이 pull 실패 미체크(systemctl is-active만)라 Action은 success인데 코드 미반영. 수정: ① `git rm --cached index_master.db`(런타임 데이터, *.db로 ignore) ② deploy.yml `set -e` + pull 전 `git checkout`으로 dirty DB 폐기. → 배포 정상화(d581cc3). **B2 서버검증 PASS:** `/api/calculator/submit` G2 body(ISA풍차+위탁, 458730 실데이터) → `g2.enabled=true`·`transfer_log` 실제 만기이벤트(목돈12.4M·만기세4.5만·재가입 라우팅) end-to-end 확인. **▶ 다음 = B3 프론트 UI(분배정책 에디터·풍차토글·금종세입력·재투자토글) + L7 실데이터 통합.**
 
 > 🔧 **2026-06-01 업데이트 23 (B2 — API surfacing):** `/api/calculator/run`=`jsonify(run_calculator_logic())` **pass-through**라 g2/cases 신규 필드 자동 노출(코드 변경 불필요). JSON 직렬화 가드 테스트 추가(`test_b2_g2_result_json_serializable` — transfer_log/comprehensive_years 등 jsonify 안전, 과거 numpy.bool_ 버그 전례 방어). **▶ 잔여 = Hetzner 배포 후 G2 body submit 실데이터 검증(HTTP 200 + 필드 존재) → B3 프론트 UI.**

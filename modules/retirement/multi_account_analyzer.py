@@ -175,6 +175,8 @@ class MultiAccountAnalyzer:
         div_start: str | None = None,
         transfers_enabled: bool = False,
         distribution_policy=None,
+        manual_comprehensive_years=None,
+        reinvest_tax_credit: bool = False,
     ):
         self.portfolio_engine = portfolio_engine
         self.accounts = accounts
@@ -191,6 +193,8 @@ class MultiAccountAnalyzer:
         self.div_start = div_start
         self.transfers_enabled = transfers_enabled
         self.distribution_policy = distribution_policy
+        self.manual_comprehensive_years = set(manual_comprehensive_years or ())
+        self.reinvest_tax_credit = bool(reinvest_tax_credit)
         self._synth_params: dict = {}
 
     def run(self) -> dict:
@@ -308,6 +312,7 @@ class MultiAccountAnalyzer:
                     "strategy": strategy,
                     "gain_harvesting": account.get("gain_harvesting", False),
                     "isa_years_held": account.get("isa_years_held", 3),
+                    "isa_renewal": account.get("isa_renewal", False),
                 })
 
             run_result = MultiAccountSimulationLoop(
@@ -319,6 +324,8 @@ class MultiAccountAnalyzer:
                 tax_enabled=self.tax_enabled,
                 user_settings=self.user_settings,
                 distribution_policy=self.distribution_policy,
+                manual_comprehensive_years=self.manual_comprehensive_years,
+                reinvest_tax_credit=self.reinvest_tax_credit,
             )
 
             history_df = run_result.combined_history_df
@@ -343,6 +350,11 @@ class MultiAccountAnalyzer:
             metrics["end"] = end.strftime("%Y-%m-%d")
             metrics["end_value"] = final_value
             metrics["raw_end_value"] = raw_final
+            # G2/G3/G4 결과 surfacing (윈도우별)
+            metrics["transfer_log"] = run_result.transfer_log
+            metrics["comprehensive_years"] = list(run_result.comprehensive_years)
+            metrics["annual_deduction_credit"] = float(run_result.annual_deduction_credit)
+            metrics["pension_transfer_credit"] = float(run_result.pension_transfer_credit_total)
             if final_value != raw_final:
                 positive_cf = history_df.loc[history_df["cash_flow"] > 0, "cash_flow"].sum()
                 if positive_cf > 0 and final_value > 0 and self.accumulation_years > 0:

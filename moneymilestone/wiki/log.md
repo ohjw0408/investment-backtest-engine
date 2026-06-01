@@ -1,5 +1,27 @@
 # Log
 
+## [2026-06-01] feat | Track G B1 — analyzer/logic 배선 (G2 엔진 → logic 관통, L9)
+
+플랜 §B(배선&UI) 중 B1. 엔진 계층(L0~L8) 완료됐으나 analyzer/calculator_logic이 G2 기능을 안 넘기던 갭 해소.
+
+### 배선
+- **`multi_account_analyzer.py`**: `__init__`에 `manual_comprehensive_years`·`reinvest_tax_credit` 추가. `loop_accounts`에 계좌별 `isa_renewal` 포함. `.run()` 호출에 신규 파라미터 전달. 윈도우별 결과(`transfer_log`·`comprehensive_years`·`annual_deduction_credit`·`pension_transfer_credit`) metrics에 surfacing.
+- **`calculator_logic.py`**: `_normalize_multi_accounts`가 `isa_renewal` 독해. body→`DistributionPolicy.from_dict`·`manual_comprehensive_years`·`reinvest_tax_credit` 파싱. `transfers_enabled` = 정책 有 OR 임의 풍차. **풍차 거부 블록 제거**(이제 G2 지원). **transfers ON시 정적 ISA cap(contribution_end_months) 스킵**(엔진 tracker가 동적 처리, 충돌 방지). analyzer에 전달. 응답: cases별 G2 필드 + top-level `g2`(대표 중앙값 케이스).
+
+### 검증 (L9 4종, Track G 35/35)
+- analyzer 만기 surfacing(L5 재현: ISA2천만/위탁2천만)·G4공제+금종세 surfacing(297만·2020 포함)·G1 회귀(정책無→transfer_log 비어있음·합산 정확)·정규화 isa_renewal 독해.
+- 회귀: 전체 스위트 PASS.
+
+### ⚠️ 한계 (다음 검토)
+- `transfers_enabled` = 정책 OR 풍차만. **정책 없는 순수 연금/IRP 계좌는 연납입공제 미적용**(연납입공제가 transfers 경로에만 있음). 분배정책 추가하면 작동. 순수 연금/IRP에도 공제 주려면 결정 필요.
+
+### 남은 것
+- B2 API surfacing(서버 검증) → B3 프론트 UI(분배정책 에디터·풍차토글·금종세입력·재투자토글, 검증 약함). L7 실데이터 통합.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-01] feat | Track G4 연 납입 세액공제 (L8) + 죽은 v1 삭제
 
 플랜 §G4 신규 설계·구현·검증. 매년 연금/IRP 납입 세액공제 환급을 통합 루프에 배선.

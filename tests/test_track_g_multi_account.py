@@ -64,7 +64,8 @@ def _provider_from_frames(frame_map):
     return provider
 
 
-def _account(ticker, initial=100.0, monthly=0.0, account_type="위탁", stop_months=None):
+def _account(ticker, initial=100.0, monthly=0.0, account_type="위탁", stop_months=None,
+             isa_renewal=False):
     return {
         "type": account_type,
         "initial_capital": initial,
@@ -74,6 +75,7 @@ def _account(ticker, initial=100.0, monthly=0.0, account_type="위탁", stop_mon
         "rebal_mode": "none",
         "band_width": 0.05,
         "dividend_mode": "hold",
+        "isa_renewal": isa_renewal,
     }
 
 
@@ -1073,3 +1075,99 @@ def test_l8_reinvest_routes_through_policy():
     assert abs(reinvests[0]["amount"] - 1_485_000.0) < 1.0
     assert abs(result.account_results[2]["end_value"] - 1_485_000.0) < 1.0
     assert_invariants(result)
+
+
+# ── L9 logic/analyzer 관통 (B1): 엔진 G2 결과가 analyzer 결과로 정확히 도달 ──
+
+from calculator_logic import _normalize_multi_accounts
+
+
+def test_l9_analyzer_maturity_surfaced():
+    """analyzer 관통: ISA 풍차 만기 결과가 cases에 정확히 surfacing.
+
+    L5 정상경로(초기1천만 ×4 만기→재가입2천만+위탁2천만)를 analyzer 단일 윈도우로 재현.
+    """
+    provider = _provider_from_frames(_grow_then_flat("AAA", mult=4.0, flat_end="2024-01-01"))
+    accounts = [
+        _account("AAA", initial=10_000_000.0, account_type="ISA", isa_renewal=True),
+        _account("AAA", initial=0.0, account_type="위탁"),
+    ]
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    analyzer = MultiAccountAnalyzer(
+        portfolio_engine=None, accounts=accounts,
+        data_start="2020-01-01", data_end="2024-01-01",
+        accumulation_years=4, step_months=12, tax_enabled=False,
+        price_provider=provider, transfers_enabled=True, distribution_policy=policy,
+    )
+    result = analyzer.run()
+    assert result["cases_count"] == 1
+    case = result["cases"][0]
+    maturities = [t for t in case["transfer_log"] if t.get("type") == "maturity"]
+    assert len(maturities) == 1
+    assert abs(case["accounts"][0]["end_value"] - 20_000_000.0) < 1.0
+    assert abs(case["accounts"][1]["end_value"] - 20_000_000.0) < 1.0
+    assert abs(case["end_value"] - 40_000_000.0) < 1.0
+
+
+def test_l9_analyzer_credit_and_comprehensive_surfaced():
+    """analyzer 관통(세금ON): G4 연납입공제·금종세 수동연도가 cases에 정확히 surfacing.
+
+    연금600+IRP300·저소득→환급 148.5만/년 × 2년 = 297만. manual {2020} → 종합과세연도 포함.
+    """
+    provider = _provider_from_frames(
+        {"AAA": _price_frame("2020-01-01", "2022-01-01", 100.0)}
+    )
+    accounts = [
+        _account("AAA", initial=0.0, monthly=500_000.0, account_type="연금저축"),
+        _account("AAA", initial=0.0, monthly=250_000.0, account_type="IRP"),
+    ]
+    analyzer = MultiAccountAnalyzer(
+        portfolio_engine=None, accounts=accounts,
+        data_start="2020-01-01", data_end="2022-01-01",
+        accumulation_years=2, step_months=12, tax_enabled=True,
+        user_settings={"earned_income": 50_000_000, "age": 40},
+        price_provider=provider, transfers_enabled=True,
+        manual_comprehensive_years={2020},
+    )
+    result = analyzer.run()
+    case = result["cases"][0]
+    assert abs(case["annual_deduction_credit"] - 2_970_000.0) < 1.0
+    assert 2020 in case["comprehensive_years"]
+
+
+def test_l9_g1_regression_no_transfers():
+    """경계: 정책無·풍차無 → transfers OFF(G1 동일). G2 결과 필드 비어있음."""
+    provider = _provider_from_frames(
+        {"AAA": _price_frame("2020-01-01", "2022-01-01", 100.0)}
+    )
+    accounts = [_account("AAA", initial=1_000.0), _account("AAA", initial=2_000.0)]
+    analyzer = MultiAccountAnalyzer(
+        portfolio_engine=None, accounts=accounts,
+        data_start="2020-01-01", data_end="2022-01-01",
+        accumulation_years=2, step_months=12, tax_enabled=False,
+        price_provider=provider,  # transfers_enabled 기본 False
+    )
+    result = analyzer.run()
+    case = result["cases"][0]
+    assert case["transfer_log"] == []
+    assert case["comprehensive_years"] == []
+    assert case["annual_deduction_credit"] == 0.0
+    # 합산 = 초기자본 합(플랫, 무납입) → G1 동작
+    assert abs(case["end_value"] - 3_000.0) < 1.0
+
+
+def test_l9_normalize_reads_isa_renewal():
+    """calculator_logic 정규화: 계좌별 isa_renewal 독해."""
+    body = {
+        "accounts": [
+            {"type": "ISA", "initial_capital": 0, "monthly_contribution": 0,
+             "tickers": [{"code": "AAA", "weight": 1.0}], "isa_renewal": True},
+            {"type": "위탁", "initial_capital": 0, "monthly_contribution": 0,
+             "tickers": [{"code": "BBB", "weight": 1.0}]},
+        ]
+    }
+    accounts = _normalize_multi_accounts(body)
+    assert accounts[0]["isa_renewal"] is True
+    assert accounts[1]["isa_renewal"] is False

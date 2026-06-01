@@ -212,12 +212,15 @@ def _normalize_multi_accounts(body: dict) -> list[dict]:
             'rebal_mode':           raw.get('rebal_mode') or body.get('rebal_mode', 'monthly'),
             'band_width':           float(raw.get('band_width', body.get('band_width', 0.05))),
             'dividend_mode':        raw.get('dividend_mode') or body.get('dividend_mode', 'reinvest'),
+            'isa_renewal':          bool(raw.get('isa_renewal', False)),
         })
     return accounts
 
 
 def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> dict:
     from modules.retirement.multi_account_analyzer import MultiAccountAnalyzer
+
+    from modules.tax.account_tax import DistributionPolicy
 
     portfolio_engine = _get_portfolio_engine()
     accounts         = _normalize_multi_accounts(body)
@@ -226,6 +229,17 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
     tax_enabled      = bool(body.get('tax_enabled', False))
     user_settings    = body.get('user_settings', {})
     gain_harvesting  = bool(body.get('gain_harvesting', False))
+
+    # G2/G3/G4: 자금이동 정책·풍차·금종세·세액공제 재투자 (없으면 G1 동작 그대로)
+    distribution_policy = DistributionPolicy.from_dict(body.get('distribution_policy'))
+    manual_comprehensive_years = set(
+        int(y) for y in (body.get('manual_comprehensive_years') or [])
+    )
+    reinvest_tax_credit = bool(body.get('reinvest_tax_credit', False))
+    transfers_enabled = (
+        distribution_policy is not None
+        or any(a.get('isa_renewal') for a in accounts)
+    )
 
     all_tickers = []
     for account in accounts:
@@ -311,14 +325,6 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
                     }, ensure_ascii=False))
 
             if account_type == 'ISA':
-                if body.get('isa_renewal', False):
-                    raise ValueError(_json.dumps({
-                        'error': 'isa_windmill_disabled',
-                        'violations': [
-                            "ISA 풍차돌리기는 다중 계좌 G2/G3의 자금이동 정책에서 다시 연결됩니다. "
-                            "G1에서는 일반 ISA 계좌로 시뮬레이션하세요."
-                        ],
-                    }, ensure_ascii=False))
                 _isa_errors = validate_isa_contribution(
                     account['initial_capital'],
                     account['monthly_contribution'],
@@ -331,10 +337,12 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
     else:
         from modules.tax.account_tax import check_contribution_limits
 
+    # transfers ON(G2)이면 ISA 1억 한도·초과 라우팅을 엔진(tracker)이 동적 처리.
+    # 정적 contribution_end_months cap은 G1(transfers OFF)에서만 적용(BUG-4).
     isa_cap_accounts = []
     _ISA_TOTAL_LIMIT = 100_000_000
     for idx, account in enumerate(accounts):
-        if account['type'] != 'ISA':
+        if account['type'] != 'ISA' or transfers_enabled:
             continue
         planned_total = (
             account['initial_capital']
@@ -381,6 +389,10 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
         progress_callback     = progress_callback,
         use_synthetic         = use_synthetic,
         div_start             = div_start,
+        transfers_enabled         = transfers_enabled,
+        distribution_policy       = distribution_policy,
+        manual_comprehensive_years = manual_comprehensive_years,
+        reinvest_tax_credit       = reinvest_tax_credit,
     )
     result = analyzer.run()
     distribution = result['combined']['distribution']
@@ -411,6 +423,11 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
                 }
                 for a in c.get('accounts', [])
             ],
+            # G2/G3/G4 윈도우별 결과 (transfers OFF면 비어있음)
+            'comprehensive_years':     c.get('comprehensive_years', []),
+            'annual_deduction_credit': round(c.get('annual_deduction_credit', 0)),
+            'pension_transfer_credit': round(c.get('pension_transfer_credit', 0)),
+            'transfer_count':          len(c.get('transfer_log', []) or []),
         }
         for c in result['cases']
     ]
@@ -428,10 +445,23 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
     else:
         isa_cap_info = None
 
+    # G2/G3/G4 대표 요약 — 종료값 중앙값 케이스 기준(transfers OFF면 enabled=False)
+    g2_summary = {'enabled': transfers_enabled}
+    if transfers_enabled and result['cases']:
+        rep = sorted(result['cases'], key=lambda c: c['end_value'])[len(result['cases']) // 2]
+        g2_summary.update({
+            'representative_run_id':   rep['run_id'],
+            'comprehensive_years':     rep.get('comprehensive_years', []),
+            'annual_deduction_credit': round(rep.get('annual_deduction_credit', 0)),
+            'pension_transfer_credit': round(rep.get('pension_transfer_credit', 0)),
+            'transfer_log':            rep.get('transfer_log', []),
+        })
+
     return {
         'cases':              cases_summary,
         'cases_count':        len(cases_summary),
         'distribution':       distribution,
+        'g2':                 g2_summary,
         'price_provenance':   price_provenance,
         'multi_account':      {
             'enabled': True,

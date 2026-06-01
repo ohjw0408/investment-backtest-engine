@@ -1171,3 +1171,35 @@ def test_l9_normalize_reads_isa_renewal():
     accounts = _normalize_multi_accounts(body)
     assert accounts[0]["isa_renewal"] is True
     assert accounts[1]["isa_renewal"] is False
+
+
+def test_l9_pension_transfers_equivalence():
+    """회귀 가드: 한도 내 연금/IRP는 transfers ON/OFF 종료값 동일.
+
+    (공제는 별도 보고이며 reinvest OFF면 포트폴리오 미주입 → 계좌 종료값 불변)
+    → calculator_logic이 순수 연금/IRP에 transfers를 켜도 안전함을 보장.
+    """
+    price_data = _two_year_flat()
+    dates = list(price_data["AAA"].index)
+
+    def mk():
+        return [
+            _loop_account("AAA", initial=0.0, monthly=500_000.0, account_type="연금저축",
+                          start_date="2020-01-01", end_date="2022-01-01"),
+            _loop_account("AAA", initial=0.0, monthly=250_000.0, account_type="IRP",
+                          start_date="2020-01-01", end_date="2022-01-01"),
+        ]
+
+    off = MultiAccountSimulationLoop(transfers_enabled=False).run(
+        mk(), price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 50_000_000, "age": 40},
+    )
+    on = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        mk(), price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 50_000_000, "age": 40},
+    )
+    for a_off, a_on in zip(off.account_results, on.account_results):
+        assert abs(a_off["end_value"] - a_on["end_value"]) < 1.0
+    # transfers ON에서만 연납입공제 산출(297만), OFF는 0
+    assert abs(on.annual_deduction_credit - 2_970_000.0) < 1.0
+    assert abs(off.annual_deduction_credit - 0.0) < 1.0

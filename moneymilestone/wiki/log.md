@@ -1,5 +1,18 @@
 # Log
 
+## [2026-06-01] fix | Track G B1 후속 — 순수 연금/IRP 연납입공제 정리
+
+B1 한계(정책 없는 순수 연금/IRP에 연납입공제 미적용) 해소.
+
+- **원인:** G4 공제 로직이 transfers 경로(`_compute_injections`)에만 존재. `transfers_enabled` = 정책 OR 풍차라 순수 연금/IRP는 transfers OFF → 공제 미산출.
+- **수정** (`calculator_logic.py`): `transfers_enabled`에 `(tax_enabled AND 연금/IRP 존재)` 추가.
+- **안전성 증명:** `test_l9_pension_transfers_equivalence` — 한도 내 연금/IRP는 transfers ON/OFF **종료값 동일**(공제는 별도 보고, reinvest OFF면 포트폴리오 미주입). 즉 순수 연금/IRP에 transfers 켜도 종료값 불변·공제만 추가. ISA 공존 시 ISA도 transfers 경로(연 2천만 한도 엔진 동적처리 — 한도 내 무차이, 초과 시 더 정확).
+- 검증: Track G 36/36 + 전체 스위트 PASS.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-01] feat | Track G B1 — analyzer/logic 배선 (G2 엔진 → logic 관통, L9)
 
 플랜 §B(배선&UI) 중 B1. 엔진 계층(L0~L8) 완료됐으나 analyzer/calculator_logic이 G2 기능을 안 넘기던 갭 해소.

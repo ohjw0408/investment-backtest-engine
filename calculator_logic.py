@@ -236,9 +236,14 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
         int(y) for y in (body.get('manual_comprehensive_years') or [])
     )
     reinvest_tax_credit = bool(body.get('reinvest_tax_credit', False))
+    # transfers ON 조건: 분배정책 OR ISA풍차 OR (세금ON & 연금/IRP 존재 → 연납입공제 산출).
+    # 한도 내 연금/IRP는 transfers ON/OFF 종료값 동일(test_l9_pension_transfers_equivalence)
+    # 이므로 순수 연금/IRP에 켜도 안전 — 공제만 추가 산출.
+    has_pension = any(a['type'] in ('연금저축', 'IRP') for a in accounts)
     transfers_enabled = (
         distribution_policy is not None
         or any(a.get('isa_renewal') for a in accounts)
+        or (tax_enabled and has_pension)
     )
 
     all_tickers = []

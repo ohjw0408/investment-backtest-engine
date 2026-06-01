@@ -390,7 +390,8 @@ L0 → L1 → L2 → L3 (G1) → L4(+tax) → L5 → L5b → L5c (G2) → L6 (G3
 - ✅ **L6 완료(G3 연금이전공제, 업데이트18):** ISA→연금 이전 `min(10%,300만)` 공제+재투자옵션. 만기 전환은 1800만 한도 별도(`pension_unlimited`).
 - ✅ **L5c 완료(2-4 금종세 풍차중단, 업데이트19):** 공유세션 멀티배선(전 위탁계좌 금융소득 개인합산)+`manual_comprehensive_years` 오버라이드. 직전3년 롤링 재평가로 대상연도엔 만기 스킵(무한유지)·비대상 복귀시 풍차재개. 정상(중단→재개)·무한유지·1억리라우팅·세금ON 라이브배당판정 검증.
 - ✅ **L8 완료(G4 연납입 세액공제, 업데이트20):** `annual_tax_deduction` 통합루프 배선. 연금/IRP external 납입 연도별 집계→연경계 정산. 재투자=정책 cascade 통합토글(G3+G4). 정상·연금단독cap·고소득·합산cap·0납입·재투자 검증.
-- ✅ **B1 완료(배선, 업데이트21):** analyzer/calculator_logic이 isa_renewal·distribution_policy·manual_comprehensive_years·reinvest 수신→엔진 전달, 결과(transfer_log·comprehensive_years·환급) surfacing. 풍차 거부 제거, transfers ON시 정적 ISA cap 스킵. L9 4종(만기 surfacing·G4공제+금종세·G1회귀·정규화). **⚠️ 한계:** transfers_enabled=정책 OR 풍차만 → 정책 없는 순수 연금/IRP는 연납입공제 미적용(정책 추가시 작동). 재검토 가능.
+- ✅ **B1 완료(배선, 업데이트21):** analyzer/calculator_logic이 isa_renewal·distribution_policy·manual_comprehensive_years·reinvest 수신→엔진 전달, 결과(transfer_log·comprehensive_years·환급) surfacing. 풍차 거부 제거, transfers ON시 정적 ISA cap 스킵. L9 4종(만기 surfacing·G4공제+금종세·G1회귀·정규화).
+- ✅ **B1 후속(업데이트22): 순수 연금/IRP 공제 정리.** `transfers_enabled`에 `(세금ON & 연금/IRP 존재)` 추가 → 정책 없는 순수 연금/IRP도 연납입공제 산출. 한도 내 연금/IRP는 transfers ON/OFF 종료값 동일(등가성 테스트로 증명)이라 안전. ISA 공존 시 ISA도 transfers 경로(연한도 엔진 동적처리, 한도 내 무차이·더 정확).
 - ❌ **B2 API surfacing** + **B3 프론트 UI**(풀커스텀 분배정책 에디터·풍차토글·금종세입력·재투자토글) — 다음.
 
 ### 성능

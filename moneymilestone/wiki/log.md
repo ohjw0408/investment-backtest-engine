@@ -1,5 +1,19 @@
 # Log
 
+## [2026-06-01] fix | 배포 파이프 버그(BUG-DEPLOY-1) + B2 서버검증
+
+**중대 발견:** 오늘 커밋 전부 서버 미배포 상태였음(로컬 106 테스트는 통과, 코드 정상, 배포만 막힘). B2 서버검증하다 발견.
+
+- **원인:** `data/meta/index_master.db`가 git 추적되는데 서버 런타임이 이 파일에 씀 → `git pull` "local changes would be overwritten"로 abort. `deploy.yml`이 pull 실패 미체크(마지막 `systemctl is-active`만 성공판정) → GitHub Action은 6연속 success인데 코드는 옛날 것.
+- **진단:** /api/calculator/run·submit 둘 다 `g2` 필드 없음(B1 이전 코드) → Action success와 모순 → git pull abort 추론(로그 403이라 정황). DB 추적 확인(`git ls-files`).
+- **수정 (d581cc3):** ① `git rm --cached data/meta/index_master.db`(런타임 데이터, .gitignore `*.db`로 자동 무시). ② `deploy.yml`: `set -e`(pull 실패 시 Action 실패 가시화) + pull 전 `git checkout -- data/meta/index_master.db`(서버 dirty DB 1회 폐기→이후 untracked 영구 해소).
+- **검증:** 배포 d581cc36 success → `/api/calculator/submit` G2 body(ISA풍차+위탁, 458730 실데이터) → `g2.enabled=true` + `transfer_log` 실제 만기이벤트(목돈 12,406,850·만기세 44,703·재가입 라우팅). **B2 end-to-end PASS.**
+- ⚠️ 부수효과: 서버 index_master.db 1회 레포버전 복귀(ECOS 재수집 루틴). [[feedback-deploy-verify-workflow]]에 서버 https URL 메모 추가.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-01] fix | Track G B1 후속 — 순수 연금/IRP 연납입공제 정리
 
 B1 한계(정책 없는 순수 연금/IRP에 연납입공제 미적용) 해소.

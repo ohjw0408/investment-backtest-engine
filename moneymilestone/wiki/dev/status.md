@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> 🔧 **2026-06-01 업데이트 23 (B2 — API surfacing):** `/api/calculator/run`=`jsonify(run_calculator_logic())` **pass-through**라 g2/cases 신규 필드 자동 노출(코드 변경 불필요). JSON 직렬화 가드 테스트 추가(`test_b2_g2_result_json_serializable` — transfer_log/comprehensive_years 등 jsonify 안전, 과거 numpy.bool_ 버그 전례 방어). **▶ 잔여 = Hetzner 배포 후 G2 body submit 실데이터 검증(HTTP 200 + 필드 존재) → B3 프론트 UI.**
+
 > ✅ **2026-06-01 업데이트 22 (B1 후속 — 순수 연금/IRP 연납입공제 정리):** 업데이트21 한계 해소. `transfers_enabled`에 `(세금ON & 연금/IRP 존재)` 추가 → 정책 없는 순수 연금/IRP도 연납입공제 산출. 안전성 = `test_l9_pension_transfers_equivalence`(한도 내 연금/IRP는 transfers ON/OFF 종료값 동일, 공제만 추가). Track G 36/36 + 전체 PASS. **▶ 다음 = B2(API surfacing 서버검증) → B3(프론트 UI) → L7.**
 
 > ✅ **2026-06-01 업데이트 21 (Track G B1 — analyzer/logic 배선 완료):** 엔진(L0~L8) 완료 후 analyzer/calculator_logic이 G2 기능 미전달하던 갭 해소. ① analyzer: `manual_comprehensive_years`/`reinvest_tax_credit` 파라미터 + `isa_renewal` 계좌전달 + 결과(transfer_log·comprehensive_years·환급) surfacing ② calculator_logic: `_normalize`가 isa_renewal 독해, body→DistributionPolicy 파싱, transfers_enabled 판정(정책 OR 풍차), **풍차 거부 제거**, transfers ON시 정적 ISA cap 스킵, 응답에 g2 섹션. 검증 **L9 4종(만기 surfacing·G4공제+금종세·G1회귀·정규화) → Track G 35/35** + 전체 스위트 PASS. **⚠️ 한계: 정책 없는 순수 연금/IRP는 연납입공제 미적용**(정책 추가시 작동, 재검토 가능). **▶ 다음 = B2(API surfacing 서버검증) → B3(프론트 UI: 분배정책 에디터·풍차토글·금종세입력·재투자토글, 검증약함) → L7 실데이터.** 상세 [[log]].

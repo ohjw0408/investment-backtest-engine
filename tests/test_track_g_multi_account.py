@@ -1203,3 +1203,39 @@ def test_l9_pension_transfers_equivalence():
     # transfers ON에서만 연납입공제 산출(297만), OFF는 0
     assert abs(on.annual_deduction_credit - 2_970_000.0) < 1.0
     assert abs(off.annual_deduction_credit - 0.0) < 1.0
+
+
+def test_b2_g2_result_json_serializable():
+    """B2: analyzer가 내는 G2 결과 필드가 JSON 직렬화 가능(API jsonify 안전).
+
+    과거 numpy.bool_/타입 누수로 'not JSON serializable' 버그 전례 → 가드.
+    """
+    import json
+    provider = _provider_from_frames(_grow_then_flat("AAA", mult=4.0, flat_end="2024-01-01"))
+    accounts = [
+        _account("AAA", initial=10_000_000.0, account_type="ISA", isa_renewal=True),
+        _account("AAA", initial=0.0, account_type="위탁"),
+    ]
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    analyzer = MultiAccountAnalyzer(
+        portfolio_engine=None, accounts=accounts,
+        data_start="2020-01-01", data_end="2024-01-01",
+        accumulation_years=4, step_months=12, tax_enabled=True,
+        user_settings={"earned_income": 50_000_000, "age": 40},
+        price_provider=provider, transfers_enabled=True, distribution_policy=policy,
+        manual_comprehensive_years={2021},
+    )
+    result = analyzer.run()
+    case = result["cases"][0]
+    # 응답에 실리는 G2 필드를 그대로 직렬화 (예외 없어야 함)
+    payload = {
+        "transfer_log": case["transfer_log"],
+        "comprehensive_years": case["comprehensive_years"],
+        "annual_deduction_credit": case["annual_deduction_credit"],
+        "pension_transfer_credit": case["pension_transfer_credit"],
+    }
+    s = json.dumps(payload)  # raises if non-serializable
+    assert "transfer_log" in s
+    assert 2021 in case["comprehensive_years"]

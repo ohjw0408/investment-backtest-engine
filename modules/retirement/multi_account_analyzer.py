@@ -77,6 +77,9 @@ def calc_metrics_from_history(
             except Exception:
                 mwr = 0.0
 
+    if not np.isfinite(mwr):
+        mwr = 0.0   # IRR 발산(내부이동만 받은 계좌 등) → 0 처리(JSON Infinity 방지)
+
     if mwr != 0.0:
         cagr = mwr
     elif total_contribution > 0 and end_value > 0:
@@ -84,6 +87,9 @@ def calc_metrics_from_history(
     elif start_value > 0 and end_value > 0:
         cagr = (end_value / start_value) ** (1 / years) - 1
     else:
+        cagr = 0.0
+
+    if not np.isfinite(cagr):
         cagr = 0.0
 
     calmar = cagr / abs(mdd) if mdd != 0 else 0.0
@@ -518,6 +524,7 @@ class MultiAccountAnalyzer:
         result = {}
         for key in keys:
             v = np.array([c.get(key, 0.0) for c in cases], dtype=float)
+            v = np.where(np.isfinite(v), v, 0.0)   # inf/nan 제거(JSON 직렬화 안전)
             result[key] = {
                 "mean": float(np.mean(v)),
                 "std": float(np.std(v)),

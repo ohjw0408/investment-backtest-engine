@@ -1201,6 +1201,34 @@ def test_l9_g1_regression_no_transfers():
     assert abs(case["end_value"] - 3_000.0) < 1.0
 
 
+def test_l9_no_infinity_in_result():
+    """회귀 가드: 만기 internal만 받는 계좌(cash_flow 0)의 IRR 발산 → cagr inf →
+    JSON Infinity로 클라 JSON.parse 깨지던 버그. 결과가 strict JSON 직렬화 가능해야.
+    """
+    import json, math
+    provider = _provider_from_frames(_grow_then_flat("AAA", mult=4.0, flat_end="2024-01-01"))
+    accounts = [
+        _account("AAA", initial=10_000_000.0, account_type="ISA", isa_renewal=True),
+        _account("AAA", initial=0.0, account_type="위탁"),  # 만기 internal만 수령 → cash_flow 0
+    ]
+    policy = DistributionPolicy(destinations=[
+        DistributionDestination(account_id=0), DistributionDestination(account_id=1),
+    ])
+    analyzer = MultiAccountAnalyzer(
+        portfolio_engine=None, accounts=accounts,
+        data_start="2020-01-01", data_end="2024-01-01",
+        accumulation_years=4, step_months=12, tax_enabled=True,
+        user_settings={"earned_income": 50_000_000, "age": 40},
+        price_provider=provider, transfers_enabled=True, distribution_policy=policy,
+    )
+    result = analyzer.run()
+    # strict JSON (allow_nan=False) = 클라 JSON.parse와 동일 엄격성 → Infinity/NaN 있으면 raise
+    json.dumps(result, allow_nan=False)
+    for acc_out in result["accounts"]:
+        cagr = acc_out["distribution"].get("cagr", {}).get("mean", 0.0)
+        assert math.isfinite(cagr)
+
+
 def test_l9_normalize_reads_isa_renewal():
     """calculator_logic 정규화: 계좌별 isa_renewal 독해."""
     body = {

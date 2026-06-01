@@ -1,6 +1,6 @@
 # Project Master Roadmap
 
-Last updated: 2026-05-31 (✅ 배당 백필 Stage A + Stage B(채권/MMF·환헤지·US 채권 자동분류·통화가드) 서버검증 완료, Phase 2c 재검증 완료 → 다음=금융소득 종합과세 완전 구현(세금 Phase 2e 배선 + `_ytd_income` 주입))
+Last updated: 2026-06-02 (✅ **Track G2/G3/G4 + 2-4 엔진 완료**(만기분배·연금이전공제·연납입공제·금종세 풍차중단, L0~L9 결정론 검증) + **B1/B2/B3 배선·UI·서버검증 완료**(투자계산기 탭). 배포파이프 버그·index_master 손상 복구. → **다음 = 절세액 표시 기능 P1**(`절세액표시_plan.md`) 또는 은퇴/백테스트 탭 G2 복제)
 
 > ⚠️ **2026-05-30 정정:** 아래 "SCHD vs TIGER now converge" / "Phase 2c Gate 통과" / "Track A 완료"는 **가격(CAGR) 수렴만** 검증된 것이었음. `debug_dividend.py` 실측 결과, 배당 **액수**는 0임이 확인됨. 원인: Track A가 DJUSDIV_PROXY를 total-return(adj-close)로 구축 → 가격은 맞지만 배당이 가격에 임베딩되어 itemize 안 됨. 백필 가격 구간(1928~)에 배당 row 없음 + provenance 전부 0행. **이는 세금 Phase 2c(배당 역산)·2e(금종세)·Track G(다중계좌 세금)의 데이터 기반을 무효화한다.** 해결 owner: `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0`(범용 배당 백필 재설계). 우선순위는 아래 "Current Recommended Next Action" 참조.
 
@@ -39,7 +39,7 @@ UI 실측/추정 필드를 확인했다.
 - ✅ **완료:** 배당 백필 Stage B(채권/MMF) — 한국 채권 전유형·환헤지비용·US 채권 자동분류·통화가드, 서버검증 — `ETF_BACKFILL § Phase 7 addendum`
 - ✅ **완료:** 세금 Phase 2c 재검증 (2e 엔진 검증 완료, 2e 배선 갭은 빌드 잔여)
 - 🔴 **지금/다음:** 금융소득 종합과세 완전 구현(세금 Phase 2e 배선 + phase1-api `_ytd_income` 주입) — 데이터 토대 완성, 블로커 없음
-- ⏸️ **대기:** Track G(다중계좌 세금) — G1 ✅, 후속 ②커서 ③UI
+- ✅ **Track G 대거 진척(2026-06-02):** G1 ✅ + **G2 자금이동**(2-1 라우팅·2-2 만기분배)·**G3 연금이전공제**·**2-4 금종세 풍차중단**·**G4 연납입공제** 엔진 전부 완료(L0~L9 결정론 40+케이스). **B1**(analyzer/logic 배선)·**B2**(API 서버검증)·**B3**(투자계산기 UI: 우선순위·풍차토글·재투자·결과패널) 완료. 잔여: 은퇴/백테스트 탭 복제·L7 실데이터·**절세액 표시**(신규 계획).
 
 완료 (가격/구조 레벨 — 단, 배당 액수 정확성은 별개):
 
@@ -290,25 +290,22 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-> ⚠️ **우선순위 전환 (2026-05-30):** 배당 데이터 근본 버그 발견. Track G는 다중계좌 **세금**(금종세·배당) 시뮬이라 배당/세율 데이터가 정확해야 테스트·구현이 의미 있음. 현재 배당 액수가 0이라 Track G 진행은 검증 불가능한 토대 위에 쌓는 셈. **따라서 데이터 토대부터 고친다.**
+> ✅ **2026-06-02 현재:** 금융소득 종합과세(Phase 2f)·Track G2/G3/G4·2-4 엔진 + 투자계산기 배선·UI(B1~B3) 전부 완료·서버검증. 다음은 아래 둘 중 택1.
 
-**[★ 지금 — 다음 작업] 금융소득 종합과세 완전 구현 (세금 Phase 2e + phase1-tax-profile-api):**
-데이터 토대(배당 Stage A + 채권 Stage B) 완성 → 더 이상 블로커 없음. 종합과세 **엔진 수학은
-구현·단위검증 완료**(`base_tax._comprehensive_tax`/`after_tax_dividend`/`_comprehensive_extra_tax`,
-2천만 임계). 남은 것 = **배선·데이터 갭 3종:**
-- ① `other_financial_income` 자동산출 미구현 — `backtest_logic.py:117`이 수동값/0 fallback(plan 금지).
-  case별 직전 완료년도 gross 배당·이자 자동집계 필요.
-- ② 분할매도/종합과세 패널이 **백테스트 탭에만** 배선 — 계산기/배당/연금 `*_logic.py` 미배선.
-- ③ `TaxedDividendEngine._ytd_income` **0 고정**(`account_tax.py:230`) — 기존 금융소득 미주입.
-실행 지시: 「금융소득 종합과세 구현해줘」. 상세 갭 = `세금에서시작된완전리팩토링계획.plan.md` Phase 2e.
+**[★ 다음 — 택1]**
+- **(A) 절세액 표시 기능 P1** — 위탁가정세금·실제세금·절세액 3종 표시. 계획 = `절세액표시_plan.md`(엄밀판, L-SAVE0~8 검증설계 포함). 실행: 「절세액 P1 구현해줘」.
+- **(B) G2 탭 복제** — 투자계산기에서 확정한 멀티계좌 UI/배선을 **백테스트→은퇴** 탭에 복제. 은퇴는 연 1500만 수령한도 고려. + L7 실데이터 통합 불변식.
 
-**[✅ 완료 2026-05-31] 배당 백필 Stage A + Stage B (채권/MMF):**
-Stage A(주식 배당, price-return + 명시배당) + Stage B(한국 채권 전유형·환헤지비용·US 채권 키워드
-자동분류·통화가드) 구현·서버검증 완료. 세금 Phase 2c 재검증 PASS(Gate 2c 3/3). 상세 =
-`ETF_BACKFILL § Phase 7 완료 addendum` + `wiki/log.md`.
+**[잔여 곁가지(우선순위 낮음)]**
+- 단일계좌 경로의 연금/IRP 한도(투자계산기는 에러 처리됨, 다른 탭 점검).
+- KQ150(코스닥150) fdr 티커 수정(현재 수집 실패).
+- `deploy.yml`의 `git checkout -- index_master.db` 줄 제거(BUG-DEPLOY-1 잔재, 현재 무해).
+- 데이터 파이프 지속가능성: 갭채움 로직 + gold 외 일일 스케줄러(현 미비).
+- 배당금계산기 G2/절세액 미지원(별도 엔진 재작업, 후속).
 
-**[3] 세금 재검증 후 — Track G 재개:**
-G1 후속 보완(② 입력 커서 유실 ③ UI 통일 — 배당 0(①)은 Stage A로 해소). 이후 은퇴/백테스트 탭 확장 → G2 자금이동.
+**[✅ 완료 2026-06-01~02] Track G2 풀스택:**
+엔진 L0~L9(만기분배·G3·2-4 금종세·G4 연납입) + B1 analyzer/logic 배선 + B2 API + B3 투자계산기 UI.
+브라우저 스모크 가이드 = `smoketestguide.md`. 상세 = `trackG_multiaccount_plan.md` + `wiki/log.md`.
 
 **[5] 이후 — PHASE4 핵심/복잡한 기능:**
 D1/D2/B1/A4/C1/C2/B4

@@ -1,6 +1,16 @@
 # Money Milestone Wiki — Index
 
-마지막 업데이트: 2026-05-30
+마지막 업데이트: 2026-06-02
+
+## 주요 계획 파일 (repo 루트)
+
+| 파일 | 내용 |
+|---|---|
+| `PROJECT_MASTER_ROADMAP.md` | 전체 로드맵·현재 다음작업 |
+| `trackG_multiaccount_plan.md` | 다중계좌 G1~G4·2-4·B1~B3 (대부분 완료) |
+| `절세액표시_plan.md` | 절세액 표시 기능 (계획, 미착수) — L-SAVE 검증설계 |
+| `smoketestguide.md` | G2 멀티계좌 브라우저 스모크 9종 |
+
 
 ## 개발 현황 (가장 중요)
 

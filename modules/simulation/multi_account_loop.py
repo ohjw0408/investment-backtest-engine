@@ -315,8 +315,9 @@ class MultiAccountSimulationLoop:
                     external, rt_by_id, transfer_log, date, kind="transfer_credit",
                 )
 
-        # ── 2-1: 월 납입 + ISA 초과분 라우팅 (외부 자금) ──
-        isa_overflow_total = 0.0
+        # ── 2-1: 월 납입 + 한도초과 라우팅 (외부 자금) ──
+        # ISA(연2천만/총1억)·연금+IRP(합산 연1800만) 한도까지만 흡수, 초과분은 정책 cascade.
+        overflow_total = 0.0
         for rt in runtimes:
             config = rt["config"]
             cap_m = getattr(config, "contribution_end_months", None)
@@ -337,17 +338,22 @@ class MultiAccountSimulationLoop:
                 rt["cycle_contribution"] += absorbed
                 overflow = base - absorbed
                 if overflow > 1e-9:
-                    isa_overflow_total += overflow
-            else:
-                cap = tracker.capacity(aid, atype)
+                    overflow_total += overflow
+            elif atype in ("연금저축", "IRP"):
+                cap = tracker.capacity(aid, atype)   # 연금+IRP 합산 1800만 풀
                 give = min(base, cap)
                 tracker.record(aid, atype, give)
                 external[aid] += give
                 self._track_pension_contrib(atype, cur_year, give)  # G4 공제 base
+                overflow = base - give
+                if overflow > 1e-9:
+                    overflow_total += overflow   # 합산한도 초과분 → 정책 라우팅
+            else:  # 위탁(무제한)
+                external[aid] += base
 
-        if isa_overflow_total > 1e-9 and distribution_policy is not None:
+        if overflow_total > 1e-9 and distribution_policy is not None:
             allocs, leftover = route_overflow(
-                isa_overflow_total, distribution_policy, tracker, account_types
+                overflow_total, distribution_policy, tracker, account_types
             )
             for dest_id, amt in allocs:
                 external[dest_id] += amt
@@ -358,7 +364,7 @@ class MultiAccountSimulationLoop:
                     self._track_pension_contrib(dtype, cur_year, amt)  # G4 공제 base
             transfer_log.append({
                 "date": str(getattr(date, "date", lambda: date)()),
-                "overflow": isa_overflow_total,
+                "overflow": overflow_total,
                 "allocations": allocs,
                 "leftover": leftover,
             })

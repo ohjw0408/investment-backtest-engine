@@ -391,6 +391,8 @@ L0 → L1 → L2 → L3 (G1) → L4(+tax) → L5 → L5b → L5c (G2) → L6 (G3
 - ✅ **L5c 완료(2-4 금종세 풍차중단, 업데이트19):** 공유세션 멀티배선(전 위탁계좌 금융소득 개인합산)+`manual_comprehensive_years` 오버라이드. 직전3년 롤링 재평가로 대상연도엔 만기 스킵(무한유지)·비대상 복귀시 풍차재개. 정상(중단→재개)·무한유지·1억리라우팅·세금ON 라이브배당판정 검증.
 - ✅ **L8 완료(G4 연납입 세액공제, 업데이트20):** `annual_tax_deduction` 통합루프 배선. 연금/IRP external 납입 연도별 집계→연경계 정산. 재투자=정책 cascade 통합토글(G3+G4). 정상·연금단독cap·고소득·합산cap·0납입·재투자 검증.
 - ✅ **B1 완료(배선, 업데이트21):** analyzer/calculator_logic이 isa_renewal·distribution_policy·manual_comprehensive_years·reinvest 수신→엔진 전달, 결과(transfer_log·comprehensive_years·환급) surfacing. 풍차 거부 제거, transfers ON시 정적 ISA cap 스킵. L9 4종(만기 surfacing·G4공제+금종세·G1회귀·정규화).
+- ✅ **연금/IRP 월납입 합산한도(1800만) 초과 라우팅(업데이트26):** 기존엔 연금/IRP 월납입이 합산 1800만 풀 초과 시 초과분을 **드롭**(ISA는 라우팅하는데 연금만 누락)했음. 수정: ISA처럼 `overflow_total`에 합산→정책 cascade 라우팅. 검증 `test_l4_pension_combined_overflow_routes`(연금100+IRP100/월→공유풀 m0~m8 1800만, m9~m11 600만 위탁 라우팅, 자금보존). 첫해 한도=1800만−초기자본은 tracker가 이미 처리(초기 record).
+  - ❌ **deferred 엣지: 연금/IRP 초기자본 > 1800만 라우팅** — ISA도 동일 미처리(초기자본 초과분이 sim 시작시점에 계좌에 그대로 들어가 한도 초과 상태로 운용됨). sim-start 라우팅 메커니즘 필요(현 라우팅은 월경계). **구현 단계:** ①run() 초기자본을 capacity로 캡, 초과분을 첫 월경계 external 풀에 주입 ②정책 라우팅. **검증(L2 확장):** 연금 초기 3000만→1800만 흡수+1200만 위탁(플랫·자금보존), ISA 초기 3천만 동일. 차기 세션.
 - ✅ **B1 후속(업데이트22): 순수 연금/IRP 공제 정리.** `transfers_enabled`에 `(세금ON & 연금/IRP 존재)` 추가 → 정책 없는 순수 연금/IRP도 연납입공제 산출. 한도 내 연금/IRP는 transfers ON/OFF 종료값 동일(등가성 테스트로 증명)이라 안전. ISA 공존 시 ISA도 transfers 경로(연한도 엔진 동적처리, 한도 내 무차이·더 정확).
 - ❌ **B2 API surfacing** + **B3 프론트 UI**(풀커스텀 분배정책 에디터·풍차토글·금종세입력·재투자토글) — 다음.
 

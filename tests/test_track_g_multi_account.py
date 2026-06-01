@@ -376,6 +376,33 @@ def test_l4_monthly_overflow_routing_cascade():
     assert_invariants(result, expected_total_in=60_000_000.0, flat_price=True)
 
 
+def test_l4_pension_combined_overflow_routes():
+    """연금+IRP 합산 1800만 풀 초과분 → 정책대로 라우팅(드롭 아님).
+
+    손계산(플랫, 세금 OFF): 연금 월100만 + IRP 월100만 = 합산 월200만/12개월=2400만.
+      공유 1800만 풀: m0~m8(9개월) 합산 1800만 흡수(연금 900만·IRP 900만).
+      m9~m11 합산 600만 초과 → 정책[위탁] 라우팅.
+      ∴ 연금 900만 / IRP 900만 / 위탁 600만 / 합산 2400만. 자금보존.
+    """
+    price_data = _flat_year_data()
+    dates = list(price_data["AAA"].index)
+    accounts = [
+        _loop_account("AAA", initial=0.0, monthly=1_000_000.0, account_type="연금저축"),
+        _loop_account("AAA", initial=0.0, monthly=1_000_000.0, account_type="IRP"),
+        _loop_account("AAA", initial=0.0, monthly=0.0, account_type="위탁"),
+    ]
+    policy = DistributionPolicy(destinations=[DistributionDestination(account_id=2)])
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        accounts, price_data, dates, tax_enabled=False, distribution_policy=policy,
+    )
+    assert abs(result.account_results[0]["end_value"] - 9_000_000.0) < 1.0
+    assert abs(result.account_results[1]["end_value"] - 9_000_000.0) < 1.0
+    assert abs(result.account_results[2]["end_value"] - 6_000_000.0) < 1.0
+    assert abs(result.combined_end_value - 24_000_000.0) < 1.0
+    assert abs(sum(t.get("overflow", 0) for t in result.transfer_log) - 6_000_000.0) < 1.0
+    assert_invariants(result, expected_total_in=24_000_000.0, flat_price=True)
+
+
 def test_l4_annual_limit_resets_next_year():
     """ISA 연한도는 해가 바뀌면 리셋(총 1억은 유지)."""
     price_data = {"AAA": _price_frame("2020-01-01", "2021-12-31", 100.0)}

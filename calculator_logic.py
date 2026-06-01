@@ -329,7 +329,9 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
                         'disclaimer': _check.get('disclaimer'),
                     }, ensure_ascii=False))
 
-            if account_type == 'ISA':
+            # transfers ON(G2)이면 ISA 연한도 초과분을 엔진이 분배정책대로 라우팅하므로
+            # 연납입 하드 거부 스킵(거부하면 분배 자체가 막힘). G1(transfers OFF)만 하드체크.
+            if account_type == 'ISA' and not transfers_enabled:
                 _isa_errors = validate_isa_contribution(
                     account['initial_capital'],
                     account['monthly_contribution'],

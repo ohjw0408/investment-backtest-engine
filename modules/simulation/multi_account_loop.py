@@ -23,6 +23,8 @@ class MultiAccountRunResult:
     transfer_log: list[dict[str, Any]] = field(default_factory=list)
     financial_income_by_year: dict = field(default_factory=dict)  # 개인 금융소득 합계(연도별)
     comprehensive_years: tuple = ()                                # 종합과세 대상 연도(>2천만 ∪ 수동)
+    annual_deduction_credit: float = 0.0       # G4 연 납입 세액공제 환급 누계
+    pension_transfer_credit_total: float = 0.0  # G3 ISA→연금 이전공제 환급 누계
 
 
 class MultiAccountSimulationLoop:
@@ -42,6 +44,7 @@ class MultiAccountSimulationLoop:
         record_history: bool = True,
         distribution_policy=None,
         manual_comprehensive_years=None,
+        reinvest_tax_credit: bool = False,
     ) -> MultiAccountRunResult:
         if not accounts:
             raise ValueError("계좌가 없습니다.")
@@ -67,10 +70,20 @@ class MultiAccountSimulationLoop:
         self._manual_comprehensive_years = set(manual_comprehensive_years or ())
         self._comprehensive_threshold = 20_000_000
 
+        # G4: 연 납입 세액공제 상태(개인 단위). external 연금/IRP 납입 연도별 집계.
+        self._reinvest_tax_credit = bool(reinvest_tax_credit)
+        self._pension_ext_by_year: dict[int, float] = {}
+        self._irp_ext_by_year: dict[int, float] = {}
+        self._annual_deduction_total = 0.0
+        self._injection_year: int | None = None
+
         runtimes = [
             self._build_runtime(i, account, tax_enabled, user_settings, dates, tax_session)
             for i, account in enumerate(accounts)
         ]
+        self._ref_tax_engine = next(
+            (rt["tax_engine"] for rt in runtimes if rt.get("tax_engine") is not None), None
+        )
 
         # G2 라우팅 상태(transfers OFF면 전부 미사용 → G1 동작 그대로)
         tracker = None
@@ -196,6 +209,10 @@ class MultiAccountSimulationLoop:
                      if inc > self._comprehensive_threshold}
             comprehensive_years = tuple(sorted(comp))
 
+        # G4: 마지막 해 연납입 세액공제 정산(보고만 — 이후 연도 없어 재투입 불가).
+        if self.transfers_enabled and self._injection_year is not None:
+            self._annual_deduction_total += self._annual_deduction_for_year(self._injection_year)
+
         return MultiAccountRunResult(
             combined_history_df=combined_history_df,
             combined_end_value=float(sum(r["end_value"] for r in account_results)),
@@ -203,6 +220,10 @@ class MultiAccountSimulationLoop:
             transfer_log=transfer_log,
             financial_income_by_year=financial_income_by_year,
             comprehensive_years=comprehensive_years,
+            annual_deduction_credit=float(self._annual_deduction_total),
+            pension_transfer_credit_total=float(
+                sum(r.get("pension_transfer_credit", 0.0) for r in account_results)
+            ),
         )
 
     def _compute_injections(
@@ -237,12 +258,28 @@ class MultiAccountSimulationLoop:
         external: dict[int, float] = defaultdict(float)
         internal: dict[int, float] = defaultdict(float)
         rt_by_id = {rt["account_id"]: rt for rt in runtimes}
+        cur_year = date.year
+
+        # ── G4: 연 경계 — 직전 해 연 납입 세액공제 정산 + (재투자 ON) 정책 cascade 재투입 ──
+        if self._injection_year is None:
+            self._injection_year = cur_year
+        elif cur_year != self._injection_year:
+            prev = self._injection_year
+            self._injection_year = cur_year
+            credit = self._annual_deduction_for_year(prev)
+            if credit > 0:
+                self._annual_deduction_total += credit
+                self._apply_credit_reinvest(
+                    credit, distribution_policy, tracker, account_types,
+                    external, rt_by_id, transfer_log, date, kind="annual_deduction",
+                )
 
         # ── 2-2/2-4: ISA 풍차 만기 (3년=36개월마다) ──
         # 2-4: 직전 3개 과세기간 중 1회라도 금융소득종합과세 대상이면 풍차 중단
         #      (청산·재가입 스킵 → 기존 ISA 무한유지). 3년 롤링 재평가로 자격 복귀.
         if idx > 0 and idx % 36 == 0 and distribution_policy is not None \
                 and self._isa_renewal_eligible(date):
+            g3_credit = 0.0
             for rt in runtimes:
                 if rt["account_type"] != "ISA" or not rt.get("isa_renewal"):
                     continue
@@ -261,11 +298,7 @@ class MultiAccountSimulationLoop:
                         rt_by_id[dest_id]["cycle_contribution"] += amt
                     elif dtype in ("연금저축", "IRP"):
                         # G3: 연금 이전 세액공제(이전액 10%, 연 300만 상한)
-                        credit = self._accrue_pension_credit(rt_by_id[dest_id], amt, date)
-                        if credit > 0 and rt_by_id[dest_id].get("reinvest_tax_credit"):
-                            # 환급금 재투자 = 외부 신규 자금(cash_flow 기록). 환급금은
-                            # 한도 외 재투자로 모델링(limit 미차감 — 단순화).
-                            external[dest_id] += credit
+                        g3_credit += self._accrue_pension_credit(rt_by_id[dest_id], amt, date)
                 transfer_log.append({
                     "date": str(getattr(date, "date", lambda: date)()),
                     "type": "maturity",
@@ -275,6 +308,12 @@ class MultiAccountSimulationLoop:
                     "allocations": allocs,
                     "leftover": leftover,
                 })
+            # G3 이전공제 환급도 통합 토글로 정책 cascade 재투입(만기월 즉시).
+            if g3_credit > 0:
+                self._apply_credit_reinvest(
+                    g3_credit, distribution_policy, tracker, account_types,
+                    external, rt_by_id, transfer_log, date, kind="transfer_credit",
+                )
 
         # ── 2-1: 월 납입 + ISA 초과분 라우팅 (외부 자금) ──
         isa_overflow_total = 0.0
@@ -304,6 +343,7 @@ class MultiAccountSimulationLoop:
                 give = min(base, cap)
                 tracker.record(aid, atype, give)
                 external[aid] += give
+                self._track_pension_contrib(atype, cur_year, give)  # G4 공제 base
 
         if isa_overflow_total > 1e-9 and distribution_policy is not None:
             allocs, leftover = route_overflow(
@@ -311,8 +351,11 @@ class MultiAccountSimulationLoop:
             )
             for dest_id, amt in allocs:
                 external[dest_id] += amt
-                if account_types.get(dest_id) == "ISA":
+                dtype = account_types.get(dest_id, "위탁")
+                if dtype == "ISA":
                     rt_by_id[dest_id]["cycle_contribution"] += amt
+                elif dtype in ("연금저축", "IRP"):
+                    self._track_pension_contrib(dtype, cur_year, amt)  # G4 공제 base
             transfer_log.append({
                 "date": str(getattr(date, "date", lambda: date)()),
                 "overflow": isa_overflow_total,
@@ -395,6 +438,51 @@ class MultiAccountSimulationLoop:
         credited[year] = used + credit
         rt["pension_transfer_credit"] = rt.get("pension_transfer_credit", 0.0) + credit
         return credit
+
+    def _track_pension_contrib(self, account_type, year, amount) -> None:
+        """G4: 연 납입 세액공제 base — 연금/IRP external 납입(직접+2-1라우팅)을 연도별 집계.
+        ISA 만기 전환분(internal)·환급 재투입분은 제외(G3 대상·이중공제 방지)."""
+        if amount <= 0:
+            return
+        if account_type == "연금저축":
+            self._pension_ext_by_year[year] = self._pension_ext_by_year.get(year, 0.0) + amount
+        elif account_type == "IRP":
+            self._irp_ext_by_year[year] = self._irp_ext_by_year.get(year, 0.0) + amount
+
+    def _annual_deduction_for_year(self, year) -> float:
+        """G4: 한 해 연금/IRP external 납입 → 세액공제 환급액(이미 검증된 계산식)."""
+        if self._ref_tax_engine is None:
+            return 0.0
+        pension = self._pension_ext_by_year.get(year, 0.0)
+        irp = self._irp_ext_by_year.get(year, 0.0)
+        if pension <= 0 and irp <= 0:
+            return 0.0
+        return float(self._ref_tax_engine.annual_tax_deduction(pension, irp))
+
+    def _apply_credit_reinvest(self, amount, distribution_policy, tracker, account_types,
+                               external, rt_by_id, transfer_log, date, kind) -> None:
+        """세액공제 환급금(G3 이전공제·G4 연납입공제 공통) 재투자.
+
+        재투자 ON이면 환급액을 **분배 정책 cascade**로 재투입(정상 납입 한도 소비,
+        pension_unlimited=False). 우선순위대로 채우고 마지막 위탁/leftover. 재투입분은
+        다음 해 공제 base에 미포함(재귀 방지). 재투자 OFF면 환급액 보고만(미주입).
+        """
+        if amount <= 1e-9 or distribution_policy is None or not self._reinvest_tax_credit:
+            return
+        from modules.tax.account_tax import route_overflow
+        allocs, leftover = route_overflow(amount, distribution_policy, tracker, account_types)
+        for dest_id, amt in allocs:
+            external[dest_id] += amt
+            if account_types.get(dest_id) == "ISA":
+                rt_by_id[dest_id]["cycle_contribution"] += amt
+        transfer_log.append({
+            "date": str(getattr(date, "date", lambda: date)()),
+            "type": "credit_reinvest",
+            "kind": kind,
+            "amount": amount,
+            "allocations": allocs,
+            "leftover": leftover,
+        })
 
     def _ensure_sync_accounts(self, accounts, distribution_policy):
         """정책 목적지가 없는 계좌(account_id >= len)를 가리키면 위탁 자동 싱크 생성.
@@ -492,7 +580,6 @@ class MultiAccountSimulationLoop:
             "tax_engine": tax_engine,
             "isa_years_held": int(account.get("isa_years_held", 3)),
             "isa_renewal": bool(account.get("isa_renewal", False)),
-            "reinvest_tax_credit": bool(account.get("reinvest_tax_credit", False)),
             "cycle_contribution": init_capital,
             "maturity_tax_paid": 0.0,
             "_last_maturity_tax": 0.0,

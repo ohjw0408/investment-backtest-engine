@@ -1,5 +1,35 @@
 # Log
 
+## [2026-06-01] feat | Track G4 연 납입 세액공제 (L8) + 죽은 v1 삭제
+
+플랜 §G4 신규 설계·구현·검증. 매년 연금/IRP 납입 세액공제 환급을 통합 루프에 배선.
+
+### 사전 정리
+- **죽은 코드 삭제** `modules/tax/multi_account.py`(`MultiAccountSimulator`) — §결정1이 폐기한 v1(계좌 독립시뮬 후 합산). 호출처 0개. 계산식·재투자 패턴만 통합 루프로 이식. (⚠️ README:990 `_init_worker` 언급 stale, 코드 무관)
+
+### 구현 (`multi_account_loop.py`)
+- **공제 계산** = 기존 `TaxEngine.annual_tax_deduction`(min(합산,900만)×16.5/13.2%, 이미 tax_truth 검증) 재사용. 통합 루프에 호출 배선만.
+- **base 집계** `_track_pension_contrib` — 연금/IRP **external 납입**(직접 월납입 + 2-1 ISA초과 라우팅)을 연도별 분리집계. ISA 만기 전환분(internal)·환급 재투입분 제외(G3 대상·이중공제/재귀 방지).
+- **연 경계 정산** — `_compute_injections`서 연도 바뀌면 직전 해 `annual_tax_deduction` 계산→누계. 마지막 해는 finalize서 보고만.
+- **재투자 통합** `_apply_credit_reinvest` — G3 이전공제 환급 + G4 연납입공제 환급 **공통 토글**(`reinvest_tax_credit`, run 레벨). 재투자 ON이면 **분배 정책 cascade로 재투입**(오너 결정: 별도 목적지 안 만들고 기존 우선순위 따라감, `route_overflow` 정상 한도). 직전 해분만 재투입(현실: 익년 정산), 마지막 해 보고만.
+- **G3 재투자 통일** — 기존 "연금 자기자신 재투입" → 정책 cascade로 변경(L6 재투자도 갱신, 결과 동일).
+- 결과 노출: `annual_deduction_credit`·`pension_transfer_credit_total`.
+
+### 오너 결정 (2026-06-01)
+- G3 전환공제(300만)·연납입공제(900만) **별도 한도**(같은 해 둘 다, 최대 1200만). 재투자 목적지=분배 정책 따라감. 재투자 토글 통합 1개.
+
+### 검증 (`tests/test_track_g_multi_account.py` L8 5종, Track G 31/31)
+- 정상(연금600+IRP300 저소득→148.5만/년)·연금단독 600만cap+고소득13.2%(79.2만)·합산 900만cap·0납입(공제0)·**재투자(정책 cascade, 직전해만 재투입 위탁 종료 148.5만, 마지막해 보고만)**.
+- 회귀: 전체 스위트 PASS(L0~L6/L5c 불변).
+
+### 남은 것
+- B단계: `calculator_logic.py` 배선(accounts+정책+isa_renewal+manual_comprehensive_years+reinvest 수신) + 풀커스텀 분배정책 프론트 UI. (UI는 검증 약함)
+- L7 실데이터 통합(불변식만).
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-01] feat | Track G2 2-4 금종세 ISA 풍차중단 (L5c) + 공유세션 멀티배선
 
 플랜 `§2-4` 구현·검증. ISA 풍차(2-2)의 "중단" 분기. 오너 결정(2026-06-01): 판정=자동(라이브)+수동 오버라이드 둘 다 / 과세단위=개인.

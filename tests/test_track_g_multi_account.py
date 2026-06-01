@@ -835,12 +835,11 @@ def test_l6_pension_transfer_credit_reinvested():
     isa = _loop_account("AAA", initial=10_000_000.0, account_type="ISA",
                         start_date="2020-01-01", end_date="2024-01-01", isa_renewal=True)
     pension = _loop_account("AAA", initial=0.0, account_type="연금저축",
-                            start_date="2020-01-01", end_date="2024-01-01",
-                            reinvest_tax_credit=True)
+                            start_date="2020-01-01", end_date="2024-01-01")
     policy = DistributionPolicy(destinations=[DistributionDestination(account_id=1)])
     result = MultiAccountSimulationLoop(transfers_enabled=True).run(
         [isa, pension], price_data, dates, tax_enabled=False,
-        distribution_policy=policy,
+        distribution_policy=policy, reinvest_tax_credit=True,
     )
     assert abs(result.account_results[1]["pension_transfer_credit"] - 3_000_000.0) < 1.0
     assert abs(result.account_results[1]["end_value"] - 43_000_000.0) < 1.0
@@ -967,4 +966,110 @@ def test_l5c_live_dividend_triggers_comprehensive():
     assert len(maturities) == 0
     # ISA 플랫·수익0 보유 → 청산세 0, 종료 1천만
     assert abs(result.account_results[0]["end_value"] - 10_000_000.0) < 1.0
+    assert_invariants(result)
+
+
+# ── L8 연 납입 세액공제 (G4): 매년 연금/IRP 납입 환급 ──
+
+def _two_year_flat(code="AAA"):
+    return {code: _price_frame("2020-01-01", "2021-12-31", 100.0)}
+
+
+def test_l8_annual_deduction_normal():
+    """정상경로: 연금 600만 + IRP 300만/년·저소득(16.5%) → 환급 900만×16.5%=148.5만/년.
+
+    2년(2020·2021 각 완납) → 총 297만. 세금 ON, 재투자 OFF.
+    """
+    price_data = _two_year_flat()
+    dates = list(price_data["AAA"].index)
+    pension = _loop_account("AAA", initial=0.0, monthly=500_000.0, account_type="연금저축",
+                            start_date="2020-01-01", end_date="2022-01-01")
+    irp = _loop_account("AAA", initial=0.0, monthly=250_000.0, account_type="IRP",
+                        start_date="2020-01-01", end_date="2022-01-01")
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [pension, irp], price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 50_000_000, "age": 40},
+    )
+    assert abs(result.annual_deduction_credit - 2_970_000.0) < 1.0
+    assert_invariants(result)
+
+
+def test_l8_pension_only_cap_and_high_income():
+    """경계: 연금 단독 1200만(600만 한도 cap) + 고소득 13.2% → 600만×13.2%=79.2만/년.
+
+    2년 → 158.4만. IRP 없음.
+    """
+    price_data = _two_year_flat()
+    dates = list(price_data["AAA"].index)
+    pension = _loop_account("AAA", initial=0.0, monthly=1_000_000.0, account_type="연금저축",
+                            start_date="2020-01-01", end_date="2022-01-01")
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [pension], price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 70_000_000, "age": 40},
+    )
+    assert abs(result.annual_deduction_credit - 1_584_000.0) < 1.0
+    assert_invariants(result)
+
+
+def test_l8_combined_900_cap():
+    """경계: 연금600+IRP600 = 합산 1200만 → 900만 합산 한도 cap. 저소득 16.5%.
+
+    환급 900만×16.5%=148.5만/년 × 2 = 297만.
+    """
+    price_data = _two_year_flat()
+    dates = list(price_data["AAA"].index)
+    pension = _loop_account("AAA", initial=0.0, monthly=500_000.0, account_type="연금저축",
+                            start_date="2020-01-01", end_date="2022-01-01")
+    irp = _loop_account("AAA", initial=0.0, monthly=500_000.0, account_type="IRP",
+                        start_date="2020-01-01", end_date="2022-01-01")
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [pension, irp], price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 50_000_000, "age": 40},
+    )
+    assert abs(result.annual_deduction_credit - 2_970_000.0) < 1.0
+    assert_invariants(result)
+
+
+def test_l8_no_pension_zero_credit():
+    """경계: 연금/IRP 납입 없으면(위탁만) 연납입 공제 0."""
+    price_data = _two_year_flat()
+    dates = list(price_data["AAA"].index)
+    broker = _loop_account("AAA", initial=10_000_000.0, monthly=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2022-01-01")
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [broker], price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 50_000_000, "age": 40},
+    )
+    assert abs(result.annual_deduction_credit - 0.0) < 1.0
+    assert_invariants(result)
+
+
+def test_l8_reinvest_routes_through_policy():
+    """L8-tax: 환급금 재투자 = 분배 정책 cascade. 직전 해분만 재투입(마지막 해 보고만).
+
+    연금600+IRP300·저소득→148.5만/년. 정책 [위탁]. 재투자 ON:
+      2020 환급 148.5만 → 2021 연경계서 위탁 재투입(플랫 → 위탁 종료 148.5만).
+      2021 환급 148.5만 → 최종정산(보고만, 재투입 X).
+      ∴ annual_deduction_credit 297만, credit_reinvest 1회, 위탁 종료 148.5만.
+    """
+    price_data = _two_year_flat()
+    dates = list(price_data["AAA"].index)
+    pension = _loop_account("AAA", initial=0.0, monthly=500_000.0, account_type="연금저축",
+                            start_date="2020-01-01", end_date="2022-01-01")
+    irp = _loop_account("AAA", initial=0.0, monthly=250_000.0, account_type="IRP",
+                        start_date="2020-01-01", end_date="2022-01-01")
+    broker = _loop_account("AAA", initial=0.0, monthly=0.0, account_type="위탁",
+                           start_date="2020-01-01", end_date="2022-01-01")
+    policy = DistributionPolicy(destinations=[DistributionDestination(account_id=2)])  # 위탁
+    result = MultiAccountSimulationLoop(transfers_enabled=True).run(
+        [pension, irp, broker], price_data, dates, tax_enabled=True,
+        user_settings={"earned_income": 50_000_000, "age": 40},
+        distribution_policy=policy, reinvest_tax_credit=True,
+    )
+    assert abs(result.annual_deduction_credit - 2_970_000.0) < 1.0
+    reinvests = [t for t in result.transfer_log if t.get("type") == "credit_reinvest"]
+    assert len(reinvests) == 1
+    assert reinvests[0]["kind"] == "annual_deduction"
+    assert abs(reinvests[0]["amount"] - 1_485_000.0) < 1.0
+    assert abs(result.account_results[2]["end_value"] - 1_485_000.0) < 1.0
     assert_invariants(result)

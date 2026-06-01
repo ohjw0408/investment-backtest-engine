@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> ✅ **2026-06-02 업데이트 27 (초기자본 연한도 = 에러로 통일):** 오너 결정 — 초기자본 초과는 라우팅 아니라 **에러**(실제 입금이라 한도 초과 불가). `_validate_initial_capital_limits`(calculator_logic): ISA 각 ≤2천만, **연금저축+IRP 합산 ≤1800만(공유)**, transfers 무관 항상. 프론트 initial_capital_limit 배너. 이전 비일관(ISA-G1만 에러·ISA-G2 앉음·연금 무검증) 해소. (월 초과분=라우팅, 초기자본=에러 — 구분 명확.) 검증 `test_l2_initial_capital_limit_validation`. cache v20260602init.
+
 > ✅ **2026-06-02 업데이트 26 (연금/IRP 월납입 초과 라우팅 + ISA 연한도 하드거부 버그):** ① **버그**: `validate_isa_contribution`이 ISA 연2천만 초과를 시뮬 시작 전 하드거부 → G2 분배 자체 차단(브라우저서 발견). 수정: transfers ON이면 스킵(엔진이 라우팅, befc6fb). ② **연금/IRP 합산 1800만 초과분 드롭→라우팅**: 기존엔 ISA만 초과 라우팅하고 연금은 초과분 드롭(자금증발). ISA처럼 `overflow_total` 합산→정책 cascade. 검증 `test_l4_pension_combined_overflow_routes`(연금100+IRP100/월→공유풀 1800만+위탁 600만). 연금/IRP 하드락은 원래 없음(경고만). **Track G 38/38.** ❌ deferred: 연금/IRP·ISA 초기자본>한도 라우팅(sim-start 메커니즘 필요, 계획 기록). **▶ B3 브라우저 스모크 재시도 + 잔여(탭복제·초기자본엣지·L7).**
 
 > 🔧 **2026-06-01 업데이트 25 (B3 프론트 UI 배선):** 계산기 멀티계좌에 G2 컨트롤 추가. ① 계좌별 **우선순위 숫자 입력**(`updateTaxAccountPriority`, 재렌더 없이 저장→커서유지) → `buildDistributionPolicy`가 우선순위 정렬로 `distribution_policy` 생성 ② 글로벌 ISA풍차 체크 → **ISA 계좌별 `isa_renewal`** 매핑(엔진이 계좌별로 읽으므로) ③ 금종세 **수동연도 입력**(`manualComprehensiveYears`, isaRenewalSection) → `manual_comprehensive_years` ④ 기존 `taxDeductionReinvest` → `reinvest_tax_credit` 배선 ⑤ 결과에 g2 패널(만기 N회·종합과세연도·환급액). JS 문법 OK, 캐시버전 v20260601b3. **검증:** node --check 통과 + **배포됨**(서버가 v3 JS·수동연도 입력 서빙 확인) + **풀스택 PASS**(UI 형태 body submit→`g2.enabled=true`·만기 1회·ISA 재가입 라우팅 end-to-end). 미검증(약함, 수용)=DOM 클릭→body 생성(브라우저 육안 스모크 1회 권장: 계좌 2개+우선순위+ISA풍차→실행→g2 패널). **▶ 잔여 = (선택)브라우저 스모크 + 은퇴/백테스트 탭 복제 + L7 실데이터 통합.**

@@ -217,6 +217,31 @@ def _normalize_multi_accounts(body: dict) -> list[dict]:
     return accounts
 
 
+def _validate_initial_capital_limits(accounts: list[dict]) -> list[str]:
+    """초기자본 연 납입한도 하드체크 (transfers 무관 — 초기자본은 실제 입금이라 한도 초과 불가).
+
+    - ISA: 각 계좌 초기자본 ≤ 2,000만(연 한도).
+    - 연금저축 + IRP: 합산 초기자본 ≤ 1,800만(공유 연 한도).
+    위반 메시지 리스트 반환(빈 리스트 = 통과).
+    """
+    errors: list[str] = []
+    for idx, a in enumerate(accounts):
+        if a.get('type') == 'ISA' and float(a.get('initial_capital', 0) or 0) > 20_000_000:
+            errors.append(
+                f"계좌 {idx + 1}: ISA 초기 투자금은 연 납입한도 2,000만원을 초과할 수 없습니다."
+            )
+    pension_init = sum(
+        float(a.get('initial_capital', 0) or 0)
+        for a in accounts if a.get('type') in ('연금저축', 'IRP')
+    )
+    if pension_init > 18_000_000:
+        errors.append(
+            f"연금저축+IRP 초기 투자금 합계 {pension_init:,.0f}원이 "
+            f"연 합산 납입한도 1,800만원을 초과합니다. (연금저축·IRP는 한도 공유)"
+        )
+    return errors
+
+
 def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> dict:
     from modules.retirement.multi_account_analyzer import MultiAccountAnalyzer
 
@@ -316,6 +341,13 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
             validate_isa_contribution,
         )
         tax_engine = TaxEngine(user_settings)
+        # 초기자본 연한도 하드체크(전 경우) — 초기자본은 라우팅 대상 아님(실제 입금).
+        _init_errors = _validate_initial_capital_limits(accounts)
+        if _init_errors:
+            raise ValueError(_json.dumps({
+                'error': 'initial_capital_limit',
+                'violations': _init_errors,
+            }, ensure_ascii=False))
         for idx, account in enumerate(accounts):
             account_type = account['type']
             ticker_codes = [t['code'] for t in account['tickers']]

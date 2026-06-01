@@ -1106,7 +1106,23 @@ def test_l8_reinvest_routes_through_policy():
 
 # ── L9 logic/analyzer 관통 (B1): 엔진 G2 결과가 analyzer 결과로 정확히 도달 ──
 
-from calculator_logic import _normalize_multi_accounts
+from calculator_logic import _normalize_multi_accounts, _validate_initial_capital_limits
+
+
+def test_l2_initial_capital_limit_validation():
+    """초기자본 연한도 하드체크: ISA 각 ≤2천만, 연금+IRP 합산 ≤1800만(공유)."""
+    def a(typ, init):
+        return {"type": typ, "initial_capital": init}
+    # ISA 초과
+    assert _validate_initial_capital_limits([a("ISA", 21_000_000)])
+    # ISA 정확히 한도 = OK
+    assert _validate_initial_capital_limits([a("ISA", 20_000_000)]) == []
+    # 연금+IRP 합산 초과(각각은 미만이나 합산 2천만 > 1800만)
+    assert _validate_initial_capital_limits([a("연금저축", 10_000_000), a("IRP", 10_000_000)])
+    # 연금+IRP 합산 정확히 1800만 = OK
+    assert _validate_initial_capital_limits([a("연금저축", 9_000_000), a("IRP", 9_000_000)]) == []
+    # 위탁 무제한 = OK
+    assert _validate_initial_capital_limits([a("위탁", 999_000_000)]) == []
 
 
 def test_l9_analyzer_maturity_surfaced():

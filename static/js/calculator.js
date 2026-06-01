@@ -378,10 +378,8 @@ async function runCalculator() {
     // G2/G3/G4: 우선순위 분배정책 + 금종세 수동연도 + 세액공제 재투자
     payload.distribution_policy = buildDistributionPolicy(accountsPayload);
     payload.reinvest_tax_credit = taxEnabled && (document.getElementById('taxDeductionReinvest')?.checked ?? false);
-    const compRaw = (document.getElementById('manualComprehensiveYears')?.value || '').trim();
-    payload.manual_comprehensive_years = compRaw
-      ? compRaw.split(/[,\s]+/).map(y => parseInt(y, 10)).filter(y => !isNaN(y))
-      : [];
+    // 금종세 대상은 위탁 배당 등 금융소득으로 엔진이 자동 판정(수동 지정 안 함).
+    payload.manual_comprehensive_years = [];
   }
 
   showProgressUI();
@@ -631,9 +629,13 @@ function renderMultiAccountSummary(multiAccount, g2) {
     return;
   }
 
-  const warnings = (multiAccount.contribution_warnings || []).map(w =>
+  let warnings = (multiAccount.contribution_warnings || []).map(w =>
     `<div style="font-size:0.76rem;color:#C62828;background:#FFEBEE;border-radius:6px;padding:6px 8px;margin-top:6px;">${w}</div>`
   ).join('');
+  // 멀티계좌 결과 — 한도 초과분은 분배 우선순위대로 이전됨을 안내.
+  if ((multiAccount.contribution_warnings || []).length) {
+    warnings += `<div style="font-size:0.74rem;color:#1B5E20;background:#E8F5E9;border-radius:6px;padding:6px 8px;margin-top:6px;">➜ 납입한도 초과분은 분배 우선순위에 따라 다른 계좌로 이전됩니다.</div>`;
+  }
   const rows = multiAccount.accounts.map((acc, i) => {
     const d = acc.distribution?.end_value || {};
     return `
@@ -1381,9 +1383,16 @@ function checkTaxLimits() {
     warnings.push(`⚠ 세액공제 한도(900만) 초과분은 공제 불가합니다.`);
 
   const warnEl = document.getElementById('taxWarnings');
-  if (warnEl) warnEl.innerHTML = warnings.map(w =>
-    `<div style="font-size:0.75rem;color:#C62828;background:#FFEBEE;padding:6px 10px;border-radius:6px;margin-bottom:4px;">${w}</div>`
-  ).join('');
+  if (warnEl) {
+    let html = warnings.map(w =>
+      `<div style="font-size:0.75rem;color:#C62828;background:#FFEBEE;padding:6px 10px;border-radius:6px;margin-bottom:4px;">${w}</div>`
+    ).join('');
+    // 멀티계좌면 초과분이 분배 우선순위대로 다른 계좌로 이전됨을 안내(단일계좌는 이전 대상 없음).
+    if (warnings.length && !isSingle) {
+      html += `<div style="font-size:0.73rem;color:#1B5E20;background:#E8F5E9;padding:6px 10px;border-radius:6px;margin-bottom:4px;">➜ 납입한도 초과분은 분배 우선순위에 따라 다른 계좌로 이전됩니다.</div>`;
+    }
+    warnEl.innerHTML = html;
+  }
 }
 // ── 공유 (C5) ──
 async function calcMakeCanvas() {

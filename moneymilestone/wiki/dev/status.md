@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> ✅ **2026-06-03 업데이트 35 (KRX 금현물 거래가능 + 위탁전용, 금 Phase 1):** KRX_GOLD가 index_master만 있고 price_daily 없어 위탁 시뮬 'portfolio_value' 에러였음. `price_loader._build_krx_gold_series`로 연속 KRW/g 시계열(2014~ KRX금 + 2014이전 GC=F×USD/KRW ratio규격화) 단락 제공 + 위탁전용 검증(ISA/연금/IRP 거부) + data_start 시계열시작·빈윈도우 스킵(5cc4c1a+ec7cfa2). **서버검증:** 위탁 금 8년 작동(금비과세 savings 0) · ISA+금 account_restrictions 거부 · 2014경계 점프0·2024년 86,940원/g 실제일치. test_krx_gold 3종+회귀 PASS. **GH 절세는 절세액에 합산 표시(25534ac).** **▶ 다음 = 금현물 ETF 2차백필(금데이터백필_plan.md Phase 2).**
+
 > ✅ **2026-06-03 업데이트 34 (단일 풍차 ISA 자동 위탁계좌):** 오너 요청 — 단일 풍차 ISA를 에러로 막지 말고 자동 처리(2ae53c6). 같은 종목·비중 위탁계좌(초기0·월0) 자동생성 + 정책 라우팅 → 멀티경로로 풍차 정상(만기 3회). 결과창 파란 안내박스. **서버검증:** 단일 풍차 ISA 458730 12년 → 절세 2,245,158·종료 3,677만(평범 ISA 3,363만↑). 회귀 L-SAVE26+TrackG41 PASS. JS v20260603windmill. **▶ 절세 P1+단일계좌(풍차 포함) 완료. 다음 = 백테스트/은퇴 복제 플랜.**
 
 > ✅ **2026-06-03 업데이트 33 (분할매도 복구 + 풍차 단일ISA 회귀 수정):** BUG-SAVE-1 A안 부작용 정리(124f82f). ① 분할매도 패널 멀티경로 복구(analyzer가 kr_foreign_gain·금융소득 surface→compute_split_sale_plan). 회귀: 풍차 단일ISA가 멀티서 풍차 미작동(maturity 0) → 라우팅 '非풍차만 멀티'로 한정, 풍차 단일은 단일경로(의도된 'isa_windmill_disabled' 안내·멀티계좌 필요). ② early_cancel은 단일계좌 도달불가(풍차단일 차단)라 무관. **서버검증:** 평범 단일 ISA 절세 1,628,586·위탁 split_sale gain 3747만·풍차단일 안내 PASS. **▶ 절세 P1 전부 정리 완료. 다음 = 백테스트/은퇴 복제 플랜.**

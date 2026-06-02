@@ -1,5 +1,26 @@
 # Log
 
+## [2026-06-03] feat | KRX 금현물 거래가능 시계열 + 위탁 전용 (금 Phase 1, 서버검증 PASS)
+
+**버그:** KRX_GOLD가 `index_master`(지수)에만 있고 `price_daily`(거래가격)엔 없어 위탁 시뮬이 'portfolio_value' 에러로 안 돌았음(5년 잡아도). 
+
+**수정 (5cc4c1a+ec7cfa2):**
+- `price_loader._build_krx_gold_series`: KRX_GOLD를 연속 KRW/g 시계열로 — 2014~ KRX 금현물 + 2014이전 GC=F(USD/oz)×USD/KRW를 2014 경계서 **ratio 규격화**(oz↔g·통화 단위차는 경계 ratio 흡수). `get_price('KRX_GOLD')` 단락(yfinance·백필·FX 미적용).
+- 위탁 전용: `validate_account_portfolio`가 ISA/연금/IRP의 KRX_GOLD 거부.
+- `_get_price_start(KRX_GOLD)` = 시계열 시작(price_daily 조회 None → data_start 과거 → 빈 윈도우 크래시 방지) + analyzer 빈 dates 윈도우 스킵.
+
+**오너 결정:** 2014이전=GC=F×USD/KRW · 위탁전용=KRX_GOLD만(금현물ETF는 ISA가능) · ratio 규격화 · **Phase 1만**(금현물 ETF 2차백필은 다음).
+
+**검증:**
+- 로컬: 시계열 1971~2026·2014 경계 점프 0(47,592→46,950)·2024년 86,940원/g(실제 KRX금 일치)·위탁 시뮬 정상·금 양도세 0. `test_krx_gold` 3종 + L-SAVE26+TrackG41 PASS.
+- **서버:** 위탁 KRX_GOLD 8년 작동(cases 72·금 비과세 savings 0·패널 숨김) · ISA+KRX_GOLD → account_restrictions 거부. **PASS.**
+
+**▶ 다음 = 금현물 ETF 2차 백필(ACE금현물 등) — `금데이터백필_plan.md` Phase 2.**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-03] feat | 단일 풍차 ISA 자동 위탁계좌 생성 (에러 대신 정상 시뮬)
 
 오너 요청: 단일 풍차 ISA가 `isa_windmill_disabled` 에러로 막히는 게 UX 나쁨(시뮬은 도는데). 막지 말고 자동 처리.

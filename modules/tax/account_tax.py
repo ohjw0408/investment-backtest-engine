@@ -144,6 +144,14 @@ def validate_account_portfolio(
         market = tax_engine.classify_asset(ticker)          # KR_DOMESTIC | KR_FOREIGN | US_DIRECT | KRX_GOLD
         inst   = tax_engine.classify_instrument_type(ticker) # ETF | STOCK | LEVERAGED_ETF | INVERSE_ETF | UNKNOWN
 
+        # KRX 금현물은 금현물계좌(위탁) 전용 — ISA·연금·IRP 매수 불가.
+        if market == "KRX_GOLD":
+            violations.append(
+                f"KRX 금현물({ticker})은 금현물 계좌(위탁)에서만 매수할 수 있습니다. "
+                f"ISA·연금·IRP에선 보유 불가 — 금현물 ETF(예: ACE KRX금현물)를 이용하세요."
+            )
+            continue
+
         if account_type == "ISA":
             if market == "US_DIRECT":
                 violations.append(

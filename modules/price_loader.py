@@ -244,6 +244,74 @@ class PriceLoader:
         self._usdkrw_cache = series
         return series
 
+    # -------------------------------------------------
+    # KRX 금현물(KRW/g) 거래가능 장기 시계열
+    # -------------------------------------------------
+
+    def _build_krx_gold_series(self) -> pd.Series:
+        """KRX 금현물(KRW/g) 연속 시계열.
+
+        - 2014~현재: index_daily의 KRX 금현물.
+        - 2014 이전: GC=F(국제 금선물, USD/oz) × USD/KRW → KRW/oz를 **2014 경계서 KRX금
+          가격 스케일로 ratio 규격화**해 이어붙임. (oz↔g·통화 단위차는 경계 ratio가 흡수.)
+        KRX_GOLD는 KRW 표시라 환율(FX) 추가 적용 안 함.
+        """
+        if getattr(self, "_krx_gold_cache", None) is not None:
+            return self._krx_gold_cache
+        if self.index_conn is None:
+            raise RuntimeError("index_master.db가 없습니다.")
+        krx = pd.read_sql(
+            "SELECT date, close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date",
+            self.index_conn,
+        )
+        if krx.empty:
+            raise RuntimeError("KRX_GOLD 데이터가 없습니다.")
+        krx["date"] = pd.to_datetime(krx["date"])
+        krx = krx.set_index("date")["close"].astype(float)
+
+        series = krx
+        gcf = pd.read_sql(
+            "SELECT date, close FROM index_daily WHERE code='GC=F' ORDER BY date",
+            self.index_conn,
+        )
+        if not gcf.empty:
+            gcf["date"] = pd.to_datetime(gcf["date"])
+            gcf = gcf.set_index("date")["close"].astype(float)
+            fx = self._load_usdkrw()
+            intl = (gcf * fx.reindex(gcf.index).ffill()).dropna()   # KRW/oz
+            boundary = krx.index.min()
+            iv = None
+            if boundary in intl.index:
+                iv = float(intl[boundary])
+            else:
+                before = intl[intl.index <= boundary]
+                if not before.empty:
+                    iv = float(before.iloc[-1])
+            if iv and iv > 0:
+                scale = float(krx[boundary]) / iv          # ratio 가격일치
+                prefix = intl[intl.index < boundary] * scale
+                series = pd.concat([prefix, krx])
+        series = series[~series.index.duplicated(keep="last")].sort_index()
+        self._krx_gold_cache = series
+        return series
+
+    def _krx_gold_price_df(self, start_date, end_date):
+        """KRX_GOLD 연속 시계열을 [start, end] 가격 DataFrame으로 반환(get_price 포맷)."""
+        s = self._build_krx_gold_series()
+        idx_dates = s.index.date
+        mask = (idx_dates >= start_date) & (idx_dates <= end_date)
+        sub = s[mask]
+        return pd.DataFrame({
+            "date":     sub.index.strftime("%Y-%m-%d"),
+            "open":     sub.values,
+            "high":     sub.values,
+            "low":      sub.values,
+            "close":    sub.values,
+            "volume":   0,
+            "dividend": 0.0,
+            "split":    1.0,
+        })
+
     def get_usdkrw(self, date: str) -> float:
         series = self._load_usdkrw()
         dt     = pd.Timestamp(date)
@@ -339,6 +407,12 @@ class PriceLoader:
         cache_key = f"{code}_{start_date}_{end_date}_{apply_fx}_{allow_synthetic}"
         if cache_key in self._price_cache:
             return self._price_cache[cache_key]
+
+        # ── KRX 금현물: index_daily 기반 연속 시계열로 단락(yfinance·백필·FX 미적용) ──
+        if code == "KRX_GOLD":
+            df = self._krx_gold_price_df(start_date, end_date)
+            self._price_cache[cache_key] = df
+            return df
 
         # ── DB 범위 확인 및 API 호출 목록 생성 ───────────────
         db_min, db_max = self.get_date_range_in_db(code)

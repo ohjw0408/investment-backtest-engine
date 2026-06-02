@@ -552,8 +552,27 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
 def run_calculator_logic(body: dict, progress_callback=None) -> dict:
     from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
 
-    if len(body.get('accounts') or []) > 1:
+    accts = body.get('accounts') or []
+    if len(accts) > 1:
         return _run_multi_account_calculator_logic(body, progress_callback)
+
+    # BUG-SAVE-1 (A): 세금 ON이면 단일계좌도 멀티경로로 → 절세액(savings) 산출.
+    # 단일경로(AccumulationAnalyzer)는 savings를 안 만들어 절세 패널이 안 떴음.
+    # 세금 OFF는 절세 의미 없으니 기존 단일경로 유지.
+    if bool(body.get('tax_enabled', False)):
+        nb = dict(body)
+        if not accts:
+            nb['accounts'] = [{
+                'type':                 body.get('account_type', '위탁'),
+                'initial_capital':      body.get('initial_capital', 0),
+                'monthly_contribution': body.get('monthly_contribution', 0),
+                'tickers':              body.get('tickers', []),
+                'rebal_mode':           body.get('rebal_mode'),
+                'band_width':           body.get('band_width', 0.05),
+                'dividend_mode':        body.get('dividend_mode'),
+                'isa_renewal':          body.get('isa_renewal', False),
+            }]
+        return _run_multi_account_calculator_logic(nb, progress_callback)
 
     portfolio_engine = _get_portfolio_engine()
 

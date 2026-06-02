@@ -29,6 +29,8 @@ tags: [dev, bug]
 | BUG-MAA-1 | MultiAccountAnalyzer `cagr` 필드 garbage (1e10 수준) | `cagr=(final/positive_cf)**(1/years)-1`에서 positive_cf 비정상(초기금만·월납0 시) 추정. use_synthetic 무관(기존). 분포는 `end_value` 사용이라 화면 무영향 | `modules/retirement/multi_account_analyzer.py` | ⚠️ 미해결(낮음) — 화면 영향 없음, 추후 확인 (Claude) |
 | BUG-INF-1 | 멀티계좌 결과 JSON에 Infinity → 클라 "Unexpected token I ... not valid JSON" | 만기 internal 이동만 받는 계좌(초기0·월0 위탁)는 외부 cash_flow=0 → IRR(mwr) 발산 → cagr=inf → 분포 mean inf → jsonify가 Infinity 출력(유효 JSON 아님) → JSON.parse 깨짐. 브라우저 스모크 테스트①②서 발견 | `modules/retirement/multi_account_analyzer.py` | ✅ 수정 (90053b7 다음): mwr/cagr 비유한 가드(→0) + _fit_distribution v 비유한 제거. 회귀 `test_l9_no_infinity_in_result`(strict JSON). (Claude) |
 | BUG-DEPLOY-1 | 자동배포 무력화 — Action success인데 코드 미반영 | `data/meta/index_master.db` 추적됨 + 서버 런타임이 씀 → `git pull` abort. deploy.yml이 pull 실패 미체크(systemctl is-active만 봄)라 success 오판. 오늘 커밋 전부 미배포였음 | `.github/workflows/deploy.yml`, `data/meta/index_master.db` | ✅ 수정 (d581cc3): git rm --cached DB + deploy.yml set -e + pull 전 git checkout. 배포·B2 서버검증 PASS (Claude) |
+| BUG-TAX-1 | **위탁 계좌 세금 과소부과** — 배당 실린 종목이 이론(15.4%)보다 적게 떼임 | 배당소득세 미부과 의심(배당분 과세 누락). 단일경로(`TaxableSimulationRunner`) 추정. 실효율: 재투자 12.5%·보유 11.1%·인출 6.4% — 배당 분리도↑일수록 ↓. 인출은 시세차익마저 과소(추가 원인 미상) | `modules/simulation/taxable_runner.py`, `modules/tax/account_tax.py`(TaxedDividendEngine), `modules/tax/liquidation.py` | ❌ 미수정 (높음) — 2026-06-02 발견, 데이터·분석 [[log]] |
+| BUG-SAVE-1 | 절세액 패널 단일계좌(1개)에서 미표시 | `run_calculator_logic`이 `len(accounts) > 1`일 때만 멀티경로(savings 산출). 계좌 1개면 단일경로(`AccumulationAnalyzer`)로 빠져 savings 미생성 | `calculator_logic.py:555` | ❌ 미수정 (중간) — 절세 P1 구현 갭, 2026-06-02 발견 |
 
 **이전 "활성"에서 해결된 항목들:**
 

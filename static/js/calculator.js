@@ -114,8 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('click', e => {
-    if (!searchInput.closest('.ticker-search-box').contains(e.target)) {
-      dropdown.style.display = 'none';
+    if (!searchInput || !searchInput.closest('.ticker-search-box')?.contains(e.target)) {
+      if (dropdown) dropdown.style.display = 'none';
     }
   });
 
@@ -933,23 +933,29 @@ function renderResult(data, payload) {
   }
 
   histConfigs.forEach(cfg => {
+    const el = document.getElementById(cfg.id);
+    if (!el) return;                              // 요소 없으면 스킵(null.closest 방지)
+    const card = el.closest('.result-card');
     const isDivDisabled = cfg.div && noDividend;
     if (isDivDisabled) {
       // 배당 없는 포트폴리오 → 해당 없음 표시
-      const card = document.getElementById(cfg.id).closest('.result-card');
-      card.querySelector('.chart-wrap-sm').innerHTML =
-        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#90A4AE;font-size:0.82rem;">배당 데이터 없음</div>';
+      const wrap = card && card.querySelector('.chart-wrap-sm');
+      if (wrap) {
+        wrap.innerHTML =
+          '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#90A4AE;font-size:0.82rem;">배당 데이터 없음</div>';
+      }
       const statsEl = document.getElementById(`stats${cfg.id.replace('hist','')}`);
       if (statsEl) statsEl.innerHTML = '';
       return;
     }
 
-    renderHistogram(cfg.id, dist[cfg.key].values, cfg.color, cfg.fmt);
-    renderHistStats(`stats${cfg.id.replace('hist', '')}`, dist[cfg.key], cfg.fmt);
+    if (dist[cfg.key]) {
+      renderHistogram(cfg.id, dist[cfg.key].values, cfg.color, cfg.fmt);
+      renderHistStats(`stats${cfg.id.replace('hist', '')}`, dist[cfg.key], cfg.fmt);
+    }
 
     // 배당 히스토그램에 케이스 수 주석 표시
-    if (cfg.div && divNote) {
-      const card = document.getElementById(cfg.id).closest('.result-card');
+    if (cfg.div && divNote && card) {
       let note = card.querySelector('.div-note');
       if (!note) {
         note = document.createElement('div');
@@ -961,8 +967,7 @@ function renderResult(data, payload) {
     }
 
     // 배당 CAGR 최소 기간 안내
-    if (cfg.id === 'histDivCagr' && !noDividend) {
-      const card = document.getElementById(cfg.id).closest('.result-card');
+    if (cfg.id === 'histDivCagr' && !noDividend && card) {
       let warn = card.querySelector('.div-cagr-warn');
       if (!warn) {
         warn = document.createElement('div');

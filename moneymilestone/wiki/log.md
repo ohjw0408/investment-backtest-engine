@@ -1,5 +1,21 @@
 # Log
 
+## [2026-06-02] fix | BUG-SAVE-1 수정 — 단일계좌 절세액 표시 (A안, 서버검증 PASS)
+
+**원인:** `run_calculator_logic`이 `len(accounts) > 1`일 때만 멀티경로(savings 산출). 계좌 1개면 단일경로(`AccumulationAnalyzer`)로 빠져 savings 미생성 → 절세 패널 안 뜸. 프론트는 단일계좌일 때 `accounts[]` 없이 legacy 필드(tickers/account_type 등) 전송.
+
+**수정 (f909c69, A안):** 세금 ON 단일계좌면 legacy 필드로 `accounts[1]` 합성 후 `_run_multi_account_calculator_logic` 호출 → savings 생성. 세금 OFF는 기존 단일경로 유지(절세 무의미).
+
+**서버검증:** 단일 ISA(458730, 1천만, 12년, hold) → 위탁가정 4,005,640·실제 2,377,054·**절세 1,628,586**. 종료자산 3,363만(위탁 3,200만보다 높음 — ISA 배당이연·낮은 청산세 우위, 합당).
+
+⚠️ **부작용:** 단일계좌 세금ON 결과에서 **분할매도·ISA조기해지 분포 패널 미표시**(멀티경로엔 해당 필드 없음). JS 가드되어 에러는 없음. 필요 시 멀티경로에 추가 검토.
+
+**▶ 절세액 P1 관련 버그 2개(TAX-1·SAVE-1) 모두 수정·서버검증 완료.**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-02] fix | BUG-TAX-1 수정 — 단일경로 배당소득세 미부과 (서버검증 PASS)
 
 **근본원인:** `DividendEngine`(base)이 GROSS 배당을 `portfolio.cash`에 입금하는데, 단일경로 `SimulationLoop`은 배당세를 cash에서 차감하는 코드가 없었음 → 배당이 사실상 미과세. 멀티경로(`multi_account_loop`)는 루프가 직접 `cash -= (gross-net)` 차감해서 정상이었음(그래서 `test_l3` 통과·발견 지연).

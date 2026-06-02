@@ -260,6 +260,7 @@ class TaxedDividendEngine:
 
         # 세금 적용
         net_by_ticker = {}
+        total_tax = 0.0
         for ticker, gross_div in gross_by_ticker.items():
             if gross_div > 0:
                 ytd = (self._session.ytd_financial_income
@@ -267,6 +268,7 @@ class TaxedDividendEngine:
                 net_div = self.tax_engine.after_tax_dividend(
                     gross_div, ticker, self.account_type, ytd,
                 )
+                total_tax += max(0.0, gross_div - net_div)
                 # 위탁 계좌의 금융소득만 누계에 포함
                 if self.account_type == "위탁":
                     if self._session is not None:
@@ -277,6 +279,11 @@ class TaxedDividendEngine:
                 net_by_ticker[ticker] = net_div
             else:
                 net_by_ticker[ticker] = gross_div
+
+        # base_engine이 GROSS를 portfolio.cash에 입금했으므로 배당소득세만큼 차감 → cash엔 net만 남음.
+        # (이 차감이 없으면 배당세가 포트폴리오에서 안 빠져 미과세됨 — BUG-TAX-1.)
+        if total_tax > 0:
+            portfolio.cash = max(0.0, portfolio.cash - total_tax)
 
         return net_by_ticker
 

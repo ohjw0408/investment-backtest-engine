@@ -510,6 +510,50 @@ def test_l_save_analyzer_windmill_surfaced():
                - sum(a["tax_saving"] for a in sav["accounts"])) < 1e-6
 
 
+# ── BUG-TAX-1 회귀: 단일경로(TaxableSimulationRunner) 배당세 실제 차감 ──
+
+def _run_taxable(dividend_mode, tax_enabled):
+    """단일경로. 458730(KR_FOREIGN), 가격 평탄 100, 초기 1000(=10주), 배당 10/주."""
+    from modules.config.simulation_config import SimulationConfig
+    from modules.rebalance.periodic import PeriodicRebalance
+    from modules.simulation.taxable_runner import TaxableSimulationRunner
+    from modules.tax.base_tax import TaxEngine
+
+    frame = _price_frame("2020-01-01", "2020-12-31", 100.0, 100.0,
+                         dividend_date="2020-06-01", dividend=10.0)
+    config = SimulationConfig(
+        start_date="2020-01-01", end_date="2021-01-01", tickers=["458730"],
+        target_weights={"458730": 1.0}, initial_capital=1000.0,
+        monthly_contribution=0.0, withdrawal_amount=0,
+        dividend_mode=dividend_mode, rebalance_frequency=None, inflation=0.0,
+    )
+    strategy = PeriodicRebalance({"458730": 1.0}, rebalance_frequency=None)
+    te = TaxEngine({"earned_income": 0, "age": 40}) if tax_enabled else None
+    return TaxableSimulationRunner().run(
+        config, {"458730": frame}, list(frame.index), strategy,
+        tax_enabled=tax_enabled, account_type="위탁", tax_engine=te,
+        user_settings={"earned_income": 0, "age": 40},
+    ).end_value
+
+
+def test_bug_tax1_single_path_dividend_taxed_hold():
+    """배당 보유 모드: 세전배당 100 → 위탁 배당세 15.4% = 15.4 차감.
+    가격 평탄(양도세 0) → 세금 차이 = 배당세뿐."""
+    no_tax = _run_taxable("hold", False)
+    taxed = _run_taxable("hold", True)
+    assert abs(no_tax - 1100.0) < 1e-6        # 1000 + 배당 100(gross)
+    assert abs(taxed - 1084.6) < 1e-6         # 1000 + net 84.6 (배당세 15.4 차감)
+    assert abs((no_tax - taxed) - 15.4) < 1e-6   # 배당세 실제 차감 확인 (버그면 0이었음)
+
+
+def test_bug_tax1_single_path_dividend_taxed_reinvest():
+    """배당 재투자 모드도 배당세 차감(net만 재투자)."""
+    no_tax = _run_taxable("reinvest", False)
+    taxed = _run_taxable("reinvest", True)
+    # 평탄가격이라 재투자분도 가치증가 없음 → 세금 차이 = 배당세 15.4
+    assert abs((no_tax - taxed) - 15.4) < 1e-6
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])

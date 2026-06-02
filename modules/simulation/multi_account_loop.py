@@ -693,7 +693,7 @@ class MultiAccountSimulationLoop:
                 for ticker, gross in gross_dividend_by_ticker.items()
             )
             if dividend_tax > 0:
-                portfolio.cash = max(0.0, portfolio.cash - dividend_tax)
+                # 현금 차감은 TaxedDividendEngine.process가 담당(이중차감 방지) — 여기선 보고만.
                 rt["dividend_tax_paid"] += dividend_tax
             # 절세액(위탁 가정): 세전 배당을 자산분류별 누적(계좌유형 무관).
             tax_engine = rt.get("tax_engine")

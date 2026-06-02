@@ -416,6 +416,24 @@ class MultiAccountSimulationLoop:
             tax = max(0.0, value - after)
         lump = value - tax
 
+        # 절세액(위탁 가정): 만기 청산 = 그 사이클 미실현차익 실현(자산분류별).
+        # 기준 리셋 전 누적 → 다음 사이클·최종청산과 무중복(풍차 통합 추적).
+        executor = rt.get("executor")
+        if executor is not None and tax_engine is not None \
+                and hasattr(executor, "_brk_us_by_year"):
+            cyc_year = date.year
+            for ticker, pos in portfolio.positions.items():
+                if ticker not in price_dict or pos.quantity <= 0:
+                    continue
+                gain = float(portfolio.unrealized_gain(ticker, price_dict[ticker]))
+                cls = tax_engine.classify_asset(ticker)
+                if cls == "KR_FOREIGN":
+                    if gain > 0:
+                        executor._brk_krf_gain += gain
+                elif cls == "US_DIRECT":
+                    executor._brk_us_by_year[cyc_year] = \
+                        executor._brk_us_by_year.get(cyc_year, 0.0) + gain
+
         portfolio.positions = {}
         portfolio.cash = 0.0
         if hasattr(portfolio, "_avg_costs"):
@@ -608,6 +626,8 @@ class MultiAccountSimulationLoop:
             "last_cf_month": None,
             "initial_capital_cf": 0.0,
             "dividend_tax_paid": 0.0,
+            # 절세액(위탁 가정): 자산분류별 세전 배당 누계(전 기간·풍차 통합).
+            "cf_gross_div_by_class": {},
         }
 
     def _price_dict_for_account(
@@ -675,6 +695,13 @@ class MultiAccountSimulationLoop:
             if dividend_tax > 0:
                 portfolio.cash = max(0.0, portfolio.cash - dividend_tax)
                 rt["dividend_tax_paid"] += dividend_tax
+            # 절세액(위탁 가정): 세전 배당을 자산분류별 누적(계좌유형 무관).
+            tax_engine = rt.get("tax_engine")
+            if tax_engine is not None:
+                cls_acc = rt["cf_gross_div_by_class"]
+                for ticker, gross in gross_dividend_by_ticker.items():
+                    cls = tax_engine.classify_asset(ticker)
+                    cls_acc[cls] = cls_acc.get(cls, 0.0) + float(gross)
         dividend_total = sum(dividend_by_ticker.values())
         if config.dividend_mode == "withdraw" and dividend_total > 0:
             portfolio.cash -= dividend_total
@@ -767,6 +794,9 @@ class MultiAccountSimulationLoop:
                 "end_value": 0.0,
                 "total_contribution": 0.0,
                 "tax_paid": 0.0,
+                "brokerage_assumed_tax": 0.0,
+                "tax_saving": 0.0,
+                "gain_harvest_saving": 0.0,
             }
 
         config = rt["config"]
@@ -811,9 +841,59 @@ class MultiAccountSimulationLoop:
                             if gain > 0:
                                 kr_foreign_unrealized_gain += gain
 
+            # 절세액(위탁 가정): 최종 청산 = 잔여 미실현차익 실현(계좌유형 무관, 자산분류별).
+            executor = rt.get("executor")
+            if executor is not None and hasattr(executor, "_brk_us_by_year") \
+                    and hasattr(rt["portfolio"], "positions"):
+                last_year = 0
+                for t in config.tickers:
+                    if t in price_data and not price_data[t].empty:
+                        last_year = max(last_year, price_data[t].index[-1].year)
+                for ticker, pos in rt["portfolio"].positions.items():
+                    if ticker not in last_prices or pos.quantity <= 0:
+                        continue
+                    gain = float(rt["portfolio"].unrealized_gain(ticker, last_prices[ticker]))
+                    cls = tax_engine.classify_asset(ticker)
+                    if cls == "KR_FOREIGN":
+                        if gain > 0:
+                            executor._brk_krf_gain += gain
+                    elif cls == "US_DIRECT":
+                        executor._brk_us_by_year[last_year] = \
+                            executor._brk_us_by_year.get(last_year, 0.0) + gain
+
         dividend_tax = float(rt.get("dividend_tax_paid", 0.0))
         realized_tax = float(getattr(rt["executor"], "total_cg_tax_paid", 0.0))
         maturity_tax = float(rt.get("maturity_tax_paid", 0.0))
+        actual_tax = dividend_tax + realized_tax + liquidation_tax + maturity_tax
+
+        # 절세액(위탁 가정): 누적 세전흐름으로 위탁 세금 추정 → 절세액 = max(0, 위탁가정 − 실제).
+        brokerage_assumed_tax = 0.0
+        tax_saving = 0.0
+        gain_harvest_saving = 0.0
+        executor = rt.get("executor")
+        if tax_engine is not None and executor is not None \
+                and hasattr(executor, "_brk_us_by_year"):
+            from modules.tax.saving_estimate import (
+                estimate_brokerage_tax, estimate_gain_harvest_saving,
+            )
+            brokerage_assumed_tax = estimate_brokerage_tax(
+                rt.get("cf_gross_div_by_class", {}),
+                executor._brk_krf_gain,
+                executor._brk_us_by_year,
+            )
+            tax_saving = max(0.0, brokerage_assumed_tax - actual_tax)
+            # GH 절세(절세매도 자체 효과): 위탁계좌 + GH ON 전용.
+            if rt["account_type"] == "위탁" and getattr(executor, "gain_harvesting", False) \
+                    and executor._brk_us_harvested_total > 0:
+                last_year = 0
+                for t in config.tickers:
+                    if t in price_data and not price_data[t].empty:
+                        last_year = max(last_year, price_data[t].index[-1].year)
+                gain_harvest_saving = estimate_gain_harvest_saving(
+                    executor._brk_us_by_year,
+                    executor._brk_us_harvested_total,
+                    last_year,
+                )
 
         return {
             "account_id": rt["account_id"],
@@ -823,11 +903,14 @@ class MultiAccountSimulationLoop:
             "end_value": float(end_value),
             "total_contribution": total_contribution,
             "cycle_contribution": float(rt.get("cycle_contribution", total_contribution)),
-            "tax_paid": dividend_tax + realized_tax + liquidation_tax + maturity_tax,
+            "tax_paid": actual_tax,
             "dividend_tax_paid": dividend_tax,
             "realized_tax_paid": realized_tax,
             "liquidation_tax_paid": liquidation_tax,
             "maturity_tax_paid": maturity_tax,
+            "brokerage_assumed_tax": brokerage_assumed_tax,
+            "tax_saving": tax_saving,
+            "gain_harvest_saving": gain_harvest_saving,
             "pension_transfer_credit": float(rt.get("pension_transfer_credit", 0.0)),
             "kr_foreign_unrealized_gain": kr_foreign_unrealized_gain,
             "portfolio": rt["portfolio"],

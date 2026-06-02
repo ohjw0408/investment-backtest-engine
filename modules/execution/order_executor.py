@@ -119,6 +119,10 @@ class TaxedOrderExecutor(OrderExecutor):
         self._current_year     = None
         self.total_cg_tax_paid = 0.0
         self._harvested_year   = None  # 올해 이미 harvest 했으면 스킵
+        # 절세액(위탁 가정): 계좌유형 무관하게 매도 실현차익 누적 — 실제 과세와 독립.
+        self._brk_krf_gain     = 0.0   # KR_FOREIGN 실현차익(이익분만, 손익통산 없음)
+        self._brk_us_by_year   = {}    # US_DIRECT 실현차익 연도별(손익통산)
+        self._brk_us_harvested_total = 0.0  # GH 절세매도로 실현·기준리셋한 누적차익(GH 절세 산출용)
 
     # ── US 양도차익 YTD (세션 있으면 세션, 없으면 자체) ──
     def _ytd_us(self) -> float:
@@ -147,6 +151,9 @@ class TaxedOrderExecutor(OrderExecutor):
         date=None,
     ) -> None:
         self._update_year(date)
+
+        # 절세액(위탁 가정): 계좌유형 무관하게 매도 실현차익을 분류별 누적(과세 전 단계).
+        self._accrue_brokerage_gain(portfolio, orders, price_dict, date)
 
         # ISA / 연금저축 / IRP: CG세 없음
         if self.account_type in ("ISA", "연금저축", "IRP"):
@@ -222,6 +229,40 @@ class TaxedOrderExecutor(OrderExecutor):
         ):
             self._do_gain_harvest(portfolio, price_dict, date)
 
+    def _accrue_brokerage_gain(self, portfolio, orders, price_dict, date) -> None:
+        """절세액(위탁 가정): 매도 실현차익을 자산분류별 누적. 계좌유형·실제과세와 독립.
+
+        KR_FOREIGN = 이익분만(손익통산 없음). US_DIRECT = 손익통산(연도별 누적).
+        국내·KRX금 = 0%이므로 무시. avg_cost는 매도 실행 전(현재) 값을 읽는다.
+        """
+        year = date.year if date is not None else 0
+        for ticker, value in orders.items():
+            if ticker == "CASH" or value >= 0 or ticker not in price_dict:
+                continue
+            price = price_dict[ticker]
+            if not price or price != price or price <= 0:
+                continue
+            position = portfolio.positions.get(ticker)
+            if position is None:
+                continue
+            quantity = min(int(abs(value) / price), int(position.quantity))
+            if quantity <= 0:
+                continue
+            avg_cost = (
+                portfolio.get_avg_cost(ticker)
+                if hasattr(portfolio, "get_avg_cost")
+                else None
+            )
+            if avg_cost is None:
+                continue
+            realized = (price - avg_cost) * quantity
+            asset_type = self.tax_engine.classify_asset(ticker)
+            if asset_type == "KR_FOREIGN":
+                if realized > 0:
+                    self._brk_krf_gain += realized
+            elif asset_type == "US_DIRECT":
+                self._brk_us_by_year[year] = self._brk_us_by_year.get(year, 0.0) + realized
+
     def maybe_gain_harvest(self, portfolio, price_dict: Dict[str, float], date) -> None:
         """
         12월에 리밸런싱 없이도 절세매도 실행.
@@ -270,6 +311,10 @@ class TaxedOrderExecutor(OrderExecutor):
 
             harvest_gain = gain_per_share * harvest_shares
             self._add_us(harvest_gain)
+            # 위탁 가정: 절세매도는 기준단가 리셋(비과세 실현)이므로 _brk_us_by_year엔 누적 안 함
+            # (남은 미실현분만 최종청산에서 과세 → 위탁 절세 0 불변식). 단 GH 절세 산출용으로
+            # harvest 누계는 별도 추적(GH 없었으면 최종 단일실현됐을 분).
+            self._brk_us_harvested_total += harvest_gain
             remaining_exempt   -= harvest_gain
 
             # 매도 후 즉시 재매수 (취득단가 현재가로 리셋)

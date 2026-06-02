@@ -126,10 +126,28 @@ estimate_brokerage_tax(gross_div_by_class, kr_foreign_gain, us_gain_by_year) -> 
 ## 7. 결정 사항 (확정/대기)
 - ✅ KRX금 0%.
 - ✅ 위탁 가정은 각 계좌 실제 실현패턴(연도별·GH설정) 그대로 사용.
-- ✅ 기준값 = 케이스별 절세액의 **p50(중앙값)**.
+- ✅ 기준값 = 케이스별 절세액의 **p50(중앙값)**. **표시는 p50 단독**(평균·범위 미표기).
 - ✅ 종합과세 가산 생략(러프) — 시작점. 필요시 후속.
-- ⏳ 연금 수령세 러프 산식 = `TaxEngine.after_tax_withdrawal` 연금경로 재사용(P1서 확정).
-- ⏳ 1,500만 수령한도 초과세 = P3(은퇴)에서만.
+- ✅ **연금/IRP 인출세 = 은퇴 탭(P3)에서만** 적용. 투자계산기·백테스트·배당금엔 미적용
+  → 이 탭들의 연금/IRP 절세액 = 적립기 위탁가정세금(배당+종료시 미실현차익), 실제=0.
+- ✅ **합산 = 계좌별 p50의 단순합**(화면 일치). median(합) 아님.
+- ⏳ (P3 전용) 연금 인출세 과세베이스 = **수익 + 세액공제받은 원금**(초과납입 비과세).
+  러프 산식: 나이별 3.3~5.5% 분리과세, 연 1,500만 초과분 16.5% — 월인출 근사, 한도증가 무시
+  (미래 정부 한도 인상 가정). 1,500만 한도·인출액·수령나이 입력은 **은퇴 탭에만** 추가.
+
+## P1(투자계산기) 구현 완료 — 2026-06-02
+- `modules/tax/saving_estimate.py` 신규 — 순수함수 `estimate_brokerage_tax`.
+- `order_executor.py` — `_brk_krf_gain`/`_brk_us_by_year` 누적(계좌유형 무관, 매도시).
+  GH 절세매도는 기준리셋이므로 미누적(최종 미실현만 과세 → 위탁 불변식 유지).
+- `multi_account_loop.py` — 배당 클래스별 누적 + 풍차만기·최종청산 미실현 누적
+  + finalize에서 `brokerage_assumed_tax`/`tax_saving` 산출.
+- `multi_account_analyzer.py` — 케이스별 surfacing + `_build_savings`(계좌별 p50 + 합산).
+- `calculator_logic.py` — 응답 `savings` 필드. `static/js/calculator.js` — 절세 3종 패널.
+- **GH 절세(4번째 숫자, 오너 추가요청):** 절세매도 자체로 아낀 세금 = (GH 안 했으면 US양도세)
+  − (실제). 방법 A 분석근사 — harvest 누적차익(`_brk_us_harvested_total`)을 GH 없었으면
+  최종연도 단일실현 가정으로 되돌려 계산(`estimate_gain_harvest_saving`). **위탁+GH ON 전용**
+  (그 외 0 → UI 숨김). 껍데기 절세(tax_saving)와 **별도 표시**.
+- 검증: `tests/test_l_save.py` **L-SAVE0~8 + 3b(GH) = 17종 PASS** + Track G 41 회귀 PASS.
 
 ## 8. UI 명시 한계
 - "약 ₩…" — 근사치(ISA net 재투자·종합과세 가산 생략).

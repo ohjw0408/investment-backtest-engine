@@ -228,7 +228,32 @@ class MultiAccountAnalyzer:
             "accounts": account_outputs,
             "cases": cases,
             "cases_count": len(cases),
+            "savings": self._build_savings(account_outputs),
         }
+
+    def _build_savings(self, account_outputs: list[dict]) -> dict:
+        """절세액 표시(3종): 위탁가정세금·실제세금·절세액.
+
+        계좌별 = 케이스 분포의 p50(중앙값). 합산 = 계좌별 p50의 단순합(화면 일치).
+        """
+        per_account = []
+        for ao in account_outputs:
+            dist = ao.get("distribution", {})
+            per_account.append({
+                "account_id": ao["account_id"],
+                "type": ao["type"],
+                "brokerage_assumed_tax": float(dist.get("brokerage_assumed_tax", {}).get("p50", 0.0)),
+                "actual_tax": float(dist.get("tax_paid", {}).get("p50", 0.0)),
+                "tax_saving": float(dist.get("tax_saving", {}).get("p50", 0.0)),
+                "gain_harvest_saving": float(dist.get("gain_harvest_saving", {}).get("p50", 0.0)),
+            })
+        combined = {
+            "brokerage_assumed_tax": float(sum(a["brokerage_assumed_tax"] for a in per_account)),
+            "actual_tax": float(sum(a["actual_tax"] for a in per_account)),
+            "tax_saving": float(sum(a["tax_saving"] for a in per_account)),
+            "gain_harvest_saving": float(sum(a["gain_harvest_saving"] for a in per_account)),
+        }
+        return {"accounts": per_account, "combined": combined}
 
     def _estimate_total_cases(self, start=None) -> int:
         cur = start if start is not None else self.data_start
@@ -381,6 +406,14 @@ class MultiAccountAnalyzer:
                 account_metrics["end_value"] = float(account_result["end_value"])
                 account_metrics["raw_end_value"] = float(account_result["raw_end_value"])
                 account_metrics["tax_paid"] = float(account_result["tax_paid"])
+                # 절세액(위탁 가정): 케이스별 계좌 위탁가정세금·절세액 surfacing.
+                account_metrics["brokerage_assumed_tax"] = float(
+                    account_result.get("brokerage_assumed_tax", 0.0)
+                )
+                account_metrics["tax_saving"] = float(account_result.get("tax_saving", 0.0))
+                account_metrics["gain_harvest_saving"] = float(
+                    account_result.get("gain_harvest_saving", 0.0)
+                )
                 account_cases.append(account_metrics)
 
             metrics["accounts"] = account_cases
@@ -520,6 +553,7 @@ class MultiAccountAnalyzer:
             "end_value", "cagr", "mdd", "sharpe", "sortino",
             "calmar", "mwr", "dividend_cagr", "dividend_mdd",
             "total_dividend", "last_year_dividend", "dividend_yield_on_cost",
+            "tax_paid", "brokerage_assumed_tax", "tax_saving", "gain_harvest_saving",
         ]
         result = {}
         for key in keys:

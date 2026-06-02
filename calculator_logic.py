@@ -242,6 +242,29 @@ def _validate_initial_capital_limits(accounts: list[dict]) -> list[str]:
     return errors
 
 
+def _build_savings_summary(savings_raw: dict) -> dict | None:
+    """절세액 표시(위탁가정세금·실제세금·절세액 + GH 절세)를 프론트 소비형으로 라운딩.
+
+    analyzer의 `savings`(계좌별 p50 + 합산) → 정수 라운딩. combined 없으면 None.
+    """
+    if not savings_raw.get('combined'):
+        return None
+    return {
+        'combined': {k: round(v) for k, v in savings_raw['combined'].items()},
+        'accounts': [
+            {
+                'account_id': a['account_id'],
+                'type':       a['type'],
+                'brokerage_assumed_tax': round(a['brokerage_assumed_tax']),
+                'actual_tax':            round(a['actual_tax']),
+                'tax_saving':            round(a['tax_saving']),
+                'gain_harvest_saving':   round(a.get('gain_harvest_saving', 0)),
+            }
+            for a in savings_raw.get('accounts', [])
+        ],
+    }
+
+
 def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> dict:
     from modules.retirement.multi_account_analyzer import MultiAccountAnalyzer
 
@@ -496,11 +519,15 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
             'transfer_log':            rep.get('transfer_log', []),
         })
 
+    # 절세액 표시(3종 + GH) — 계좌별 p50 + 합산.
+    savings_summary = _build_savings_summary(result.get('savings') or {})
+
     return {
         'cases':              cases_summary,
         'cases_count':        len(cases_summary),
         'distribution':       distribution,
         'g2':                 g2_summary,
+        'savings':            savings_summary,
         'price_provenance':   price_provenance,
         'multi_account':      {
             'enabled': True,

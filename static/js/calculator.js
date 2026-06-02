@@ -678,26 +678,27 @@ function renderMultiAccountSummary(multiAccount, g2, savings, autoWindmill) {
   let savingsHtml = '';
   if (savings && savings.combined && savings.combined.brokerage_assumed_tax > 0) {
     const c = savings.combined;
+    // 절세액 = 껍데기 효과(tax_saving) + 절세매도 효과(gain_harvest_saving) 합산.
+    const totalSaving = (c.tax_saving || 0) + (c.gain_harvest_saving || 0);
     const accRows = (savings.accounts || [])
-      .filter(a => a.brokerage_assumed_tax > 0 || a.tax_saving > 0)
+      .filter(a => a.brokerage_assumed_tax > 0 || a.tax_saving > 0 || a.gain_harvest_saving > 0)
       .map(a => `
         <div style="display:flex;justify-content:space-between;font-size:0.73rem;color:#33691E;margin-top:3px;">
           <span>${a.type || '계좌'}</span>
-          <span>위탁가정 ${fmtKRW(a.brokerage_assumed_tax)} · 실제 ${fmtKRW(a.actual_tax)} · 절세 <b>${fmtKRW(a.tax_saving)}</b></span>
+          <span>위탁가정 ${fmtKRW(a.brokerage_assumed_tax)} · 실제 ${fmtKRW(a.actual_tax)} · 절세 <b>${fmtKRW((a.tax_saving || 0) + (a.gain_harvest_saving || 0))}</b></span>
         </div>`).join('');
+    const ghNote = (c.gain_harvest_saving > 0)
+      ? `<div style="font-size:0.68rem;color:#558B2F;margin-top:4px;">↳ 절세매도(연 250만 공제) 효과 ${fmtKRW(c.gain_harvest_saving)} 포함</div>`
+      : '';
     savingsHtml = `
       <div style="margin-top:10px;padding:12px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;">
         <div style="font-size:0.8rem;font-weight:800;color:#1B5E20;margin-bottom:8px;">💰 세금 절감 효과 (중앙값 기준)</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
           <div><div style="font-size:0.68rem;color:#558B2F;">전체 위탁 가정 세금</div><div style="font-size:0.9rem;font-weight:800;color:#33691E;">${fmtKRW(c.brokerage_assumed_tax)}</div></div>
           <div><div style="font-size:0.68rem;color:#558B2F;">실제 세금</div><div style="font-size:0.9rem;font-weight:800;color:#33691E;">${fmtKRW(c.actual_tax)}</div></div>
-          <div><div style="font-size:0.68rem;color:#558B2F;">절세액</div><div style="font-size:0.98rem;font-weight:900;color:#2E7D32;">약 ${fmtKRW(c.tax_saving)}</div></div>
+          <div><div style="font-size:0.68rem;color:#558B2F;">절세액</div><div style="font-size:0.98rem;font-weight:900;color:#2E7D32;">약 ${fmtKRW(totalSaving)}</div></div>
         </div>
-        ${(c.gain_harvest_saving > 0) ? `
-        <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#FFF3E0;border:1px solid #FFCC80;border-radius:6px;">
-          <span style="font-size:0.73rem;color:#E65100;font-weight:700;">📉 절세매도(연 250만 공제) 추가 절감</span>
-          <span style="font-size:0.92rem;font-weight:900;color:#E65100;">약 ${fmtKRW(c.gain_harvest_saving)}</span>
-        </div>` : ''}
+        ${ghNote}
         ${accRows}
         <div style="font-size:0.67rem;color:#7CB342;margin-top:8px;">※ 근사치 — 금융소득종합과세 가산·연금 인출세 미반영(연금 인출세는 은퇴 탭에서). ISA는 세후 재투자 가정.</div>
       </div>`;

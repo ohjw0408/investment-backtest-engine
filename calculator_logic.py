@@ -522,12 +522,35 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
     # 절세액 표시(3종 + GH) — 계좌별 p50 + 합산.
     savings_summary = _build_savings_summary(result.get('savings') or {})
 
+    # 분할매도 패널 (위탁 계좌 + KR_FOREIGN 청산이익 중앙값 > 2천만) — 단일경로와 동일 로직.
+    split_sale_plan = None
+    comprehensive_flag = any(c.get('comprehensive_years') for c in result['cases'])
+    if any(a.get('type') == '위탁' for a in accounts):
+        import statistics as _stats
+        _krf = [c.get('kr_foreign_unrealized_gain', 0.0) or 0.0 for c in result['cases']]
+        _krf = [g for g in _krf if g > 0]
+        if _krf and _stats.median(_krf) > 20_000_000:
+            from modules.tax.split_sale_planner import (
+                compute_split_sale_plan, recurring_financial_income,
+            )
+            _fin_years = next(
+                (c.get('financial_income_by_year') for c in result['cases']
+                 if c.get('financial_income_by_year')), {},
+            )
+            split_sale_plan = compute_split_sale_plan(
+                kr_foreign_gain        = _stats.median(_krf),
+                earned_income          = user_settings.get('earned_income', 0),
+                other_financial_income = recurring_financial_income(_fin_years),
+            )
+
     return {
         'cases':              cases_summary,
         'cases_count':        len(cases_summary),
         'distribution':       distribution,
         'g2':                 g2_summary,
         'savings':            savings_summary,
+        'split_sale_plan':    split_sale_plan,
+        'comprehensive_flag': comprehensive_flag,
         'price_provenance':   price_provenance,
         'multi_account':      {
             'enabled': True,
@@ -556,10 +579,12 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
     if len(accts) > 1:
         return _run_multi_account_calculator_logic(body, progress_callback)
 
-    # BUG-SAVE-1 (A): 세금 ON이면 단일계좌도 멀티경로로 → 절세액(savings) 산출.
+    # BUG-SAVE-1 (A): 세금 ON 단일계좌도 멀티경로로 → 절세액(savings) 산출.
     # 단일경로(AccumulationAnalyzer)는 savings를 안 만들어 절세 패널이 안 떴음.
-    # 세금 OFF는 절세 의미 없으니 기존 단일경로 유지.
-    if bool(body.get('tax_enabled', False)):
+    # 단, ISA 풍차(재가입)는 단일경로에 둔다 — 멀티경로는 distribution_policy 없이 풍차가
+    # 안 돌고(회귀), 풍차 부분사이클 조기해지 비교(distribution_early_cancel)도 단일경로 전용.
+    # 세금 OFF도 절세 무의미 → 단일경로 유지.
+    if bool(body.get('tax_enabled', False)) and not bool(body.get('isa_renewal', False)):
         nb = dict(body)
         if not accts:
             nb['accounts'] = [{

@@ -386,6 +386,11 @@ class MultiAccountAnalyzer:
             metrics["comprehensive_years"] = list(run_result.comprehensive_years)
             metrics["annual_deduction_credit"] = float(run_result.annual_deduction_credit)
             metrics["pension_transfer_credit"] = float(run_result.pension_transfer_credit_total)
+            # 분할매도 패널용: 위탁 KR_FOREIGN 청산 미실현차익 합 + 연도별 금융소득.
+            metrics["kr_foreign_unrealized_gain"] = float(sum(
+                ar.get("kr_foreign_unrealized_gain", 0.0) for ar in run_result.account_results
+            ))
+            metrics["financial_income_by_year"] = dict(run_result.financial_income_by_year or {})
             if final_value != raw_final:
                 positive_cf = history_df.loc[history_df["cash_flow"] > 0, "cash_flow"].sum()
                 if positive_cf > 0 and final_value > 0 and self.accumulation_years > 0:

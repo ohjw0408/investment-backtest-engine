@@ -1,5 +1,20 @@
 # Log
 
+## [2026-06-03] fix | 분할매도 패널 멀티경로 복구 + 풍차 단일ISA 회귀 수정 (BUG-SAVE-1 후속)
+
+BUG-SAVE-1 A안(단일→멀티 라우팅) 부작용 정리.
+
+- **① 분할매도(split_sale_plan) 복구 (124f82f):** A 라우팅 후 위탁 단일계좌서 분할매도 패널·종합과세 플래그가 사라졌던 것 복구. `MultiAccountAnalyzer`가 케이스별 `kr_foreign_unrealized_gain`·`financial_income_by_year` surface → 멀티 logic이 `compute_split_sale_plan` 호출(단일경로와 동일). **서버검증:** 단일 위탁 458730 초기2천만 → split_sale gain 3,747만·최적 2년분할, 위탁 절세 0.
+- **회귀 수정:** A가 풍차(isa_renewal) 단일 ISA도 멀티로 보내 distribution_policy 부재로 풍차 미작동(서버 maturity 0 확인). 라우팅을 **'非풍차일 때만 멀티'**로 한정 → 풍차 단일 ISA는 단일경로 유지.
+- **풍차 단일 ISA = 의도된 동작:** 단일경로가 `isa_windmill_disabled` 안내("재가입 한도초과, 멀티계좌 쓰세요") 반환 — 금액 무관 항상(설계). 즉 풍차는 멀티계좌(ISA+위탁 수신) 필요.
+- **② ISA 조기해지(distribution_early_cancel):** 단일 풍차 ISA가 항상 차단되므로 단일계좌서 **원래 도달 불가능한 경로** → 복구할 것 없음(A가 잃은 진짜 패널은 split_sale뿐, 복구 완료).
+
+**검증:** 평범 단일 ISA savings 1,628,586 · 위탁 split_sale · 풍차단일 안내 — 서버 PASS. L-SAVE 26 + Track G 41 PASS.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-02] fix | BUG-SAVE-1 수정 — 단일계좌 절세액 표시 (A안, 서버검증 PASS)
 
 **원인:** `run_calculator_logic`이 `len(accounts) > 1`일 때만 멀티경로(savings 산출). 계좌 1개면 단일경로(`AccumulationAnalyzer`)로 빠져 savings 미생성 → 절세 패널 안 뜸. 프론트는 단일계좌일 때 `accounts[]` 없이 legacy 필드(tickers/account_type 등) 전송.

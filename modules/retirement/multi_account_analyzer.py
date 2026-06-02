@@ -311,6 +311,12 @@ class MultiAccountAnalyzer:
                 run_id += 1
                 continue
 
+            # 가격 데이터가 없는 윈도우(예: 시계열 시작 이전)는 스킵 — loop.run 크래시 방지.
+            if not dates:
+                cur += relativedelta(months=self.step_months)
+                run_id += 1
+                continue
+
             loop_accounts = []
             for account in self.accounts:
                 tickers = [t["code"] for t in account["tickers"]]

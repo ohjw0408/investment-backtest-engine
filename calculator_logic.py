@@ -19,6 +19,13 @@ def _get_portfolio_engine():
 
 
 def _get_price_start(portfolio_engine, ticker: str):
+    # KRX 금현물은 price_daily가 아닌 연속 시계열(index_master 기반) → 그 시작일 사용.
+    if ticker == "KRX_GOLD":
+        try:
+            s = portfolio_engine.loader._build_krx_gold_series()
+            return s.index.min().strftime("%Y-%m-%d")
+        except Exception:
+            return None
     try:
         cur = portfolio_engine.loader.conn.execute(
             "SELECT MIN(date) FROM price_daily WHERE code=?", (ticker,)

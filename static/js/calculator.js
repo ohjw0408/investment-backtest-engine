@@ -620,7 +620,7 @@ function toggleIsaEarlyCancel(checked) {
   renderRollingChart(cases);
 }
 
-function renderMultiAccountSummary(multiAccount, g2, savings) {
+function renderMultiAccountSummary(multiAccount, g2, savings, autoWindmill) {
   const wrap = document.getElementById('multiAccountSummary');
   if (!wrap) return;
   if (!multiAccount || !multiAccount.enabled || !multiAccount.accounts?.length) {
@@ -703,9 +703,16 @@ function renderMultiAccountSummary(multiAccount, g2, savings) {
       </div>`;
   }
 
+  // 단일 풍차 ISA → 위탁계좌 자동 생성 안내(연 2천만 한도 초과분 위탁 운용).
+  const autoWindmillHtml = autoWindmill ? `
+    <div style="margin-top:10px;padding:9px 12px;background:#E3F2FD;border:1px solid #90CAF9;border-radius:8px;font-size:0.75rem;color:#0D47A1;">
+      ℹ️ ISA 해지 시 전액 재입금이 불가하여(연 2,000만원 한도) 한도 초과분은 자동 생성된 위탁계좌(같은 종목·비중)에서 운용했습니다.
+    </div>` : '';
+
   wrap.innerHTML = `
     <div class="result-card" style="margin-bottom:0;">
       <div class="result-card-title">계좌별 종료 자산</div>
+      ${autoWindmillHtml}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">${rows}</div>
       ${savingsHtml}
       ${g2Html}
@@ -893,7 +900,7 @@ function renderResult(data, payload) {
   document.getElementById('distP10').textContent = fmtKRW(dist.end_value.p10);
   document.getElementById('distP50').textContent = fmtKRW(dist.end_value.p50);
   document.getElementById('distP90').textContent = fmtKRW(dist.end_value.p90);
-  renderMultiAccountSummary(data.multi_account, data.g2, data.savings);
+  renderMultiAccountSummary(data.multi_account, data.g2, data.savings, data.windmill_auto_brokerage);
 
   // 롤링 케이스 차트
   renderRollingChart(data.cases);

@@ -581,23 +581,37 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
 
     # BUG-SAVE-1 (A): 세금 ON 단일계좌도 멀티경로로 → 절세액(savings) 산출.
     # 단일경로(AccumulationAnalyzer)는 savings를 안 만들어 절세 패널이 안 떴음.
-    # 단, ISA 풍차(재가입)는 단일경로에 둔다 — 멀티경로는 distribution_policy 없이 풍차가
-    # 안 돌고(회귀), 풍차 부분사이클 조기해지 비교(distribution_early_cancel)도 단일경로 전용.
-    # 세금 OFF도 절세 무의미 → 단일경로 유지.
-    if bool(body.get('tax_enabled', False)) and not bool(body.get('isa_renewal', False)):
+    # 세금 OFF는 절세 무의미 → 단일경로 유지.
+    if bool(body.get('tax_enabled', False)) and not accts:
         nb = dict(body)
-        if not accts:
-            nb['accounts'] = [{
-                'type':                 body.get('account_type', '위탁'),
-                'initial_capital':      body.get('initial_capital', 0),
-                'monthly_contribution': body.get('monthly_contribution', 0),
-                'tickers':              body.get('tickers', []),
-                'rebal_mode':           body.get('rebal_mode'),
-                'band_width':           body.get('band_width', 0.05),
-                'dividend_mode':        body.get('dividend_mode'),
-                'isa_renewal':          body.get('isa_renewal', False),
-            }]
-        return _run_multi_account_calculator_logic(nb, progress_callback)
+        primary = {
+            'type':                 body.get('account_type', '위탁'),
+            'initial_capital':      body.get('initial_capital', 0),
+            'monthly_contribution': body.get('monthly_contribution', 0),
+            'tickers':              body.get('tickers', []),
+            'rebal_mode':           body.get('rebal_mode'),
+            'band_width':           body.get('band_width', 0.05),
+            'dividend_mode':        body.get('dividend_mode'),
+            'isa_renewal':          body.get('isa_renewal', False),
+        }
+        # 단일 풍차 ISA: 만기 목돈이 연 2천만 한도를 초과해 단일계좌론 전액 재입금 불가.
+        # → 같은 종목·비중의 위탁계좌(초기0·월0)를 자동 생성하고 한도 초과분을 위탁으로
+        #   라우팅(분배정책)해 풍차를 정상 작동시킨다. 결과창에 안내문구 표시.
+        auto_brokerage = False
+        if body.get('account_type') == 'ISA' and bool(body.get('isa_renewal', False)):
+            mirror = dict(primary)
+            mirror.update({'type': '위탁', 'initial_capital': 0,
+                           'monthly_contribution': 0, 'isa_renewal': False})
+            nb['accounts'] = [primary, mirror]
+            nb['distribution_policy'] = {'destinations': [{'account_id': 0},
+                                                          {'account_id': 1}]}
+            auto_brokerage = True
+        else:
+            nb['accounts'] = [primary]
+        res = _run_multi_account_calculator_logic(nb, progress_callback)
+        if auto_brokerage:
+            res['windmill_auto_brokerage'] = True
+        return res
 
     portfolio_engine = _get_portfolio_engine()
 

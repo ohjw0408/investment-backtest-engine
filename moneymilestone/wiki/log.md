@@ -1,5 +1,25 @@
 # Log
 
+## [2026-06-03] fix | BUG-TAX-2 위탁 인출 매도 양도세 누락 + G5(백테스트·은퇴 복제) 플랜
+
+**오너 지적:** "왜 위탁 인출 양도세가 없어?" — 정당. 코드 추적 결과 **기존 버그 확인.**
+
+**BUG-TAX-2 (높음):** 은퇴 인출(세금ON) 위탁이 인출하며 판 매도차익에 양도세 미부과. 원인 = `TaxableSimulationRunner`가 인출에 평범한 `WithdrawalEngine` 사용→`portfolio.sell()` 직행(TaxedOrderExecutor 우회), `TaxTrackedPortfolio`는 `sell` 미오버라이드라 세션 미누적. 최종 `apply_liquidation_tax`는 남은 보유분만 과세 → 인출로 판 차익이 양도세·청산세 둘 다 빠짐. BUG-TAX-1(배당세 누락) 계열.
+
+**수정:** `TaxedOrderExecutor.sell_with_tax(portfolio, ticker, qty, price)` 추출 — 리밸런싱·인출 매도 **공유**(단일 소스, 드리프트 방지). `execute_orders` 위탁 루프가 이걸 호출하도록 리팩터(동작 동일). `WithdrawalEngine.process(executor=)` 신규 인자 → 위탁 인출 매도를 sell_with_tax 경유(세션에 실현차익 누적→양도세+종합과세). `SimulationLoop`·`MultiAccountSimulationLoop`이 executor 전달. 세금OFF/평범 OrderExecutor면 `hasattr` 가드로 직접 매도 fallback.
+
+**검증:** 신규 `tests/test_withdrawal_cg_tax.py` 2종 — 위탁 인출(상승분 실현) `total_cg_tax_paid>0`·ISA 인출 `=0`(과세이연). 회귀 73 PASS + krx_gold 5 + 신규 2. **반복 검증:** 결정론 sim(KR_FOREIGN 100→200, 월인출) tax OFF 13,000,000 vs ON 11,781,910(양도세 효과 1,218,090).
+- ⚠️ **기존 은퇴 인출(위탁) 결과 바뀜** — 지금까지 과소과세였고 이제 정확(BUG-TAX-1 전례와 동일 성격).
+- ⚠️ **gate2a (test_gate2a_runner_vs_legacy) 2종 실패는 별건** — stash 후 실행해도 동일 실패(40,913,520) → 내 변경 무관. BUG-TAX-1(5ca9a96 배당세 중앙화) 이후 PHASE1 레거시 상수 미갱신 stale golden. 범위 밖이라 미수정(추후 골든 재기록 필요).
+
+**G5 플랜 (`trackG_multiaccount_plan.md` 추가):** 백테스트·은퇴 멀티계좌 복제 설계. 탭별 성격 차이(백테스트=단일 역사윈도우/은퇴=적립롤링+인출디큐뮬레이션). 결정: 인출순서 세금최적자동, 연금 1500만 개인합산 16.5% 분리과세 근사, 순서 백테스트→은퇴적립→BUG-TAX-2(완료)→은퇴인출. L10~L12 검증계층.
+
+**▶ 다음 = G5-A 백테스트 멀티계좌(공통 모듈 추출 먼저).**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-03] fix | BUG-G1-2 다중계좌 입력 커서 유실 + deploy.yml divergent 복구
 
 **① deploy.yml (BUG-DEPLOY 후속):** 금 Phase 2 커밋을 amend+force-push했더니 서버 `git pull`이 divergent로 실패(`Need to specify how to reconcile divergent branches`, exit 128) → 미배포. `git pull origin main` → `git fetch` + `git reset --hard origin/main`로 교체(서버를 origin 단일진실에 강제일치, force-push/divergent에도 복구). 런타임 DB는 gitignore라 reset 무영향. **교훈: push 후 amend+force-push 금지.**

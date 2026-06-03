@@ -13,6 +13,7 @@ class WithdrawalEngine:
         last_month,
         elapsed_months: int = 0,
         inflation: float = 0.0,
+        executor=None,
     ):
 
         if withdrawal_amount <= 0:
@@ -84,7 +85,12 @@ class WithdrawalEngine:
             if sell_qty <= 0:
                 continue
 
-            portfolio.sell(ticker, sell_qty, price)
+            # BUG-TAX-2: 인출 매도도 위탁 양도세 대상 → 세금 executor 경유(있으면).
+            # 세금 OFF이거나 평범한 OrderExecutor면 sell_with_tax 없음 → 직접 매도.
+            if executor is not None and hasattr(executor, "sell_with_tax"):
+                executor.sell_with_tax(portfolio, ticker, sell_qty, price)
+            else:
+                portfolio.sell(ticker, sell_qty, price)
             needed -= sell_qty * price
 
             if needed <= 0:

@@ -746,6 +746,7 @@ class MultiAccountSimulationLoop:
             last_month=rt["last_withdrawal_month"],
             elapsed_months=rt["elapsed_months"],
             inflation=getattr(config, "inflation", 0.0),
+            executor=rt["executor"],
         )
 
         if strategy.should_rebalance(date, portfolio, price_dict):

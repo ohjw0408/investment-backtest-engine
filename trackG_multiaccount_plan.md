@@ -438,3 +438,87 @@ G2는 G1 완성 후 **실제 코드 기준으로 분배 정책·트리거 설계
 ### 3. [미적] 계좌별 입력 UI 통일성·위계
 **증상:** 추가된 계좌 입력 영역이 첫 계좌와 시각적으로 통일되지 않아, 아래쪽 입력이 덜 중요해 보임(실제로는 동등하게 중요).
 **조치:** 계좌 카드 디자인 통일, 모든 계좌를 동등한 시각 위계로. 프론트 재설계. 우선순위 낮음(기능 영향 없음, 미관).
+
+> **#2 커서 사라짐 = ✅ 수정 완료 (2026-06-03, BUG-G1-2).** `updateTaxAccountAmount`·`onAccountTickerWeightChange`가 oninput마다 전체 재렌더하던 것 제거(금액→`checkTaxLimits`만, 비중→전용 `acctWeightWarn{idx}` div만). 로컬 수정·미육안검증.
+
+---
+
+## G5 — 백테스트 · 은퇴 탭 복제 (2026-06-03 설계)
+
+투자계산기 탭 B1~B3 완료. 이제 나머지 2개 탭(백테스트·은퇴)에 멀티계좌 적용.
+**복제가 균일하지 않음** — 세 탭의 시뮬 성격이 근본 다르기 때문(오너 통찰: "적용이 조금씩 다르다").
+
+### 탭별 성격 차이 (코드 확인 2026-06-03)
+
+| 탭 | logic | 시뮬 성격 | 인출 | 멀티계좌 복제 난이도 |
+|---|---|---|---|---|
+| 투자계산기 | `calculator_logic._run_multi_account_calculator_logic` | **롤링 몬테카를로**(다수 윈도우→분포) | 없음 | ✅ 완료(레퍼런스) |
+| 백테스트 | `backtest_logic.run_backtest_logic` | **단일 역사윈도우**(start→end, `TaxableSimulationRunner` 직접) | 없음(`withdrawal_amount=0`) | 중 |
+| 은퇴 적립 | `retirement_logic.run_retirement_logic` | 롤링(calculator와 동일) | 없음 | 하 |
+| 은퇴 인출 | `retirement_logic.run_withdrawal_logic` + `WithdrawalAnalyzer` | **롤링 디큐뮬레이션**(생존율 분포) | 있음 + **연금소득세** | 상(신규) |
+
+### 확정 결정 (오너 2026-06-03)
+
+- **Q1 인출단계 세금:** 오너 통찰 — "인출 때는 연금소득세 딱 하나만." **부분 정정 필요(2026-06-03 코드 추적):**
+  - 적립 중 위탁 양도세·ISA 청산세·배당세는 계좌별 `TaxedOrderExecutor`/`TaxedDividendEngine`이 처리 ✓.
+  - 연금/IRP는 적립 때 과세이연 → 인출 때만 **연금소득세**(3.3~5.5%) 부과 = 신규 세금 ✓.
+  - ❌ **BUG-TAX-2 (위탁 인출 양도세 누락) — 기존 단일계좌 버그.** `TaxableSimulationRunner`가 인출에 평범한 `WithdrawalEngine` 사용 → `portfolio.sell()` 직행(`TaxedOrderExecutor` 우회), `TaxTrackedPortfolio`는 `sell` 미오버라이드라 세션에 실현차익 미누적. 최종 `apply_liquidation_tax`는 **남은 보유분만** 과세. **인출하며 판 위탁 매도차익이 양도세·청산세 둘 다 빠져나감 = 비과세.** 인출 비중 큰 은퇴 시뮬에서 과소과세 큼. `_calc_gross_withdrawal` line 503 "위탁/ISA 인출 중 CG세 없음"이 그 잘못된 가정.
+  - **수정(필수, 단일+멀티 공유):** 인출 매도를 `TaxedOrderExecutor` 경유로 라우팅 → 실현차익이 세션에 누적되어 위탁 양도세(국내 15.4%/해외 22%·기본공제·종합과세 합산) 정상 부과. ISA 인출은 ISA 청산세 규칙. **기존 은퇴 인출 결과 바뀜**(BUG-TAX-1 전례처럼 정확해지는 방향). G5-C 전에 또는 함께 수정.
+- **Q2 인출 순서 = 세금최적 자동.** 과세 적은 계좌부터: **위탁·ISA 먼저 소진 → 연금/IRP 마지막**(연금세·과세이연 최대한 유지). 사용자 지정 순서 UI 안 만듦.
+- **Q3 연금소득 1500만 = 16.5% 분리과세 근사.** 개인 연금저축+IRP 인출액 **연 합산** 1500만 초과 시 16.5% 적용(2024 개정 선택제 반영). 1500만 이하는 나이별 3.3~5.5%. (종합과세 누진 정밀은 안 함.) 멀티계좌는 1500만 판정을 **개인 합산**으로(금종세 개인합산과 동형).
+- **Q4 구현·검증 순서 = 백테스트 → 은퇴 적립 → 은퇴 인출.** 쉬운 것부터, 각 단계 검증 통과 후 다음.
+
+### G5-A 백테스트 멀티계좌 (단일 역사윈도우)
+
+`run_backtest_logic`은 롤링이 아니라 `TaxableSimulationRunner`로 **단일 윈도우 1회** 실행 → 시계열 차트.
+멀티계좌 = `MultiAccountSimulationLoop`을 **1회** 실행(롤링 `MultiAccountAnalyzer`는 부적합/과함).
+- 입력: calculator와 동일 `accounts`/`distribution_policy` 스키마 재사용. `_normalize_multi_accounts` 공유.
+- 단일 윈도우 드라이버 필요(신규 thin wrapper 또는 루프 직접 호출) — 계좌별 + 합산 **일별 history** surface(차트용).
+- transfers: calculator와 동일(정책/풍차/연납입공제). 인출 없음.
+- 결과: 합산 경로 + 계좌별 분해(투자계산기 결과 스키마 준용). **표시 디폴트 = 합산+계좌별**(별도 오너 결정 없으면 calculator 따름).
+- **검증 L10:** 단일 계좌 백테스트 = 기존 `TaxableSimulationRunner` 결과 ±1원(골든 회귀). 2계좌 합산 = Σ. 세금 ON/OFF. 결정론 픽스처.
+
+### G5-B 은퇴 적립단계 멀티계좌
+
+calculator의 롤링 멀티계좌와 사실상 동일. `run_retirement_logic`(적립부) → `MultiAccountAnalyzer` 재사용.
+- 차이: `pension_start_age` 처리(기존), 적립 종료 후 **최종자산을 인출단계로 인계**(계좌별 평가액·취득가 유지).
+- **검증 L11:** 단일 계좌 적립 = 기존 경로 ±1원. calculator L0~L9 회귀가 대부분 커버(엔진 공유). 은퇴 특화(pension_start_age) 경계만 추가.
+
+### G5-C 은퇴 인출단계 멀티계좌 (신규 핵심)
+
+롤링 디큐뮬레이션 + 계좌별 인출 + 연금소득세. `MultiAccountAnalyzer`는 현재 `withdrawal_amount=0` 하드코딩 →
+인출 지원 확장 OR 멀티계좌 인출 분석기. 루프는 `WithdrawalEngine` 배선 보유(확장 지점 명확).
+- **인출 순서(세금최적 자동):** 매달 인출 필요액을 **위탁→ISA→연금/IRP** 순으로 계좌에서 충당(앞 계좌 소진 후 다음). 루프의 단일 `WithdrawalEngine`을 **계좌 우선순위 인식**으로 확장.
+- **위탁/ISA 인출세(BUG-TAX-2 수정):** 인출 매도를 `TaxedOrderExecutor` 경유로 → 위탁 양도세·ISA 청산세 정상 부과. 단일+멀티 공유 경로에서 고침.
+- **연금소득세(신규):** 연금/IRP에서 인출되는 금액에 나이별 3.3~5.5% 부과. 연 개인합산 1500만 초과 시 16.5%. 적립 엔진엔 없으므로 인출 경로에 신규 적용.
+- **생존율:** 기존 `WithdrawalAnalyzer.success_rate` 개념을 합산 자산 기준으로(전 계좌 합산 고갈 시점). `pension_tax_info`는 계좌별→합산.
+- **검증 L12:** ① 단일 위탁 인출 = 양도세 손계산(인출 매도차익 과세, BUG-TAX-2 수정 확인) ② 단일 연금/IRP 인출 = 나이별 세율·1500만 플래그 ③ 위탁+연금 2계좌: 위탁 먼저 소진→연금 인출 시작 시점·연금세 정확 ④ 1500만 개인합산 16.5% 경계(연금+IRP 합산 1499만/1501만) ⑤ 세금 ON/OFF ⑥ 불변식(합산 자금보존·음수0).
+
+### 공통 모듈 추출
+
+세 탭이 `accounts`/`distribution_policy`/결과 surfacing을 공유 → calculator_logic의 멀티계좌 헬퍼
+(`_normalize_multi_accounts`·`_validate_initial_capital_limits`·`_build_savings_summary`·정책 파싱)를
+**공용 모듈로 추출**(예 `modules/multi_account_common.py`) 후 3개 logic이 import. 중복·드리프트 방지.
+
+### 파일 변경 지도 (G5 추가분)
+
+| 파일 | 변경 |
+|------|------|
+| `backtest_logic.py` | `accounts` 분기 + 단일윈도우 멀티계좌 드라이버. 단일계좌면 기존 경로 |
+| `retirement_logic.py` | 적립=MultiAccountAnalyzer, 인출=멀티계좌 디큐뮬레이션 + 연금소득세 |
+| `modules/retirement/multi_account_analyzer.py` | `withdrawal_amount=0` 하드코딩 해제, 인출 지원 + 생존율 |
+| `modules/simulation/multi_account_loop.py` | `WithdrawalEngine`을 계좌 우선순위 인식으로 확장 + 연금/IRP 인출 연금소득세 |
+| `modules/(신규) multi_account_common.py` | calculator_logic 멀티계좌 헬퍼 추출(3 logic 공유) |
+| `static/js/backtest.js`·`retirement.js` + 템플릿 | calculator.js 멀티계좌 UI 패턴 복제(커서버그 이미 수정됨, 안전) |
+
+### 구현 순서 & 게이트
+
+```
+공통 모듈 추출
+  → G5-A 백테스트 (L10 통과)
+  → G5-B 은퇴 적립 (L11 통과)
+  → BUG-TAX-2 수정 (인출 매도 → TaxedOrderExecutor, 단일계좌 먼저, 기존 은퇴 인출 회귀)
+  → G5-C 은퇴 인출 멀티계좌 (L12 통과)  ← 인출순서 + 연금소득세 신규
+  → 각 탭 B2(API 서버검증)·B3(UI 스모크)
+```
+각 단계 검증 통과 전 다음 금지(B 단계 게이트 규약 동일). L7(실데이터 통합)은 인출까지 끝난 후.

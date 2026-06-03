@@ -136,6 +136,7 @@ class SimulationLoop:
                 last_month=last_withdrawal_month,
                 elapsed_months=elapsed_months,
                 inflation=inflation,
+                executor=self.executor,
             )
 
             # ── rebalance ────────────────────────────

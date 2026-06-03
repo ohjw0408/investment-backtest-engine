@@ -179,28 +179,7 @@ class TaxedOrderExecutor(OrderExecutor):
             if quantity <= 0:
                 continue
 
-            avg_cost = (
-                portfolio.get_avg_cost(ticker)
-                if hasattr(portfolio, "get_avg_cost")
-                else None
-            )
-            if avg_cost is None:
-                avg_cost = price  # 취득단가 불명 → 차익 0 (보수적 처리)
-            realized_gain = (price - avg_cost) * quantity
-
-            portfolio.sell(ticker, quantity, price)
-
-            # US_DIRECT 손실도 YTD에 반영 (손익통산 — 양도소득세)
-            if realized_gain < 0 and avg_cost != price:
-                asset_type = self.tax_engine.classify_asset(ticker)
-                if asset_type == "US_DIRECT":
-                    self._add_us(realized_gain)  # 음수 → 공제 여유 증가
-
-            if realized_gain > 0:
-                cg_tax = self._calc_cg_tax(ticker, realized_gain)
-                if cg_tax > 0:
-                    portfolio.cash = max(0.0, portfolio.cash - cg_tax)
-                    self.total_cg_tax_paid += cg_tax
+            self.sell_with_tax(portfolio, ticker, quantity, price)
 
         # 매수
         for ticker, value in orders.items():
@@ -228,6 +207,40 @@ class TaxedOrderExecutor(OrderExecutor):
             and self._harvested_year != date.year
         ):
             self._do_gain_harvest(portfolio, price_dict, date)
+
+    def sell_with_tax(self, portfolio, ticker: str, quantity: int, price: float) -> None:
+        """위탁 매도 실현차익에 양도세 부과 후 매도. ISA/연금/IRP는 과세이연(비과세 매도).
+
+        리밸런싱 매도와 인출 매도가 공유한다(BUG-TAX-2: 인출하며 판 위탁 매도차익도
+        양도세 대상 — 기존엔 WithdrawalEngine이 portfolio.sell 직행으로 누락).
+        """
+        if quantity <= 0:
+            return
+        avg_cost = (
+            portfolio.get_avg_cost(ticker)
+            if hasattr(portfolio, "get_avg_cost")
+            else None
+        )
+        if avg_cost is None:
+            avg_cost = price  # 취득단가 불명 → 차익 0 (보수적 처리)
+        realized_gain = (price - avg_cost) * quantity
+
+        portfolio.sell(ticker, quantity, price)
+
+        # ISA / 연금저축 / IRP: 과세이연, CG세 없음
+        if self.account_type in ("ISA", "연금저축", "IRP"):
+            return
+
+        # US_DIRECT 손실도 YTD에 반영 (손익통산 — 양도소득세)
+        if realized_gain < 0 and avg_cost != price:
+            if self.tax_engine.classify_asset(ticker) == "US_DIRECT":
+                self._add_us(realized_gain)  # 음수 → 공제 여유 증가
+
+        if realized_gain > 0:
+            cg_tax = self._calc_cg_tax(ticker, realized_gain)
+            if cg_tax > 0:
+                portfolio.cash = max(0.0, portfolio.cash - cg_tax)
+                self.total_cg_tax_paid += cg_tax
 
     def _accrue_brokerage_gain(self, portfolio, orders, price_dict, date) -> None:
         """절세액(위탁 가정): 매도 실현차익을 자산분류별 누적. 계좌유형·실제과세와 독립.

@@ -1,8 +1,13 @@
 """
 Gate 2a: TaxableSimulationRunner 백테스트 회귀 검증.
 
-Phase 1 골든값(harvest off=38,415,192 / on=41,990,905)과 비교.
+Phase 1 골든값(harvest off=37,365,073 / on=40,913,520)과 비교.
 Runner 도입 후 동일 결과 보장.
+
+골든 갱신 이력:
+- 2026-06-04: BUG-TAX-1(단일경로 배당소득세 차감, log 업데이트 31) 반영.
+  off 38,415,192→37,365,073(−1,050,119), on 41,990,905→40,913,520(−1,077,385).
+  하락분 = SPY 재투자 배당에 정확히 부과된 15.4% 배당소득세.
 """
 import sys
 import os
@@ -23,8 +28,8 @@ GOLDEN = {
     "user_settings":        {"earned_income": 50_000_000, "age": 40},
 }
 
-PHASE1_OFF = 38_415_192
-PHASE1_ON  = 41_990_905
+PHASE1_OFF = 37_365_073
+PHASE1_ON  = 40_913_520
 EPSILON    = 1  # 허용 오차 ±1원
 
 

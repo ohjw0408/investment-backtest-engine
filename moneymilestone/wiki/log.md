@@ -1,5 +1,22 @@
 # Log
 
+## [2026-06-03] fix | G5-C C2 연금소득세 인출 배선 (분리과세 전액 16.5%, BUG-PENSION-1 해소)
+
+**C2:** 인출 연금소득세를 하이브리드(`pension_effective_rate`→`pension_monthly_after_tax`: 1500이하 저율+초과분만 16.5%, BUG-PENSION-1) → **`pension_separate_tax_annual`**(1500 이하 나이별 3.3~5.5%, 초과 시 **전액** 16.5%, 오너결정·현행 선택분리과세)로 교체.
+- `WithdrawalAnalyzer._calc_gross_withdrawal`: gross-up 실효율 = `pension_separate_tax_annual(annual_est, age)/annual_est`. (연금 인출은 net 수령 위해 계좌서 gross 인출 → 그 차액이 세금.)
+- `_calc_pension_tax_by_age`(표시): 나이 구간별 실효율도 분리과세 기준 → 1500만 초과면 전 구간 16.5%.
+- pension_start_age = 인출시작 가정(Q3) → 인출 나이(withdrawal_start_age)가 곧 연금 수령나이라 단일계좌는 충돌 없음.
+
+**검증 `tests/test_g5_pension_withdrawal_wiring.py` 3종:** 나이별 gross-up(55→5.5·70→4.4·80→3.3, 연1200만)·1500만 초과 전액16.5%(나이무관)·pension_tax_info 분리과세 반영. 회귀 **122 PASS**.
+
+⚠️ 하이브리드 함수군(`pension_monthly_after_tax`/`pension_annual_tax`/`pension_effective_rate`/`_pension_excess_rate`) 이제 프로덕션 미사용(미삭제 — pre-existing 공개 API). ⚠️ `run_withdrawal_logic`·은퇴 인출 연금 결과 바뀜(과소→정확). **BUG-PENSION-1 해소.**
+
+**▶ 다음 = C3 가구 인출 오케스트레이터(멀티, 위탁→ISA→연금 순차소진).**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-03] fix | G5-C C1 인출 과세 배선 + BUG-TAX-3 진단 정정 (취득가 인계)
 
 **진단 정정 (오너에게 보고·동의):** 앞선 "은퇴 이중과세" 진단은 **부정확**했음. `run_retirement_logic`/`app.py:retirement_run`의 `wd_config`에 `tax_engine`이 없어 **인출투영은 원래 면세**였음(`_calc_gross_withdrawal`/`pension_tax`는 tax_engine 있을 때만 작동). 즉 적립끝 청산세가 **유일 세금**(이중 아님). ∴ BUG-TAX-3 수정(적립 무청산)만 하면 적립면세+인출면세 = **세금 0 회귀**. 오너 규칙 "은퇴 절대 일괄청산 금지"의 올바른 구현 = 적립끝 청산 제거(전반부) + **인출 과세 배선(후반부=C1)**.

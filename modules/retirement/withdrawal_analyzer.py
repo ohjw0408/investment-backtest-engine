@@ -519,8 +519,10 @@ class WithdrawalAnalyzer:
         for month in range(n_total):
             age          = self.withdrawal_start_age + month // 12
             annual_gross = self.monthly_withdrawal * 12  # 초기 추정치로 연간 수령액 계산
-            # 1,500만 초과 여부 판단 후 실효세율 적용
-            rate = self.tax_engine.pension_effective_rate(annual_gross, age)
+            # 사적연금 분리과세(G5-C C2·오너결정): 1,500만 이하 나이별 3.3~5.5%,
+            # 초과 시 전액 16.5%. 기존 pension_effective_rate(하이브리드, BUG-PENSION-1) 대체.
+            tax  = self.tax_engine.pension_separate_tax_annual(annual_gross, age)
+            rate = tax / annual_gross if annual_gross > 0 else 0.0
             gross_sum += net / (1.0 - rate) if rate < 1.0 else net
         return gross_sum / n_total
 
@@ -533,31 +535,30 @@ class WithdrawalAnalyzer:
         gross   = self.monthly_withdrawal
         start   = self.withdrawal_start_age
         end_age = start + self.withdrawal_years
+        annual  = gross * 12
 
-        BRACKETS = [
-            (55, 70, 0.055),
-            (70, 80, 0.044),
-            (80, 200, 0.033),
-        ]
-
+        # 사적연금 분리과세(C2): 1500만 이하 나이별 3.3~5.5%, 초과 시 전구간 전액 16.5%.
+        # 나이 구간별 실효세율 = pension_separate_tax_annual(연수령, 구간나이)/연수령.
+        BRACKETS = [(55, 70), (70, 80), (80, 200)]
         brackets = []
-        for b_start, b_end, rate in BRACKETS:
+        for b_start, b_end in BRACKETS:
             age_from = max(start, b_start)
             age_to   = min(end_age, b_end)
             if age_from >= age_to:
                 continue
-            net = gross * (1.0 - rate)
+            tax  = self.tax_engine.pension_separate_tax_annual(annual, age_from)
+            rate = tax / annual if annual > 0 else 0.0
+            net  = gross * (1.0 - rate)
             brackets.append({
                 "age_from":     age_from,
                 "age_to":       age_to,
-                "rate":         rate,
+                "rate":         round(rate, 4),
                 "gross_monthly": round(gross),
                 "net_monthly":   round(net),
                 "tax_monthly":   round(gross - net),
             })
 
         # 연간 1,500만 초과 체크
-        annual = gross * 12
         threshold = 15_000_000
         over_threshold = annual > threshold
 

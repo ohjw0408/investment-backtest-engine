@@ -190,86 +190,12 @@ def _make_strategy_factory(target_weights, rebal_mode, band_width=0.05):
     return strategy_factory
 
 
-def _normalize_multi_accounts(body: dict) -> list[dict]:
-    accounts = []
-    for idx, raw in enumerate(body.get('accounts') or []):
-        tickers = raw.get('tickers') or []
-        if not tickers:
-            raise ValueError(f"계좌 {idx + 1}에 종목을 최소 1개 이상 추가해주세요.")
-
-        normalized_tickers = []
-        total_weight = 0.0
-        for ticker in tickers:
-            weight = float(ticker.get('weight', 0))
-            total_weight += weight
-            normalized_tickers.append({
-                'code':   ticker['code'],
-                'name':   ticker.get('name', ticker['code']),
-                'badge':  ticker.get('badge', ''),
-                'weight': weight,
-            })
-        if total_weight > 1.000001:
-            raise ValueError(f"계좌 {idx + 1}의 비중 합계가 100%를 초과했습니다.")
-
-        accounts.append({
-            'type':                 raw.get('type', '위탁'),
-            'initial_capital':      float(raw.get('initial_capital', 0) or 0),
-            'monthly_contribution': float(raw.get('monthly_contribution', 0) or 0),
-            'tickers':              normalized_tickers,
-            'rebal_mode':           raw.get('rebal_mode') or body.get('rebal_mode', 'monthly'),
-            'band_width':           float(raw.get('band_width', body.get('band_width', 0.05))),
-            'dividend_mode':        raw.get('dividend_mode') or body.get('dividend_mode', 'reinvest'),
-            'isa_renewal':          bool(raw.get('isa_renewal', False)),
-        })
-    return accounts
-
-
-def _validate_initial_capital_limits(accounts: list[dict]) -> list[str]:
-    """초기자본 연 납입한도 하드체크 (transfers 무관 — 초기자본은 실제 입금이라 한도 초과 불가).
-
-    - ISA: 각 계좌 초기자본 ≤ 2,000만(연 한도).
-    - 연금저축 + IRP: 합산 초기자본 ≤ 1,800만(공유 연 한도).
-    위반 메시지 리스트 반환(빈 리스트 = 통과).
-    """
-    errors: list[str] = []
-    for idx, a in enumerate(accounts):
-        if a.get('type') == 'ISA' and float(a.get('initial_capital', 0) or 0) > 20_000_000:
-            errors.append(
-                f"계좌 {idx + 1}: ISA 초기 투자금은 연 납입한도 2,000만원을 초과할 수 없습니다."
-            )
-    pension_init = sum(
-        float(a.get('initial_capital', 0) or 0)
-        for a in accounts if a.get('type') in ('연금저축', 'IRP')
-    )
-    if pension_init > 18_000_000:
-        errors.append(
-            f"연금저축+IRP 초기 투자금 합계 {pension_init:,.0f}원이 "
-            f"연 합산 납입한도 1,800만원을 초과합니다. (연금저축·IRP는 한도 공유)"
-        )
-    return errors
-
-
-def _build_savings_summary(savings_raw: dict) -> dict | None:
-    """절세액 표시(위탁가정세금·실제세금·절세액 + GH 절세)를 프론트 소비형으로 라운딩.
-
-    analyzer의 `savings`(계좌별 p50 + 합산) → 정수 라운딩. combined 없으면 None.
-    """
-    if not savings_raw.get('combined'):
-        return None
-    return {
-        'combined': {k: round(v) for k, v in savings_raw['combined'].items()},
-        'accounts': [
-            {
-                'account_id': a['account_id'],
-                'type':       a['type'],
-                'brokerage_assumed_tax': round(a['brokerage_assumed_tax']),
-                'actual_tax':            round(a['actual_tax']),
-                'tax_saving':            round(a['tax_saving']),
-                'gain_harvest_saving':   round(a.get('gain_harvest_saving', 0)),
-            }
-            for a in savings_raw.get('accounts', [])
-        ],
-    }
+# 멀티계좌 입력 정규화·검증·결과 헬퍼는 공통 모듈에서 공유(백테스트·은퇴 복제, G5).
+from modules.multi_account_common import (
+    normalize_multi_accounts as _normalize_multi_accounts,
+    validate_initial_capital_limits as _validate_initial_capital_limits,
+    build_savings_summary as _build_savings_summary,
+)
 
 
 def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> dict:

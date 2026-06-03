@@ -1,5 +1,32 @@
 # Log
 
+## [2026-06-03] feat | 금 ETF 상장전 2차 백필 — 현물=KRX_GOLD·선물=GC=F 갈래 라우팅 (금 Phase 2)
+
+**오너 스펙:** "금현물 말고 금선물 ETF도 같이 백필. 어차피 그게 그거." → 짚음: 현물≠선물(콘탱고/헤지 다름). 단 **우리 소스는 가격 레벨뿐**이라 콘탱고 드래그(롤오버 손실)는 안 보임 → 상장전 합성구간은 현물·선물 거의 동일, 진짜 차이는 상장후 실제가에 반영. → 둘 다 백필 OK(상장전은 근사, 모든 백필 공통한계).
+
+**발견:** 모든 금 ETF가 `index=GOLD`→`GC=F`(USD 금선물)로 매핑돼 현물조차 GC=F로 백필 중이었음. `fx_applied`는 `market=="US"` 요구 → 금 ETF는 `market=COMMODITY`라 환율 미적용. **현물(unhedged)** ETF는 실제가=금(USD)×원화인데 GC=F 환율없이 백필 → 상장전 원화변동 누락(형태 부정확). **선물(H)** 은 헤지라 GC=F 맞음.
+
+**오너 결정:** ① 갈래별 라우팅(현물/국제금 unhedged→KRX_GOLD KRW/g 네이티브, 선물H→GC=F) ② 순수 금만(레버리지·인버스·혼합·금광주·커버드콜 제외).
+
+**구현:**
+- `price_loader.py`: KRX_GOLD KRW/g 빌더를 모듈함수 `build_krx_gold_krw_series(index_conn, usdkrw)`로 추출(`_build_krx_gold_series`는 호출만) — backfill_engine과 공유, BUG-DIV-3 ratio 로직 중복방지.
+- `backfill_engine.py`: `_GOLD_KRX_SPOT={411060,0072R0,0064K0,0066W0}` → index_code 오버라이드 KRX_GOLD. `_load_index("KRX_GOLD")`가 공유빌더로 1971~ 시계열 빌드. `KRX_GOLD`를 `_NO_DIVIDEND_INDICES`에 추가(금=무배당).
+- 선물 3종(132030·319640·139320)은 GC=F 유지, 변경 없음.
+
+**검증(로컬):**
+- 현물 4종 proxy=KRX_GOLD·**1971-08-16부터**(50년+) · 선물 3종 proxy=GC=F. backfill_runs 확인.
+- 상장경계 점프 전부 ±2.5% 이내(411060 −0.39%·0072R0 −2.49%(금 1일변동)·132030 +0.78% 등) — BUG-DIV-3 폭발 없음.
+- 411060 1990~2026 9177행 로드 정상.
+- test_krx_gold **5종 PASS**(라우팅+공유빌더 일치 2종 신규) + 회귀 71 PASS(save/track_g/multi_account/krx_gold).
+
+**미배포·미검증:** 서버 배포 + 서버 금 ETF 백테스트 실데이터 검증 남음. price_daily.db는 gitignore라 코드만 배포→서버가 lazy 재백필(서버 index_daily KRX_GOLD+GC=F+USD/KRW 기존 보유).
+
+**▶ 다음 = 서버 배포·검증 OR 백테스트/은퇴 복제 플랜.**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-03] feat | KRX 금현물 거래가능 시계열 + 위탁 전용 (금 Phase 1, 서버검증 PASS)
 
 **버그:** KRX_GOLD가 `index_master`(지수)에만 있고 `price_daily`(거래가격)엔 없어 위탁 시뮬이 'portfolio_value' 에러로 안 돌았음(5년 잡아도). 

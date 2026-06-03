@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> ✅ **2026-06-03 업데이트 36 (금 ETF 2차 백필 — 현물=KRX_GOLD·선물=GC=F 갈래 라우팅, 금 Phase 2):** 오너 "금선물 ETF도 같이, 그게 그거" → 현물≠선물이나 우리 소스(가격 레벨)엔 콘탱고 드래그 안 보여 상장전 합성은 근사로 둘 다 OK. **발견:** 모든 금 ETF가 GOLD→GC=F라 현물조차 GC=F 백필 + `fx_applied`가 `market=="US"` 요구→금ETF(COMMODITY)는 환율 미적용→현물(unhedged) 상장전 원화변동 누락. **결정:** 현물/국제금→KRX_GOLD(KRW/g 네이티브), 선물H→GC=F / 순수 금만. **구현:** KRX_GOLD 빌더 모듈함수 `build_krx_gold_krw_series` 추출(price_loader↔backfill_engine 공유), `_GOLD_KRX_SPOT={411060,0072R0,0064K0,0066W0}` 오버라이드, `_load_index("KRX_GOLD")` 공유빌더, KRX_GOLD 무배당 등록. **검증(로컬):** 현물 proxy=KRX_GOLD 1971~(50년+)·선물 GC=F·경계점프 ±2.5%이내·411060 9177행. test_krx_gold 5 PASS(라우팅+빌더일치 신규)+회귀 71 PASS. ⚠️ **미배포·서버 실데이터 검증 남음**(price_daily gitignore→코드만 배포, 서버 lazy 재백필). **▶ 다음 = 서버 배포·검증 OR 백테스트/은퇴 복제.**
+
 > ✅ **2026-06-03 업데이트 35 (KRX 금현물 거래가능 + 위탁전용, 금 Phase 1):** KRX_GOLD가 index_master만 있고 price_daily 없어 위탁 시뮬 'portfolio_value' 에러였음. `price_loader._build_krx_gold_series`로 연속 KRW/g 시계열(2014~ KRX금 + 2014이전 GC=F×USD/KRW ratio규격화) 단락 제공 + 위탁전용 검증(ISA/연금/IRP 거부) + data_start 시계열시작·빈윈도우 스킵(5cc4c1a+ec7cfa2). **서버검증:** 위탁 금 8년 작동(금비과세 savings 0) · ISA+금 account_restrictions 거부 · 2014경계 점프0·2024년 86,940원/g 실제일치. test_krx_gold 3종+회귀 PASS. **GH 절세는 절세액에 합산 표시(25534ac).** **▶ 다음 = 금현물 ETF 2차백필(금데이터백필_plan.md Phase 2).**
 
 > ✅ **2026-06-03 업데이트 34 (단일 풍차 ISA 자동 위탁계좌):** 오너 요청 — 단일 풍차 ISA를 에러로 막지 말고 자동 처리(2ae53c6). 같은 종목·비중 위탁계좌(초기0·월0) 자동생성 + 정책 라우팅 → 멀티경로로 풍차 정상(만기 3회). 결과창 파란 안내박스. **서버검증:** 단일 풍차 ISA 458730 12년 → 절세 2,245,158·종료 3,677만(평범 ISA 3,363만↑). 회귀 L-SAVE26+TrackG41 PASS. JS v20260603windmill. **▶ 절세 P1+단일계좌(풍차 포함) 완료. 다음 = 백테스트/은퇴 복제 플랜.**

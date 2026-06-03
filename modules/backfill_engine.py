@@ -35,7 +35,12 @@ _NO_DIVIDEND_INDICES: set[str] = {
     "DGS30", "DGS10", "DGS3MO",
     "GC=F", "SI=F", "CL=F", "HG=F",
     "USD/KRW", "USD/JPY",
+    "KRX_GOLD",   # 금현물 — 배당 없음
 }
+
+# 금현물·국제금(unhedged) ETF: 상장전 프록시를 KRX_GOLD(KRW/g 네이티브, FX 포함)로.
+# GC=F(USD)는 환율 미반영이라 unhedged 원화 ETF엔 형태가 틀림 → 환헤지 선물 ETF만 GC=F 유지.
+_GOLD_KRX_SPOT: set[str] = {"411060", "0072R0", "0064K0", "0066W0"}
 
 # 프록시 지수 → 배당수익률 테이블(index_div_yield) 별칭.
 # DJUSDIV_PROXY 가격 체인의 배당은 DJUSDIV100 실측 yield(2011~2026)로 주입.
@@ -363,6 +368,13 @@ class BackfillEngine:
         if index_code in self._index_cache:
             return self._index_cache[index_code]
 
+        # KRX_GOLD: KRW/g 연속 시계열(2014~ KRX금 + 2014이전 GC=F×환율) — price_loader와 공유
+        if index_code == "KRX_GOLD":
+            from modules.price_loader import build_krx_gold_krw_series
+            series = build_krx_gold_krw_series(self.index_conn, self._load_usdkrw())
+            self._index_cache[index_code] = series
+            return series
+
         df = pd.read_sql(
             "SELECT date, close FROM index_daily WHERE code=? ORDER BY date",
             self.index_conn,
@@ -519,6 +531,10 @@ class BackfillEngine:
             index_code = index_nm if index_nm and index_nm != "None" else None
         else:
             index_code = INDEX_MAP.get(index_nm)
+
+        # 금현물·국제금 ETF는 GC=F 대신 KRX_GOLD(KRW/g 네이티브) 프록시 사용
+        if code in _GOLD_KRX_SPOT:
+            index_code = "KRX_GOLD"
 
         if not index_code or index_code == "None":
             return {"code": code, "status": f"no_index_map ({index_nm})"}

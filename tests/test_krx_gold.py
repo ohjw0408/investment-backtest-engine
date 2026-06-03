@@ -80,6 +80,33 @@ def test_krx_gold_brokerage_sim_runs_and_tax_zero():
     assert abs(r0.end_value - r1.end_value) < 1.0   # 금 양도세 0 (비과세)
 
 
+# ── 금 ETF 상장전 백필 프록시 라우팅 (Phase 2) ──
+
+def test_gold_etf_backfill_proxy_routing():
+    """현물·국제금(unhedged) ETF는 KRX_GOLD, 환헤지 선물 ETF는 GC=F로 백필."""
+    from modules.backfill_engine import _GOLD_KRX_SPOT, INDEX_MAP
+    # 현물/국제금 → KRX_GOLD 프록시
+    for code in ("411060", "0072R0", "0064K0", "0066W0"):
+        assert code in _GOLD_KRX_SPOT, code
+    # 환헤지 선물은 KRX_GOLD 오버라이드 대상 아님 → GOLD→GC=F 유지
+    for code in ("132030", "319640", "139320"):
+        assert code not in _GOLD_KRX_SPOT, code
+    assert INDEX_MAP["GOLD"] == "GC=F"
+
+
+def test_backfill_krx_gold_proxy_matches_price_loader():
+    """BackfillEngine과 PriceLoader가 동일한 KRX_GOLD KRW/g 시계열을 쓴다(공유 빌더)."""
+    if not os.path.exists(_INDEX_DB):
+        return
+    from modules.price_loader import PriceLoader
+    from modules.backfill_engine import BackfillEngine
+    pl_series = PriceLoader()._build_krx_gold_series()
+    bf_series = BackfillEngine(verbose=False)._load_index("KRX_GOLD")
+    assert bf_series is not None and len(bf_series) > 100
+    assert len(bf_series) == len(pl_series)
+    assert abs(float(bf_series.iloc[-1]) - float(pl_series.iloc[-1])) < 1.0
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])

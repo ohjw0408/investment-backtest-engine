@@ -58,6 +58,48 @@ def _looks_like_krx_code(code: str) -> bool:
     return bool(code) and len(code) == 6 and code[0].isdigit() and code.isalnum()
 
 
+def build_krx_gold_krw_series(index_conn, usdkrw: pd.Series) -> pd.Series:
+    """KRX 금현물(KRW/g) 연속 시계열 빌더 — price_loader/backfill_engine 공유.
+
+    - 2014~현재: index_daily의 KRX 금현물.
+    - 2014 이전: GC=F(국제 금선물, USD/oz) × USD/KRW → KRW/oz를 2014 경계서 KRX금
+      가격 스케일로 ratio 규격화해 이어붙임. (oz↔g·통화 단위차는 경계 ratio가 흡수.)
+    KRX_GOLD는 KRW 표시라 환율(FX) 추가 적용 안 함.
+    """
+    krx = pd.read_sql(
+        "SELECT date, close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date",
+        index_conn,
+    )
+    if krx.empty:
+        raise RuntimeError("KRX_GOLD 데이터가 없습니다.")
+    krx["date"] = pd.to_datetime(krx["date"])
+    krx = krx.set_index("date")["close"].astype(float)
+
+    series = krx
+    gcf = pd.read_sql(
+        "SELECT date, close FROM index_daily WHERE code='GC=F' ORDER BY date",
+        index_conn,
+    )
+    if not gcf.empty:
+        gcf["date"] = pd.to_datetime(gcf["date"])
+        gcf = gcf.set_index("date")["close"].astype(float)
+        intl = (gcf * usdkrw.reindex(gcf.index).ffill()).dropna()   # KRW/oz
+        boundary = krx.index.min()
+        iv = None
+        if boundary in intl.index:
+            iv = float(intl[boundary])
+        else:
+            before = intl[intl.index <= boundary]
+            if not before.empty:
+                iv = float(before.iloc[-1])
+        if iv and iv > 0:
+            scale = float(krx[boundary]) / iv          # ratio 가격일치
+            prefix = intl[intl.index < boundary] * scale
+            series = pd.concat([prefix, krx])
+    series = series[~series.index.duplicated(keep="last")].sort_index()
+    return series
+
+
 class PriceLoader:
 
     USD_KRW_START = "1964-05-04"
@@ -260,38 +302,7 @@ class PriceLoader:
             return self._krx_gold_cache
         if self.index_conn is None:
             raise RuntimeError("index_master.db가 없습니다.")
-        krx = pd.read_sql(
-            "SELECT date, close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date",
-            self.index_conn,
-        )
-        if krx.empty:
-            raise RuntimeError("KRX_GOLD 데이터가 없습니다.")
-        krx["date"] = pd.to_datetime(krx["date"])
-        krx = krx.set_index("date")["close"].astype(float)
-
-        series = krx
-        gcf = pd.read_sql(
-            "SELECT date, close FROM index_daily WHERE code='GC=F' ORDER BY date",
-            self.index_conn,
-        )
-        if not gcf.empty:
-            gcf["date"] = pd.to_datetime(gcf["date"])
-            gcf = gcf.set_index("date")["close"].astype(float)
-            fx = self._load_usdkrw()
-            intl = (gcf * fx.reindex(gcf.index).ffill()).dropna()   # KRW/oz
-            boundary = krx.index.min()
-            iv = None
-            if boundary in intl.index:
-                iv = float(intl[boundary])
-            else:
-                before = intl[intl.index <= boundary]
-                if not before.empty:
-                    iv = float(before.iloc[-1])
-            if iv and iv > 0:
-                scale = float(krx[boundary]) / iv          # ratio 가격일치
-                prefix = intl[intl.index < boundary] * scale
-                series = pd.concat([prefix, krx])
-        series = series[~series.index.duplicated(keep="last")].sort_index()
+        series = build_krx_gold_krw_series(self.index_conn, self._load_usdkrw())
         self._krx_gold_cache = series
         return series
 

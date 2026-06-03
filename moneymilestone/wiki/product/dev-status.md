@@ -1,16 +1,16 @@
 ---
-updated: 2026-05-30
-sources: [PROJECT_MASTER_ROADMAP.md, 세금에서시작된완전리팩토링계획.plan.md, ETF_BACKFILL_ARCHITECTURE_PLAN.md]
+updated: 2026-06-03
+sources: [PROJECT_MASTER_ROADMAP.md, trackG_multiaccount_plan.md, 세금에서시작된완전리팩토링계획.plan.md]
 tags: [product, tech]
 ---
 
 # 개발 현황 + 블로커
 
-마지막 업데이트: 2026-05-30 기준.
+마지막 업데이트: 2026-06-03 기준.
 
 ## 현재 상태 한 줄 요약
 
-> ✅ **배당 데이터 Stage A 서버 적용 완료.** 세금 리팩토링(Phase 1~3, 2a/2b/2d)·Track F·Track G G1·합성데이터까지 진행됐고, 배당 액수 0 블로커는 `ETF_BACKFILL Phase 6.0 Stage A`로 해소됨. **현재 1순위는 정상 배당 데이터 기준 세금 Phase 2c/2e 재검증.**
+> ✅ **투자계산기 다중계좌(Track G2~G4)·절세액 P1·단일계좌·금현물·종합과세 배선 전부 완료.** 배당 데이터 블로커는 Stage A/B로 해소(완). **현재 1순위 = Track G5(백테스트·은퇴 탭 다중계좌 복제).** 백테스트 백엔드+L10 ✅, 은퇴 인출 엔진(G5-C) 진행 중. 상세 = `trackG_multiaccount_plan.md` §G5 + [[dev/status]].
 
 ## 세금 리팩토링 진행 상황
 
@@ -19,11 +19,11 @@ tags: [product, tech]
 | Phase 1 | 세금 공통 코어, 절세매도 분리, 청산세 통일 | ✅ 완료 (Gate 1 통과) |
 | Phase 2a | TaxableSimulationRunner + 백테스트 | ✅ 완료 (Gate 2a 통과) |
 | Phase 2b | 투자계산기 + 은퇴 적립 Runner 전환 | ✅ 완료 (Gate 2b 통과) |
-| Phase 2c | 배당 역산 Runner 전환 | ✅ 구현 / 🔁 Gate 재검증 필요 (Stage A 정상 배당 데이터 기준) |
-| Phase 2d | 은퇴 인출 세금 주입 | ✅ 완료 (Gate 2d 5/5) |
-| Phase 2e | 금융소득 종합과세 경고 + 분할매도 패널 | ⚠️ 부분 구현 (엔진+백테스트만, 아래) |
+| Phase 2c | 배당 역산 Runner 전환 | ✅ 완료 (Gate 2c 재검증 PASS, 2026-05-31) |
+| Phase 2d | 은퇴 인출 세금 주입 | ✅ 완료 (Gate 2d 5/5) ⚠️ BUG-TAX-2: 인출 매도 위탁 양도세 누락은 수정됨(공유 sell_with_tax) |
+| Phase 2e/2f | 금융소득 종합과세 + 분할매도 패널 | ✅ 다중계좌 배선 완료(공유세션 개인합산·comprehensive_years). 단일계좌도 surface. ⚠️ other_financial_income 전탭 자동산출만 잔여 |
 | Phase 3 | 정리, ISA Runner 통일, 문서화 | ✅ 완료 |
-| phase1-api | TaxProfile API 통일 (other_financial_income 주입) | ⏳ 미완료 |
+| phase1-api | TaxProfile API 통일 (other_financial_income 주입) | ⏳ 미완료 (전탭 자동산출) |
 
 **종합과세(Phase 2e) 실제 상태** (코드 확인 2026-05-30):
 - ✅ 계산 엔진 (`base_tax._comprehensive_tax`/2천만 임계/비례공제) — 완전, `tax_truth_test` 단위검증 통과
@@ -56,15 +56,18 @@ tags: [product, tech]
 ## 다음 실행 트랙 (의존성 순서)
 
 ```
-[1] 세금 Phase 2c/2e 재검증 (정상 배당 데이터로) — 현재 최우선
-  → [2] 배당 백필 Stage B (채권/MMF, Phase 7)
-  → [3] Track G 재개 (다중계좌 세금)
-  → [4] PHASE4 잔여 (D4/D1/D2/B1/A4/C1/C2/B4)
+[P0] Track G5 다중계좌 탭 복제 — 현재 진행
+  ✅ G5-A 백테스트 백엔드+L10  ✅ G5-C 토대(연금 분리과세)
+  → G5-C 인출 엔진 본체(가구 인출 오케스트레이터+연금소득세+생존율+L12)
+  → 통합(run_retirement_logic 적립+인출 멀티) → UI 일괄(backtest.js·retirement.js)
+[P1] 신규 간편 도구 — 간편계산기 묶음 / 세금 전환 계산기
+[P2] 절세액 P2/P3 · 종합과세 other_financial_income 전탭 자동산출
+[P3] PHASE4 (즐겨찾기→리스크리턴도표, D1/D2/A4/C1/C2)
 ```
 
 ### 다음 실행 명령어
 ```
-Phase 2c/2e 재검증해줘
+G5-C 은퇴 인출 엔진 구현해줘
 ```
 
 ## 사업 일정 대비 현재 위치

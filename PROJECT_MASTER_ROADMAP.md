@@ -1,6 +1,6 @@
 # Project Master Roadmap
 
-Last updated: 2026-06-02 (✅ **Track G2/G3/G4 + 2-4 엔진 완료**(만기분배·연금이전공제·연납입공제·금종세 풍차중단, L0~L9 결정론 검증) + **B1/B2/B3 배선·UI·서버검증 완료**(투자계산기 탭). 배포파이프 버그·index_master 손상 복구. → **다음 = 절세액 표시 기능 P1**(`절세액표시_plan.md`) 또는 은퇴/백테스트 탭 G2 복제)
+Last updated: 2026-06-03 (✅ **절세액 표시 P1 완료**(투자계산기, 위탁가정·실제·절세액 3종+GH) · **단일계좌 지원**(풍차 자동위탁 포함) · **KRX 금현물 거래가능 Phase 1+2**(위탁전용 시계열 + 현물/선물 ETF 백필) · **BUG-TAX-1**(위탁 배당세 누락)·**BUG-TAX-2**(위탁 인출 매도 양도세 누락)·**BUG-G1-2**(멀티계좌 입력 커서) 수정 · **deploy.yml** force-push 복구. → **진행 중 = Track G5 멀티계좌 탭 복제**: 백테스트 ✅(L10) → 은퇴 인출 엔진(G5-C, 토대 완료) → 통합 → UID 일괄)
 
 > ⚠️ **2026-05-30 정정:** 아래 "SCHD vs TIGER now converge" / "Phase 2c Gate 통과" / "Track A 완료"는 **가격(CAGR) 수렴만** 검증된 것이었음. `debug_dividend.py` 실측 결과, 배당 **액수**는 0임이 확인됨. 원인: Track A가 DJUSDIV_PROXY를 total-return(adj-close)로 구축 → 가격은 맞지만 배당이 가격에 임베딩되어 itemize 안 됨. 백필 가격 구간(1928~)에 배당 row 없음 + provenance 전부 0행. **이는 세금 Phase 2c(배당 역산)·2e(금종세)·Track G(다중계좌 세금)의 데이터 기반을 무효화한다.** 해결 owner: `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0`(범용 배당 백필 재설계). 우선순위는 아래 "Current Recommended Next Action" 참조.
 
@@ -19,7 +19,13 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 | `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | ✅ **Phase 6.0 Stage A + Stage B 완료**(주식 배당 + 채권/MMF·환헤지비용·US 채권 키워드 자동분류·통화가드, 서버검증). Phase 3+ (etf_master, etf_proxy_map, confidence grading)는 이후. |
 | `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | ✅ Complete (Phase 1~10, all screens). |
 | `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | **Backend complete (e8b7c1e). Frontend partially done. BUG-1~5 remain.** |
-| `PHASE4_PLAN.md § 4G` | Multi-account simulation engine + real ISA windmill (sequential/conditional flow). Requires Track F first. Key constraint: percentiles must be computed after per-scenario sum, not by summing individual percentiles. | Not started. Requires Track F first. |
+| `PHASE4_PLAN.md § 4G` | Multi-account simulation engine + real ISA windmill (sequential/conditional flow). Requires Track F first. Key constraint: percentiles must be computed after per-scenario sum, not by summing individual percentiles. | ✅ 엔진+투자계산기 완료. → `trackG_multiaccount_plan.md`로 이관. |
+| `trackG_multiaccount_plan.md` | 다중계좌 엔진(G1~G4·2-4) + 배선/UI(B1~B3) + 탭복제(G5: 백테스트·은퇴) | ✅ 투자계산기 완료. **G5 진행**: 백테스트 백엔드+L10 ✅, 은퇴 인출(G5-C) 토대 ✅·엔진 본체 next, UI 일괄 대기. |
+| `절세액표시_plan.md` | 결과화면 절세액 3종(위탁가정·실제·절세액)+GH 절세. L-SAVE 검증설계. | ✅ **P1 완료**(투자계산기, 03f28cb+). 백테스트/은퇴는 G5 복제로 따라옴. P2/P3 후속. |
+| `금데이터백필_plan.md` | KRX 금현물 거래가능 시계열(위탁전용) + 금 ETF 상장전 백필 | ✅ **Phase 1**(위탁 KRW/g 시계열, 서버검증)+**Phase 2**(현물=KRX_GOLD·선물=GC=F 갈래 라우팅, 로컬검증) 완료. |
+| `간편계산기_plan.md` | 가정 기반 간편 계산기 묶음(복리·배당재투자 등, 시트 대체). 롤링 엔진과 별개. | 💡 아이디어 — 미착수. 우선순위 중상(quick win·시트대체). |
+| `세금계산기_plan.md` | 위탁→ISA 전환 결정 도구(전환 양도세 vs ISA 세제혜택, 스위칭코스트). | 💡 아이디어 — 미착수. 우선순위 중상(세금 모트·액셔너블). |
+| `리스크리턴도표_plan.md` | 저장 포트폴리오 위험-수익 산점도(FunETF 류). | 💡 아이디어 — 미착수. **선행=포트폴리오 즐겨찾기(미구현)** → 후순위. |
 
 ## Current Situation
 
@@ -290,25 +296,31 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-> ✅ **2026-06-02 현재:** 금융소득 종합과세(Phase 2f)·Track G2/G3/G4·2-4 엔진 + 투자계산기 배선·UI(B1~B3) 전부 완료·서버검증. 다음은 아래 둘 중 택1.
+> ✅ **2026-06-03 현재:** 투자계산기 멀티계좌·절세액 P1·단일계좌·금현물 전부 완료. **진행 중 = Track G5(멀티계좌 탭 복제).** 우선순위 ↓.
 
-**[★ 다음 — 택1]**
-- **(A) 절세액 표시 기능 P1** — 위탁가정세금·실제세금·절세액 3종 표시. 계획 = `절세액표시_plan.md`(엄밀판, L-SAVE0~8 검증설계 포함). 실행: 「절세액 P1 구현해줘」.
-- **(B) G2 탭 복제** — 투자계산기에서 확정한 멀티계좌 UI/배선을 **백테스트→은퇴** 탭에 복제. 은퇴는 연 1500만 수령한도 고려. + L7 실데이터 통합 불변식.
+**[P0 — 진행 중] Track G5 멀티계좌 탭 복제 (`trackG_multiaccount_plan.md` §G5)**
+- ✅ G5-A 백테스트 단일윈도우 멀티계좌 백엔드 + L10(골든·불변식·세금ON/OFF).
+- ✅ G5-C 토대: `pension_separate_tax_annual`(연금 1500만 초과 전액 16.5%) + 정확값 7종.
+- ⬜ **다음 = G5-C 인출 엔진 본체** — 가구 단일 인출액 → 세금최적 순서(위탁→ISA→연금) 분배 오케스트레이터(루프 신규) + 연금소득세 + 합산고갈 생존율 + L12.
+- ⬜ G5 통합: `run_retirement_logic` 적립(MultiAccountAnalyzer)+인출 멀티.
+- ⬜ **UI 일괄**: backtest.js·retirement.js 멀티계좌(calculator.js 패턴 복제, 백엔드 3탭 확정 후 한 번에). 커서버그(BUG-G1-2) 이미 수정됨.
+- ⬜ L7 실데이터 통합 불변식(최종).
 
-**[잔여 곁가지(우선순위 낮음)]**
-- 단일계좌 경로의 연금/IRP 한도(투자계산기는 에러 처리됨, 다른 탭 점검).
-- KQ150(코스닥150) fdr 티커 수정(현재 수집 실패).
-- `deploy.yml`의 `git checkout -- index_master.db` 줄 제거(BUG-DEPLOY-1 잔재, 현재 무해).
-- 데이터 파이프 지속가능성: 갭채움 로직 + gold 외 일일 스케줄러(현 미비).
-- 배당금계산기 G2/절세액 미지원(별도 엔진 재작업, 후속).
+**[P1 — G5 후 신규 간편 도구 (오너 아이디어, quick win)]**
+- **간편 계산기 묶음** (`간편계산기_plan.md`) — 가정 기반 복리·배당재투자(시트 대체). 가볍고 비개발자 타겟에 직접 가치.
+- **세금 전환 계산기** (`세금계산기_plan.md`) — 위탁→ISA 전환 양도세 vs ISA 혜택. 세금 모트·액셔너블.
 
-**[✅ 완료 2026-06-01~02] Track G2 풀스택:**
-엔진 L0~L9(만기분배·G3·2-4 금종세·G4 연납입) + B1 analyzer/logic 배선 + B2 API + B3 투자계산기 UI.
-브라우저 스모크 가이드 = `smoketestguide.md`. 상세 = `trackG_multiaccount_plan.md` + `wiki/log.md`.
+**[P2 — 절세액 P2/P3 + 데이터 토대]**
+- 절세액 P2/P3(백테스트/은퇴는 G5 복제로 따라옴, 연금 인출세 P3).
+- 금융소득 종합과세 완전 구현(2e 배선) — `세금에서시작된완전리팩토링계획.plan.md`.
 
-**[5] 이후 — PHASE4 핵심/복잡한 기능:**
-D1/D2/B1/A4/C1/C2/B4
+**[P3 — PHASE4 제품 기능]**
+- 포트폴리오 즐겨찾기(B1) ← 리스크리턴도표 선행. D1 TDF·D2 연금통합·A4 종목상세·C1/C2.
 
-**[6] 마지막 — 인프라/UX 마감:**
-E1 모바일, E2/E3/E4 최적화, C4 온보딩
+**[잔여 곁가지(낮음)]**
+- **BUG-PENSION-1**: 단일계좌 은퇴 인출 연금세 하이브리드(초과분만 16.5%) → 전액 16.5% 통일(결과 바뀜, 별도 검토).
+- KQ150 fdr 티커 수정(수집 실패). 데이터 파이프 갭채움+gold 외 일일 스케줄러.
+- 배당금계산기 G2/절세액 미지원(별도 엔진, 후속).
+- 리스크리턴도표(`리스크리턴도표_plan.md`) — 즐겨찾기 선행.
+
+**[6] 마지막 — 인프라/UX 마감:** E1 모바일, E2/E3/E4 최적화, C4 온보딩.

@@ -1,15 +1,19 @@
 # Money Milestone Wiki — Index
 
-마지막 업데이트: 2026-06-02
+마지막 업데이트: 2026-06-03
 
 ## 주요 계획 파일 (repo 루트)
 
-| 파일 | 내용 |
-|---|---|
-| `PROJECT_MASTER_ROADMAP.md` | 전체 로드맵·현재 다음작업 |
-| `trackG_multiaccount_plan.md` | 다중계좌 G1~G4·2-4·B1~B3 (대부분 완료) |
-| `절세액표시_plan.md` | 절세액 표시 기능 (계획, 미착수) — L-SAVE 검증설계 |
-| `smoketestguide.md` | G2 멀티계좌 브라우저 스모크 9종 |
+| 파일 | 내용 | 상태 |
+|---|---|---|
+| `PROJECT_MASTER_ROADMAP.md` | 전체 로드맵·현재 다음작업·우선순위 | 갱신 |
+| `trackG_multiaccount_plan.md` | 다중계좌 G1~G4·2-4·B1~B3 + G5 탭복제(백테스트·은퇴) | ✅ 투자계산기 / G5 진행 |
+| `절세액표시_plan.md` | 절세액 3종 표시(위탁가정·실제·절세액)+GH | ✅ P1 완료 |
+| `금데이터백필_plan.md` | KRX 금현물 거래시계열(위탁전용)+금 ETF 백필 | ✅ Phase 1+2 |
+| `간편계산기_plan.md` | 가정 기반 간편 계산기 묶음(시트 대체) | 💡 아이디어 |
+| `세금계산기_plan.md` | 위탁→ISA 전환 결정 계산기 | 💡 아이디어 |
+| `리스크리턴도표_plan.md` | 위험-수익 산점도(선행=즐겨찾기) | 💡 아이디어 |
+| `smoketestguide.md` | G2 멀티계좌 브라우저 스모크 9종 | — |
 
 
 ## 개발 현황 (가장 중요)

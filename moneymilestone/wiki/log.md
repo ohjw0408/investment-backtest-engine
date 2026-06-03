@@ -1,5 +1,22 @@
 # Log
 
+## [2026-06-03] docs | 전체 문서 최신화 — 마스터로드맵·wiki 동기화 + 우선순위
+
+오너 요청 — 누적 작업을 마스터플랜·wiki 전반에 반영, 신규 기능 추가·우선순위 부여.
+
+- **PROJECT_MASTER_ROADMAP.md:** Last updated 2026-06-03. Source Plans 표에 신규 플랜 7개 추가(trackG/절세액표시/금데이터백필/간편계산기/세금계산기/리스크리턴도표) + 상태. Current Recommended Next Action 재작성 — **P0 Track G5(진행)** / P1 간편계산기·세금전환계산기 / P2 절세액 P2·P3·종합과세 전탭배선 / P3 PHASE4(즐겨찾기→리스크리턴). BUG-PENSION-1 곁가지 기록.
+- **wiki/index.md:** 플랜 파일 표 갱신(상태 컬럼 + 신규 7개).
+- **wiki/product/features.md:** 다중계좌·절세액표시·금현물거래·풍차·G3/G4 ✅ 추가. 종합과세 상태 갱신. 신규 계획 도구 섹션(간편/세금전환/리스크리턴 + 우선순위).
+- **wiki/product/dev-status.md:** 요약·Phase 표·다음트랙 G5 기준 갱신(Stage A 재검증 최우선 → G5로 교체). 다음 명령어 = "G5-C 은퇴 인출 엔진 구현해줘".
+- **wiki/dev/ideas.md:** 금데이터백필 ✅완료 주석.
+- status.md(업데이트 38)·bugs.md(BUG-TAX-2/PENSION-1/G1-2)는 이번 세션 작업 시 이미 최신.
+
+**우선순위 확정:** P0 G5 다중계좌 복제 → P1 간편/세금 도구 → P2 절세액 P2/P3·종합과세 → P3 PHASE4.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-03] fix | BUG-TAX-2 위탁 인출 매도 양도세 누락 + G5(백테스트·은퇴 복제) 플랜
 
 **오너 지적:** "왜 위탁 인출 양도세가 없어?" — 정당. 코드 추적 결과 **기존 버그 확인.**

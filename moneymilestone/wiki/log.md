@@ -1,5 +1,27 @@
 # Log
 
+## [2026-06-03] feat | G5-B 은퇴 적립단계 멀티계좌 (엔진 + L11)
+
+**오너 지시:** "엔진 전부 다 한 다음에 UI." → G5-A UI 건너뛰고 엔진 순서로 G5-B 착수. "적립은 투자계산기랑 거의 같은 엔진" — 맞음, `MultiAccountAnalyzer` 그대로 공유.
+
+**구현:** `retirement_logic._run_multi_account_retirement_logic` 신규 — `_run_multi_account_calculator_logic`를 은퇴 데이터관례로 적응. 공통모듈(`_normalize_multi_accounts`·`_validate_initial_capital_limits`·`_build_savings_summary`) import, `years=accumulation_years`, 데이터준비=`prepare_scenario_data`(price_provenance 대신, 단일 retirement와 동일), 계좌별 규제검증·ISA 1억캡(transfers OFF)·transfers(정책/풍차/연금)·롤링 후 combined+계좌별 분포+savings+g2+split_sale+accumulation_summary surface. `run_retirement_logic` 디스패치: `len(accounts)>1`→멀티, 단일→기존경로.
+
+**오너 Q&A 결정 (착수 전 4문):**
+- **Q1 인출투영(생존율) = G5-C로 완전 연기.** 멀티 응답은 `withdrawal_pending=True`·`sample_results=[]`·`combined_summary=None`. 발견한 충돌: calculator는 인출 없어 단일→멀티 라우팅 무손실이나, **retirement 단일경로는 RetirementPlanner로 생존율 생성** → 인출-연기 멀티경로로 보내면 기존 생존율 사라짐(회귀). ∴ **단일→멀티 합성(savings 패널·단일풍차 자동미러)은 인출 완성(G5-C)까지 연기**, 단일계좌는 기존경로 그대로.
+- **Q2 분기 = calculator 미러** (len>1).
+- **Q3 ISA 풍차 = 멀티서 transfers로 허용** (MultiAccountAnalyzer 기존 지원).
+- **Q4 pension_start_age = G5-C로 연기** (적립은 연금 과세이연이라 무관, 인출 나이별 세율에만 사용).
+
+**검증 `tests/test_g5_retirement_accum.py` L11 5종 PASS:** ① 골든 래퍼=엔진직접호출 ±1원(엔진→Runner 동치는 calculator L0 보증 → 전이적으로 래퍼=엔진=Runner) ② 불변식 combined=Σaccounts ③ 평탄가격·거치·세금OFF→종료값=초기합 8,000,000 ④ 계단가격 세금ON<OFF ⑤ 인출 pending·디스패치(2↑멀티/1단일). 결정론: `prepare_scenario_data`·`price_loader.load`·`_get_dividend_start`·`loader.get_price` 패치. **회귀 80(G5-A+TrackG+L-save+withdrawal-cg) + retirement 11 PASS.**
+
+⚠️ UI 미배선(엔진 단계 후 B). ⚠️ 멀티 retirement 인출 결과는 G5-C 전까지 pending.
+
+**▶ 다음 엔진 = G5-C 은퇴 인출 멀티계좌(L12):** 가구 단일 인출액 → 오케스트레이터(위탁→ISA→연금 세금최적 순차소진) + 연금소득세(`pension_separate_tax_annual` 토대 완료) + 합산 생존율 + `MultiAccountAnalyzer` withdrawal_amount 확장.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-03] docs | 전체 문서 최신화 — 마스터로드맵·wiki 동기화 + 우선순위
 
 오너 요청 — 누적 작업을 마스터플랜·wiki 전반에 반영, 신규 기능 추가·우선순위 부여.

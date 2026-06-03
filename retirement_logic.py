@@ -53,7 +53,314 @@ def _make_strategy_factory(target_weights, rebal_mode, band_width=0.05):
     return strategy_factory
 
 
+# 멀티계좌 입력 정규화·검증·결과 헬퍼는 공통 모듈에서 공유(투자계산기·백테스트와 동일, G5).
+from modules.multi_account_common import (
+    normalize_multi_accounts as _normalize_multi_accounts,
+    validate_initial_capital_limits as _validate_initial_capital_limits,
+    build_savings_summary as _build_savings_summary,
+)
+
+
+def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> dict:
+    """은퇴 적립단계 멀티계좌 (G5-B) — 롤링 멀티계좌 적립.
+
+    투자계산기 멀티계좌(_run_multi_account_calculator_logic)와 동일 엔진(MultiAccountAnalyzer).
+    차이: years=accumulation_years, 데이터 준비=prepare_scenario_data(은퇴 관례).
+
+    ⚠️ 인출투영(생존율)은 G5-C로 연기 — 단일경로(run_retirement_logic)는 RetirementPlanner로
+    인출까지 하지만, 멀티계좌 인출(계좌별 디큐뮬레이션+연금소득세)은 G5-C가 구현한다.
+    그 사이 멀티 적립 결과는 인출 필드를 pending(None)으로 두고 반환한다.
+    """
+    from modules.retirement.multi_account_analyzer import MultiAccountAnalyzer
+    from modules.tax.account_tax import DistributionPolicy
+    from modules.data_preparation import prepare_scenario_data
+
+    portfolio_engine = _get_portfolio_engine()
+    accounts         = _normalize_multi_accounts(body)
+    years            = int(body['accumulation_years'])
+    dividend_mode    = body.get('dividend_mode', 'reinvest')
+    tax_enabled      = bool(body.get('tax_enabled', False))
+    user_settings    = body.get('user_settings', {})
+    gain_harvesting  = bool(body.get('gain_harvesting', False))
+
+    # G2/G3/G4: 자금이동 정책·풍차·금종세·세액공제 재투자 (없으면 G1 동작 그대로).
+    distribution_policy = DistributionPolicy.from_dict(body.get('distribution_policy'))
+    manual_comprehensive_years = set(
+        int(y) for y in (body.get('manual_comprehensive_years') or [])
+    )
+    reinvest_tax_credit = bool(body.get('reinvest_tax_credit', False))
+    has_pension = any(a['type'] in ('연금저축', 'IRP') for a in accounts)
+    transfers_enabled = (
+        distribution_policy is not None
+        or any(a.get('isa_renewal') for a in accounts)
+        or (tax_enabled and has_pension)
+    )
+
+    all_tickers: list[str] = []
+    for account in accounts:
+        account['gain_harvesting'] = gain_harvesting and account['type'] == '위탁'
+        for ticker in account['tickers']:
+            if ticker['code'] not in all_tickers:
+                all_tickers.append(ticker['code'])
+
+    usdkrw_start = portfolio_engine.loader.USD_KRW_START
+    data_end     = datetime.date.today().strftime('%Y-%m-%d')
+    for ticker in all_tickers:
+        try:
+            portfolio_engine.loader.get_price(ticker, usdkrw_start, data_end)
+        except Exception as e:
+            print(f"[retirement] {ticker} 데이터 로드 오류: {e}")
+
+    use_synthetic = bool(body.get('use_synthetic', False))
+    prep = prepare_scenario_data(
+        tickers          = all_tickers,
+        required_years   = years,
+        data_end         = data_end,
+        step_months      = 3,
+        allow_backfill   = True,
+        allow_synthetic  = use_synthetic,
+        purpose          = "retirement_multi_account",
+        price_db_path    = PRICE_DB_PATH,
+    )
+    data_start     = prep["effective_start"]
+    synthetic_info = prep.get("synthetic_info", {})
+    backfilled     = prep.get("backfilled", [])
+
+    if not use_synthetic:
+        start_dt  = datetime.datetime.strptime(data_start, '%Y-%m-%d').date()
+        max_years = (datetime.date.today() - start_dt).days // 365
+        if years > max_years:
+            raise ValueError(
+                f"데이터 부족: {all_tickers}의 데이터는 {data_start}부터 있어서 "
+                f"최대 {max_years}년 시뮬레이션이 가능합니다."
+            )
+
+    div_starts = [_get_dividend_start(portfolio_engine, t) for t in all_tickers]
+    div_starts = [d for d in div_starts if d]
+    div_start  = max(div_starts) if div_starts else None
+
+    import json as _json
+    import statistics as _stats
+    tax_engine = None
+    if tax_enabled:
+        from modules.tax.base_tax import TaxEngine
+        from modules.tax.account_tax import (
+            check_contribution_limits,
+            validate_account_portfolio,
+            validate_isa_contribution,
+        )
+        tax_engine = TaxEngine(user_settings)
+        # 초기자본 연한도 하드체크(전 경우) — 초기자본은 라우팅 대상 아님(실제 입금).
+        _init_errors = _validate_initial_capital_limits(accounts)
+        if _init_errors:
+            raise ValueError(_json.dumps({
+                'error': 'initial_capital_limit',
+                'violations': _init_errors,
+            }, ensure_ascii=False))
+        for idx, account in enumerate(accounts):
+            account_type   = account['type']
+            ticker_codes   = [t['code'] for t in account['tickers']]
+            target_weights = {t['code']: t['weight'] for t in account['tickers']}
+            if account_type != '위탁':
+                _check = validate_account_portfolio(account_type, ticker_codes, target_weights, tax_engine)
+                if not _check['valid']:
+                    raise ValueError(_json.dumps({
+                        'error': 'account_restrictions',
+                        'violations': [f"계좌 {idx + 1}: {v}" for v in _check['violations']],
+                        'disclaimer': _check.get('disclaimer'),
+                    }, ensure_ascii=False))
+            # transfers ON(G2)이면 ISA 연한도 초과분을 엔진이 분배정책대로 라우팅 → 하드거부 스킵.
+            if account_type == 'ISA' and not transfers_enabled:
+                _isa_errors = validate_isa_contribution(
+                    account['initial_capital'], account['monthly_contribution'],
+                )
+                if _isa_errors:
+                    raise ValueError(_json.dumps({
+                        'error': 'isa_contribution_limit',
+                        'violations': [f"계좌 {idx + 1}: {v}" for v in _isa_errors],
+                    }, ensure_ascii=False))
+    else:
+        from modules.tax.account_tax import check_contribution_limits
+
+    # transfers ON(G2)이면 ISA 1억 한도·초과 라우팅을 엔진(tracker)이 동적 처리.
+    # 정적 contribution_end_months cap은 G1(transfers OFF)에서만 적용(BUG-4).
+    isa_cap_accounts = []
+    _ISA_TOTAL_LIMIT = 100_000_000
+    for idx, account in enumerate(accounts):
+        if account['type'] != 'ISA' or transfers_enabled:
+            continue
+        planned_total = account['initial_capital'] + account['monthly_contribution'] * 12 * years
+        if planned_total > _ISA_TOTAL_LIMIT:
+            remaining = max(0.0, _ISA_TOTAL_LIMIT - account['initial_capital'])
+            stop_months = (
+                int(remaining / account['monthly_contribution'])
+                if account['monthly_contribution'] > 0 else years * 12
+            )
+            account['contribution_end_months'] = stop_months
+            isa_cap_accounts.append({
+                'account_id': idx,
+                'account_label': f"계좌 {idx + 1}",
+                'capped': True,
+                'original_total': round(planned_total),
+                'capped_total': _ISA_TOTAL_LIMIT,
+                'original_monthly': round(account['monthly_contribution']),
+                'stop_months': stop_months,
+                'stop_years': stop_months // 12,
+                'stop_months_remainder': stop_months % 12,
+            })
+
+    contribution_warnings = check_contribution_limits([
+        {'type': a['type'], 'monthly_contribution': a['monthly_contribution']}
+        for a in accounts
+    ])
+
+    analyzer = MultiAccountAnalyzer(
+        portfolio_engine           = portfolio_engine,
+        accounts                   = accounts,
+        data_start                 = data_start,
+        data_end                   = data_end,
+        accumulation_years         = years,
+        dividend_mode              = dividend_mode,
+        step_months                = 3,
+        tax_enabled                = tax_enabled,
+        user_settings              = user_settings,
+        progress_callback          = progress_callback,
+        use_synthetic              = use_synthetic,
+        div_start                  = div_start,
+        transfers_enabled          = transfers_enabled,
+        distribution_policy        = distribution_policy,
+        manual_comprehensive_years = manual_comprehensive_years,
+        reinvest_tax_credit        = reinvest_tax_credit,
+    )
+    result = analyzer.run()
+    distribution = result['combined']['distribution']
+
+    if div_start:
+        distribution['div_data_start']    = div_start
+        distribution['div_cases_count']   = len(result['cases'])
+    else:
+        distribution['no_dividend'] = True
+
+    # 적립 요약 (RetirementPlanner._summarize_accumulation와 동일 키 — 인출투영 인계용).
+    accumulation_summary = {
+        'end_value': {p: distribution['end_value'][p] for p in ('p10', 'p25', 'p50', 'p75', 'p90')},
+        'cagr':      {p: distribution['cagr'][p] for p in ('p10', 'p50', 'p90')},
+        'mdd':       {'p50': distribution['mdd']['p50']},
+        'sharpe':    {'p50': distribution['sharpe']['p50']},
+        'dividend_cagr': {'p50': distribution['dividend_cagr']['p50']},
+    }
+
+    cases_summary = [
+        {
+            'run_id':    c['run_id'],
+            'start':     c['start'],
+            'end':       c['end'],
+            'end_value': round(c['end_value']),
+            'cagr':      round(c['cagr'], 4),
+            'mdd':       round(c['mdd'], 4),
+            'accounts': [
+                {
+                    'account_id': a['account_id'],
+                    'type':       a['type'],
+                    'end_value':  round(a['end_value']),
+                    'tax_paid':   round(a.get('tax_paid', 0)),
+                }
+                for a in c.get('accounts', [])
+            ],
+            'comprehensive_years':     c.get('comprehensive_years', []),
+            'annual_deduction_credit': round(c.get('annual_deduction_credit', 0)),
+            'pension_transfer_credit': round(c.get('pension_transfer_credit', 0)),
+            'transfer_count':          len(c.get('transfer_log', []) or []),
+        }
+        for c in result['cases']
+    ]
+
+    if len(isa_cap_accounts) == 1:
+        isa_cap_info = isa_cap_accounts[0]
+    elif isa_cap_accounts:
+        isa_cap_info = {'capped': True, 'accounts': isa_cap_accounts}
+    else:
+        isa_cap_info = None
+
+    # G2/G3/G4 대표 요약 — 종료값 중앙값 케이스 기준(transfers OFF면 enabled=False).
+    g2_summary = {'enabled': transfers_enabled}
+    if transfers_enabled and result['cases']:
+        rep = sorted(result['cases'], key=lambda c: c['end_value'])[len(result['cases']) // 2]
+        g2_summary.update({
+            'representative_run_id':   rep['run_id'],
+            'comprehensive_years':     rep.get('comprehensive_years', []),
+            'annual_deduction_credit': round(rep.get('annual_deduction_credit', 0)),
+            'pension_transfer_credit': round(rep.get('pension_transfer_credit', 0)),
+            'transfer_log':            rep.get('transfer_log', []),
+        })
+
+    savings_summary = _build_savings_summary(result.get('savings') or {})
+
+    # 분할매도 패널 (위탁 + KR_FOREIGN 청산이익 중앙값 > 2천만) — 단일경로와 동일 로직.
+    split_sale_plan = None
+    comprehensive_flag = any(c.get('comprehensive_years') for c in result['cases'])
+    if any(a.get('type') == '위탁' for a in accounts):
+        _krf = [c.get('kr_foreign_unrealized_gain', 0.0) or 0.0 for c in result['cases']]
+        _krf = [g for g in _krf if g > 0]
+        if _krf and _stats.median(_krf) > 20_000_000:
+            from modules.tax.split_sale_planner import (
+                compute_split_sale_plan, recurring_financial_income,
+            )
+            _fin_years = next(
+                (c.get('financial_income_by_year') for c in result['cases']
+                 if c.get('financial_income_by_year')), {},
+            )
+            split_sale_plan = compute_split_sale_plan(
+                kr_foreign_gain        = _stats.median(_krf),
+                earned_income          = user_settings.get('earned_income', 0),
+                other_financial_income = recurring_financial_income(_fin_years),
+            )
+
+    return {
+        'multi_account': {
+            'enabled': True,
+            'accounts': [
+                {
+                    'account_id':   a['account_id'],
+                    'type':         a['type'],
+                    'distribution': a['distribution'],
+                }
+                for a in result['accounts']
+            ],
+            'contribution_warnings': contribution_warnings,
+        },
+        'cases':                cases_summary,
+        'acc_cases_count':      len(cases_summary),
+        'acc_values':           [round(c['end_value']) for c in result['cases']],
+        'distribution':         distribution,
+        'accumulation_summary': accumulation_summary,
+        'savings':              savings_summary,
+        'g2':                   g2_summary,
+        'split_sale_plan':      split_sale_plan,
+        'comprehensive_flag':   comprehensive_flag,
+        'isa_cap_info':         isa_cap_info,
+        'data_start':           data_start,
+        'synthetic_info':       synthetic_info,
+        'backfilled':           backfilled,
+        'tax_enabled':          tax_enabled,
+        # ── 인출투영(생존율)은 G5-C로 연기 ──────────────────────────────
+        'withdrawal_pending':   True,
+        'sample_results':       [],
+        'combined_summary':     None,
+        'message':              {
+            'text': "멀티계좌 인출 분석(생존율)은 추후 지원 예정입니다. "
+                    "현재는 적립단계 결과만 표시됩니다.",
+            'survival_rate': None,
+            'is_safe': None,
+        },
+    }
+
+
 def run_retirement_logic(body: dict, progress_callback=None) -> dict:
+    # 멀티계좌(accounts 2개 이상) → 적립단계 멀티경로(인출투영은 G5-C). 단일계좌 → 기존 경로.
+    if len(body.get('accounts') or []) > 1:
+        return _run_multi_account_retirement_logic(body, progress_callback)
+
     import time
     from modules.retirement.accumulation_analyzer import AccumulationAnalyzer
     from modules.retirement.retirement_planner import RetirementPlanner

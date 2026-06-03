@@ -1,5 +1,31 @@
 # Log
 
+## [2026-06-04] fix | BUG-WD-1 은퇴 인출 ~2배 과소인출 (현금흐름 버그, C3 전 발견)
+
+**발견 맥락:** C3(가구 인출 오케스트레이터) 착수 전 인출 원시함수(`WithdrawalEngine`) 검토 중 발견. 가구 오케스트레이터를 이 위에 지으면 멀티도 동일 버그 상속하므로 먼저 수정(오너 승인).
+
+**버그:** `WithdrawalEngine.process` 매도 경로 — `needed = withdrawal_amount - cash; cash = 0` 후 `needed`만큼 매도(`portfolio.sell` → proceeds를 cash에 가산)하나 **인출액을 cash에서 빼지 않고 종료.** → 매도월엔 자산→cash 이동만(실제 유출 0), 다음달 주차 cash로 충당(매도 없음) → 격월로만 실제 유출 → **유효 인출률 ≈ 50%.** 실증: 평탄가격 자산 12,000 → 월 1,000×12 인출(의도 12,000) → 종료 6,000(절반만 유출).
+
+**영향:** 단일 은퇴 생존율 **과대평가**(인출 절반만 일어나 자산 더 오래 버팀). 지금까지 모든 은퇴 인출 결과. BUG-TAX-2/3와 별개(세금 아닌 현금흐름). 단일·멀티 인출 공유 원시함수라 C3도 위험했음.
+
+**수정:** 매도 루프 후 `portfolio.cash = max(0.0, cash - outflow_from_sales)`(=매도로 충당할 인출분). CG세는 `sell_with_tax`가 별도 차감 → retiree net + 정부 세금 둘 다 정확 유출. 자산 부족 시 0 바닥(생존 실패).
+
+**검증(재현 먼저=goal-driven):** `tests/test_bug_wd1_withdrawal_outflow.py` 4종 — ① 평탄 12개월×1000=정확 12,000 ② 기존cash 우선소비 후 매도 합계정확 ③ 인플레이션 Σ월별 inflated ④ 고갈 0바닥. 수정 전 3 FAIL→수정 후 4 PASS. **전체 회귀 184 PASS**(은퇴 테스트 불변식 기반이라 절대 생존율 골든 없음 → 자동 그린). ⚠️기존 단일 은퇴 생존율 바뀜(과대→정확, 하락).
+
+**▶ 다음 = C3 가구 인출 오케스트레이터(이제 정확한 원시함수 위에).**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
+## [2026-06-04] test | gate2a stale golden 갱신 (BUG-TAX-1 배당세 반영)
+
+전체 회귀서 `test_gate2a_runner_vs_legacy` 2종 FAIL(off/on) 확인 — Phase1 골든(off 38,415,192/on 41,990,905)이 BUG-TAX-1(단일경로 배당세 차감, 업데이트31) 이후 미갱신. 실제값 off **37,365,073**(−1,050,119)/on **40,913,520**(−1,077,385). 하락분 = SPY 재투자 배당 15.4% 배당소득세. 코드 회귀 아님(carried_cost_basis default None → calculator/backtest 불변). 골든 2개 + 사유주석 갱신. gate2a 4 PASS. (74c343c)
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-03] fix | G5-C C2 연금소득세 인출 배선 (분리과세 전액 16.5%, BUG-PENSION-1 해소)
 
 **C2:** 인출 연금소득세를 하이브리드(`pension_effective_rate`→`pension_monthly_after_tax`: 1500이하 저율+초과분만 16.5%, BUG-PENSION-1) → **`pension_separate_tax_annual`**(1500 이하 나이별 3.3~5.5%, 초과 시 **전액** 16.5%, 오너결정·현행 선택분리과세)로 교체.

@@ -41,6 +41,7 @@ class WithdrawalEngine:
 
         needed = withdrawal_amount - portfolio.cash
         portfolio.cash = 0
+        outflow_from_sales = needed  # BUG-WD-1: 매도로 충당할 인출분(루프에서 needed가 차감되므로 보존)
 
         # -----------------------------
         # overweight 순으로 매도
@@ -95,5 +96,10 @@ class WithdrawalEngine:
 
             if needed <= 0:
                 break
+
+        # BUG-WD-1: 매도 proceeds를 cash에 주차만 하던 버그 수정 — 인출분을 실제 유출.
+        # (기존엔 매도월 자산→cash 이동만 일어나 ~50% 과소인출.) CG세는 sell_with_tax가
+        # 별도 차감(retiree net + 정부 세금). 자산 부족 시 0 바닥(생존 실패).
+        portfolio.cash = max(0.0, portfolio.cash - outflow_from_sales)
 
         return last_month

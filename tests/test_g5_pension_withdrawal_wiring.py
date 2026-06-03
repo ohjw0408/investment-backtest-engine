@@ -45,6 +45,16 @@ def test_c2_grossup_over_threshold_flat_165():
     assert abs(g80 - 1_500_000 / (1 - 0.165)) <= 1, "1500만 초과는 나이 무관 전액 16.5%"
 
 
+def test_c2_threshold_boundary():
+    """경계: 연 정확히 1500만 → 저율(≤). 1500만 초과 → 전액 16.5%. (추정=net×12 기준)"""
+    # net 125만×12 = 15,000,000 == 임계 → 이하 처리 → 60세 5.5%
+    g_at   = _wa(1_250_000, 60)._calc_gross_withdrawal()
+    assert abs(g_at - 1_250_000 / (1 - 0.055)) <= 1, "1500만 정확=저율(이하)이어야"
+    # net 126만×12 = 15,120,000 > 임계 → 전액 16.5%
+    g_over = _wa(1_260_000, 60)._calc_gross_withdrawal()
+    assert abs(g_over - 1_260_000 / (1 - 0.165)) <= 1, "1500만 초과=전액 16.5%여야"
+
+
 def test_c2_pension_tax_info_reflects_separate_tax():
     """pension_tax_info 표시: 1500만 초과면 전 구간 16.5%, 이하면 나이별 저율."""
     # 이하(연 1200만): 60세 구간 5.5%

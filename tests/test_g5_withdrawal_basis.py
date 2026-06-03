@@ -79,6 +79,73 @@ def test_c1_withdrawal_path_taxes_accumulation_gain():
         f"인출 매도세 미부과: carried {e_carried} >= no_basis {e_no_basis}"
 
 
+def test_c1_accumulation_loss_no_phantom_tax():
+    """경계: 적립 손실(취득가 > gross) → 미실현 손실 → 위탁 양도세 0(허위과세 없음)."""
+    e_none = _run(None,        withdrawal=0)   # 12,000,000
+    e_loss = _run(15_000_000,  withdrawal=0)   # 취득가 15M > gross 12M → 손실 → 세금0
+    assert abs(e_loss - e_none) <= 2, f"적립손실인데 과세됨: diff={e_none - e_loss}"
+
+
+def test_c1_run_wd_case_delivers_cost_basis():
+    """플러밍: 인출 워커 _run_wd_case가 config_dict['cost_basis']를 runner까지 전달.
+    (RetirementPlanner→WithdrawalAnalyzer→config_dict→_run_wd_case→runner 체인의
+    하류 절반 — 키 오타 등 전달 누락 검출.) 인출0·평탄 → 종료청산이 적립차익 과세."""
+    import modules.retirement.withdrawal_analyzer as wa_mod
+    dates = pd.bdate_range("2020-01-01", "2021-12-31")
+    df    = _flat_df(dates)
+    wa_mod._w_price_data = {KRF: df}
+    wa_mod._w_dates      = list(dates)
+    us = {"earned_income": 0, "age": 40}
+
+    def _cfg(basis):
+        return {
+            "tickers": [KRF], "initial_capital": 12_000_000, "withdrawal_amount": 0,
+            "dividend_mode": "hold", "inflation": 0.0, "tax_enabled": True,
+            "account_type": "위탁", "user_settings": us, "gain_harvesting": False,
+            "cost_basis": basis,
+        }
+    strat = {"target_weights": {KRF: 1.0}, "rebalance_frequency": None, "drift_threshold": None}
+
+    r_none = wa_mod._run_wd_case(("2020-01-01", "2021-12-31", _cfg(None),       strat, 1))
+    r_carr = wa_mod._run_wd_case(("2020-01-01", "2021-12-31", _cfg(6_000_000),  strat, 2))
+    assert r_none is not None and r_carr is not None
+    diff = r_none["tax_end_value"] - r_carr["tax_end_value"]
+    assert abs(diff - 924_000) <= 2, f"cost_basis 전달 누락? diff={diff} (기대 924,000)"
+
+
+def test_c1c2_planner_forwards_cost_basis_and_tax(monkeypatch):
+    """플러밍 상류: RetirementPlanner가 cost_basis·tax_engine·account_type을
+    WithdrawalAnalyzer에 전달(wd_config 경유). 인출 과세 배선(C1/C2) 전달 검출."""
+    import modules.retirement.retirement_planner as rp_mod
+    captured = {}
+
+    class _StubWA:
+        def __init__(self, **kw):
+            captured.update(kw)
+        def run(self):
+            return {"success_rate": 1.0,
+                    "distribution": {"end_value_ratio": {"p50": 1.0}},
+                    "cases": [{"end_value_ratio": 1.0}]}
+
+    monkeypatch.setattr(rp_mod, "WithdrawalAnalyzer", _StubWA)
+    te = TaxEngine({"age": 60})
+    planner = rp_mod.RetirementPlanner(
+        acc_result = {"distribution": {"end_value": {"values": [10_000_000] * 11}}},
+        wd_config  = {
+            "portfolio_engine": None, "tickers": [KRF], "strategy_factory": lambda: None,
+            "data_start": "2000-01-01", "data_end": "2030-01-01", "withdrawal_years": 5,
+            "dividend_mode": "hold", "step_months": 6, "tax_engine": te,
+            "account_type": "위탁", "user_settings": {}, "current_age": 60,
+            "accumulation_years": 0, "gain_harvesting": False,
+        },
+        monthly_withdrawal = 1_000_000, withdrawal_years = 5, cost_basis = 6_000_000,
+    )
+    planner._run_withdrawal_samples()
+    assert captured.get("cost_basis") == 6_000_000, "cost_basis 미전달"
+    assert captured.get("tax_engine") is te, "tax_engine 미전달(인출 과세 안 켜짐)"
+    assert captured.get("account_type") == "위탁"
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])

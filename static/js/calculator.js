@@ -1194,10 +1194,12 @@ function updateTaxAccountType(idx, type) {
   renderTaxAccounts();
 }
 
+// 금액 입력(oninput) — 입력칸 재생성하면 커서 유실(BUG-G1-2).
+// 상태만 갱신하고 금액 의존 표시(연금/IRP 한도경고)는 입력칸 안 건드리는 checkTaxLimits로만.
 function updateTaxAccountAmount(idx, field, val) {
   if (!window.taxAccounts[idx]) return;
   window.taxAccounts[idx][field] = Math.max(0, Number(val) || 0);
-  renderTaxAccounts();
+  checkTaxLimits();
 }
 
 // 분배 우선순위 — 재렌더 없이 상태만 갱신(입력 커서 유지).
@@ -1240,12 +1242,15 @@ function removeAccountTicker(idx, code) {
   renderTaxAccounts();
 }
 
+// 비중 입력(oninput) — 입력칸 재생성하면 커서 유실(BUG-G1-2).
+// 상태만 갱신하고 비중합계 경고는 입력칸 안 건드리는 전용 div만 갱신.
 function onAccountTickerWeightChange(idx, code, val) {
   const accTickers = ensureAccountTickers(idx);
   const ticker = accTickers.find(t => t.code === code);
   if (!ticker) return;
   ticker.weight = Math.max(0, Math.min(100, Number(val) || 0));
-  renderTaxAccounts();
+  const warnEl = document.getElementById(`acctWeightWarn${idx}`);
+  if (warnEl) warnEl.innerHTML = accountWeightWarnHtml(idx);
 }
 
 async function onAccountTickerSearch(idx, q) {
@@ -1278,15 +1283,21 @@ async function onAccountTickerSearch(idx, q) {
   }
 }
 
+// 비중합계 경고 HTML — oninput 시 입력칸 재생성 없이 전용 div만 갱신하려고 분리(BUG-G1-2).
+function accountWeightWarnHtml(idx) {
+  const accTickers = ensureAccountTickers(idx);
+  const total = accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0);
+  if (total > 100) return '<span style="font-size:0.72rem;color:#C62828;">비중 합계가 100%를 초과했습니다.</span>';
+  if (total < 100) return `<span style="font-size:0.72rem;color:#78909C;">나머지 ${100-total}%는 현금으로 유지됩니다.</span>`;
+  return '';
+}
+
 function renderAccountTickerList(idx) {
   const accTickers = ensureAccountTickers(idx);
   if (accTickers.length === 0) {
     return '<div style="font-size:0.76rem;color:#90A4AE;padding:8px 0;">종목을 추가하세요</div>';
   }
-  const total = accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0);
-  const warn = total > 100
-    ? '<div style="font-size:0.72rem;color:#C62828;margin-top:4px;">비중 합계가 100%를 초과했습니다.</div>'
-    : (total < 100 ? `<div style="font-size:0.72rem;color:#78909C;margin-top:4px;">나머지 ${100-total}%는 현금으로 유지됩니다.</div>` : '');
+  const warn = `<div id="acctWeightWarn${idx}" style="margin-top:4px;">${accountWeightWarnHtml(idx)}</div>`;
   return accTickers.map(t => `
     <div style="display:grid;grid-template-columns:70px 1fr 64px 24px;gap:6px;align-items:center;margin-top:6px;">
       <div style="font-weight:800;font-size:0.78rem;color:var(--text);">${t.code}</div>

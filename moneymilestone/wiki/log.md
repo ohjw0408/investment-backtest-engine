@@ -1,5 +1,21 @@
 # Log
 
+## [2026-06-03] fix | BUG-G1-2 다중계좌 입력 커서 유실 + deploy.yml divergent 복구
+
+**① deploy.yml (BUG-DEPLOY 후속):** 금 Phase 2 커밋을 amend+force-push했더니 서버 `git pull`이 divergent로 실패(`Need to specify how to reconcile divergent branches`, exit 128) → 미배포. `git pull origin main` → `git fetch` + `git reset --hard origin/main`로 교체(서버를 origin 단일진실에 강제일치, force-push/divergent에도 복구). 런타임 DB는 gitignore라 reset 무영향. **교훈: push 후 amend+force-push 금지.**
+
+**② BUG-G1-2 (중간, 미해결이던 것):** 투자계산기 다중계좌 2번째 계좌 입력 시 커서 사라짐. 원인 = `oninput` 핸들러가 매 키스트로크 `renderTaxAccounts()` 전체 재렌더 → 입력칸 재생성 → 포커스 유실. (업데이트 25는 우선순위 입력칸만 고쳤음.)
+- `updateTaxAccountAmount`(초기투자금·월적립액): 재렌더 제거, `checkTaxLimits()`만 호출(연금/IRP 한도경고는 `taxWarnings`만 갱신, 입력칸 안 건드림).
+- `onAccountTickerWeightChange`(종목 비중): 재렌더 제거, 비중합계 경고를 전용 `acctWeightWarn{idx}` div만 갱신(`accountWeightWarnHtml` 헬퍼 분리).
+- 우선순위 입력은 이미 onchange+무재렌더라 안전(기존).
+- JS 문법 OK. cache v20260603cursorfix. ⚠️ 브라우저 육안 스모크 미검증.
+
+**▶ 투자계산기 잔여 버그 해소. 다음 = 백테스트/은퇴 탭 복제(이제 커서버그 복제 안 됨).**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-03] feat | 금 ETF 상장전 2차 백필 — 현물=KRX_GOLD·선물=GC=F 갈래 라우팅 (금 Phase 2)
 
 **오너 스펙:** "금현물 말고 금선물 ETF도 같이 백필. 어차피 그게 그거." → 짚음: 현물≠선물(콘탱고/헤지 다름). 단 **우리 소스는 가격 레벨뿐**이라 콘탱고 드래그(롤오버 손실)는 안 보임 → 상장전 합성구간은 현물·선물 거의 동일, 진짜 차이는 상장후 실제가에 반영. → 둘 다 백필 OK(상장전은 근사, 모든 백필 공통한계).

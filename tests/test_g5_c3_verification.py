@@ -40,15 +40,22 @@ def _frame(dates, px):
 #    (단일 WithdrawalAnalyzer가 워커에서 쓰는 바로 그 엔진과 직접 등치)
 # ════════════════════════════════════════════════════════════════
 
-def _single_loop_end(price_data, dates, monthly, initial, weights):
+def _strategy(weights, rebal_mode, band_width=0.05):
+    freq  = None if rebal_mode in ("none", "band") else rebal_mode
+    drift = band_width if rebal_mode == "band" else None
+    return PeriodicRebalance(weights, rebalance_frequency=freq, drift_threshold=drift)
+
+
+def _single_loop_end(price_data, dates, monthly, initial, weights, rebal_mode="none"):
+    freq = None if rebal_mode in ("none", "band") else rebal_mode
     cfg = SimulationConfig(
         start_date=str(dates[0].date()), end_date=str(dates[-1].date()),
         tickers=list(weights.keys()), target_weights=weights,
         initial_capital=initial, monthly_contribution=0,
         withdrawal_amount=monthly, dividend_mode="hold",
-        rebalance_frequency=None, inflation=0.0,
+        rebalance_frequency=freq, inflation=0.0,
     )
-    strat = PeriodicRebalance(weights, rebalance_frequency=None)
+    strat = _strategy(weights, rebal_mode)
     pf = Portfolio(initial)
     loop = SimulationLoop(
         DividendEngine(), ContributionEngine(), WithdrawalEngine(),
@@ -185,22 +192,62 @@ def test_C_dividend_reinvest_increases_end_value():
     assert with_div["combined_end_value"] > no_div["combined_end_value"]
 
 
-def test_C_two_ticker_rebalance_runs():
-    """2종목 + 주기 리밸런싱 경로 작동(무에러) + 보존 방향성."""
+def test_C_two_ticker_rebalance_actually_fires():
+    """2종목 발산가격 + 분기 리밸 → 리밸 ON과 OFF 종료값이 달라짐(리밸 실제 발생 증명)."""
     dates = pd.bdate_range("2030-01-01", "2033-12-31")
     px1 = np.linspace(100.0, 220.0, len(dates))   # 상승
-    px2 = np.linspace(100.0, 90.0, len(dates))    # 완만 하락 → 드리프트 → 리밸 발생
+    px2 = np.linspace(100.0, 90.0, len(dates))    # 하락 → 비중 발산 → 리밸 매도/매수
     data = {CODE: _frame(dates, px1), CODE2: _frame(dates, px2)}
-    accts = [{"account_id": 0, "type": "위탁", "value": 10_000_000.0,
-              "target_weights": {CODE: 0.5, CODE2: 0.5}}]
 
-    # 분기 리밸런싱 전략으로 교체(시뮬레이터가 PeriodicRebalance(None) 고정이라
-    # 여기선 리밸 미발생 — 대신 2종목 가격경로·배분 동작만 검증)
-    res = simulate_household_window(accts, data, list(dates), 60_000.0)
-    assert res["success"] is True
-    assert res["combined_end_value"] > 0
-    # 2종목 합산이 단일 계좌 종료값과 일치(계좌 1개)
-    assert abs(res["per_account"][0]["end_value"] - res["combined_end_value"]) <= 1.0
+    def _acct(rebal):
+        return [{"account_id": 0, "type": "위탁", "value": 10_000_000.0,
+                 "target_weights": {CODE: 0.5, CODE2: 0.5}, "rebal_mode": rebal}]
+
+    none_ = simulate_household_window(_acct("none"), data, list(dates), 60_000.0)
+    quart = simulate_household_window(_acct("quarterly"), data, list(dates), 60_000.0)
+
+    # 리밸이 실제로 일어나면 종료값이 무리밸과 달라야 함(발산가격이라 차이 큼)
+    assert abs(none_["combined_end_value"] - quart["combined_end_value"]) > 1000.0, (
+        f"리밸 미발생 의심 — none {none_['combined_end_value']} == quarterly {quart['combined_end_value']}"
+    )
+
+
+def test_A_single_equals_multi_with_rebalancing():
+    """리밸 포함 정합: 2종목 분기 리밸 위탁 — 단일 SimulationLoop == 멀티1 ±1원."""
+    dates = pd.bdate_range("2030-01-01", "2033-12-31")
+    px1 = np.linspace(100.0, 220.0, len(dates))
+    px2 = np.linspace(100.0, 90.0, len(dates))
+    data = {CODE: _frame(dates, px1), CODE2: _frame(dates, px2)}
+    weights = {CODE: 0.5, CODE2: 0.5}
+
+    single = _single_loop_end(data, dates, 60_000.0, 10_000_000.0, weights,
+                              rebal_mode="quarterly")
+    multi = simulate_household_window(
+        [{"account_id": 0, "type": "위탁", "value": 10_000_000.0,
+          "target_weights": weights, "rebal_mode": "quarterly"}],
+        data, list(dates), 60_000.0,
+    )["combined_end_value"]
+
+    assert abs(single - multi) <= 1.0, f"리밸 정합 위반 — 단일 {single} != 멀티1 {multi}"
+
+
+def test_A_single_equals_multi_band_rebalancing():
+    """밴드 리밸(드리프트 5%) 정합: 단일 == 멀티1 ±1원."""
+    dates = pd.bdate_range("2030-01-01", "2033-12-31")
+    px1 = np.linspace(100.0, 250.0, len(dates))
+    px2 = np.full(len(dates), 100.0)
+    data = {CODE: _frame(dates, px1), CODE2: _frame(dates, px2)}
+    weights = {CODE: 0.5, CODE2: 0.5}
+
+    single = _single_loop_end(data, dates, 50_000.0, 10_000_000.0, weights,
+                              rebal_mode="band")
+    multi = simulate_household_window(
+        [{"account_id": 0, "type": "위탁", "value": 10_000_000.0,
+          "target_weights": weights, "rebal_mode": "band", "band_width": 0.05}],
+        data, list(dates), 50_000.0,
+    )["combined_end_value"]
+
+    assert abs(single - multi) <= 1.0, f"밴드 리밸 정합 위반 — 단일 {single} != 멀티1 {multi}"
 
 
 def test_C_growth_outpaces_withdrawal():

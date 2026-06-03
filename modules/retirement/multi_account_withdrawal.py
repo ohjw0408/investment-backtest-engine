@@ -52,6 +52,13 @@ def _build_account_runtime(spec, first_price_dict, tax_engine, session):
             for t in list(pf._avg_costs.keys()):
                 pf._avg_costs[t] *= scale
 
+    # 계좌별 리밸런싱 전략 — 적립(multi_account_common/MultiAccountAnalyzer)과 동일 로직.
+    # none→무리밸, band→드리프트 임계, 그 외(monthly/quarterly/yearly)→주기.
+    rebal_mode = spec.get("rebal_mode", "none")
+    band_width = float(spec.get("band_width", 0.05))
+    rebalance_frequency = None if rebal_mode in ("none", "band") else rebal_mode
+    drift_threshold = band_width if rebal_mode == "band" else None
+
     return {
         "account_id":     spec["account_id"],
         "type":           atype,
@@ -59,7 +66,10 @@ def _build_account_runtime(spec, first_price_dict, tax_engine, session):
         "executor":       executor,
         "div_engine":     div_engine,
         "allocator":      allocator,
-        "strategy":       PeriodicRebalance(weights, rebalance_frequency=None),
+        "strategy":       PeriodicRebalance(
+            weights, rebalance_frequency=rebalance_frequency,
+            drift_threshold=drift_threshold,
+        ),
         "target_weights": weights,
     }
 
@@ -332,6 +342,8 @@ def analyze_household_samples(
                 "value":          value,
                 "cost_basis":     spec.get("cost_basis"),
                 "target_weights": spec["target_weights"],
+                "rebal_mode":     spec.get("rebal_mode", "none"),
+                "band_width":     spec.get("band_width", 0.05),
             })
         wd = analyze_household_withdrawal(
             accounts, price_data, all_dates, data_start, data_end,

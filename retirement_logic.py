@@ -345,6 +345,8 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
                 'cost_basis':     (account['initial_capital']
                                    + account['monthly_contribution'] * 12 * years)
                                   if tax_enabled else None,
+                'rebal_mode':     account.get('rebal_mode', 'none'),
+                'band_width':     float(account.get('band_width', 0.05)),
             })
         wd_price_data, wd_dates = portfolio_engine.price_loader.load(
             all_tickers, data_start, data_end,

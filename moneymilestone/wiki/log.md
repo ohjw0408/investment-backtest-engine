@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-04] fix | G5-C C3 리밸런싱 한계 해소 — 인출 시뮬에 rebal_mode 배선
+
+강검증 후 남긴 잔여 한계(리밸 미배선) 해소. 인출 시뮬레이터 `_build_account_runtime`이 `PeriodicRebalance(None)` 고정이라 인출 페이즈 리밸런싱 미발생 → 다종목+리밸모드 계좌가 단일 경로와 divergence. **수정:** 적립(multi_account_common/MultiAccountAnalyzer)과 동일 로직으로 계좌별 `rebal_mode`/`band_width`→전략(none/band/주기) 빌드. `analyze_household_samples`·`_run_multi_account_retirement_logic` account_specs에 rebal_mode/band_width 전파.
+
+**검증 빡세게:** `test_g5_c3_verification` 9종(+2)으로 보강 — **리밸 실발생 증명**(2종목 발산가격, none vs quarterly 종료값 상이) + **리밸 포함 정합**(분기·밴드 단일 SimulationLoop == 멀티1 `simulate_household_window` **±1원 정확**). 단일종목·무리밸 경로 불변(default none). **전체 회귀 212 PASS.**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-04] test | G5-C C3 강검증 — 정합 앵커·분수 생존율·실데이터 + off-by-one 수정
 
 C3 검증이 평탄가격·단일종목·무배당에 치우친 구멍 지적받아 빡세게 보강. `test_g5_c3_verification` 7종 신규:

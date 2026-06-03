@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-04] deploy | G5-C C3 전체 푸시 (8ea885a..4a4f90c, 10커밋)
+
+세션 전체 작업 origin/main 푸시 — `8ea885a..4a4f90c`(clean fast-forward, force-push 아님 → divergent 위험 없음). deploy.yml Hetzner 자동배포 트리거됨. 커밋: gate2a golden·BUG-WD-1·C3.1~3.3·강검증+off-by-one·리밸·합성보충·BUG-CALC-40Y기록·status45.
+
+**검증 한계(정직):** 이 환경에 `gh` 없어 GitHub Action 결과 직접 확인 못 함. 서버(178.105.84.213) HTTP 응답함(nginx 살아있음, 0.47s)이나 라우트 구조 불명으로 앱레벨 배포 성공은 미확인. 변경이 **엔진+테스트(신규 엔드포인트·UI 없음)**라 기능 검증 대상은 없음. ▶ 오너가 GitHub Actions 배포 성공 + 앱 정상 확인 권장.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-04] feat | G5-C C3 합성 보충 — 실윈도우 부족 시 GBM 패딩 (마지막 한계 해소) + BUG-CALC-40Y 기록
 
 **합성 보충(잔여 한계 #2 해소):** `analyze_household_withdrawal`이 실윈도우만 쓰던 것 → 단일 WithdrawalAnalyzer처럼 실윈도우 < `MIN_CASES_WD(30)`이면 GBM(Student-t df=5) 합성 윈도우로 패딩. **구현:** 티커별 실종가→월(mu,sigma)(`_ticker_return_stats`, 단일 `_get_return_stats` 동형, 폴백 7%/15%) → 티커별 독립 합성 가격경로 생성 → `_synthetic_household_window`이 그 경로로 `simulate_household_window` 재사용(드레인 순서·연금세·취득가·리밸 전부 보존). 결과에 `n_real`/`n_synthetic` surface. 종목간 상관은 독립 근사(단일도 미모델링). 검증 `test_g5_c3_verification` D 2종(짧은 히스토리→30 패딩·긴 히스토리→패딩0). 기존 롤링 결정론 3종은 step 12→3(실윈도우≥30)으로 패딩 회피 유지.

@@ -30,6 +30,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import modules.data_preparation as data_preparation
 import retirement_logic
 from modules.retirement.multi_account_analyzer import MultiAccountAnalyzer
+from modules.simulation.multi_account_loop import MultiAccountSimulationLoop
+from modules.simulation.taxable_runner import TaxableSimulationRunner
+from modules.config.simulation_config import SimulationConfig
+from modules.rebalance.periodic import PeriodicRebalance
+from modules.tax.base_tax import TaxEngine
 
 KRF = "458730"  # KR_FOREIGN
 KRD = "069500"  # KR_DOMESTIC
@@ -239,6 +244,80 @@ def test_l11_dispatch_routes_by_account_count(monkeypatch):
     except Exception:
         pass
     assert called["multi"] == 1, "1계좌인데 멀티경로 진입함"
+
+
+def _ramp_frame(dates, lo=100.0, hi=200.0):
+    px = np.linspace(lo, hi, len(dates))
+    return pd.DataFrame(
+        {"open": px, "high": px, "low": px, "close": px,
+         "volume": 1.0, "dividend": 0.0, "split": 1.0},
+        index=dates,
+    )
+
+
+def test_l11_loop_equals_runner_both_flags():
+    """직접 앵커(#4): MultiAccountSimulationLoop(1계좌) == TaxableSimulationRunner ±1원,
+    apply_final_liquidation True·False 양쪽. 무청산 플래그가 청산만 게이트함도 확인
+    (False=gross > True=청산세 차감). 롤링/래퍼 우회, 순수 엔진 등치."""
+    dates = pd.bdate_range("2018-01-01", "2021-12-31")
+    px    = _ramp_frame(dates)  # 100→200 단조상승 → 위탁 청산 시 미실현차익 존재
+    pdata = {KRF: px}
+    cfg = SimulationConfig(
+        start_date="2018-01-01", end_date="2021-12-31", tickers=[KRF],
+        target_weights={KRF: 1.0}, initial_capital=10_000_000.0,
+        monthly_contribution=0.0, withdrawal_amount=0, dividend_mode="hold",
+        rebalance_frequency=None, inflation=0.0,
+    )
+    us = {"earned_income": 0, "age": 40}
+
+    def _runner(flag):
+        return TaxableSimulationRunner().run(
+            cfg, {KRF: px}, list(dates),
+            PeriodicRebalance({KRF: 1.0}, rebalance_frequency=None),
+            tax_enabled=True, account_type="위탁",
+            tax_engine=TaxEngine(us), user_settings=us,
+            apply_final_liquidation=flag,
+        ).end_value
+
+    def _loop(flag):
+        acct = {"type": "위탁", "config": cfg,
+                "strategy": PeriodicRebalance({KRF: 1.0}, rebalance_frequency=None)}
+        return MultiAccountSimulationLoop(transfers_enabled=False).run(
+            accounts=[acct], price_data={KRF: px}, dates=list(dates),
+            tax_enabled=True, user_settings=us, apply_final_liquidation=flag,
+        ).combined_end_value
+
+    # 직접 등치 — 두 플래그 모두 ±1원
+    assert abs(_loop(False) - _runner(False)) <= 1, "무청산 loop != runner"
+    assert abs(_loop(True)  - _runner(True))  <= 1, "청산 loop != runner"
+    # 플래그가 청산을 실제로 게이트: False(gross) > True(청산세 차감)
+    assert _loop(False) > _loop(True) + 1, "무청산이 청산보다 안 큼(청산세 미부과?)"
+    # 폐형식(#5): 거치·단일종목·무청산 → 종료값 = 초기 × (가격끝/가격시작) = 10M×200/100 = 20M.
+    assert abs(_runner(False) - 20_000_000) <= 2, f"성장 폐형식 위반 {_runner(False)}"
+
+
+def test_l11_isa_cap_stops_contributions():
+    """경계(#5): ISA 총 1억 한도 — 납입 지속하다 1억 도달 시 중단. 평탄가격 →
+    종료값 = 1억(초과 납입 안 들어감). isa_cap_info 노출."""
+    dates = pd.bdate_range(EFF_START, DATA_END)
+    fmap  = {KRF: _flat_frame(dates)}
+    # ISA 초기0·월 500만·3년(36개월) → 계획 1.8억 > 1억 → 20개월서 중단.
+    body = {
+        "accounts": [{
+            "type": "ISA", "initial_capital": 0, "monthly_contribution": 5_000_000,
+            "tickers": [{"code": KRF, "weight": 1.0}], "rebal_mode": "none",
+            "dividend_mode": "hold",
+        }],
+        "accumulation_years": 3, "tax_enabled": False, "user_settings": {},
+        "dividend_mode": "hold",
+    }
+    with _patched(fmap):
+        res = retirement_logic._run_multi_account_retirement_logic(body)
+    assert res["isa_cap_info"] and res["isa_cap_info"].get("capped"), "ISA 캡 미노출"
+    assert res["isa_cap_info"]["stop_months"] == 20, res["isa_cap_info"]["stop_months"]
+    # 평탄가격 → 수익0 → 종료값 = 납입한도 1억 (초과분 미납입)
+    for c in res["cases"]:
+        assert abs(c["end_value"] - 100_000_000) <= 1, f"ISA 캡 후 종료값 {c['end_value']}"
 
 
 if __name__ == "__main__":

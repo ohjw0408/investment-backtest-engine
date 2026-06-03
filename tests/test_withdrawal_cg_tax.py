@@ -103,6 +103,63 @@ def test_withdrawal_kr_domestic_exempt():
     assert _run("위탁", KR_DOMESTIC_CODE, jump=200.0) == 0.0
 
 
+# ── sell_with_tax 정확값 단위 검증 (±1원 손계산) ───────────────────────
+# 위 통합 테스트는 "세금이 붙는지"(방향성)만 본다. 아래는 "금액이 정확한지"를
+# 손계산 기댓값으로 검증 — 세율·공제가 틀리면 잡힌다.
+
+def _exec(account_type: str, session=None) -> TaxedOrderExecutor:
+    te = TaxEngine({"earned_income": 0, "age": 40})
+    return TaxedOrderExecutor(te, account_type, session=session or TaxSessionState())
+
+
+def test_sell_with_tax_kr_foreign_exact():
+    """KR_FOREIGN 실현차익 10,000 × 15.4% = 1,540원 (±1원). 현금=대금−세금."""
+    ex = _exec("위탁")
+    p  = TaxTrackedPortfolio(1_000_000)
+    p.buy(KR_FOREIGN_CODE, 100, 100.0)   # avg_cost 100, cash 990,000
+    cash_before = p.cash
+    ex.sell_with_tax(p, KR_FOREIGN_CODE, 100, 200.0)  # 차익 (200-100)*100 = 10,000
+    assert abs(ex.total_cg_tax_paid - 1_540.0) < 1.0
+    # 매도대금 20,000 입금 − 양도세 1,540 차감
+    assert abs(p.cash - (cash_before + 20_000 - 1_540)) < 1.0
+
+
+def test_sell_with_tax_us_direct_exact_after_exemption():
+    """US_DIRECT 차익 3,000,000 − 250만 공제 = 50만 × 22% = 110,000원 (±1원)."""
+    ex = _exec("위탁")
+    p  = TaxTrackedPortfolio(10_000_000)
+    p.buy(US_DIRECT_CODE, 100, 100.0)
+    ex.sell_with_tax(p, US_DIRECT_CODE, 100, 30_100.0)  # 차익 (30100-100)*100 = 3,000,000
+    assert abs(ex.total_cg_tax_paid - 110_000.0) < 1.0
+
+
+def test_sell_with_tax_us_direct_within_exemption_zero():
+    """US_DIRECT 차익 2,000,000 < 250만 공제 → 세금 0 (±1원)."""
+    ex = _exec("위탁")
+    p  = TaxTrackedPortfolio(10_000_000)
+    p.buy(US_DIRECT_CODE, 100, 100.0)
+    ex.sell_with_tax(p, US_DIRECT_CODE, 100, 20_100.0)  # 차익 2,000,000
+    assert ex.total_cg_tax_paid == 0.0
+
+
+def test_sell_with_tax_kr_domestic_exempt():
+    """KR_DOMESTIC(국내주식형) 양도 비과세 → 차익 커도 세금 0."""
+    ex = _exec("위탁")
+    p  = TaxTrackedPortfolio(1_000_000)
+    p.buy(KR_DOMESTIC_CODE, 100, 100.0)
+    ex.sell_with_tax(p, KR_DOMESTIC_CODE, 100, 200.0)
+    assert ex.total_cg_tax_paid == 0.0
+
+
+def test_sell_with_tax_isa_deferred():
+    """ISA 과세이연 → 매도차익에 CG세 없음."""
+    ex = _exec("ISA")
+    p  = TaxTrackedPortfolio(1_000_000)
+    p.buy(KR_FOREIGN_CODE, 100, 100.0)
+    ex.sell_with_tax(p, KR_FOREIGN_CODE, 100, 200.0)
+    assert ex.total_cg_tax_paid == 0.0
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])

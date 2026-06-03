@@ -284,3 +284,100 @@ def analyze_household_withdrawal(
         "per_account":        per_account_dist,
         "median_pension_tax": round(float(np.median(pension_taxes)), 2),
     }
+
+
+# 적립 분포 샘플링 percentile (단일 RetirementPlanner와 동일).
+SAMPLE_PERCENTILES = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95]
+
+
+def analyze_household_samples(
+    account_specs,
+    per_account_values,
+    price_data: dict,
+    all_dates,
+    data_start,
+    data_end,
+    withdrawal_years: int,
+    monthly_withdrawal: float,
+    *,
+    tax_engine=None,
+    withdrawal_start_age: int = 65,
+    inflation: float = 0.0,
+    dividend_mode: str = "reinvest",
+    step_months: int = 3,
+    target_percentile: float = 0.90,
+) -> dict:
+    """적립 분포를 11개 percentile 샘플링 → 각 가구 인출 롤링 → 합성 생존율.
+
+    단일 RetirementPlanner의 멀티 대응. 오너결정: 멀티 인출 시작값 = 계좌별 분포의
+    동일 분위 p값 합(`per_account_values[k]`의 p-percentile).
+
+    account_specs: [{account_id, type, target_weights, cost_basis(opt)}] (value 제외)
+    per_account_values: [[적립 end_value per case], ...] account_specs와 동일 순서.
+    반환: {sample_results, combined_summary, message}.
+    """
+    sample_results = []
+    for pct in SAMPLE_PERCENTILES:
+        accounts = []
+        initial_capital = 0.0
+        for k, spec in enumerate(account_specs):
+            value = float(np.percentile(per_account_values[k], pct))
+            initial_capital += value
+            accounts.append({
+                "account_id":     spec["account_id"],
+                "type":           spec["type"],
+                "value":          value,
+                "cost_basis":     spec.get("cost_basis"),
+                "target_weights": spec["target_weights"],
+            })
+        wd = analyze_household_withdrawal(
+            accounts, price_data, all_dates, data_start, data_end,
+            withdrawal_years, monthly_withdrawal,
+            tax_engine=tax_engine, withdrawal_start_age=withdrawal_start_age,
+            inflation=inflation, dividend_mode=dividend_mode, step_months=step_months,
+        )
+        sample_results.append({
+            "percentile":      pct,
+            "initial_capital": round(initial_capital),
+            "success_rate":    wd["survival_rate"],
+            "end_value_p50":   wd["combined_end_value"]["p50"],
+            "n_windows":       wd["n_windows"],
+        })
+
+    success_rates = np.array([r["success_rate"] for r in sample_results])
+    end_values    = np.array([r["end_value_p50"] for r in sample_results])
+    survival_rate = float(np.mean(success_rates))
+    target_end_value = float(np.percentile(end_values, (1 - target_percentile) * 100))
+
+    combined_summary = {
+        "survival_rate":     round(survival_rate, 4),
+        "target_percentile": target_percentile,
+        "target_end_value":  round(target_end_value),
+        "total_withdrawal":  round(monthly_withdrawal * withdrawal_years * 12),
+        "combined_end_value": {
+            "mean": round(float(np.mean(end_values))),
+            "std":  round(float(np.std(end_values))),
+            "p10":  round(float(np.percentile(end_values, 10))),
+            "p25":  round(float(np.percentile(end_values, 25))),
+            "p50":  round(float(np.percentile(end_values, 50))),
+            "p75":  round(float(np.percentile(end_values, 75))),
+            "p90":  round(float(np.percentile(end_values, 90))),
+        },
+        "sample_success_rates":    success_rates.tolist(),
+        "sample_initial_capitals": [r["initial_capital"] for r in sample_results],
+        "n_samples":               len(sample_results),
+    }
+    is_safe = survival_rate >= target_percentile
+    return {
+        "sample_results":   sample_results,
+        "combined_summary": combined_summary,
+        "message": {
+            "survival_rate": round(survival_rate, 4),
+            "is_safe":       is_safe,
+            "text":          (
+                f"{int(target_percentile * 100)}% 신뢰도 기준 "
+                + ("인출 가능" if is_safe else "인출액 조정 권장")
+                + f" (생존율 {survival_rate:.1%})"
+            ),
+        },
+    }

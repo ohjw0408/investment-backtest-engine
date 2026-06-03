@@ -317,6 +317,48 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
                 other_financial_income = recurring_financial_income(_fin_years),
             )
 
+    # ── G5-C C3: 가구 인출 분석 (생존율) ──────────────────────────────
+    # 적립 분포 11분위 샘플 → 계좌별 동일분위 시작값 → 가구 디큐뮬레이션 롤링 → 합성 생존율.
+    from modules.retirement.multi_account_withdrawal import analyze_household_samples
+    monthly_withdrawal   = float(body.get('monthly_withdrawal', 0) or 0)
+    withdrawal_years     = int(body.get('withdrawal_years', 0) or 0)
+    wd_inflation         = float(body.get('inflation', 0.02))
+    target_percentile    = float(body.get('target_percentile', 0.90))
+    withdrawal_start_age = int(user_settings.get('age', 40)) + years
+
+    wd_report = None
+    if monthly_withdrawal > 0 and withdrawal_years > 0 and result['cases']:
+        per_account_values = []
+        account_specs = []
+        for idx, account in enumerate(accounts):
+            vals = []
+            for c in result['cases']:
+                for a in c.get('accounts', []):
+                    if a['account_id'] == idx:
+                        vals.append(a['end_value'])
+                        break
+            per_account_values.append(vals or [0.0])
+            account_specs.append({
+                'account_id':     idx,
+                'type':           account['type'],
+                'target_weights': {t['code']: t['weight'] for t in account['tickers']},
+                'cost_basis':     (account['initial_capital']
+                                   + account['monthly_contribution'] * 12 * years)
+                                  if tax_enabled else None,
+            })
+        wd_price_data, wd_dates = portfolio_engine.price_loader.load(
+            all_tickers, data_start, data_end,
+        )
+        wd_report = analyze_household_samples(
+            account_specs, per_account_values,
+            wd_price_data, wd_dates, data_start, data_end,
+            withdrawal_years, monthly_withdrawal,
+            tax_engine=tax_engine if tax_enabled else None,
+            withdrawal_start_age=withdrawal_start_age,
+            inflation=wd_inflation, dividend_mode=dividend_mode,
+            step_months=6, target_percentile=target_percentile,
+        )
+
     return {
         'multi_account': {
             'enabled': True,
@@ -344,13 +386,12 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
         'synthetic_info':       synthetic_info,
         'backfilled':           backfilled,
         'tax_enabled':          tax_enabled,
-        # ── 인출투영(생존율)은 G5-C로 연기 ──────────────────────────────
-        'withdrawal_pending':   True,
-        'sample_results':       [],
-        'combined_summary':     None,
-        'message':              {
-            'text': "멀티계좌 인출 분석(생존율)은 추후 지원 예정입니다. "
-                    "현재는 적립단계 결과만 표시됩니다.",
+        # ── G5-C C3: 가구 인출 분석 (생존율) ────────────────────────────
+        'withdrawal_pending':   wd_report is None,
+        'sample_results':       wd_report['sample_results'] if wd_report else [],
+        'combined_summary':     wd_report['combined_summary'] if wd_report else None,
+        'message':              wd_report['message'] if wd_report else {
+            'text': "월 인출액·인출 기간을 입력하면 가구 인출 생존율을 분석합니다.",
             'survival_rate': None,
             'is_safe': None,
         },

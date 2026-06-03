@@ -1,5 +1,23 @@
 # Log
 
+## [2026-06-04] feat | G5-C C3 은퇴 인출 멀티계좌 — 가구 디큐뮬레이션 오케스트레이터 (생존율 완성)
+
+멀티계좌 은퇴 인출(`withdrawal_pending` 스텁) 해소. 단일 RetirementPlanner→WithdrawalAnalyzer 흐름의 멀티 대응 신규 구축. 3 단계, 각 단계 손계산/결정론 검증 후 진행.
+
+**C3.1 가구 인출 오케스트레이터** (`modules/retirement/household_withdrawal.py`): 월 가구 net 인출액을 **위탁→ISA→연금/IRP** 순 소진(오너 Q2). 위탁/ISA=net 인출(CG세 sell_with_tax 별도, BUG-TAX-2), 연금/IRP=gross-up(개인 합산 1500만 판정 `pension_separate_tax_annual`, 오너 Q3). 단일 WithdrawalEngine 매도 재사용 → 단일==멀티1계좌 정합. 검증 `test_g5_household_withdrawal` 6종(소진순서·연금 4.4%/16.5%·합산판정 15.6M→둘다16.5%·위탁CG 77원·고갈 불변식).
+
+**C3.2 멀티 디큐뮬레이션** (`modules/retirement/multi_account_withdrawal.py`): `simulate_household_window`(N계좌 합동 1윈도우, 계좌별 배당·리밸 독립 + 가구인출 결합, 취득가 인계=C1 원리) + `analyze_household_withdrawal`(실가격 롤링→**합산 생존율**, 합산자산이 월인출 못대는 첫시점=실패=오너 Q4). 검증 윈도우 5종(생존9.6M·소진순서 위탁0→연금2.8M·고갈실패·연금세 생존하락·보존불변식)+롤링 3종(생존율1.0/0.0·분포·계좌별 surface). **C4(합산 생존율) 흡수.**
+
+**C3.3 배선** (`analyze_household_samples` + `retirement_logic._run_multi_account_retirement_logic`): 적립 분포 11분위 샘플(계좌별 동일분위 시작값=오너결정) → 각 가구 인출 롤링 → 합성 생존율. `withdrawal_pending`/`sample_results`/`combined_summary` 실제 surface(단일 RetirementPlanner 형식 미러). 검증 `test_g5_retirement_withdrawal`(L12) 5종(생존 end-to-end·고갈·구조불변식·무입력 pending유지·연금세 생존≤OFF).
+
+**전체 회귀 203 PASS.** ⚠️ UI 미배선(엔진 우선, 오너결정 — retirement.js 생존율 패널은 별도). ⚠️ 멀티 인출 롤링은 in-process 순차(합성보충 없음, 실윈도우만) — 실데이터 성능은 추후. ⚠️ BUG-WD-1(인출 2배 과소) 선수정으로 단일 은퇴 생존율도 정확해짐.
+
+**▶ G5-C 엔진 핵심 완료(C1 위탁인출세·C2 연금세·C3 가구오케스트레이터·C4 합산생존). 다음 = UI 배선(retirement.js) OR L7 실데이터 통합.**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-04] fix | BUG-WD-1 은퇴 인출 ~2배 과소인출 (현금흐름 버그, C3 전 발견)
 
 **발견 맥락:** C3(가구 인출 오케스트레이터) 착수 전 인출 원시함수(`WithdrawalEngine`) 검토 중 발견. 가구 오케스트레이터를 이 위에 지으면 멀티도 동일 버그 상속하므로 먼저 수정(오너 승인).

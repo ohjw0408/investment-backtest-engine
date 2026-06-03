@@ -128,6 +128,9 @@ def simulate_household_window(
                 _build_account_runtime(s, price_dict, tax_engine, session)
                 for s in accounts
             ]
+            # 단일 SimulationLoop과 정합: 첫 달은 인출 스킵(last_withdrawal_month를
+            # 시작월로 초기화하는 단일 엔진과 동일 — 은퇴 시작 첫 달 무인출).
+            last_wd_month = current_month
 
         # 계좌별 배당
         for rt in runtimes:

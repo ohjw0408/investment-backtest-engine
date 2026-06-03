@@ -40,8 +40,8 @@ def test_single_brokerage_survives_flat():
 
     assert res["success"] is True
     assert res["fail_month"] is None
-    # 24개월 × 100,000 = 2,400,000 인출 → 12M - 2.4M = 9.6M
-    assert abs(res["combined_end_value"] - 9_600_000.0) <= 1.0
+    # 첫 달 인출 스킵(단일 엔진 정합) → 23개월 × 100,000 = 2,300,000 → 12M - 2.3M = 9.7M
+    assert abs(res["combined_end_value"] - 9_700_000.0) <= 1.0
 
 
 # ── 2. 소진 순서: 위탁 먼저 고갈 → 연금 충당 (무세금 선형) ──────────
@@ -50,12 +50,12 @@ def test_drain_order_brokerage_then_pension():
     accts = [_acct(0, "위탁", 5_000_000), _acct(1, "연금저축", 5_000_000)]
     res = simulate_household_window(accts, pd_data, dates, 300_000.0)
 
-    # 총 인출 300k×24 = 7.2M. 위탁 5M 소진 후 연금 2.2M → 연금 잔 2.8M
+    # 첫 달 스킵 → 23개월 × 300k = 6.9M. 위탁 5M 소진 후 연금 1.9M → 연금 잔 3.1M
     assert res["success"] is True
-    assert abs(res["combined_end_value"] - 2_800_000.0) <= 1.0
+    assert abs(res["combined_end_value"] - 3_100_000.0) <= 1.0
     by_id = {p["account_id"]: p["end_value"] for p in res["per_account"]}
     assert abs(by_id[0] - 0.0) <= 1.0        # 위탁 고갈
-    assert abs(by_id[1] - 2_800_000.0) <= 1.0  # 연금 잔여
+    assert abs(by_id[1] - 3_100_000.0) <= 1.0  # 연금 잔여
 
 
 # ── 3. 고갈 실패: 인출 > 합산 자산 → success False, fail_month ──────
@@ -99,7 +99,7 @@ def test_invariant_conservation_no_tax():
     accts = [_acct(0, "위탁", 5_000_000), _acct(1, "ISA", 3_000_000)]
     res = simulate_household_window(accts, pd_data, dates, 150_000.0)
 
-    withdrawn = 150_000.0 * 24  # 3.6M
+    withdrawn = 150_000.0 * 23  # 첫 달 스킵 → 23개월 = 3.45M
     assert abs((start_total - res["combined_end_value"]) - withdrawn) <= 1.0
 
 

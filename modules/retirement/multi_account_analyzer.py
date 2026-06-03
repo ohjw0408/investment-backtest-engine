@@ -183,6 +183,7 @@ class MultiAccountAnalyzer:
         distribution_policy=None,
         manual_comprehensive_years=None,
         reinvest_tax_credit: bool = False,
+        apply_final_liquidation: bool = True,
     ):
         self.portfolio_engine = portfolio_engine
         self.accounts = accounts
@@ -201,6 +202,8 @@ class MultiAccountAnalyzer:
         self.distribution_policy = distribution_policy
         self.manual_comprehensive_years = set(manual_comprehensive_years or ())
         self.reinvest_tax_credit = bool(reinvest_tax_credit)
+        # 투자계산기=True(끝에 일괄청산). 은퇴 적립=False(무청산 인계).
+        self.apply_final_liquidation = bool(apply_final_liquidation)
         self._synth_params: dict = {}
 
     def run(self) -> dict:
@@ -363,6 +366,7 @@ class MultiAccountAnalyzer:
                 distribution_policy=self.distribution_policy,
                 manual_comprehensive_years=self.manual_comprehensive_years,
                 reinvest_tax_credit=self.reinvest_tax_credit,
+                apply_final_liquidation=self.apply_final_liquidation,
             )
 
             history_df = run_result.combined_history_df

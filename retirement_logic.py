@@ -231,6 +231,7 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
         distribution_policy        = distribution_policy,
         manual_comprehensive_years = manual_comprehensive_years,
         reinvest_tax_credit        = reinvest_tax_credit,
+        apply_final_liquidation    = False,  # 은퇴: 절대 일괄청산 금지 → 무청산 인계(인출단계서 과세).
     )
     result = analyzer.run()
     distribution = result['combined']['distribution']
@@ -512,6 +513,7 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
         use_synthetic           = use_synthetic,
         synthetic_params        = synthetic_info if use_synthetic else {},
         contribution_end_months = _isa_cap_info['stop_months'] if _isa_cap_info else None,
+        apply_final_liquidation = False,  # 은퇴: 절대 일괄청산 금지 → 무청산 인계(인출단계서 과세).
     )
     acc_result = acc_analyzer.run()
 

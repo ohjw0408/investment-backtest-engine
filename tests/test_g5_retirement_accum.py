@@ -129,6 +129,7 @@ def _run_direct_engine(accounts, years, tax_enabled, user_settings, provider):
         accumulation_years=years, dividend_mode="hold", step_months=3,
         tax_enabled=tax_enabled, user_settings=user_settings,
         price_provider=provider, div_start=None,
+        apply_final_liquidation=False,  # 은퇴 = 무청산 인계 (래퍼와 동일)
     )
     return analyzer.run()
 
@@ -175,8 +176,9 @@ def test_l11_flat_price_no_growth_and_combined_sum():
     assert abs(res["distribution"]["end_value"]["p50"] - 8_000_000) <= 1
 
 
-def test_l11_tax_reduces_end_value():
-    """세금 ON/OFF: 계단가격 위탁 청산세 → ON 종료값 < OFF (적립기 위탁 양도세 효과)."""
+def test_l11_no_final_liquidation_gross_handoff():
+    """은퇴 = 절대 일괄청산 금지. 거치 위탁(배당0·리밸none) → 적립기 세금이벤트 0 →
+    무청산이므로 세금 ON 적립 종료값 == 세금 OFF (gross 인계, 청산세 미부과)."""
     dates = pd.bdate_range(EFF_START, DATA_END)
     fmap  = {KRF: _step_frame(dates)}
     base  = {
@@ -188,7 +190,12 @@ def test_l11_tax_reduces_end_value():
             {**base, "tax_enabled": False, "user_settings": {}})
         on = retirement_logic._run_multi_account_retirement_logic(
             {**base, "tax_enabled": True, "user_settings": {"earned_income": 0, "age": 40}})
-    assert on["distribution"]["end_value"]["p50"] < off["distribution"]["end_value"]["p50"]
+    # 무청산 → 위탁 상승분(100→200) 미실현차익에 청산세 안 떼임 → ON == OFF (gross).
+    on_vals  = on["distribution"]["end_value"]["values"]
+    off_vals = off["distribution"]["end_value"]["values"]
+    assert len(on_vals) == len(off_vals) and len(on_vals) > 0
+    for o, f in zip(on_vals, off_vals):
+        assert abs(o - f) <= 1, f"무청산 위반 — 세금ON {o} != OFF {f} (적립끝 청산세 부과됨)"
 
 
 def test_l11_withdrawal_deferred():

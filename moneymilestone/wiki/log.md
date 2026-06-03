@@ -1,5 +1,23 @@
 # Log
 
+## [2026-06-03] fix | BUG-TAX-3 은퇴 이중과세 — 적립 무청산 인계 (apply_final_liquidation 플래그)
+
+**오너 지적:** "투자계산기는 단일·멀티 일괄청산 맞음. 근데 은퇴 계산기는 절대 일괄청산 금지." — 정당. 코드추적 결과 기존 버그 확인.
+
+**BUG-TAX-3:** `TaxableSimulationRunner`·`MultiAccountSimulationLoop`이 `tax_enabled`면 시뮬 끝에 무조건 `apply_liquidation_tax`(연금/IRP→`after_tax_withdrawal` 5.5% 전액·위탁→미실현차익 15.4/22% 일괄청산). 독립 투자계산기엔 맞다(스냅샷). 근데 은퇴는 `AccumulationAnalyzer` 적립종료값 → `RetirementPlanner`(11분위 샘플) → `WithdrawalAnalyzer` 인출. 적립종료값이 **이미 세후**라 인출단계서 또 과세 → **연금=명백한 이중과세**(적립끝 5.5% + 인출 gross-up 또 5.5%), 위탁=비현실적 전액 일괄청산 후 인출기 재과세.
+
+**수정(오너결정 b: 단일+멀티 전부):** `apply_final_liquidation` 플래그 신설 — `TaxableSimulationRunner.run`·`MultiAccountSimulationLoop.run`·`AccumulationAnalyzer`·`MultiAccountAnalyzer`에 통과(기본 True=투자계산기·백테 불변). False면 최종 `apply_liquidation_tax` 스킵→gross 반환, 적립기 중간세(배당·리밸)는 유지. **은퇴 적립 전 경로 False:** `retirement_logic.run_retirement_logic`(단일)+`_run_multi_account_retirement_logic`(멀티)+`app.py:retirement_run`(병렬 sync 구현).
+
+**검증:** L11 `test_l11_no_final_liquidation_gross_handoff` 추가(거치 위탁 배당0·리밸none → 적립 세금이벤트 0 → 무청산이므로 tax ON 종료값 == OFF, 청산세 미부과 증명). 기존 골든도 `apply_final_liquidation=False`로 갱신. **L11 5종 PASS.** **calculator/backtest 회귀 91 PASS(default True 불변):** G5-A·TrackG·L-save·withdrawal-cg·gate2b·pension. test_retirement_simulation은 pytest 형식 아님(스크립트 smoke, "no tests ran").
+
+⚠️ **위탁 적립차익 과세 누락 잔존:** 인계가 스칼라(`initial_capital` 숫자 1개)라 인출 시뮬이 그 값을 새 취득가로 시작 → 적립기 미실현차익이 인출까지 과세 안 됨. **정확한 위탁 인출 양도세 = 계좌별 포지션+취득가 인계 필요 = G5-C 핵심**(스칼라→포지션 인계 교체). 연금은 gross 인계로 정확(인출 시 연금세가 전액 기준).
+
+**▶ 다음 = G5-C:** 취득가 포지션 인계 + 가구 인출 오케스트레이터(위탁→ISA→연금 세금최적) + 연금소득세 + 합산 생존율.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-03] feat | G5-B 은퇴 적립단계 멀티계좌 (엔진 + L11)
 
 **오너 지시:** "엔진 전부 다 한 다음에 UI." → G5-A UI 건너뛰고 엔진 순서로 G5-B 착수. "적립은 투자계산기랑 거의 같은 엔진" — 맞음, `MultiAccountAnalyzer` 그대로 공유.

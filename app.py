@@ -1054,6 +1054,7 @@ def retirement_run():
             account_type         = account_type,
             isa_renewal          = isa_renewal,
             gain_harvesting      = gain_harvesting,
+            apply_final_liquidation = False,  # 은퇴: 절대 일괄청산 금지 → 무청산 인계(인출단계서 과세).
         )
         acc_result = acc_analyzer.run()
 

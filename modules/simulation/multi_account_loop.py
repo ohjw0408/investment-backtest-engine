@@ -45,6 +45,7 @@ class MultiAccountSimulationLoop:
         distribution_policy=None,
         manual_comprehensive_years=None,
         reinvest_tax_credit: bool = False,
+        apply_final_liquidation: bool = True,
     ) -> MultiAccountRunResult:
         if not accounts:
             raise ValueError("계좌가 없습니다.")
@@ -52,6 +53,8 @@ class MultiAccountSimulationLoop:
             raise ValueError("시뮬레이션 날짜가 없습니다.")
 
         user_settings = user_settings or {}
+        # 투자계산기·백테스트=True(끝에 일괄청산). 은퇴 적립=False(무청산 인계 → 인출단계서 과세).
+        self._apply_final_liquidation = apply_final_liquidation
 
         # G2: 정책 목적지가 없는 계좌를 가리키면 위탁 자동 싱크(첫 ISA 미러) 생성
         if self.transfers_enabled and distribution_policy is not None:
@@ -809,6 +812,9 @@ class MultiAccountSimulationLoop:
         kr_foreign_unrealized_gain = 0.0
 
         tax_engine = rt.get("tax_engine")
+        # 은퇴 적립은 무청산 인계(self._apply_final_liquidation=False) — 끝에 안 판다.
+        # 적립기 중간세(배당·리밸·풍차 만기세)는 루프에서 이미 처리됨. 최종 청산만 스킵.
+        apply_final_liq = getattr(self, "_apply_final_liquidation", True)
         if tax_engine is not None:
             from modules.tax.liquidation import apply_liquidation_tax
 
@@ -817,23 +823,7 @@ class MultiAccountSimulationLoop:
                 for t in config.tickers
                 if t in price_data and not price_data[t].empty
             }
-            ytd_us_gains = getattr(rt["executor"], "_ytd_us_gains", 0.0)
-            # 풍차 ISA: 최종 청산세 원가는 마지막 사이클 납입액(전 기간 누적 아님).
-            tc_for_tax = total_contribution
-            if rt["account_type"] == "ISA" and rt.get("isa_renewal"):
-                tc_for_tax = float(rt.get("cycle_contribution", total_contribution))
-            end_value = apply_liquidation_tax(
-                end_value=raw_end_value,
-                portfolio=rt["portfolio"],
-                last_prices=last_prices,
-                tax_engine=tax_engine,
-                account_type=rt["account_type"],
-                total_contribution=tc_for_tax,
-                ytd_us_realized_gains=ytd_us_gains,
-                age=getattr(tax_engine, "age", 40),
-                isa_years_held=rt.get("isa_years_held", 3),
-            )
-            liquidation_tax = max(0.0, raw_end_value - end_value)
+            # 위탁 미실현 KR_FOREIGN 차익(정보용 — 청산 여부와 무관하게 surface).
             if rt["account_type"] == "위탁" and hasattr(rt["portfolio"], "positions"):
                 for ticker, pos in rt["portfolio"].positions.items():
                     if ticker in last_prices and pos.quantity > 0:
@@ -842,25 +832,43 @@ class MultiAccountSimulationLoop:
                             if gain > 0:
                                 kr_foreign_unrealized_gain += gain
 
-            # 절세액(위탁 가정): 최종 청산 = 잔여 미실현차익 실현(계좌유형 무관, 자산분류별).
-            executor = rt.get("executor")
-            if executor is not None and hasattr(executor, "_brk_us_by_year") \
-                    and hasattr(rt["portfolio"], "positions"):
-                last_year = 0
-                for t in config.tickers:
-                    if t in price_data and not price_data[t].empty:
-                        last_year = max(last_year, price_data[t].index[-1].year)
-                for ticker, pos in rt["portfolio"].positions.items():
-                    if ticker not in last_prices or pos.quantity <= 0:
-                        continue
-                    gain = float(rt["portfolio"].unrealized_gain(ticker, last_prices[ticker]))
-                    cls = tax_engine.classify_asset(ticker)
-                    if cls == "KR_FOREIGN":
-                        if gain > 0:
-                            executor._brk_krf_gain += gain
-                    elif cls == "US_DIRECT":
-                        executor._brk_us_by_year[last_year] = \
-                            executor._brk_us_by_year.get(last_year, 0.0) + gain
+            if apply_final_liq:
+                ytd_us_gains = getattr(rt["executor"], "_ytd_us_gains", 0.0)
+                # 풍차 ISA: 최종 청산세 원가는 마지막 사이클 납입액(전 기간 누적 아님).
+                tc_for_tax = total_contribution
+                if rt["account_type"] == "ISA" and rt.get("isa_renewal"):
+                    tc_for_tax = float(rt.get("cycle_contribution", total_contribution))
+                end_value = apply_liquidation_tax(
+                    end_value=raw_end_value,
+                    portfolio=rt["portfolio"],
+                    last_prices=last_prices,
+                    tax_engine=tax_engine,
+                    account_type=rt["account_type"],
+                    total_contribution=tc_for_tax,
+                    ytd_us_realized_gains=ytd_us_gains,
+                    age=getattr(tax_engine, "age", 40),
+                    isa_years_held=rt.get("isa_years_held", 3),
+                )
+                liquidation_tax = max(0.0, raw_end_value - end_value)
+                # 절세액(위탁 가정): 최종 청산 = 잔여 미실현차익 실현(계좌유형 무관, 자산분류별).
+                executor = rt.get("executor")
+                if executor is not None and hasattr(executor, "_brk_us_by_year") \
+                        and hasattr(rt["portfolio"], "positions"):
+                    last_year = 0
+                    for t in config.tickers:
+                        if t in price_data and not price_data[t].empty:
+                            last_year = max(last_year, price_data[t].index[-1].year)
+                    for ticker, pos in rt["portfolio"].positions.items():
+                        if ticker not in last_prices or pos.quantity <= 0:
+                            continue
+                        gain = float(rt["portfolio"].unrealized_gain(ticker, last_prices[ticker]))
+                        cls = tax_engine.classify_asset(ticker)
+                        if cls == "KR_FOREIGN":
+                            if gain > 0:
+                                executor._brk_krf_gain += gain
+                        elif cls == "US_DIRECT":
+                            executor._brk_us_by_year[last_year] = \
+                                executor._brk_us_by_year.get(last_year, 0.0) + gain
 
         dividend_tax = float(rt.get("dividend_tax_paid", 0.0))
         realized_tax = float(getattr(rt["executor"], "total_cg_tax_paid", 0.0))

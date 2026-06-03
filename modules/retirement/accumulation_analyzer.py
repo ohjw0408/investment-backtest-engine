@@ -35,6 +35,7 @@ class AccumulationAnalyzer:
         use_synthetic:          bool        = False,
         synthetic_params:       dict        = None,
         contribution_end_months: Optional[int] = None,
+        apply_final_liquidation: bool        = True,
     ):
         self.portfolio_engine      = portfolio_engine
         self.tickers               = tickers
@@ -57,6 +58,8 @@ class AccumulationAnalyzer:
         # code -> {mu_monthly, sigma_monthly, actual_start, anchor_price}
         self.synthetic_params      = synthetic_params or {}
         self.contribution_end_months = contribution_end_months
+        # 투자계산기=True(끝에 일괄청산). 은퇴 적립=False(무청산 인계 → 인출단계서 과세).
+        self.apply_final_liquidation = apply_final_liquidation
 
     def _estimate_total_cases(self, start=None) -> int:
         cur = start if start is not None else self.data_start
@@ -196,6 +199,7 @@ class AccumulationAnalyzer:
                     account_type    = self.account_type,
                     tax_engine      = self.tax_engine,
                     gain_harvesting = self.gain_harvesting,
+                    apply_final_liquidation = self.apply_final_liquidation,
                 )
                 history_df  = run_result.history_df
                 final_value = run_result.end_value

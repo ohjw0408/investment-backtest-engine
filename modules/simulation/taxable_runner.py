@@ -34,6 +34,7 @@ class TaxableSimulationRunner:
         gain_harvesting: bool = False,
         progress_callback=None,
         isa_years_held: int = 3,
+        apply_final_liquidation: bool = True,
     ) -> RunResult:
         from modules.core.portfolio                  import Portfolio
         from modules.execution.order_executor        import OrderExecutor
@@ -103,26 +104,31 @@ class TaxableSimulationRunner:
                             if gain > 0:
                                 kr_foreign_unrealized_gain += gain
 
-            # 청산 연도 기 발생 금융소득(외부 + 위탁 배당 + KR_FOREIGN 중간실현) — 청산이익과 합산 종합과세
-            ytd_financial_income = tax_session.ytd_financial_income
-            ytd_us_gains = tax_session.ytd_us_realized_gains
-            end_value = apply_liquidation_tax(
-                end_value=end_value,
-                portfolio=portfolio,
-                last_prices=last_prices,
-                tax_engine=tax_engine,
-                account_type=account_type,
-                total_contribution=total_invested,
-                ytd_us_realized_gains=ytd_us_gains,
-                age=user_settings.get('age', 40),
-                isa_years_held=isa_years_held,
-                ytd_financial_income=ytd_financial_income,
-            )
-
-            # 연도별 종합과세 트래킹 (마지막 연도에 청산 KR_FOREIGN 미실현차익 가산)
-            financial_income_by_year = tax_session.finalize(
-                extra_final_year_income=kr_foreign_unrealized_gain
-            )
+            # 은퇴 적립은 무청산 인계(apply_final_liquidation=False) — 끝에 안 판다(gross).
+            # 적립기 중간세(배당·리밸)는 루프에서 이미 처리됨. 최종 청산만 스킵.
+            if apply_final_liquidation:
+                # 청산 연도 기 발생 금융소득(외부 + 위탁 배당 + KR_FOREIGN 중간실현) — 청산이익 합산 종합과세
+                ytd_financial_income = tax_session.ytd_financial_income
+                ytd_us_gains = tax_session.ytd_us_realized_gains
+                end_value = apply_liquidation_tax(
+                    end_value=end_value,
+                    portfolio=portfolio,
+                    last_prices=last_prices,
+                    tax_engine=tax_engine,
+                    account_type=account_type,
+                    total_contribution=total_invested,
+                    ytd_us_realized_gains=ytd_us_gains,
+                    age=user_settings.get('age', 40),
+                    isa_years_held=isa_years_held,
+                    ytd_financial_income=ytd_financial_income,
+                )
+                # 연도별 종합과세 트래킹 (마지막 연도에 청산 KR_FOREIGN 미실현차익 가산)
+                financial_income_by_year = tax_session.finalize(
+                    extra_final_year_income=kr_foreign_unrealized_gain
+                )
+            else:
+                # 무청산: end_value=gross. 미실현차익은 인출단계로 인계(여기서 실현 안 함).
+                financial_income_by_year = tax_session.finalize()
             threshold = getattr(tax_engine, 'DIVIDEND_THRESHOLD', 20_000_000)
             comprehensive_years = tuple(
                 sorted(y for y, inc in financial_income_by_year.items() if inc > threshold)

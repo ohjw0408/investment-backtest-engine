@@ -396,6 +396,23 @@ class TaxEngine:
         if age >= 70: return self.PENSION_RATES[70]
         return self.PENSION_RATES[55]
 
+    def pension_separate_tax_annual(self, annual_pension: float, age: int) -> float:
+        """사적연금(연금저축+IRP 개인 합산) 연 수령액의 분리과세 세금 (Track G5 인출).
+
+        - 1,500만 이하: 나이별 저율(3.3~5.5%) 분리과세.
+        - 1,500만 초과: **전액** 16.5% 분리과세(2024 개정 선택분리과세 — 초과분만이 아니라
+          전체 사적연금액에 16.5%. 오너 결정 2026-06-03 · 현행법). 종합과세 선택은
+          모델링 안 함(보수적 근사).
+
+        주의: 기존 `pension_monthly_after_tax`는 '1500만 이하 저율 + 초과분만 16.5%'
+        하이브리드라 본 메서드와 다르다(그쪽은 단일계좌 은퇴 인출에서 사용 중).
+        """
+        if annual_pension <= 0:
+            return 0.0
+        if annual_pension <= self.PENSION_ANNUAL_THRESHOLD:
+            return annual_pension * self.pension_rate_by_age(age)
+        return annual_pension * self.PENSION_EXCESS_SEP_RATE
+
     def pension_monthly_after_tax(
         self,
         monthly_amount: float,

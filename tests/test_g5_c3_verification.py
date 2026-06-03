@@ -263,6 +263,47 @@ def test_C_growth_outpaces_withdrawal():
     assert res["combined_end_value"] > 10_000_000.0
 
 
+# ════════════════════════════════════════════════════════════════
+# D. 합성 보충: 실윈도우 < MIN_CASES_WD(30) → GBM 합성으로 패딩
+# ════════════════════════════════════════════════════════════════
+
+def test_D_synthetic_supplements_short_history():
+    """짧은 히스토리(실윈도우 소수) → 30개까지 합성 보충, 생존율 (0,1] 산출."""
+    from modules.retirement.multi_account_withdrawal import MIN_CASES_WD
+    # 7년 데이터, 인출 5년, step 6개월 → 실윈도우 ~4개
+    dates = pd.bdate_range("2017-01-01", "2023-12-31")
+    rng = np.random.default_rng(7)
+    px = 100.0 * np.cumprod(1 + rng.normal(0.0003, 0.01, len(dates)))
+    data = {CODE: _frame(dates, px)}
+    accts = [{"account_id": 0, "type": "위탁", "value": 10_000_000.0,
+              "target_weights": {CODE: 1.0}}]
+
+    res = analyze_household_withdrawal(
+        accts, data, list(dates), "2017-01-01", "2023-12-31",
+        withdrawal_years=5, monthly_net=120_000.0, step_months=6,
+    )
+    assert res["n_real"] < MIN_CASES_WD, f"실윈도우 {res['n_real']}"
+    assert res["n_synthetic"] > 0
+    assert res["n_windows"] == MIN_CASES_WD
+    assert 0.0 <= res["survival_rate"] <= 1.0
+
+
+def test_D_no_synthetic_when_enough_real():
+    """긴 히스토리(실윈도우 ≥ 30) → 합성 보충 안 함(n_synthetic=0)."""
+    dates = pd.bdate_range("1990-01-01", "2024-12-31")  # 35년
+    px = np.full(len(dates), 100.0)
+    data = {CODE: _frame(dates, px)}
+    accts = [{"account_id": 0, "type": "위탁", "value": 20_000_000.0,
+              "target_weights": {CODE: 1.0}}]
+    # 인출 5년, step 3개월 → 실윈도우 (30-5)*12/3 = 100+ ≥ 30
+    res = analyze_household_withdrawal(
+        accts, data, list(dates), "1990-01-01", "2024-12-31",
+        withdrawal_years=5, monthly_net=50_000.0, step_months=3,
+    )
+    assert res["n_real"] >= 30
+    assert res["n_synthetic"] == 0
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])

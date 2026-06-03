@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-04] feat | G5-C C3 합성 보충 — 실윈도우 부족 시 GBM 패딩 (마지막 한계 해소) + BUG-CALC-40Y 기록
+
+**합성 보충(잔여 한계 #2 해소):** `analyze_household_withdrawal`이 실윈도우만 쓰던 것 → 단일 WithdrawalAnalyzer처럼 실윈도우 < `MIN_CASES_WD(30)`이면 GBM(Student-t df=5) 합성 윈도우로 패딩. **구현:** 티커별 실종가→월(mu,sigma)(`_ticker_return_stats`, 단일 `_get_return_stats` 동형, 폴백 7%/15%) → 티커별 독립 합성 가격경로 생성 → `_synthetic_household_window`이 그 경로로 `simulate_household_window` 재사용(드레인 순서·연금세·취득가·리밸 전부 보존). 결과에 `n_real`/`n_synthetic` surface. 종목간 상관은 독립 근사(단일도 미모델링). 검증 `test_g5_c3_verification` D 2종(짧은 히스토리→30 패딩·긴 히스토리→패딩0). 기존 롤링 결정론 3종은 step 12→3(실윈도우≥30)으로 패딩 회피 유지.
+
+**BUG-CALC-40Y 기록(오너 발견, C3 무관):** 투자계산기 QQQ+GLD+SCHD 40·30년 시뮬이 가상데이터 체크해도 "가상 데이터 생성 불가" 실패(20년 정상). 에러 출처 `calculator_logic.py:268`(`prepare_scenario_data` n_cases==0). 로컬 재현 불가(로컬 DB는 백필 깊음→n_cases=60 정상) → **서버 DB(gitignore, lazy backfill) history 얕음 추정.** 추가로 로컬 GLD 데이터 2020-12-30 종료(stale). `bugs.md` BUG-CALC-40Y에 상세 기록 — 미해결(서버 DB 확인 필요). **C3와 완전 별개 트랙.**
+
+**전체 회귀 PASS.** ⚠️ G5-C C3 잔여 한계 전부 해소(리밸·합성보충). dividend_mode 전역은 단일과 일관(무해).
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-04] fix | G5-C C3 리밸런싱 한계 해소 — 인출 시뮬에 rebal_mode 배선
 
 강검증 후 남긴 잔여 한계(리밸 미배선) 해소. 인출 시뮬레이터 `_build_account_runtime`이 `PeriodicRebalance(None)` 고정이라 인출 페이즈 리밸런싱 미발생 → 다종목+리밸모드 계좌가 단일 경로와 divergence. **수정:** 적립(multi_account_common/MultiAccountAnalyzer)과 동일 로직으로 계좌별 `rebal_mode`/`band_width`→전략(none/band/주기) 빌드. `analyze_household_samples`·`_run_multi_account_retirement_logic` account_specs에 rebal_mode/band_width 전파.

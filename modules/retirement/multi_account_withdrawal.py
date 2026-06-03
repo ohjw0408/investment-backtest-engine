@@ -19,6 +19,8 @@ from modules.rebalance.periodic import PeriodicRebalance
 from modules.retirement.household_withdrawal import household_withdraw
 
 _PENSION_TYPES = ("연금저축", "IRP")
+MIN_CASES_WD = 30   # 실윈도우 부족 시 이 개수까지 합성 보충 (단일 WithdrawalAnalyzer와 동일).
+SYNTHETIC_DF = 5    # Student-t 자유도 (단일과 동일).
 
 
 def _build_account_runtime(spec, first_price_dict, tax_engine, session):
@@ -208,6 +210,57 @@ def simulate_household_window(
     }
 
 
+def _ticker_return_stats(closes) -> tuple:
+    """실 종가 → 월 (mu, sigma). 단일 WithdrawalAnalyzer._get_return_stats와 동형.
+    데이터 부족 시 7%/15% 연 환산 폴백."""
+    try:
+        closes = np.asarray(closes, dtype=float)
+        if len(closes) >= 24:
+            mpx  = closes[np.arange(0, len(closes), 21)]
+            mret = np.diff(mpx) / np.where(mpx[:-1] > 0, mpx[:-1], 1.0)
+            mret = mret[np.isfinite(mret) & (np.abs(mret) < 0.5)]
+            if len(mret) >= 12:
+                mu, sigma = float(np.mean(mret)), float(np.std(mret))
+                if sigma > 0 and np.isfinite(mu):
+                    return mu, sigma
+    except Exception:
+        pass
+    return 0.07 / 12, 0.15 / np.sqrt(12)
+
+
+def _synthetic_household_window(
+    accounts, ticker_stats, withdrawal_years, monthly_net, rng,
+    *, tax_engine, withdrawal_start_age, inflation, dividend_mode,
+) -> dict:
+    """티커별 GBM(Student-t) 합성 월가격 경로 생성 → simulate_household_window 1회.
+
+    종목 간 상관은 독립 근사(단일 합성도 미모델링). 합성 구간 배당 0.
+    드레인 순서·연금세·취득가·리밸은 simulate_household_window가 그대로 처리.
+    """
+    n_months = withdrawal_years * 12
+    dates = pd.date_range("2000-01-01", periods=n_months + 1, freq="MS")
+    t_scale = np.sqrt(SYNTHETIC_DF / (SYNTHETIC_DF - 2))
+
+    synth_data = {}
+    for ticker, (mu, sigma) in ticker_stats.items():
+        rets = (rng.standard_t(df=SYNTHETIC_DF, size=n_months) / t_scale) * sigma + mu
+        closes = np.empty(n_months + 1)
+        closes[0] = 100.0
+        closes[1:] = 100.0 * np.cumprod(1.0 + rets)
+        synth_data[ticker] = pd.DataFrame(
+            {"open": closes, "high": closes, "low": closes, "close": closes,
+             "volume": 1.0, "dividend": 0.0, "split": 1.0},
+            index=dates,
+        )
+    res = simulate_household_window(
+        accounts, synth_data, list(dates), monthly_net,
+        tax_engine=tax_engine, withdrawal_start_age=withdrawal_start_age,
+        inflation=inflation, dividend_mode=dividend_mode,
+    )
+    res["is_synthetic"] = True
+    return res
+
+
 _PCTS = [10, 25, 50, 75, 90]
 
 
@@ -275,6 +328,26 @@ def analyze_household_withdrawal(
     if not case_results:
         raise ValueError("유효 윈도우가 0개입니다.")
 
+    # ── 합성 보충: 실윈도우 < MIN_CASES_WD면 GBM 합성으로 패딩 (단일과 동형) ──
+    n_real = len(case_results)
+    n_needed = max(0, MIN_CASES_WD - n_real)
+    if n_needed > 0:
+        ticker_stats = {
+            t: _ticker_return_stats(df["close"].values)
+            for t, df in price_data.items()
+        }
+        for i in range(n_needed):
+            rng = np.random.default_rng(seed=1000 + i)
+            try:
+                case_results.append(_synthetic_household_window(
+                    accounts, ticker_stats, withdrawal_years, monthly_net, rng,
+                    tax_engine=tax_engine, withdrawal_start_age=withdrawal_start_age,
+                    inflation=inflation, dividend_mode=dividend_mode,
+                ))
+            except Exception:
+                continue
+    n_synthetic = len(case_results) - n_real
+
     survival_rate = float(np.mean([1.0 if r["success"] else 0.0 for r in case_results]))
     combined_vals = [r["combined_end_value"] for r in case_results]
 
@@ -293,6 +366,8 @@ def analyze_household_withdrawal(
     return {
         "survival_rate":      round(survival_rate, 4),
         "n_windows":          len(case_results),
+        "n_real":             n_real,
+        "n_synthetic":        n_synthetic,
         "combined_end_value": _pct_dist(combined_vals),
         "per_account":        per_account_dist,
         "median_pension_tax": round(float(np.median(pension_taxes)), 2),

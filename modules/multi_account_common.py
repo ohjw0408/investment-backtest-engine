@@ -72,6 +72,54 @@ def validate_initial_capital_limits(accounts: list[dict]) -> list[str]:
     return errors
 
 
+def build_loop_accounts(accounts: list[dict], start_str: str, end_str: str,
+                        default_dividend_mode: str = "reinvest",
+                        withdrawal_amount: float = 0) -> list[dict]:
+    """정규화 계좌 dict → MultiAccountSimulationLoop이 먹는 config+strategy 포함 dict 리스트.
+
+    롤링(analyzer 윈도우별)·단일윈도우(백테스트)·인출(은퇴, withdrawal_amount>0) 공유.
+    start_str/end_str = 해당 윈도우 경계. analyzer._run_rolling의 인라인 빌드와 동일 스펙.
+    """
+    from modules.config.simulation_config import SimulationConfig
+    from modules.rebalance.periodic import PeriodicRebalance
+
+    loop_accounts = []
+    for account in accounts:
+        tickers = [t["code"] for t in account["tickers"]]
+        weights = {t["code"]: float(t["weight"]) for t in account["tickers"]}
+        rebal_mode = account.get("rebal_mode", "monthly")
+        band_width = float(account.get("band_width", 0.05))
+        rebalance_frequency = None if rebal_mode in ("none", "band") else rebal_mode
+        drift_threshold = band_width if rebal_mode == "band" else None
+        strategy = PeriodicRebalance(
+            target_weights=weights,
+            rebalance_frequency=rebalance_frequency,
+            drift_threshold=drift_threshold,
+        )
+        config = SimulationConfig(
+            start_date=start_str,
+            end_date=end_str,
+            tickers=tickers,
+            target_weights=weights,
+            initial_capital=float(account.get("initial_capital", 0.0)),
+            monthly_contribution=float(account.get("monthly_contribution", 0.0)),
+            contribution_end_months=account.get("contribution_end_months"),
+            withdrawal_amount=withdrawal_amount,
+            dividend_mode=account.get("dividend_mode", default_dividend_mode),
+            rebalance_frequency=rebalance_frequency,
+            inflation=0.0,
+        )
+        loop_accounts.append({
+            "type": account.get("type", "위탁"),
+            "config": config,
+            "strategy": strategy,
+            "gain_harvesting": account.get("gain_harvesting", False),
+            "isa_years_held": account.get("isa_years_held", 3),
+            "isa_renewal": account.get("isa_renewal", False),
+        })
+    return loop_accounts
+
+
 def build_savings_summary(savings_raw: dict) -> dict | None:
     """절세액 표시(위탁가정세금·실제세금·절세액 + GH 절세)를 프론트 소비형으로 라운딩.
 

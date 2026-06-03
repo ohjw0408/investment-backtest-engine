@@ -92,6 +92,7 @@ def _run_wd_case(args: tuple):
                 account_type    = account_type,
                 user_settings   = user_settings,
                 gain_harvesting = gain_harvesting,
+                carried_cost_basis = config_dict.get("cost_basis"),
             )
             history_df    = run_result.history_df
             tax_end_value = run_result.end_value
@@ -141,6 +142,7 @@ class WithdrawalAnalyzer:
         user_settings:      dict      = None,
         gain_harvesting:    bool      = False,
         progress_callback             = None,
+        cost_basis:         float     = None,
     ):
         self.portfolio_engine   = portfolio_engine
         self.tickers            = tickers
@@ -153,6 +155,8 @@ class WithdrawalAnalyzer:
         self.account_type          = account_type
         self.user_settings         = user_settings or {}
         self.gain_harvesting       = gain_harvesting and account_type == "위탁"
+        # 적립 취득가(=총납입) 인계 — 위탁 인출 매도세가 적립차익까지 과세하도록(G5-C C1).
+        self.cost_basis            = cost_basis
         self.withdrawal_start_age  = current_age + accumulation_years
         self.initial_capital    = initial_capital
         self.inflation          = inflation
@@ -242,6 +246,7 @@ class WithdrawalAnalyzer:
             "account_type":      self.account_type,
             "user_settings":     self.user_settings,
             "gain_harvesting":   self.gain_harvesting,
+            "cost_basis":        self.cost_basis,
         }
         task_args = [
             (s, e, config_dict, strategy_dict, rid)

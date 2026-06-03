@@ -1059,23 +1059,32 @@ def retirement_run():
         acc_result = acc_analyzer.run()
 
         # 2. 은퇴 플래너 (축적 → 인출)
+        # 인출 과세 배선 (G5-C C1): 적립 무청산 인계 → 인출하면서 과세. cost_basis=적립 총납입.
         from modules.retirement.retirement_planner import RetirementPlanner
+        _cost_basis = initial_capital + monthly_contribution * accumulation_years * 12
         planner = RetirementPlanner(
             acc_result         = acc_result,
             wd_config          = {
-                "portfolio_engine": portfolio_engine,
-                "tickers":          ticker_codes,
-                "strategy_factory": strategy_factory,
-                "data_start":       data_start,
-                "data_end":         data_end,
-                "withdrawal_years": withdrawal_years,
-                "dividend_mode":    dividend_mode,
-                "step_months":      6,
+                "portfolio_engine":   portfolio_engine,
+                "tickers":            ticker_codes,
+                "strategy_factory":   strategy_factory,
+                "data_start":         data_start,
+                "data_end":           data_end,
+                "withdrawal_years":   withdrawal_years,
+                "dividend_mode":      dividend_mode,
+                "step_months":        6,
+                "tax_engine":         ret_tax_engine,
+                "account_type":       account_type if tax_enabled else "위탁",
+                "user_settings":      user_settings if tax_enabled else {},
+                "current_age":        int(user_settings.get("age", 40)) if tax_enabled else 40,
+                "accumulation_years": accumulation_years,
+                "gain_harvesting":    gain_harvesting if tax_enabled else False,
             },
             monthly_withdrawal = monthly_withdrawal,
             withdrawal_years   = withdrawal_years,
             inflation          = inflation,
             verbose            = False,
+            cost_basis         = _cost_basis if tax_enabled else None,
         )
         report = planner.run(target_percentile=target_percentile)
 

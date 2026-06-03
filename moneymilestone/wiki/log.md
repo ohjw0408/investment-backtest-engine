@@ -1,5 +1,27 @@
 # Log
 
+## [2026-06-03] fix | G5-C C1 인출 과세 배선 + BUG-TAX-3 진단 정정 (취득가 인계)
+
+**진단 정정 (오너에게 보고·동의):** 앞선 "은퇴 이중과세" 진단은 **부정확**했음. `run_retirement_logic`/`app.py:retirement_run`의 `wd_config`에 `tax_engine`이 없어 **인출투영은 원래 면세**였음(`_calc_gross_withdrawal`/`pension_tax`는 tax_engine 있을 때만 작동). 즉 적립끝 청산세가 **유일 세금**(이중 아님). ∴ BUG-TAX-3 수정(적립 무청산)만 하면 적립면세+인출면세 = **세금 0 회귀**. 오너 규칙 "은퇴 절대 일괄청산 금지"의 올바른 구현 = 적립끝 청산 제거(전반부) + **인출 과세 배선(후반부=C1)**.
+
+**모델 확정 (오너):** 적립 종료 시 일괄과세 없음(무청산 gross 인계) → **인출하면서 과세.**
+
+**C1 구현 (취득가 인계, 단일+멀티 공유 토대):**
+- `carried_cost_basis` 플러밍: `RetirementPlanner(cost_basis=)` → `WithdrawalAnalyzer(cost_basis=)` → `config_dict` → `TaxableSimulationRunner.run(carried_cost_basis=)` → `SimulationLoop.run(carried_cost_basis=)`.
+- `SimulationLoop`: day-1 매수 직후 `_avg_costs`를 `carried_cost_basis/invested` 비례축소 → 인출 종료자산(gross)을 받아도 적립차익이 취득가에 반영됨. 위탁만 영향(ISA/연금은 `sell_with_tax`가 과세이연 → CG 0, 무해).
+- **`wd_config`에 tax_engine·account_type·user_settings·current_age·accumulation_years·gain_harvesting 배선** (이게 누락이라 인출 면세였음 — 회귀 해소). cost_basis = 적립 총납입(결정론).
+- 단일 `run_retirement_logic` + `app.py:retirement_run` 양쪽.
+
+**검증 `tests/test_g5_withdrawal_basis.py`:** ① 거치(인출0)·평탄가격 종료청산 손계산 ±1원 — gross 12M·취득가 6M → 내재차익 6M×15.4% = **924,000** 정확(avg_cost 재조정이 청산 unrealized_gain에 반영). ② 인출경로(BUG-TAX-2 sell_with_tax) 방향성 — carried < no-basis(인출 매도차익 과세). 회귀 **119 PASS**(calculator/backtest 불변=carried_cost_basis default None).
+
+⚠️ **C1 = 위탁 인출세 토대.** 연금 인출세(C2 `pension_separate_tax_annual` 배선)·멀티 가구 인출 오케스트레이터(C3)·합산 생존율(C4) 잔여. ⚠️ 단일 은퇴 tax-ON 결과 바뀜(면세→인출과세, 정확해지는 방향).
+
+**▶ 다음 = C2 연금소득세 인출 배선.**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-03] fix | BUG-TAX-3 은퇴 이중과세 — 적립 무청산 인계 (apply_final_liquidation 플래그)
 
 **오너 지적:** "투자계산기는 단일·멀티 일괄청산 맞음. 근데 은퇴 계산기는 절대 일괄청산 금지." — 정당. 코드추적 결과 기존 버그 확인.

@@ -521,17 +521,28 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     if progress_callback:
         progress_callback(current=50, total=100, elapsed=time.time() - _acc_start)
 
+    # 인출 과세 배선 (G5-C C1): 은퇴는 적립 무청산 인계 → 인출하면서 과세해야 함.
+    # 기존엔 wd_config에 tax_engine이 없어 인출이 면세였음(적립끝 청산세가 유일 세금이던 모델).
+    # 무청산 전환 후 인출 과세를 안 켜면 세금 0이 되므로 여기서 켠다.
+    # cost_basis = 적립 총납입(결정론) → 위탁 인출 매도세가 적립차익까지 과세.
+    _cost_basis = initial_capital + monthly_contribution * accumulation_years * 12
     planner = RetirementPlanner(
         acc_result         = acc_result,
         wd_config          = {
-            "portfolio_engine": portfolio_engine,
-            "tickers":          ticker_codes,
-            "strategy_factory": strategy_factory,
-            "data_start":       data_start,
-            "data_end":         data_end,
-            "withdrawal_years": withdrawal_years,
-            "dividend_mode":    dividend_mode,
-            "step_months":      6,
+            "portfolio_engine":   portfolio_engine,
+            "tickers":            ticker_codes,
+            "strategy_factory":   strategy_factory,
+            "data_start":         data_start,
+            "data_end":           data_end,
+            "withdrawal_years":   withdrawal_years,
+            "dividend_mode":      dividend_mode,
+            "step_months":        6,
+            "tax_engine":         ret_tax_engine,
+            "account_type":       account_type if tax_enabled else "위탁",
+            "user_settings":      user_settings if tax_enabled else {},
+            "current_age":        int(user_settings.get("age", 40)) if tax_enabled else 40,
+            "accumulation_years": accumulation_years,
+            "gain_harvesting":    gain_harvesting if tax_enabled else False,
         },
         monthly_withdrawal  = monthly_withdrawal,
         withdrawal_years    = withdrawal_years,
@@ -539,6 +550,7 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
         verbose             = False,
         progress_callback   = progress_callback,
         start_time          = _acc_start,
+        cost_basis          = _cost_basis if tax_enabled else None,
     )
     report = planner.run(target_percentile=target_percentile)
 

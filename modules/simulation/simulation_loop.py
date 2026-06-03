@@ -25,6 +25,7 @@ class SimulationLoop:
         recorder,
         record_history=True,
         progress_callback=None,
+        carried_cost_basis=None,
     ):
         import time as _time
 
@@ -86,6 +87,23 @@ class SimulationLoop:
                         price_dict,
                         config.target_weights
                     )
+
+                # ── 적립 취득가 인계 (은퇴 인출 G5-C) ──────────────
+                # day-1 매수 직후 avg_cost는 인출시작가. 인출은 적립 종료자산(gross)을
+                # initial_capital로 받으므로 적립차익이 취득가에 안 잡힘 → 위탁 인출 매도가
+                # 그 차익을 과세 못 함(BUG-TAX-3 위탁 잔여). carried_cost_basis(=적립 총납입)로
+                # avg_cost를 비례 축소 → 첫 매도부터 (현재가−적립취득가) 차익 과세.
+                # 위탁만 영향(ISA/연금은 sell_with_tax가 과세이연 → CG 0이라 무해).
+                if carried_cost_basis and hasattr(portfolio, "_avg_costs") and portfolio._avg_costs:
+                    invested = sum(
+                        portfolio._avg_costs[t] * portfolio.positions[t].quantity
+                        for t in portfolio._avg_costs
+                        if t in portfolio.positions and portfolio.positions[t].quantity > 0
+                    )
+                    if invested > 0:
+                        scale = carried_cost_basis / invested
+                        for t in list(portfolio._avg_costs.keys()):
+                            portfolio._avg_costs[t] *= scale
 
             # ── dividend ─────────────────────────────
             dividend_by_ticker = self.dividend_engine.process(

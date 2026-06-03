@@ -35,6 +35,7 @@ class TaxableSimulationRunner:
         progress_callback=None,
         isa_years_held: int = 3,
         apply_final_liquidation: bool = True,
+        carried_cost_basis=None,
     ) -> RunResult:
         from modules.core.portfolio                  import Portfolio
         from modules.execution.order_executor        import OrderExecutor
@@ -75,7 +76,8 @@ class TaxableSimulationRunner:
                                   exec_engine, CashAllocator())
         recorder = HistoryRecorder()
         loop.run(portfolio, strategy, config, price_data, dates, recorder,
-                 progress_callback=progress_callback)
+                 progress_callback=progress_callback,
+                 carried_cost_basis=carried_cost_basis)
         history_df = recorder.to_dataframe()
 
         if history_df.empty:

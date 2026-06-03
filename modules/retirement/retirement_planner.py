@@ -55,6 +55,7 @@ class RetirementPlanner:
         verbose:            bool  = False,
         progress_callback=None,     # fn(current, total, elapsed)
         start_time:         float = None,
+        cost_basis:         float = None,   # 적립 총납입(취득가) 인계 — 위탁 인출세(G5-C C1)
     ):
         self.acc_result         = acc_result
         self.wd_config          = wd_config
@@ -64,6 +65,7 @@ class RetirementPlanner:
         self.verbose            = verbose
         self.progress_callback  = progress_callback
         self.start_time         = start_time
+        self.cost_basis         = cost_basis
 
     # ════════════════════════════════════════════════════════
     # 메인 실행
@@ -161,6 +163,7 @@ class RetirementPlanner:
                     "withdrawal_years":   self.withdrawal_years,
                     "inflation":          self.inflation,
                     "verbose":            False,
+                    "cost_basis":         self.cost_basis,
                 }
             )
             wd_result = wd_analyzer.run()

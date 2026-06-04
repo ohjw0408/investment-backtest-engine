@@ -371,6 +371,101 @@ class TestPrepareSyntheticTrue:
         assert result["data_confidence"] == "synthetic"
 
 
+# ─── BUG-CALC-40Y 회귀: 백필 ok-skip이 합성을 막지 않음 ───────────────────────
+
+class TestBackfillOkShallowFallsThroughToSynthetic:
+    """
+    BUG-CALC-40Y 회귀.
+
+    SCHD처럼 인덱스 프록시 백필이 특정 연도까지만 닿고 "이미 백필됨 → 스킵"으로
+    status=='ok'를 반환하는 종목은, 백필이 sim_years에 충분히 깊지 않으면
+    합성 생성으로 잔여 구간을 보충해야 한다. (과거: ok → continue 로 합성을 건너뛰어
+    effective_start가 갇히고 장기(40년) 시뮬에서 n_cases=0 → 에러)
+    """
+
+    def _make_shallow_db(self) -> str:
+        """2003~2026 영업일 실데이터(통계 계산 충분) 1종목 + provenance 테이블."""
+        tmp = tempfile.mktemp(suffix=".db")
+        conn = sqlite3.connect(tmp)
+        conn.execute(
+            "CREATE TABLE price_daily (code TEXT, date TEXT, open REAL, high REAL, "
+            "low REAL, close REAL, volume REAL, PRIMARY KEY(code,date))"
+        )
+        import numpy as np
+        rng = np.random.default_rng(7)
+        days = pd.bdate_range("2003-01-02", "2026-06-01")
+        px = 100.0
+        rows = []
+        for d in days:
+            px *= (1 + rng.normal(0.0007, 0.011))
+            ds = d.strftime("%Y-%m-%d")
+            rows.append(("SHALLOW", ds, px, px, px, px, 1000.0))
+        conn.executemany(
+            "INSERT INTO price_daily VALUES (?,?,?,?,?,?,?)", rows
+        )
+        conn.commit()
+        import modules.provenance as prov
+        prov.ensure_provenance_tables(conn)
+        conn.close()
+        return tmp
+
+    def _fake_backfill_engine(self):
+        """backfill()이 항상 status='ok'지만 데이터는 늘리지 않음 (이미 백필됨 스킵 모사)."""
+        class FakeBE:
+            def __init__(self, *a, **k):
+                pass
+
+            def backfill(self, code):
+                return {"status": "ok", "date_from": None, "date_to": None}
+        return FakeBE
+
+    def test_40y_synthetic_fills_when_backfill_ok_but_shallow(self, monkeypatch):
+        from modules.retirement.data_preparer import DataPreparer
+        import modules.retirement.data_preparer as dp_mod
+
+        db = self._make_shallow_db()
+        monkeypatch.setattr(dp_mod, "BackfillEngine", self._fake_backfill_engine())
+        try:
+            dp = DataPreparer(price_db_path=db, verbose=False)
+            res = dp.prepare(
+                tickers=["SHALLOW"],
+                sim_years=40,
+                data_end="2026-06-02",
+                allow_backfill=True,
+                allow_synthetic=True,
+            )
+            dp.close()
+            # 합성이 채워져 장기 윈도우가 생겨야 함 (과거 버그: n_cases=0)
+            assert res["n_cases"] > 0, f"n_cases should be >0 after synthetic, got {res['n_cases']}"
+            assert "SHALLOW" in res["synthetic_info"], "synthetic must be generated for shallow ticker"
+            # data_start가 2003 갇힘에서 풀려 충분히 과거로 가야 함
+            assert res["data_start"] < "1990-01-01", res["data_start"]
+        finally:
+            os.unlink(db)
+
+    def test_20y_unaffected_when_backfill_deep_enough(self, monkeypatch):
+        """백필이 sim_years에 충분히 깊으면(여기선 mock이 얕지만 sim_years가 짧아 통과)
+        합성 없이도 정상 — 단기는 회귀 없음."""
+        from modules.retirement.data_preparer import DataPreparer
+        import modules.retirement.data_preparer as dp_mod
+
+        db = self._make_shallow_db()
+        monkeypatch.setattr(dp_mod, "BackfillEngine", self._fake_backfill_engine())
+        try:
+            dp = DataPreparer(price_db_path=db, verbose=False)
+            res = dp.prepare(
+                tickers=["SHALLOW"],
+                sim_years=5,
+                data_end="2026-06-02",
+                allow_backfill=True,
+                allow_synthetic=True,
+            )
+            dp.close()
+            assert res["n_cases"] > 0
+        finally:
+            os.unlink(db)
+
+
 # ─── 실행 ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

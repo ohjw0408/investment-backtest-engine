@@ -231,9 +231,24 @@ class DataPreparer:
                 backfilled.append(code)
                 if self.verbose:
                     print(f"  [{code}] 백필 완료: {result['date_from']} ~ {result['date_to']}")
-                continue
+                # 백필이 sim_years에 충분히 깊으면 종료. 부족하면(인덱스 프록시가
+                # 짧거나 "이미 백필됨 → 스킵"이라 더 못 가는 경우 포함) 아래 합성 생성으로
+                # 잔여 구간을 보충한다. (BUG-CALC-40Y: SCHD 등 백필 ok-skip이 합성을 막아
+                #  effective_start가 갇히고 장기 시뮬에서 n_cases=0 → 에러.)
+                from dateutil.relativedelta import relativedelta as _rd_bf
+                _need_start = max(
+                    (pd.Timestamp(data_end) - _rd_bf(years=sim_years)
+                     - _rd_bf(months=TARGET_CASES * step_months)).strftime("%Y-%m-%d"),
+                    USD_KRW_START,
+                )
+                if new_start is None or new_start <= _need_start:
+                    continue
+                current_start = new_start  # 합성은 이 지점부터 역방향 생성
+                if self.verbose:
+                    print(f"  [{code}] 백필 깊이 부족 ({new_start} > 목표 {_need_start}) → 합성 보충")
+                # ↓ fall through → 3b 합성 생성
 
-            # ── 3b. 백필 불가 → 가상 데이터 생성 ─────────
+            # ── 3b. 백필 불가/깊이부족 → 가상 데이터 생성 ─────────
             # [SYNTHETIC_PATH: DB-Level] DataPreparer -> SyntheticPriceGenerator
             # 허용 조건: allow_synthetic=True (기본값). ScenarioDataPreparer가 이 플래그로 제어.
             if not allow_synthetic:
@@ -246,7 +261,7 @@ class DataPreparer:
                 continue
 
             if self.verbose:
-                print(f"  [{code}] 백필 불가 ({result['status']}) → 가상 데이터 생성")
+                print(f"  [{code}] 백필 불가/깊이부족 ({result['status']}) → 가상 데이터 생성")
 
             stats = self.stats_cache.get_or_compute(code)
             if stats is None:

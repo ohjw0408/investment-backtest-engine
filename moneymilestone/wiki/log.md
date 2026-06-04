@@ -1,5 +1,23 @@
 # Log
 
+## [2026-06-05] fix | BUG-CALC-40Y 원인 확정·수정 — 백필 ok-skip이 합성 폴스루 차단
+
+투자계산기 장기(40·30년) "가상 데이터 생성 불가" 에러 추적. **로컬 재현 불가**(로컬 DB 깊음)라 **서버 DB 실측 필요** — 오너 승인하에 Hetzner(178.105.84.213) SSH **읽기전용** 조회.
+
+**진단 경로:** ① 셸로우 DB 로컬 repro → 코드 자체는 20/30/40년 전부 합성 정상(코드 무죄). ② 서버 git HEAD==origin/main(424d568) → **배포 stale 아님**(deploy 성공). ③ 서버 `price_daily` 실측: QQQ 1928~deep·GLD 2004real+synth1971~·**SCHD real 2003~**(인덱스 프록시 백필 한계, synth 0). ④ 서버 DB 복사본에 실제 `prepare_scenario_data` verbose 실행 → **결정적 재현**.
+
+**확정 원인:** SCHD가 binding(2003). DataPreparer 3단계 보완에서 `BackfillEngine.backfill("SCHD")`가 "이미 백필됨(21,046행)→스킵"으로 **status=='ok'** 반환 → `if status=='ok': ... continue`가 **합성 생성을 건너뜀** → SCHD 2003 갇힘 → effective_start=2003. **40년:** 2003+40>2026 → n_cases=**0** → `calculator_logic` ValueError. **20년:** 2003+20≤2026 → n_cases=11(>0 통과 → "20부터 됨"). 비대칭은 순전히 n_cases==0 임계값(코드·sim_years 무관).
+
+**수정(`modules/retirement/data_preparer.py` 3a 분기):** 백필 ok라도 `new_start > 목표(_min_target = data_end - sim_years - TARGET_CASES×step)`면 `continue` 대신 합성 생성으로 폴스루 → 잔여 구간 보충. 백필 실데이터(프록시)는 닿는 데까지 우선 사용, 그 이전만 합성.
+
+**검증(서버 DB 복사본 288M 실측):** 수정전 40y n_cases=0 → 수정후 **40y=61·30y=61·20y=60**(SCHD 1971/1981/1991까지 합성 보충). 20y도 11→60 개선(회귀 아님, 케이스 증가). 회귀테스트 `test_scenario_data_preparer::TestBackfillOkShallowFallsThroughToSynthetic` 2종(백필 ok-skip→합성 폴스루·단기 무영향) + 관련 스위트(data-prep·g5·engine·retirement·rolling·wd1) **79 PASS**.
+
+⚠️ GLD stale(로컬 2020 종료)는 별개 데이터 갱신 과제로 잔존(서버 GLD 2026까지 정상). **C3와 무관.** ⚠️ **미커밋·미배포**(push=Hetzner 자동배포).
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-04] deploy | G5-C C3 전체 푸시 (8ea885a..4a4f90c, 10커밋)
 
 세션 전체 작업 origin/main 푸시 — `8ea885a..4a4f90c`(clean fast-forward, force-push 아님 → divergent 위험 없음). deploy.yml Hetzner 자동배포 트리거됨. 커밋: gate2a golden·BUG-WD-1·C3.1~3.3·강검증+off-by-one·리밸·합성보충·BUG-CALC-40Y기록·status45.

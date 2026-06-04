@@ -425,9 +425,20 @@ class AccumulationAnalyzer:
 
             actual_start_str = params["actual_start"]
             actual_start_dt  = pd.Timestamp(actual_start_str)
-            mu_monthly       = float(params["mu_monthly"])
+            from modules.retirement.synthetic_price_generator import MAX_SYNTH_MU_MONTHLY
+            # mu 상한 캡: 짧은 불장 표본 mu를 수십 년 외삽 시 폭발 방지(generate_and_save와 동일).
+            mu_monthly       = min(float(params["mu_monthly"]), MAX_SYNTH_MU_MONTHLY)
             sigma_monthly    = float(params["sigma_monthly"])
-            anchor_price     = float(params["anchor_price"])
+            # anchor는 실 suffix와 같은 FX 단위(KRW)여야 한다. params["anchor_price"]는
+            # data_preparer가 raw price_daily(USD)로 잡은 값이라 get_price(FX·KRW) 실데이터와
+            # 경계에서 ~환율배 어긋나 가격이 폭발한다(BUG-DIV-3). actual_start의 FX 실가격으로
+            # anchor를 잡아 연속성을 보장한다(build_window_synth_params와 동일 방식).
+            _a_end = (actual_start_dt + pd.Timedelta(days=14)).strftime("%Y-%m-%d")
+            _adf   = raw_loader.get_price(code, actual_start_str, _a_end, allow_synthetic=False)
+            if _adf is not None and not _adf.empty and "close" in _adf.columns and float(_adf["close"].iloc[0]) > 0:
+                anchor_price = float(_adf["close"].iloc[0])
+            else:
+                anchor_price = float(params["anchor_price"])
 
             if window_start >= actual_start_dt:
                 # Window fully in real range

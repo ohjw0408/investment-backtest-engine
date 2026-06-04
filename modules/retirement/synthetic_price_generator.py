@@ -21,6 +21,12 @@ SYNTHETIC_DF            = 5     # Student-t 자유도
 TRADING_DAYS_PER_MONTH  = 21
 T_SCALE                 = float(np.sqrt(SYNTHETIC_DF / (SYNTHETIC_DF - 2)))  # ≈ 1.291
 
+# 합성 pre-history(상장 전 가상 구간)는 장기 광역시장을 능가한다고 가정하지 않는다.
+# 짧은 불장 표본에서 적합한 월 mu를 수십 년 과거로 외삽하면 비현실적 폭발이 난다
+# (실측: 40년 GLD 263배·SCHD 182배 → 포트폴리오 2.9조). SPY 1928~2026 실역사 ≈
+# 연 7.65%(USD)를 기준으로 월 mu를 상한 캡한다. FX(원화 환산)는 get_price에서 별도 적용.
+MAX_SYNTH_MU_MONTHLY    = 0.0065   # ≈ 연 8.1% 명목(USD) — 광역시장 장기 상한
+
 
 def generate_and_save(
     code:          str,
@@ -69,6 +75,9 @@ def generate_and_save(
         return {"code": code, "status": "empty_range", "rows": 0}
 
     n_days = len(bdays)
+
+    # ── mu 상한 캡 (장기 외삽 폭발 방지) ─────────────────
+    mu_monthly = min(float(mu_monthly), MAX_SYNTH_MU_MONTHLY)
 
     # ── 일별 mu, sigma 변환 ───────────────────────────────
     mu_daily    = mu_monthly    / TRADING_DAYS_PER_MONTH

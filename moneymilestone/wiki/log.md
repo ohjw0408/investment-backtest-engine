@@ -1,5 +1,23 @@
 # Log
 
+## [2026-06-05] fix | BUG-SYNTH-FX 가상데이터 40년 폭발 — 합성 anchor USD/KRW 단위 불일치
+
+BUG-CALC-40Y 수정으로 40년이 돌기 시작하자 오너가 **QQQ+GLD+SCHD 등비중 40년 = 2.9조**(SPY 40년 62억 대비 수백배) 발견. 명백히 틀림.
+
+**진단(서버 DB 복사본 288M 실측):** ① get_price 직접호출은 GLD 245배(정상)인데 계산기 sim은 폭발 → sim이 합성을 다르게 읽음. ② dividend_mode hold도 폭발(배당 아님). ③ **종목별 격리(40년 보유):** QQQ(합성無)=144배 정상, **GLD=70,679배·SCHD=44,300배** — 합성 종목만 폭발.
+
+**원인 = BUG-DIV-3 계열 잔재(계산기 윈도우 합성 경로 미수정):** `AccumulationAnalyzer._load_with_per_window_synthetic`이 합성 prefix를 stitch할 때 anchor를 `synthetic_params["anchor_price"]`(data_preparer가 raw `price_daily`로 잡은 **USD**)로 사용. 실 suffix는 `get_price(allow_synthetic=False)`라 **FX(KRW) 적용**(US자산 ×환율 ~1300). → `actual_start` 경계에서 USD(GLD 44)→KRW(48,400) **~환율배 점프** → buy-hold가 경계 넘으며 ~1300배 폭등. `build_window_synth_params`(C3 보충경로)는 이미 get_price(FX) anchor로 고쳤으나, 계산기는 data_preparer USD anchor를 넘겨 이 경로가 안 고쳐짐.
+
+**수정:** ① **anchor FX 정합** — 합성 anchor를 `actual_start`의 FX 실가격(`get_price` 첫 종가)으로 잡아 실 suffix와 단위 일치(build_window_synth_params와 동일 방식). ② **합성 mu 캡** `MAX_SYNTH_MU_MONTHLY=0.0065`(≈연8.1% USD, SPY 1928~ 장기치 기준) — 짧은 불장 표본 mu(GLD 연12.6%)를 수십 년 외삽하는 비현실성 완화. 두 합성 경로(window·DB generate_and_save) 동일 적용.
+
+**검증(서버 DB 복사본, 40년 1천만 매수보유):** GLD 70,679→**18배**, SCHD 44,300→**14배**, QGS 포트 38,696배(354억)→**62배(6.16억)**, 재투자 76배(7.63억). SPY 40년 64배(6.4억)와 동급 — 폭발 제거·현실화. QQQ(비합성) 144배 불변 = 비합성 경로 무손상. 회귀 `tests/test_synthetic_anchor_fx.py`(경계 점프<5배·prefix KRW단위) + 관련 스위트(data-prep·accum·rolling·C3) 43 PASS.
+
+**정직한 한계:** 상장 전 합성은 본질적으로 D등급 추측이다. 단일 mu 캡은 자산별 장기특성(예 금 1980~2000 횡보)을 못 잡아 여전히 근사다. 진짜 정확도 향상 = 실 프록시 매핑(금→GC=F/KRX_GOLD, 배당주→배당지수)·로그공간 생성(크래시가드 상방편향 제거)이며 별도 과제로 남김.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-05] fix | BUG-CALC-40Y 원인 확정·수정 — 백필 ok-skip이 합성 폴스루 차단
 
 투자계산기 장기(40·30년) "가상 데이터 생성 불가" 에러 추적. **로컬 재현 불가**(로컬 DB 깊음)라 **서버 DB 실측 필요** — 오너 승인하에 Hetzner(178.105.84.213) SSH **읽기전용** 조회.

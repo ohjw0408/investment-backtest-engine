@@ -123,6 +123,72 @@ def test_conditional_prefix_follows_real_ticker():
     assert 0.5 < jump < 2.0, f"경계 점프 {jump:.3f}"
 
 
+def _correlated_three(rho=0.8, n=5400, seed=7):
+    """공통팩터로 3종목 corr≈rho. 상장일 제각각."""
+    rng = np.random.default_rng(seed)
+    dates = pd.bdate_range("2000-01-01", periods=n)
+    f = rng.standard_normal(n)
+    cols = {}
+    for nm, mu, sig, base in [("AAA", 0.0003, 0.010, 100.0),
+                              ("BBB", 0.0004, 0.012, 50.0),
+                              ("CCC", 0.0002, 0.009, 80.0)]:
+        e = rng.standard_normal(n)
+        r = mu + sig * (np.sqrt(rho) * f + np.sqrt(1 - rho) * e)
+        cols[nm] = base * np.cumprod(1 + r)
+    return dates, cols
+
+
+def test_three_ticker_multisegment_and_empty_R():
+    """k=3, 상장일 3종(다중 세그먼트 + R공집합 무조건결합) 실사용 경로.
+
+    AAA 상장 dates[300], BBB dates[1800], CCC dates[3300].
+    window_start=dates[0] < 모든 actual_start → 최초 구간 R공집합(전부합성, 무조건 결합).
+    이후 AAA만 실(R=1)·AAA+BBB 실(R=2) 세그먼트서 CCC 조건부.
+    """
+    dates, cols = _correlated_three(rho=0.8)
+    loader = FakeLoader()
+    cuts = {"AAA": 300, "BBB": 1800, "CCC": 3300}
+    for c, cut in cuts.items():
+        loader.add_series(c, dates[cut:], cols[c][cut:])
+
+    js = estimate_joint_stats(["AAA", "BBB", "CCC"], loader)
+    assert js["ok"], js.get("warnings")
+    o = js["order"]
+    # 추정 상관 3쌍 모두 복원
+    for x, y in [("AAA", "BBB"), ("AAA", "CCC"), ("BBB", "CCC")]:
+        rho_hat = js["corr"][o.index(x), o.index(y)]
+        assert 0.6 < rho_hat < 0.95, f"{x}-{y} est {rho_hat:.3f}"
+
+    ws = dates[0]                       # 모든 상장 전 → R공집합 구간 포함
+    we = dates[4000]                    # CCC 상장(3300) 후까지
+    combined, _ = generate_joint_window(["AAA", "BBB", "CCC"], js, ws, we, loader)
+    assert set(combined) == {"AAA", "BBB", "CCC"}
+
+    # 가격 전부 유한·양수(폭발/음수 없음)
+    for c in combined:
+        cl = combined[c]["close"].dropna()
+        assert np.all(np.isfinite(cl)) and np.all(cl > 0), f"{c} 가격 이상"
+
+    # ── R=2 세그먼트(AAA·BBB 실, CCC 합성): CCC가 둘 다 추종 ──
+    seg2 = pd.bdate_range(dates[1800], dates[3300] - pd.Timedelta(days=1))
+    rc = combined["CCC"]["close"].reindex(seg2).pct_change().dropna()
+    ra = combined["AAA"]["close"].reindex(seg2).pct_change().dropna()
+    rb = combined["BBB"]["close"].reindex(seg2).pct_change().dropna()
+    ci = rc.index.intersection(ra.index).intersection(rb.index)
+    corr_ca = np.corrcoef(rc.loc[ci], ra.loc[ci])[0, 1]
+    corr_cb = np.corrcoef(rc.loc[ci], rb.loc[ci])[0, 1]
+    assert corr_ca > 0.5, f"CCC-AAA(R=2구간) {corr_ca:.3f}"
+    assert corr_cb > 0.5, f"CCC-BBB(R=2구간) {corr_cb:.3f}"
+
+    # ── R공집합 구간(AAA 상장 전, 전부합성): 무조건 결합 상관 유지 ──
+    seg0 = pd.bdate_range(dates[0], dates[300] - pd.Timedelta(days=1))
+    a0 = combined["AAA"]["close"].reindex(seg0).pct_change().dropna()
+    b0 = combined["BBB"]["close"].reindex(seg0).pct_change().dropna()
+    ci0 = a0.index.intersection(b0.index)
+    corr_ab0 = np.corrcoef(a0.loc[ci0], b0.loc[ci0])[0, 1]
+    assert corr_ab0 > 0.4, f"R공집합 AAA-BBB {corr_ab0:.3f} (독립이면 ≈0)"
+
+
 def test_deterministic():
     loader, dates, cut = _build_loader(rho=0.8)
     js = estimate_joint_stats(["AAA", "BBB"], loader)

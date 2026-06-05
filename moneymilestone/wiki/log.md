@@ -14,7 +14,7 @@
 
 **로컬 검증** `tests/test_synthetic_mvn.py` 5종: 인메모리 corr=0.8 합성데이터로 추정 **0.808** → `generate_joint_window` 합성구간 복원 **0.788**(독립이면 ≈0)·nearest-PSD 단위대각·경계점프 0.5~2·결정론(동일seed 동일가격)·표본부족 ok=False. 회귀: anchor-fx/data-preparer/accum 30 + 광역(rolling·multi·accum·synth·track_g·l_save·gate2·l3·backtest) **137 PASS**, 회귀 0.
 
-⚠️ **미커밋·미배포.** 실데이터 SCHD-SPY 0.89 복원·리밸 정상화(none↔band30 스프레드 소폭·단조·MDD 반응)는 서버 배포 후 검증 대기. DB경로(`generate_and_save`) 단일종목 독립이라 미수정(9.4=a 후순위, 캡·경고만).
+✅ **커밋(4a48803)·Hetzner 배포·서버 검증 완료.** domino.service 배포 직후 재시작·HTTP 200. **서버 실데이터(읽기전용) 상관 복원 PASS:** SCHD real 2003-11~·SPY 1928~, 추정 corr SCHD-SPY=**0.913**(실 겹침), 합성구간 corr **0.03(수정전)→0.947(수정후)**(n=2084), SCHD 합성가격 2336~10897 KRW 비폭발(BUG-SYNTH-FX 회귀 무손상). 리밸 정상화(none↔band30 스프레드)는 브라우저 실측 잔여. DB경로(`generate_and_save`) 단일종목 독립이라 미수정(9.4=a 후순위, 캡·경고만).
 
 _작성: Claude (Opus 4.8)_
 

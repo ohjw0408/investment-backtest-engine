@@ -402,6 +402,23 @@ class AccumulationAnalyzer:
         combined: dict = {}
         all_dates_set: set = set()
 
+        # BUG-SYNTH-CORR: 조건부 다변량(종목 간 상관 복원) 우선 시도.
+        # 추정 실패(표본부족·특이)·생성 실패 시 아래 종목별 독립 GBM 폴백(회귀 0).
+        js = getattr(self, "_joint_stats", "unset")
+        if js == "unset":
+            try:
+                from modules.retirement.synthetic_mvn import estimate_joint_stats
+                self._joint_stats = estimate_joint_stats(self.tickers, raw_loader)
+            except Exception:
+                self._joint_stats = {"ok": False}
+            js = self._joint_stats
+        if js and js.get("ok"):
+            try:
+                from modules.retirement.synthetic_mvn import generate_joint_window
+                return generate_joint_window(self.tickers, js, window_start, window_end, raw_loader)
+            except Exception:
+                pass  # 독립 폴백으로 진행
+
         for code in self.tickers:
             params = self.synthetic_params.get(code)
             window_start_str = window_start.strftime("%Y-%m-%d")

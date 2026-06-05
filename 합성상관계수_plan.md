@@ -1,7 +1,22 @@
 # 합성 데이터 상관계수 복원 설계 플랜 (완전 조건부 다변량)
 
-> 작성 2026-06-05 (Claude Opus 4.8). 상태: **설계안 — 승인 대기, 미구현.**
+> 작성 2026-06-05 (Claude Opus 4.8). 상태: **구현 완료 (2026-06-06) — 로컬 PASS, 서버 실데이터 검증 대기.**
+> 구현물: `modules/retirement/synthetic_mvn.py` + 단일/멀티 분석기 joint 분기 + `tests/test_synthetic_mvn.py`.
 > v2: 시장팩터 모델 폐기(시장지수 없는 ETF 상관 불가) → **조건부 다변량**으로 교체.
+
+## 0. 오너 결정 (2026-06-06 확정)
+
+- **9.1 = (a)** μ_S 캡 backstop 유지 (`MAX_SYNTH_MU_MONTHLY`, 이미 배포된 안전망 재사용).
+- **9.2 = (b)** 쌍별(pairwise) 추정 — 각 종목쌍 최대 겹침구간으로 상관 산출. ⚠️ PSD 깨질 수 있어
+  **nearest-PSD 보정**(고유값 클리핑) 필수. 추천(a)보다 복잡하나 표본 최대 활용.
+- **9.3 = (a)** 다변량-t 근사 (z_t = 표준-t df=5 / T_SCALE, 꼬리·MDD 보존).
+- **9.4 = (a)** DB경로(`generate_and_save`) 후순위 — 윈도우 경로만 수정.
+
+### 구현 단순화(플랜 §4 대비)
+- `joint_stats`를 synthetic_params로 플러밍하지 않고 **분석기 안에서 raw_loader+tickers로 1회
+  lazy 계산·캐시**. 실데이터에서만 유도되므로 params 출처(data_preparer / build_window_synth_params) 무관.
+- **폴백 = 전부-joint 또는 전부-독립**(혼합 없음). joint 추정 실패(표본부족·특이) 시 `ok=False`
+  → 분석기가 기존 독립 루프 그대로 사용(회귀 0). §5의 "독립 폴백+경고" 구현.
 
 ## 1. 문제
 

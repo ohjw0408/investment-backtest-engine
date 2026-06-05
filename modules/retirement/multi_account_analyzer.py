@@ -490,6 +490,25 @@ class MultiAccountAnalyzer:
         combined: dict = {}
         all_dates: set = set()
 
+        # BUG-SYNTH-CORR: 조건부 다변량(종목 간 상관 복원) 우선, 실패 시 독립 폴백.
+        _key = tuple(tickers)
+        _cache = getattr(self, "_joint_stats_cache", None)
+        if _cache is None:
+            _cache = self._joint_stats_cache = {}
+        if _key not in _cache:
+            try:
+                from modules.retirement.synthetic_mvn import estimate_joint_stats
+                _cache[_key] = estimate_joint_stats(list(tickers), raw_loader)
+            except Exception:
+                _cache[_key] = {"ok": False}
+        js = _cache[_key]
+        if js and js.get("ok"):
+            try:
+                from modules.retirement.synthetic_mvn import generate_joint_window
+                return generate_joint_window(list(tickers), js, window_start, window_end, raw_loader)
+            except Exception:
+                pass  # 독립 폴백
+
         for code in tickers:
             params = self._synth_params.get(code)
             if params is None:

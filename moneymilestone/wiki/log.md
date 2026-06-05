@@ -1,5 +1,25 @@
 # Log
 
+## [2026-06-06] fix | BUG-SYNTH-CORR 조건부 다변량 합성 구현 — 합성구간 상관 복원
+
+설계 플랜(업데이트48) 오너 결정 확정 후 구현. **결정: 9.1=a**(μ_S 캡 backstop)·**9.2=b**(쌍별 추정+nearest-PSD)·**9.3=a**(다변량-t)·**9.4=a**(DB경로 후순위).
+
+**신규 `modules/retirement/synthetic_mvn.py`:**
+- `estimate_joint_stats(tickers, raw_loader)` — 종목별 실데이터 전체 일일수익(get_price FX·KRW)으로 μ·σ, **쌍별(9.2=b) 최대겹침구간 상관** 산출 → 고유값 클리핑 **nearest-PSD 보정**(단위대각 복원) → cov. 표본<252 or 쌍 겹침<252면 경고/0가정, 종목 표본부족 시 `ok=False`(폴백 신호).
+- `generate_joint_window(...)` — 윈도우별 조건부 다변량 합성 prefix + 실 suffix. actual_start 경계로 **세그먼트 분할**(구간마다 R=실범위·S=합성필요), `r_S = μ_S + B(a−μ_R) + L·z`(B=Σ_SR Σ_RR⁻¹, Σ_cond=Σ_SS−B Σ_RS, L=chol, z=표준t(df5)/T_SCALE). R 공집합이면 무조건 결합. μ_S만 일일캡(9.1=a), μ_R(centering)은 raw. FX anchor 역재구성(BUG-SYNTH-FX 유지).
+
+**배선:** 단일 `_load_with_per_window_synthetic`·멀티 `_load_window_synthetic` 둘 다 함수 상단에 joint 분기 — raw_loader+tickers로 **lazy 1회 추정·캐시**(synthetic_params 플러밍 안 함, 실데이터에서만 유도) → `ok` 이면 `generate_joint_window` 반환, 실패(추정/생성 예외)면 **기존 종목별 독립 GBM 루프로 폴스루**(전부-joint 또는 전부-독립, 혼합 없음 → 회귀 0).
+
+**핵심 디버그 — 역재구성 off-by-one:** 첫 테스트서 합성구간 corr 0.058(복원 실패). 원인 = `prices[i]=prices[i+1]/(1+r[i])` 역재구성이 r_i를 d_i→d_{i+1} 전이로 만들어 **pct_change가 1일 밀림** → r_i는 a_{d_i}에 조건부인데 corr 측정은 a_{d_{i+1}}과 매칭돼 상관 소멸. **수정:** 전이에 `r[i+1]` 사용 → day d_i pct_change = 조건부 r_i 정렬. (독립 폴백 경로는 상관 무관이라 미수정.)
+
+**로컬 검증** `tests/test_synthetic_mvn.py` 5종: 인메모리 corr=0.8 합성데이터로 추정 **0.808** → `generate_joint_window` 합성구간 복원 **0.788**(독립이면 ≈0)·nearest-PSD 단위대각·경계점프 0.5~2·결정론(동일seed 동일가격)·표본부족 ok=False. 회귀: anchor-fx/data-preparer/accum 30 + 광역(rolling·multi·accum·synth·track_g·l_save·gate2·l3·backtest) **137 PASS**, 회귀 0.
+
+⚠️ **미커밋·미배포.** 실데이터 SCHD-SPY 0.89 복원·리밸 정상화(none↔band30 스프레드 소폭·단조·MDD 반응)는 서버 배포 후 검증 대기. DB경로(`generate_and_save`) 단일종목 독립이라 미수정(9.4=a 후순위, 캡·경고만).
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-05] design | BUG-SYNTH-CORR 발견 + 조건부 다변량 합성 설계 플랜
 
 BUG-SYNTH-FX(40년 폭발) 수정 후 오너가 밴드 리밸런싱 이상 발견: 합성 GLD+SCHD+SPY 33% 등비중

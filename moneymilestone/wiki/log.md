@@ -1,5 +1,20 @@
 # Log
 
+## [2026-06-07] plan | G5 프론트 UI 배선 — 탭별 차이 정리 + 공용모듈 결정
+
+본선(Track G5 멀티계좌 UI) 복귀. 백엔드(G5-A/B/C 엔진+L10~L12) 완료, 남은 건 프론트 UI뿐. **코드 실측 차이 정리:**
+
+- **현 상태:** calculator만 멀티계좌 UI 완비(외부 `calculator.js`). **backtest·retirement는 구형 단일계좌 드롭다운(`account_type`)만, 멀티 UI 전무.** 두 탭은 JS가 **HTML 인라인**(`backtest.html` L358~, `retirement.html` L589~)이라 calculator.js 외부파일 공유 불가.
+- **레퍼런스 3구성:** DOM 패널(`calculator.html` L117~164) + JS 함수군(`calculator.js` L1128~1450, ~320줄, BUG-G1-2 커서회피 내장) + 페이로드빌더(L272~383) + 결과렌더 `renderMultiAccountSummary`(L623~).
+- **탭별 결과렌더 갈림(핵심):** 은퇴 적립=calculator 동형 분포(렌더 재사용) / 백테스트=단일윈도우라 계좌별 **스칼라 종료값**(분포 아님, 적응) / 은퇴 인출=**생존율 분포** 신규 렌더.
+- **권장 순서:** 은퇴적립→백테→은퇴인출(동형부터, 엔진순서와 반대).
+
+**오너 결정 = 공용 JS 모듈 추출(b).** 인라인 3벌 복제는 드리프트(BUG-G1-2식 수정 3곳) 위험으로 기각. 신규 `static/js/multi_account_ui.js` → 3탭 `<script src>` 공유. 1단계=calculator에서 추출(회귀0 확인), 2단계=backtest/retirement 배선. 상세 = `trackG_multiaccount_plan.md` 「G5 프론트 UI 배선」.
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-06] investigation | 합성 리밸런싱 현상 = 실제 금융(버그 아님) + FX 상관 오염 발견
 
 BUG-SYNTH-CORR 배포 후 오너가 "합성 40년 리밸하면 자산↑·MDD 불변·밴드 넓힐수록 더↑(37→44억)" 이상현상 제기 → 심층 조사(서버 실DB·읽기전용 + 순수 numpy). 상세: [[합성_리밸런싱_조사]].

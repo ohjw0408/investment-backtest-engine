@@ -1,5 +1,19 @@
 # Log
 
+## [2026-06-07] refactor | G5 1단계 — 멀티계좌 UI 공용모듈 추출(calculator)
+
+오너 결정(공용모듈 b) 따라 1단계 착수. 신규 `static/js/multi_account_ui.js` — calculator.js 멀티계좌 입력 UI 16함수(ACCOUNT_TYPES·buildDistributionPolicy·계좌/종목 CRUD·renderTaxAccounts·checkTaxLimits·fmtTaxKRW) **순수 이동**(로직 무변경). calculator.js서 288줄 제거. calculator.html이 모듈을 calculator.js **앞에** 로드(v20260607extract).
+
+**설계 근거:** classic script들은 전역 lexical 환경 공유 → 옮긴 함수가 calculator.js 잔류 전역(`tickers`·`badgeColor`·`fmtKRW`) 런타임 참조 정상. 호스트 계약(전역 `tickers`/`window.taxAccounts`, DOM id `initialCapital`/`monthlyContrib`/`taxAccountList` 등)을 모듈 헤더에 명시 — 2단계서 backtest/retirement가 충족해야 함. 결과렌더(`renderMultiAccountSummary`)·토글·프로필로드는 탭별 glue라 모듈서 제외.
+
+**검증(정적):** node --check 모듈·calculator.js 둘 다 OK, 결합 파싱 재선언 충돌 0, calculator 중복정의 잔존 0, 호스트 전역 보존. ⚠️ **브라우저 실클릭 미확인**(순수 리팩이라 동작 불변 기대하나 런타임 DOM 동작 미실측). ⚠️ 미배포.
+
+**▶ 다음 = 1단계 브라우저 스모크(세금ON→계좌추가→종목추가→실행) OR 2단계(backtest/retirement 배선, 은퇴적립→백테→은퇴인출).**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-07] plan | G5 프론트 UI 배선 — 탭별 차이 정리 + 공용모듈 결정
 
 본선(Track G5 멀티계좌 UI) 복귀. 백엔드(G5-A/B/C 엔진+L10~L12) 완료, 남은 건 프론트 UI뿐. **코드 실측 차이 정리:**

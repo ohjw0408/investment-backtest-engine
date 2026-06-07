@@ -12,6 +12,21 @@
 
 const ACCOUNT_TYPES = ['위탁', 'ISA', '연금저축', 'IRP'];
 
+// 탭별 결합점 설정. 각 탭이 자기 포트폴리오 전역·상단 금액 DOM id를 주입.
+// 미설정 시 calculator 기본값(전역 `tickers`, id `initialCapital`/`monthlyContrib`).
+window.MMTAX = window.MMTAX || {};
+function _mmPortfolioTickers() {
+  if (typeof window.MMTAX.portfolioTickers === 'function') return window.MMTAX.portfolioTickers();
+  return (typeof tickers !== 'undefined') ? tickers : [];
+}
+function _mmTotalAmount(kind) {
+  const id = kind === 'init'
+    ? (window.MMTAX.totalInitId || 'initialCapital')
+    : (window.MMTAX.totalMonId  || 'monthlyContrib');
+  const el = document.getElementById(id);
+  return el ? (Number(el.value) || 0) : 0;
+}
+
 // 계좌 우선순위 순서로 분배 정책(자금이동 목적지 cascade) 생성.
 function buildDistributionPolicy(accountsPayload) {
   if (!accountsPayload || accountsPayload.length <= 1) return null;
@@ -27,7 +42,7 @@ function addTaxAccount() {
     type: '위탁',
     initial_capital: 0,
     monthly_contribution: 0,
-    tickers: tickers.map(t => ({...t})),
+    tickers: _mmPortfolioTickers().map(t => ({...t})),
     priority: window.taxAccounts.length + 1,
   });
   renderTaxAccounts();
@@ -178,8 +193,8 @@ function fmtTaxKRW(v) {
 function renderTaxAccounts() {
   const accs     = window.taxAccounts;
   const isSingle = accs.length <= 1;
-  const totalI   = Number(document.getElementById('initialCapital').value) || 0;
-  const totalM   = Number(document.getElementById('monthlyContrib').value)  || 0;
+  const totalI   = _mmTotalAmount('init');
+  const totalM   = _mmTotalAmount('mon');
   const list     = document.getElementById('taxAccountList');
   if (!list) return;
 
@@ -272,7 +287,7 @@ function renderTaxAccounts() {
 }
 
 function checkTaxLimits() {
-  const totalM  = Number(document.getElementById('monthlyContrib').value) || 0;
+  const totalM  = _mmTotalAmount('mon');
   const accs    = window.taxAccounts;
   const isSingle = accs.length <= 1;
   const warnings = [];

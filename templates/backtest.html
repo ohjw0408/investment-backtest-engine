@@ -220,26 +220,42 @@
           <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:4px;">세금 설정 프로필</div>
           <div id="btTaxProfileInfo">세금 설정에서 불러옵니다.</div>
         </div>
-        <div style="margin-bottom:8px;">
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">계좌 유형</div>
-          <select id="btTaxAccount" onchange="updateBtTaxAccount()"
-            style="width:100%;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;background:white;">
-            <option value="위탁">위탁</option>
-            <option value="ISA">ISA</option>
-            <option value="연금저축">연금저축</option>
-            <option value="IRP">IRP</option>
-          </select>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:0.82rem;font-weight:700;">계좌 설정</span>
+          <button onclick="addTaxAccount()" style="font-size:0.75rem;padding:4px 10px;background:var(--blue);color:white;border:none;border-radius:6px;cursor:pointer;">+ 계좌 추가</button>
         </div>
-        <div id="btGainHarvesting" style="display:block;padding:8px 10px;background:#E3F2FD;border-radius:8px;margin-bottom:8px;font-size:0.8rem;border:1px solid #90CAF9;">
+        <div id="taxAccountList"></div>
+        <div id="taxWarnings" style="margin-top:4px;"></div>
+
+        <!-- ISA 풍차돌리기 옵션 (ISA 선택 시만 표시) -->
+        <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:#E8F5E9;border-radius:8px;font-size:0.8rem;border:1px solid #A5D6A7;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="btGainHarvestingCheck" style="width:14px;height:14px;">
+            <input type="checkbox" id="isaRenewalCheck" style="width:14px;height:14px;">
+            <div>
+              <span style="font-weight:700;color:#1B5E20;">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
+              <div style="color:#2E7D32;font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 200만원 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다.</div>
+            </div>
+          </label>
+        </div>
+
+        <div id="taxDeductionSection" style="display:none;margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;font-size:0.8rem;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="taxDeductionReinvest" checked style="width:14px;height:14px;">
+            <span>세액공제 환급금 재투자</span>
+          </label>
+        </div>
+
+        <!-- 절세 매도 (위탁 계좌 선택 시 표시) -->
+        <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:#E3F2FD;border-radius:8px;font-size:0.8rem;border:1px solid #90CAF9;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="gainHarvestingCheck" style="width:14px;height:14px;">
             <div>
               <span style="font-weight:700;color:#1565C0;">📉 절세 매도 (연 250만 공제 소진)</span>
               <div style="color:#1976D2;font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
             </div>
           </label>
         </div>
-        <div style="font-size:0.75rem;color:var(--text-muted);background:var(--bg);padding:7px 10px;border-radius:6px;">
+        <div style="margin-top:8px;font-size:0.75rem;color:var(--text-muted);background:var(--bg);padding:7px 10px;border-radius:6px;">
           세금 적용 시 최종 자산에 청산세 반영 (배당세·리밸런싱 CG세 포함)
         </div>
       </div>
@@ -305,6 +321,7 @@
           </div>
         </div>
         <div class="metrics-grid" id="btMetrics"></div>
+        <div id="btMultiAccountSummary" style="margin-top:14px;"></div>
       </div>
 
       <!-- 포트폴리오 가치 차트 -->
@@ -355,6 +372,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260607b"></script>
 <script>
 // 오늘 날짜 기본값
 document.getElementById('btEndDate').value = new Date().toISOString().split('T')[0];
@@ -466,8 +484,16 @@ document.getElementById('btMonthly').addEventListener('input', function() {
 // ── 세금 토글 ──
 window.btTaxEnabled = false;
 window.btTaxProfile = {};
+// 멀티계좌 공용모듈(multi_account_ui.js) 결합점 — 백테 포트폴리오·금액 DOM 주입.
+window.taxAccounts = [];
+window.MMTAX = {
+  portfolioTickers: () => btTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: (t.weight || 0) * 100 })),
+  totalInitId: 'btSeed',
+  totalMonId:  'btMonthly',
+};
 function toggleBtTax() {
   window.btTaxEnabled = !window.btTaxEnabled;
+  window.taxEnabled   = window.btTaxEnabled;  // 모듈이 참조
   const on = window.btTaxEnabled;
   document.getElementById('btTaxWrap').style.background = on ? 'var(--blue)' : 'var(--border)';
   document.getElementById('btTaxThumb').style.left      = on ? '23px' : '3px';
@@ -475,7 +501,8 @@ function toggleBtTax() {
   document.getElementById('btTaxLabel').style.color     = on ? 'var(--blue)' : 'var(--text-muted)';
   document.getElementById('btTaxPanel').style.display   = on ? 'block' : 'none';
   if (on) {
-    updateBtTaxAccount();
+    if (window.taxAccounts.length === 0) addTaxAccount();
+    else renderTaxAccounts();
     loadBtTaxProfile();
   }
 }
@@ -503,10 +530,101 @@ async function loadBtTaxProfile() {
   info.innerHTML = `연소득 ${fmtKRW(window.btTaxProfile.earned_income || 0)} · 나이 ${window.btTaxProfile.age || 40}세 <a href="/tax-settings" style="color:var(--blue);margin-left:6px;">수정</a>`;
 }
 
-function updateBtTaxAccount() {
-  const acc   = document.getElementById('btTaxAccount')?.value;
-  const ghSec = document.getElementById('btGainHarvesting');
-  if (ghSec) ghSec.style.display = acc === '위탁' ? 'block' : 'none';
+// 멀티계좌 페이로드 — 계좌 2개 이상일 때만. 계좌 1은 상단 포트폴리오/금액 사용.
+function buildBtAccountsPayload(rebalMode, bandWidth, dividendMode) {
+  const accs = window.taxAccounts || [];
+  if (accs.length <= 1) return null;
+  const renewalOn = document.getElementById('isaRenewalCheck')?.checked ?? false;
+  const primary = {
+    type: accs[0]?.type || '위탁',
+    initial_capital: parseFloat(document.getElementById('btSeed').value) || 0,
+    monthly_contribution: parseFloat(document.getElementById('btMonthly').value) || 0,
+    tickers: btTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: t.weight })),
+    rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
+    isa_renewal: renewalOn && (accs[0]?.type === 'ISA'),
+    priority: Number(accs[0]?.priority ?? 1),
+  };
+  const accounts = [primary];
+  for (let i = 1; i < accs.length; i++) {
+    const accTickers = ensureAccountTickers(i);
+    if (accTickers.length === 0) { alert(`계좌 ${i + 1}에 종목을 최소 1개 추가해주세요.`); return false; }
+    if (accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0) > 100) {
+      alert(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`); return false;
+    }
+    accounts.push({
+      type: accs[i].type || '위탁',
+      initial_capital: Number(accs[i].initial_capital || 0),
+      monthly_contribution: Number(accs[i].monthly_contribution || 0),
+      tickers: accTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: (Number(t.weight) || 0) / 100 })),
+      rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
+      isa_renewal: renewalOn && (accs[i].type === 'ISA'),
+      priority: Number(accs[i].priority ?? (i + 1)),
+    });
+  }
+  return accounts;
+}
+
+// 백테 멀티계좌 결과 — 단일 역사윈도우라 계좌별 = 스칼라 종료값(분포 아님). + 절세·자금이동.
+function btRenderMultiAccount(data) {
+  const wrap = document.getElementById('btMultiAccountSummary');
+  if (!wrap) return;
+  const accts = data.accounts || [];
+  if (!data.multi_account || accts.length <= 1) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+
+  const rows = accts.map((a, i) => `
+    <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;">
+        <div style="font-size:0.82rem;font-weight:800;color:var(--text);">계좌 ${i + 1}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);">${a.type || '위탁'}</div>
+      </div>
+      <div style="font-size:0.95rem;font-weight:800;color:var(--text);">${fmtKRW(a.end_value)}</div>
+      ${a.tax_paid ? `<div style="font-size:0.68rem;color:#C62828;margin-top:2px;">세금 ${fmtKRW(a.tax_paid)}</div>` : ''}
+    </div>`).join('');
+
+  // 절세액(세금 ON) — 계산기와 동일 savings 스키마.
+  let savingsHtml = '';
+  const sv = data.savings;
+  if (sv && sv.combined && sv.combined.brokerage_assumed_tax > 0) {
+    const c = sv.combined;
+    const totalSaving = (c.tax_saving || 0) + (c.gain_harvest_saving || 0);
+    savingsHtml = `
+      <div style="margin-top:10px;padding:12px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;">
+        <div style="font-size:0.8rem;font-weight:800;color:#1B5E20;margin-bottom:8px;">💰 세금 절감 효과</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+          <div><div style="font-size:0.68rem;color:#558B2F;">전체 위탁 가정 세금</div><div style="font-size:0.9rem;font-weight:800;color:#33691E;">${fmtKRW(c.brokerage_assumed_tax)}</div></div>
+          <div><div style="font-size:0.68rem;color:#558B2F;">실제 세금</div><div style="font-size:0.9rem;font-weight:800;color:#33691E;">${fmtKRW(c.actual_tax)}</div></div>
+          <div><div style="font-size:0.68rem;color:#558B2F;">절세액</div><div style="font-size:0.98rem;font-weight:900;color:#2E7D32;">약 ${fmtKRW(totalSaving)}</div></div>
+        </div>
+      </div>`;
+  }
+
+  // 자금이동·세액공제(g2)
+  let g2Html = '';
+  const g2 = data.g2;
+  if (g2) {
+    const tl = g2.transfer_log || [];
+    const maturity = tl.filter(t => t.type === 'maturity').length;
+    const comp = g2.comprehensive_years || [];
+    const items = [];
+    if (maturity) items.push(`ISA 풍차 만기 ${maturity}회 → 우선순위대로 분배`);
+    if (comp.length) items.push(`금융소득종합과세 대상연도: ${comp.join(', ')}`);
+    if (g2.annual_deduction_credit > 0) items.push(`연 납입 세액공제 환급: ${fmtKRW(g2.annual_deduction_credit)}`);
+    if (g2.pension_transfer_credit_total > 0) items.push(`ISA→연금 이전 세액공제: ${fmtKRW(g2.pension_transfer_credit_total)}`);
+    if (items.length) g2Html = `
+      <div style="margin-top:10px;padding:10px 12px;background:#F1F8E9;border:1px solid #C5E1A5;border-radius:8px;">
+        <div style="font-size:0.78rem;font-weight:800;color:#33691E;margin-bottom:6px;">자금 이동 · 세액공제</div>
+        ${items.map(t => `<div style="font-size:0.76rem;color:#33691E;margin-top:3px;">• ${t}</div>`).join('')}
+      </div>`;
+  }
+
+  wrap.innerHTML = `
+    <div class="bt-card" style="margin-bottom:0;">
+      <div class="bt-card-title">계좌별 종료 자산</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">${rows}</div>
+      ${savingsHtml}
+      ${g2Html}
+    </div>`;
+  wrap.style.display = 'block';
 }
 
 // ── 실행 ──
@@ -540,21 +658,36 @@ async function runBacktest() {
       band_width:           Number(document.getElementById('btBandSlider').value) / 100,
       use_synthetic:        document.getElementById('btUseSyntheticCheck')?.checked ?? false,
     };
+    const accs = window.taxAccounts || [];
+    const acct0Type = (window.btTaxEnabled && accs.length) ? (accs[0].type || '위탁') : '위탁';
+    const accountsPayload = window.btTaxEnabled
+      ? buildBtAccountsPayload(window._btLastBody.rebal_mode, window._btLastBody.band_width, window._btLastBody.dividend_mode)
+      : null;
+    if (accountsPayload === false) { btHideProgressUI(); document.getElementById('btRunBtn').disabled = false; document.getElementById('btResultEmpty').style.display = 'flex'; return; }
+
+    const submitBody = {
+      ...window._btLastBody,
+      tax_enabled:          window.btTaxEnabled || false,
+      account_type:         acct0Type,
+      gain_harvesting: window.btTaxEnabled && accs.some(a => a.type === '위탁') && (document.getElementById('gainHarvestingCheck')?.checked ?? false),
+      isa_renewal:     window.btTaxEnabled && (document.getElementById('isaRenewalCheck')?.checked ?? false),
+      user_settings: (window.btTaxEnabled) ? {
+        age:           parseInt(taxProfile.age || 40),
+        earned_income: parseInt(taxProfile.earned_income || 0),
+        isa_type:      taxProfile.isa_type || 'general',
+        pension_age:   parseInt(taxProfile.pension_age || 65),
+      } : {},
+    };
+    if (accountsPayload && accountsPayload.length > 1) {
+      submitBody.accounts = accountsPayload;
+      submitBody.distribution_policy = buildDistributionPolicy(accountsPayload);
+      submitBody.reinvest_tax_credit = document.getElementById('taxDeductionReinvest')?.checked ?? false;
+      submitBody.manual_comprehensive_years = [];
+    }
     const res = await fetch('/api/backtest/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...window._btLastBody,
-        tax_enabled:          window.btTaxEnabled || false,
-        account_type:         document.getElementById('btTaxAccount')?.value || '위탁',
-        gain_harvesting: window.btTaxEnabled && document.getElementById('btTaxAccount')?.value === '위탁' && (document.getElementById('btGainHarvestingCheck')?.checked ?? false),
-        user_settings: (window.btTaxEnabled) ? {
-          age:           parseInt(taxProfile.age || 40),
-          earned_income: parseInt(taxProfile.earned_income || 0),
-          isa_type:      taxProfile.isa_type || 'general',
-          pension_age:   parseInt(taxProfile.pension_age || 65),
-        } : {},
-      }),
+      body: JSON.stringify(submitBody),
     });
     const resData = await res.json();
     if (res.status === 429) throw new Error(resData.error);
@@ -853,6 +986,9 @@ function renderBacktest(data) {
     };
   } catch(e) {}
   document.getElementById('btShareBtns').style.display = 'flex';
+
+  // 멀티계좌 계좌별 종료자산 + 절세·자금이동
+  btRenderMultiAccount(data);
 
   // 가치 추이 차트
   renderValueChart(data.history);

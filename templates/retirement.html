@@ -396,30 +396,37 @@
           </div>
         </div>
 
-        <!-- 계좌 유형 -->
-        <div style="margin-bottom:10px;">
-          <div style="font-size:0.8rem;font-weight:700;margin-bottom:6px;">계좌 유형</div>
-          <select id="retTaxAccount" onchange="updateRetTaxInfo()"
-            style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:0.85rem;background:white;">
-            <option value="위탁">위탁 (일반 계좌)</option>
-            <option value="ISA">ISA</option>
-            <option value="연금저축" selected>연금저축</option>
-            <option value="IRP">IRP</option>
-          </select>
+        <!-- 계좌 설정 (멀티계좌 — 적립기 전용) -->
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;">※ 멀티계좌는 적립기 시뮬에 적용됩니다.</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:0.82rem;font-weight:700;">계좌 설정</span>
+          <button onclick="addTaxAccount()" style="font-size:0.75rem;padding:4px 10px;background:var(--blue);color:white;border:none;border-radius:6px;cursor:pointer;">+ 계좌 추가</button>
         </div>
+        <div id="taxAccountList"></div>
+        <div id="taxWarnings" style="margin-top:4px;"></div>
 
         <!-- ISA 풍차돌리기 옵션 -->
-        <div id="retIsaRenewal" style="display:none;padding:8px 10px;background:#E8F5E9;border-radius:8px;margin-bottom:10px;font-size:0.8rem;border:1px solid #A5D6A7;">
+        <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:#E8F5E9;border-radius:8px;font-size:0.8rem;border:1px solid #A5D6A7;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="retIsaRenewalCheck" style="width:14px;height:14px;">
-            <span style="font-weight:700;color:#1B5E20;">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
+            <input type="checkbox" id="isaRenewalCheck" style="width:14px;height:14px;">
+            <div>
+              <span style="font-weight:700;color:#1B5E20;">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
+              <div style="color:#2E7D32;font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다.</div>
+            </div>
+          </label>
+        </div>
+
+        <div id="taxDeductionSection" style="display:none;margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;font-size:0.8rem;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="taxDeductionReinvest" checked style="width:14px;height:14px;">
+            <span>세액공제 환급금 재투자</span>
           </label>
         </div>
 
         <!-- 절세 매도 (위탁 계좌 시 표시) -->
-        <div id="retGainHarvesting" style="display:none;padding:8px 10px;background:#E3F2FD;border-radius:8px;margin-bottom:10px;font-size:0.8rem;border:1px solid #90CAF9;">
+        <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:#E3F2FD;border-radius:8px;font-size:0.8rem;border:1px solid #90CAF9;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="retGainHarvestingCheck" style="width:14px;height:14px;">
+            <input type="checkbox" id="gainHarvestingCheck" style="width:14px;height:14px;">
             <div>
               <span style="font-weight:700;color:#1565C0;">📉 절세 매도 (연 250만 공제 소진)</span>
               <div style="color:#1976D2;font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
@@ -545,6 +552,9 @@
         <div style="font-size:11px;color:var(--text-muted);text-align:right;margin-top:4px;" id="retAccCaseNote"></div>
       </div>
 
+      <!-- 멀티계좌 계좌별 분포 + 절세 + 자금이동 (적립기 멀티계좌 시) -->
+      <div id="multiAccountSummary" style="margin-top:14px;"></div>
+
       <!-- 시나리오별 생존율 (은퇴 시뮬레이션 모드만) -->
       <div class="acc-dist-card" id="retSampleCard">
         <div class="acc-dist-title">📊 축적 시나리오별 인출 생존율</div>
@@ -586,6 +596,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260607c"></script>
 <script>
 let retTickers = [];
 let _retTaskId = null, _retCancelled = false;
@@ -714,6 +725,40 @@ document.getElementById('wdSeed').addEventListener('input', function() { documen
 document.getElementById('wdWithdraw').addEventListener('input', function() { document.getElementById('wdWithdrawHint').textContent = fmtKRWHint(parseFloat(this.value)||0); });
 
 // ── 실행 ──
+// 멀티계좌 페이로드(적립기) — 계좌 1은 상단 포트폴리오/금액 사용. 2개 이상일 때만.
+function buildRetAccountsPayload(rebalMode, bandWidth, dividendMode) {
+  const accs = window.taxAccounts || [];
+  if (accs.length <= 1) return null;
+  const renewalOn = document.getElementById('isaRenewalCheck')?.checked ?? false;
+  const primary = {
+    type: accs[0]?.type || '위탁',
+    initial_capital: parseFloat(document.getElementById('simSeed').value) || 0,
+    monthly_contribution: parseFloat(document.getElementById('simMonthly').value) || 0,
+    tickers: retTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: t.weight })),
+    rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
+    isa_renewal: renewalOn && (accs[0]?.type === 'ISA'),
+    priority: Number(accs[0]?.priority ?? 1),
+  };
+  const accounts = [primary];
+  for (let i = 1; i < accs.length; i++) {
+    const accTickers = ensureAccountTickers(i);
+    if (accTickers.length === 0) { alert(`계좌 ${i + 1}에 종목을 최소 1개 추가해주세요.`); return false; }
+    if (accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0) > 100) {
+      alert(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`); return false;
+    }
+    accounts.push({
+      type: accs[i].type || '위탁',
+      initial_capital: Number(accs[i].initial_capital || 0),
+      monthly_contribution: Number(accs[i].monthly_contribution || 0),
+      tickers: accTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: (Number(t.weight) || 0) / 100 })),
+      rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
+      isa_renewal: renewalOn && (accs[i].type === 'ISA'),
+      priority: Number(accs[i].priority ?? (i + 1)),
+    });
+  }
+  return accounts;
+}
+
 async function runRetirement() {
   const total = Math.round(retTickers.reduce((s,t) => s+t.weight, 0) * 100);
   if (!retTickers.length) { alert('종목을 추가해주세요.'); return; }
@@ -750,9 +795,9 @@ async function runRetirement() {
       pension_start_age:    parseInt(document.getElementById('simPensionStartAge')?.value) || 65,
       target_percentile:    targetProb,
       tax_enabled:          retTaxOn,
-      account_type:         document.getElementById('retTaxAccount')?.value || '위탁',
-      isa_renewal:          retTaxOn && (document.getElementById('retIsaRenewalCheck')?.checked ?? false),
-      gain_harvesting:      retTaxOn && document.getElementById('retTaxAccount')?.value === '위탁' && (document.getElementById('retGainHarvestingCheck')?.checked ?? false),
+      account_type:         (window.taxAccounts && window.taxAccounts[0]) ? (window.taxAccounts[0].type || '위탁') : '위탁',
+      isa_renewal:          retTaxOn && (document.getElementById('isaRenewalCheck')?.checked ?? false),
+      gain_harvesting:      retTaxOn && (window.taxAccounts || []).some(a => a.type === '위탁') && (document.getElementById('gainHarvestingCheck')?.checked ?? false),
       user_settings: retTaxOn ? {
         age:           retAge,
         earned_income: parseFloat(taxProfile.earned_income || 0),
@@ -760,6 +805,21 @@ async function runRetirement() {
         pension_age:   parseInt(taxProfile.pension_age || 65),
       } : {},
     };
+    // 멀티계좌(적립기) — 계좌 2개 이상이면 accounts/분배정책 부착.
+    const _retAp = retTaxOn ? buildRetAccountsPayload(body.rebal_mode, body.band_width, body.dividend_mode) : null;
+    if (_retAp === false) {
+      document.getElementById('retRunBtn').disabled = false;
+      document.getElementById('retLoading').style.display = 'none';
+      document.getElementById('retResultEmpty').style.display = 'flex';
+      retHideProgressUI && retHideProgressUI();
+      return;
+    }
+    if (_retAp && _retAp.length > 1) {
+      body.accounts = _retAp;
+      body.distribution_policy = buildDistributionPolicy(_retAp);
+      body.reinvest_tax_credit = document.getElementById('taxDeductionReinvest')?.checked ?? false;
+      body.manual_comprehensive_years = [];
+    }
   } else {
     body = {
       tickers:            retTickers.map(t => ({ code: t.code, name: t.name, weight: t.weight })),
@@ -1023,16 +1083,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ── 세금 토글 ──────────────────────────────────────────
 window.retTaxEnabled = false;
 window.retTaxProfile = {};
+// 멀티계좌 공용모듈(multi_account_ui.js) 결합점 — 은퇴 적립 포트폴리오·금액 DOM 주입.
+window.taxAccounts = [];
+window.MMTAX = {
+  portfolioTickers: () => retTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: (t.weight || 0) * 100 })),
+  totalInitId: 'simSeed',
+  totalMonId:  'simMonthly',
+};
 
 function toggleRetTax() {
   window.retTaxEnabled = !window.retTaxEnabled;
+  window.taxEnabled    = window.retTaxEnabled;  // 모듈이 참조
   const on = window.retTaxEnabled;
   document.getElementById('retTaxWrap').style.background = on ? 'var(--blue)' : 'var(--border)';
   document.getElementById('retTaxThumb').style.left      = on ? '23px' : '3px';
   document.getElementById('retTaxLabel').textContent     = on ? 'ON' : 'OFF';
   document.getElementById('retTaxLabel').style.color     = on ? 'var(--blue)' : 'var(--text-muted)';
   document.getElementById('retTaxPanel').style.display   = on ? 'block' : 'none';
-  if (on) loadRetTaxProfile();
+  if (on) {
+    if (window.taxAccounts.length === 0) addTaxAccount();
+    else renderTaxAccounts();
+    loadRetTaxProfile();
+  }
 }
 
 async function loadRetTaxProfile() {
@@ -1064,7 +1136,7 @@ function updateRetTaxInfo() {
   const age     = parseInt(taxProfile.age || 40);
   const accYrs  = parseInt(document.getElementById('simAccYears')?.value || 20);
   const monthly = parseFloat(document.getElementById('simWithdraw')?.value || 0);
-  const account = document.getElementById('retTaxAccount')?.value || '위탁';
+  const account = (window.taxAccounts && window.taxAccounts[0]) ? (window.taxAccounts[0].type || '위탁') : '위탁';
 
   // 연금 수령 시작 나이: max(55, age+accYrs) 기본값. 사용자 입력 우선.
   const pensionInput = document.getElementById('simPensionStartAge');
@@ -1076,13 +1148,7 @@ function updateRetTaxInfo() {
   if (hint) hint.style.display = (rawAge && rawAge < 55) ? 'block' : 'none';
   const annual  = monthly * 12;
 
-  // ISA 풍차돌리기 표시
-  const isaRenSec = document.getElementById('retIsaRenewal');
-  if (isaRenSec) isaRenSec.style.display = (account === 'ISA') ? 'block' : 'none';
-
-  // 절세 매도 표시
-  const ghSec = document.getElementById('retGainHarvesting');
-  if (ghSec) ghSec.style.display = (account === '위탁') ? 'block' : 'none';
+  // ISA 풍차/절세매도 섹션 표시는 멀티계좌 모듈(renderTaxAccounts)이 계좌 구성으로 처리.
 
   let taxInfo = `<b>수령 시작 나이:</b> ${withdrawAge}세`;
 
@@ -1228,6 +1294,11 @@ function renderRetirement(data, body) {
         <td>${fmtKRW(s.end_value_p50)}</td>
       </tr>`;
     }).join('');
+  }
+
+  // 멀티계좌(적립기) — 계좌별 종료자산 분포 + 절세 + 자금이동(공용모듈 렌더, calculator 동형)
+  if (typeof renderMultiAccountSummary === 'function') {
+    renderMultiAccountSummary(showAcc ? data.multi_account : null, data.g2, data.savings, false);
   }
 
   // 인출기 종료자산 — p50 축적 시나리오 기준

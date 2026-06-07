@@ -6,9 +6,13 @@
 
 **설계 근거:** classic script들은 전역 lexical 환경 공유 → 옮긴 함수가 calculator.js 잔류 전역(`tickers`·`badgeColor`·`fmtKRW`) 런타임 참조 정상. 호스트 계약(전역 `tickers`/`window.taxAccounts`, DOM id `initialCapital`/`monthlyContrib`/`taxAccountList` 등)을 모듈 헤더에 명시 — 2단계서 backtest/retirement가 충족해야 함. 결과렌더(`renderMultiAccountSummary`)·토글·프로필로드는 탭별 glue라 모듈서 제외.
 
-**검증(정적):** node --check 모듈·calculator.js 둘 다 OK, 결합 파싱 재선언 충돌 0, calculator 중복정의 잔존 0, 호스트 전역 보존. ⚠️ **브라우저 실클릭 미확인**(순수 리팩이라 동작 불변 기대하나 런타임 DOM 동작 미실측). ⚠️ 미배포.
+**검증(정적):** node --check 모듈·calculator.js 둘 다 OK, 결합 파싱 재선언 충돌 0, calculator 중복정의 잔존 0, 호스트 전역 보존.
 
-**▶ 다음 = 1단계 브라우저 스모크(세금ON→계좌추가→종목추가→실행) OR 2단계(backtest/retirement 배선, 은퇴적립→백테→은퇴인출).**
+**검증(브라우저 스모크 — jsdom):** 로컬 Flask 기동 → 렌더된 실제 `/calculator` HTML에 두 JS를 classic script로 주입(전역 lexical 공유 재현) → 멀티계좌 흐름 실행. **8/8 PASS, 런타임 에러 0:** 모듈함수 전역 노출·calculator 전역(badgeColor/fmtKRW) 보존·fmtTaxKRW·addTaxAccount×2·renderTaxAccounts 리스트 채움·addAccountTicker 종목행 렌더·updateTaxAccountAmount+checkTaxLimits 무throw·buildDistributionPolicy 우선순위 정렬. **calculator 회귀 0 확정.**
+
+**배포·서버검증:** 푸시(57e1fc4)→Hetzner 자동배포. 라이브 `moneymilestone.duckdns.org/calculator`가 신규 모듈 참조(v20260607extract), `/static/js/multi_account_ui.js` HTTP 200(15740 bytes, 로컬 동일).
+
+**▶ 다음 = 2단계(backtest/retirement 배선, 은퇴적립→백테→은퇴인출). 각 탭은 모듈 헤더 호스트계약(전역 tickers/window.taxAccounts, DOM id initialCapital/monthlyContrib/taxAccountList 등) 충족 필요.**
 
 _작성: Claude (Opus 4.8)_
 

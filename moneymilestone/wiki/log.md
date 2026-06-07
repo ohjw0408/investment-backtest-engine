@@ -1,5 +1,19 @@
 # Log
 
+## [2026-06-07] design | G5-D 은퇴 인출기(standalone wd) 멀티계좌+세금 배선 설계
+
+오너 지적: 은퇴시뮬(sim)=적립기+인출기, 인출 부분은 같은 엔진이어야 하는데 인출기 탭만 단일. **2단계서 "인출기 백엔드 미지원"이라 한 건 부정확 — 정정.** 멀티 인출 엔진 `analyze_household_withdrawal`(위탁→ISA→연금 순차소진+연금소득세+위탁 양도세)은 **이미 존재·sim서 작동 중**(내 E2E 생존율 0.6879가 그 결과). 다만 standalone `run_withdrawal_logic`이 옛 단일 `WithdrawalAnalyzer`만 호출 → 인출기만 단일. **추가 갭: 인출기 wd body가 세금 필드 자체를 안 보냄(단일조차 세금 OFF).**
+
+**설계(plan §G5-D):** `run_withdrawal_logic`에 accounts 분기 → `analyze_household_withdrawal` 직접 호출(시작 목돈=사용자 입력, sim의 analyze_household_samples는 적립분포용이라 불필요). 모듈 `MMTAX.mode` 인식(wd 모드=월적립 숨김·위탁 미실현차익칸). UI switchMode MMTAX 스왑 + wd body 세금·accounts + 결과렌더.
+
+**오너 결정:** Q1 공용패널 재사용(월적립 숨김) · Q2 취득가=계좌별 미실현차익 입력칸(cost_basis=목돈−미실현) · Q3 인출 시작 나이=wdPensionStartAge. 미해결: 계좌별 리밸은 상단 wdRebal 공통 가정.
+
+**▶ 다음 = G5-D 구현(모듈 mode인식→run_withdrawal_logic 멀티+단일세금→UI→jsdom+E2E→배포). L13 검증.**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-07] feat | G5 2단계 — 백테스트·은퇴 멀티계좌 UI 배선 (배포 완료)
 
 1단계(공용모듈 추출) 후 2단계 = backtest·retirement 탭 배선. 공용 `multi_account_ui.js` 공유.

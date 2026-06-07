@@ -13,7 +13,7 @@ tags: [dev, bug]
 
 ## 활성 버그 목록
 
-> updated: 2026-05-31
+> updated: 2026-06-07
 
 | # | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|---|
@@ -28,6 +28,8 @@ tags: [dev, bug]
 | BUG-DIV-3 | 투자계산기 가상보충 시 가격 폭발 (CAGR 860억배) | 합성 prefix anchor를 raw price_daily(USD)로 잡았는데 실 suffix는 `get_price`(USD ETF→KRW ×환율 ~1181) → 2003 경계에서 1181배 점프 | `modules/retirement/synthetic_price_generator.py` (`build_window_synth_params`) | ✅ 수정 (4f.. anchor를 get_price(FX)로 산출, 7af4c05까지): end_value 정상 검증 (Claude) |
 | BUG-MAA-1 | MultiAccountAnalyzer `cagr` 필드 garbage (1e10 수준) | `cagr=(final/positive_cf)**(1/years)-1`에서 positive_cf 비정상(초기금만·월납0 시) 추정. use_synthetic 무관(기존). 분포는 `end_value` 사용이라 화면 무영향 | `modules/retirement/multi_account_analyzer.py` | ⚠️ 미해결(낮음) — 화면 영향 없음, 추후 확인 (Claude) |
 | BUG-INF-1 | 멀티계좌 결과 JSON에 Infinity → 클라 "Unexpected token I ... not valid JSON" | 만기 internal 이동만 받는 계좌(초기0·월0 위탁)는 외부 cash_flow=0 → IRR(mwr) 발산 → cagr=inf → 분포 mean inf → jsonify가 Infinity 출력(유효 JSON 아님) → JSON.parse 깨짐. 브라우저 스모크 테스트①②서 발견 | `modules/retirement/multi_account_analyzer.py` | ✅ 수정 (90053b7 다음): mwr/cagr 비유한 가드(→0) + _fit_distribution v 비유한 제거. 회귀 `test_l9_no_infinity_in_result`(strict JSON). (Claude) |
+| BUG-WD-TAX | 은퇴 **인출기(standalone wd)** 탭이 세금을 아예 적용 안 함 | `retirement.html` wd 모드 submit body에 `tax_enabled`/`account_type`/`user_settings` 필드 없음(L824~836) → `run_withdrawal_logic`이 tax_enabled=False로 받아 세금 OFF. 세금 패널은 화면에 보이나(switchMode가 안 가림) 무시됨. `WithdrawalAnalyzer`는 tax_engine 받을 준비 됨 — UI 미배선. (2026-06-07 발견, 기존 상태·G5 무관) | `templates/retirement.html`(wd body), `retirement_logic.py:run_withdrawal_logic` | ⚠️ 미수정 — G5-D에서 함께 배선 예정(plan §G5-D). 단일 세금 + 멀티계좌 동시 |
+| GAP-WD-MULTI | 은퇴 인출기(standalone wd) 멀티계좌 미배선 | `run_withdrawal_logic`이 멀티 인출 엔진 `analyze_household_withdrawal`(존재·sim서 작동) 안 부르고 옛 단일 `WithdrawalAnalyzer`만 호출. 버그 아니라 미배선. | `retirement_logic.py:run_withdrawal_logic` | ⚠️ 미배선 — G5-D 설계 완료(plan §G5-D), 구현 대기 |
 | BUG-DEPLOY-1 | 자동배포 무력화 — Action success인데 코드 미반영 | `data/meta/index_master.db` 추적됨 + 서버 런타임이 씀 → `git pull` abort. deploy.yml이 pull 실패 미체크(systemctl is-active만 봄)라 success 오판. 오늘 커밋 전부 미배포였음 | `.github/workflows/deploy.yml`, `data/meta/index_master.db` | ✅ 수정 (d581cc3): git rm --cached DB + deploy.yml set -e + pull 전 git checkout. 배포·B2 서버검증 PASS (Claude) |
 | BUG-TAX-1 | **위탁 계좌 세금 과소부과** — 배당 실린 종목이 이론(15.4%)보다 적게 떼임 | `DividendEngine`(base)이 GROSS를 cash 입금하나 단일경로 `SimulationLoop`이 배당세 미차감 → 배당 사실상 미과세. 인출 모드는 미차감세가 cash 잔류→청산세와 상쇄(시세차익까지 과소로 보임, 동일 원인). 멀티경로는 루프가 직접 차감해 정상 | `modules/tax/account_tax.py`(TaxedDividendEngine) | ✅ 수정 (5ca9a96): `TaxedDividendEngine.process`가 배당세 차감 중앙화 + 멀티 이중차감 제거. **서버검증 PASS** — 보유 3200만·인출 2585만(이론 일치). 회귀 2종 추가 (Claude) |
 | BUG-PENSION-1 | 단일계좌 은퇴 인출 연금소득세 1500만 초과 처리 = 하이브리드(저율+초과분 16.5%) | `pension_monthly_after_tax`가 1500만 이하 저율 + 초과분만 16.5%로 계산. 현행법(선택분리과세)은 1500만 초과 시 **전액** 16.5%라 과소과세 가능 | `modules/tax/base_tax.py`, `modules/retirement/withdrawal_analyzer.py` | ✅ 수정 (2026-06-03, G5-C C2): 인출 경로(`_calc_gross_withdrawal` gross-up + `_calc_pension_tax_by_age` 표시)를 하이브리드 `pension_effective_rate` → `pension_separate_tax_annual`(전액 16.5%)로 교체. 검증 `test_g5_pension_withdrawal_wiring`(나이별 3.3~5.5%·1500만 초과 전액16.5% 나이무관). ⚠️하이브리드 함수군(`pension_monthly_after_tax`/`pension_annual_tax`/`pension_effective_rate`/`_pension_excess_rate`)은 이제 프로덕션 미사용(미삭제 — pre-existing 공개 API, 추후 정리 가능). run_withdrawal_logic·retirement 인출 연금 결과 바뀜(과소→정확) |

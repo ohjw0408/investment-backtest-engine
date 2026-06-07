@@ -1,5 +1,23 @@
 # Log
 
+## [2026-06-07] feat | G5 2단계 — 백테스트·은퇴 멀티계좌 UI 배선 (배포 완료)
+
+1단계(공용모듈 추출) 후 2단계 = backtest·retirement 탭 배선. 공용 `multi_account_ui.js` 공유.
+
+**모듈 config화:** `MMTAX`(portfolioTickers·totalInitId·totalMonId)로 탭별 결합점 파라미터화 → calculator는 기본값(tickers/initialCapital/monthlyContrib)으로 무변경. backtest=btTickers/btSeed/btMonthly, retirement=retTickers/simSeed/simMonthly 주입. `renderMultiAccountSummary`(분포 렌더)도 calculator.js→모듈 이동(계산기·은퇴 적립 공유).
+
+**백테스트(2-A):** 단일 `account_type` 드롭다운 → 멀티계좌 패널. 멀티 페이로드 빌더 + **계좌별 스칼라 종료자산**(단일 역사윈도우라 분포 아님) + 절세 + g2 자체 렌더(`btRenderMultiAccount`). E2E 동기 `/api/backtest/run` 2계좌 → multi_account=True·accounts=2·savings.combined 반환.
+
+**은퇴 적립기(2-B):** 단일 드롭다운 → 멀티계좌 패널. sim(적립기) accounts 페이로드 + `renderMultiAccountSummary`(calculator 동형 분포) 호출. updateRetTaxInfo 계좌유형을 taxAccounts[0]서 파생. **인출기(wd)는 단일 유지** — `run_withdrawal_logic`이 accounts 미지원(백엔드 한계, UI 범위 밖). E2E `run_retirement_logic` 직접 멀티호출 → multi_account.enabled=True·accounts=[위탁,연금저축]·생존율 0.6879·savings.combined(절세 1,632,510)·g2 반환.
+
+**검증:** jsdom 3탭 스모크 **11/11 PASS·런타임에러0**(calc 회귀 — config+renderMASummary 이동 무손상 / bt 회귀 / ret 신규). E2E 백테(sync)·은퇴(직접) 둘 다 멀티 shape 확인. ✅ **커밋(fd41f65·9cface8)·푸시·Hetzner 배포 완료** — 라이브 3탭 모두 모듈 v20260607c 참조·HTTP 200(23,253 bytes).
+
+⚠️ **잔여:** 브라우저 실클릭 미확인(jsdom+E2E로 커버되나 육안 아님). 인출기 멀티계좌는 백엔드 미지원(별도 엔진 과제). **▶ G5 멀티계좌 UI 3탭(투자계산기·백테·은퇴적립) 전부 완료. 다음 = L7 실데이터 통합검증 OR 인출기 멀티 엔진 OR 다른 작업.**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-07] refactor | G5 1단계 — 멀티계좌 UI 공용모듈 추출(calculator)
 
 오너 결정(공용모듈 b) 따라 1단계 착수. 신규 `static/js/multi_account_ui.js` — calculator.js 멀티계좌 입력 UI 16함수(ACCOUNT_TYPES·buildDistributionPolicy·계좌/종목 CRUD·renderTaxAccounts·checkTaxLimits·fmtTaxKRW) **순수 이동**(로직 무변경). calculator.js서 288줄 제거. calculator.html이 모듈을 calculator.js **앞에** 로드(v20260607extract).

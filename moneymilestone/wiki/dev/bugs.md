@@ -132,3 +132,4 @@ tags: [dev, bug]
 | `TaxedDividendEngine._ytd_income` 초기값 0 | ⏳ 미완료 | `other_financial_income` 연동 필요 |
 | `modules/sim/tax_engine.py` 덮어씀 | ⏳ 미완료 | Phase 2c 이후 정리 예정 |
 | T1~T4 수동 테스트 미완료 | ⚠️ 미확인 | T1 배너, T2 종합과세 패널, T4 ISA 풍차 체크박스 — 브라우저 직접 확인 필요 |
+| **GAP-DECUM-COMP — 인출(decum) 중 금융소득 종합과세 미모델링** | ⏸️ 오너 판단 전 보류 (2026-06-09 세금감사 발견) | `multi_account_withdrawal.py:107`이 `TaxSessionState(other_financial_income=0.0)` 하드코딩, `household_withdrawal.py`에 종합과세 로직 없음. 은퇴 인출 중 위탁 배당이 연 2천만 초과해도 종합과세 가산 안 함 → 고액 위탁 보유자 과소과세 가능. 적립끝 종합과세(분할매도 planner)는 있으나 decum엔 없음. **버그 아닌 보수적 근사** — 대부분 유저(연금 위주 인출) 영향 미미. 지금 구현 안 함(오너 결정 대기). 구현 시=decum 위탁 배당을 세션 금융소득 누적→종합과세 판정, 인출 롤링에 배선 |

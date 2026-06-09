@@ -1,5 +1,24 @@
 # Log
 
+## [2026-06-09] audit | 세금 커버리지 전탭 풀 매트릭스 감사
+
+G5-D 후 오너 요청 — 세금 구현 완성도 실측 감사(기존 테스트 재실행 아님, 코드 경로 읽기로 탭×계좌×이벤트 대조).
+
+**매트릭스 실측:**
+- **적립 3탭(계산기·백테·은퇴적립)** = 단일소스 `MultiAccountSimulationLoop` 경유 확인. 계산기 세금ON 단일계좌도 멀티경로 라우팅(`run_calculator_logic:518`). 백테는 `MultiAccountSimulationLoop` 직접·계산기/은퇴적립은 `MultiAccountAnalyzer`(롤링 래퍼)지만 동일 루프. 세금이벤트 전부 단일소스: 배당세(`TaxedDividendEngine`)·리밸 양도세(`sell_with_tax`)·청산세(`apply_liquidation_tax`)·ISA만기(`_mature_isa`)·연납입공제(`annual_tax_deduction`)·이전공제(`_accrue_pension_credit`)·금종세(`comprehensive_years`). `apply_final_liquidation`=계산기/백테 True·은퇴적립 False(무청산 인계) 정확.
+- **인출(은퇴인출)** 단일=`WithdrawalAnalyzer`(세금ON시 `TaxableSimulationRunner` 경유=배당세+CG+청산, 평탄 DividendEngine은 OFF분기만) / 멀티=`analyze_household_withdrawal`(`_build_account_runtime`이 TaxedDividendEngine+TaxedOrderExecutor). 양측 일관: 인출 매도 양도세·배당세·cost_basis 인계과세·연금소득세(`pension_separate_tax_annual`).
+- **배당금 계산기** tax_engine 전달(`dividend_logic.py:82`)+`after_tax_dividend`(위탁 15.4%·ISA/연금 gross 반환=비과세/과세이연 정확).
+
+**결과: 신규 배선버그 0.** 4탭 풀플래그 도달·단일↔멀티 일관·세율 정확. 과거 반복 패턴(TAX-1/2/3·WD-TAX) 이미 다 해소됨 — 처음 추정(1~2개 발견)보다 깨끗. 최근 G5-C/D가 인출측 꼼꼼히 배선한 덕.
+
+**발견 갭 1개(버그 아닌 근사):** **GAP-DECUM-COMP** — 인출 중 금융소득 종합과세 미모델링(`multi_account_withdrawal.py:107` other_financial_income=0 하드코딩). 은퇴 중 위탁 배당 2천만 초과시 종합과세 가산 안 함 → 고액 위탁 보유자 과소과세 가능. **오너 결정: 판단 전 보류**(bugs.md 등록, 지금 구현 안 함).
+
+**▶ 다음 = L7 실데이터 통합검증(브라우저 육안) OR 타작업.**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-09] feat | G5-D 은퇴 인출기(standalone wd) 멀티계좌+세금 배선 구현
 
 설계(2026-06-07) 구현 완료. 오너 결정: 공통 리밸(wdRebal/wdBand 상단 공통) 적용.

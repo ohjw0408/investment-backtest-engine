@@ -1,5 +1,25 @@
 # Log
 
+## [2026-06-09] feat | G5-D 은퇴 인출기(standalone wd) 멀티계좌+세금 배선 구현
+
+설계(2026-06-07) 구현 완료. 오너 결정: 공통 리밸(wdRebal/wdBand 상단 공통) 적용.
+
+**백엔드(`retirement_logic.py`):** `run_withdrawal_logic`에 `accounts>1` 분기 + 신규 `_run_multi_account_withdrawal_logic`. 적립 분포 없는 인출기라 `analyze_household_samples`(sim용) 대신 **`analyze_household_withdrawal` 직접 호출**(시작 목돈=사용자 입력). 계좌별 spec: `value=initial_capital`, `cost_basis=목돈−미실현차익`(위탁·세금ON시; else None), 공통 rebal. 반환 매핑=`multi_account.accounts[].distribution.end_value`+`combined_summary`(survival/combined_end_value)+`median_pension_tax`. **단일 세금 갭(BUG-WD-TAX)은 백엔드 이미 배선됨(run_withdrawal_logic L694~705이 tax_engine 생성·WithdrawalAnalyzer 전달) — UI 갭이 유일 원인.** `normalize_multi_accounts`에 `unrealized_gain` 필드 추가(기본0, 기존 무영향).
+
+**모듈(`multi_account_ui.js`):** `MMTAX.mode` 인식. `_mmAmountFields`(신규)·primary 카드가 mode='withdrawal'이면 **월적립 숨김·시작목돈 라벨·위탁 미실현차익칸**(primary 위탁 포함). calculator/적립기(accumulation 기본)는 무변경.
+
+**UI(`retirement.html`):** `switchMode`가 MMTAX 모드 스왑(wd=wdSeed/withdrawal, sim=simSeed/simMonthly/accumulation)+renderTaxAccounts 재호출. wd body에 세금(`tax_enabled`/`account_type`/`gain_harvesting`/`user_settings`)+`buildWdAccountsPayload`(신규, 시작목돈·미실현차익·월적립 없음)+분배정책. renderRetirement가 wd 멀티 per-account 분포 렌더(renderMultiAccountSummary)+`median_pension_tax` 표시. 모듈 캐시 v20260607g5d.
+
+**검증:** L13 백엔드 `test_g5_wd_household.py` **6종 PASS**(dispatch 단일/멀티·cost_basis=목돈−미실현차익·세금OFF시 None·반환shape·연금세 surface) + 광역 회귀 **71 PASS**(G5 인출·적립·백테 무손상) + **jsdom 14종 PASS**(wd 패널 월적립숨김·위탁 미실현차익·payload shape·sim 회귀) + E2E 실DB(458730 위탁+069500 연금: 멀티 생존율·계좌별 분포·median_pension_tax 6,121,986·tax ON/OFF).
+
+⚠️ 미해결 가정: 계좌별 리밸=상단 wdRebal 공통(계좌별 리밸 UI 없음, 필요시 후속). 브라우저 육안 미확인(jsdom+E2E 커버).
+
+**▶ 다음 = 커밋·Hetzner 배포·서버검증. 이후 G5 멀티계좌 UI 4탭(계산기·백테·은퇴적립·은퇴인출) 전부 완료 → L7 실데이터 통합검증 OR 타작업.**
+
+_작성: Claude (Opus 4.8)_
+
+---
+
 ## [2026-06-07] design | G5-D 은퇴 인출기(standalone wd) 멀티계좌+세금 배선 설계
 
 오너 지적: 은퇴시뮬(sim)=적립기+인출기, 인출 부분은 같은 엔진이어야 하는데 인출기 탭만 단일. **2단계서 "인출기 백엔드 미지원"이라 한 건 부정확 — 정정.** 멀티 인출 엔진 `analyze_household_withdrawal`(위탁→ISA→연금 순차소진+연금소득세+위탁 양도세)은 **이미 존재·sim서 작동 중**(내 E2E 생존율 0.6879가 그 결과). 다만 standalone `run_withdrawal_logic`이 옛 단일 `WithdrawalAnalyzer`만 호출 → 인출기만 단일. **추가 갭: 인출기 wd body가 세금 필드 자체를 안 보냄(단일조차 세금 OFF).**

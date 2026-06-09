@@ -43,6 +43,7 @@ def normalize_multi_accounts(body: dict) -> list[dict]:
             'band_width':           float(raw.get('band_width', body.get('band_width', 0.05))),
             'dividend_mode':        raw.get('dividend_mode') or body.get('dividend_mode', 'reinvest'),
             'isa_renewal':          bool(raw.get('isa_renewal', False)),
+            'unrealized_gain':      float(raw.get('unrealized_gain', 0) or 0),
         })
     return accounts
 

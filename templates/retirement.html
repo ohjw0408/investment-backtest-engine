@@ -589,6 +589,7 @@
           </div>
         </div>
         <canvas id="retWdChart" height="140"></canvas>
+        <div id="retWdPensionTax" style="display:none;margin-top:10px;font-size:0.8rem;color:var(--text-muted);background:var(--bg);border-radius:8px;padding:8px 10px;"></div>
       </div>
     </div>
   </div>
@@ -596,7 +597,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260607c"></script>
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260607g5d"></script>
 <script>
 let retTickers = [];
 let _retTaskId = null, _retCancelled = false;
@@ -628,6 +629,15 @@ function switchMode(mode) {
   document.getElementById('tabRetSim').classList.toggle('active', mode === 'sim');
   document.getElementById('tabRetWd').classList.toggle('active',  mode === 'wd');
   document.getElementById('retProbNum').textContent = mode === 'sim' ? '03' : '03';
+
+  // 공용 멀티계좌 패널 MMTAX 스왑 — 인출기(wd)는 시작 목돈(wdSeed)·월적립 숨김.
+  const _portfolioTickers = () =>
+    retTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: (t.weight || 0) * 100 }));
+  window.MMTAX = (mode === 'wd')
+    ? { portfolioTickers: _portfolioTickers, totalInitId: 'wdSeed', mode: 'withdrawal' }
+    : { portfolioTickers: _portfolioTickers, totalInitId: 'simSeed', totalMonId: 'simMonthly', mode: 'accumulation' };
+  if (window.taxAccounts && window.taxAccounts.length && typeof renderTaxAccounts === 'function') renderTaxAccounts();
+
   // 결과 초기화
   document.getElementById('retResultEmpty').style.display   = 'block';
   document.getElementById('retResultContent').style.display = 'none';
@@ -759,6 +769,37 @@ function buildRetAccountsPayload(rebalMode, bandWidth, dividendMode) {
   return accounts;
 }
 
+// 인출기 멀티계좌 페이로드 — 계좌별 시작 목돈(value)·미실현차익(위탁). 월적립 없음.
+function buildWdAccountsPayload(rebalMode, bandWidth, dividendMode) {
+  const accs = window.taxAccounts || [];
+  if (accs.length <= 1) return null;
+  const primary = {
+    type: accs[0]?.type || '위탁',
+    initial_capital: parseFloat(document.getElementById('wdSeed').value) || 0,
+    unrealized_gain: Number(accs[0]?.unrealized_gain || 0),
+    tickers: retTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: t.weight })),
+    rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
+    priority: Number(accs[0]?.priority ?? 1),
+  };
+  const accounts = [primary];
+  for (let i = 1; i < accs.length; i++) {
+    const accTickers = ensureAccountTickers(i);
+    if (accTickers.length === 0) { alert(`계좌 ${i + 1}에 종목을 최소 1개 추가해주세요.`); return false; }
+    if (accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0) > 100) {
+      alert(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`); return false;
+    }
+    accounts.push({
+      type: accs[i].type || '위탁',
+      initial_capital: Number(accs[i].initial_capital || 0),
+      unrealized_gain: Number(accs[i].unrealized_gain || 0),
+      tickers: accTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: (Number(t.weight) || 0) / 100 })),
+      rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
+      priority: Number(accs[i].priority ?? (i + 1)),
+    });
+  }
+  return accounts;
+}
+
 async function runRetirement() {
   const total = Math.round(retTickers.reduce((s,t) => s+t.weight, 0) * 100);
   if (!retTickers.length) { alert('종목을 추가해주세요.'); return; }
@@ -821,6 +862,14 @@ async function runRetirement() {
       body.manual_comprehensive_years = [];
     }
   } else {
+    const retTaxOn = window.retTaxEnabled || false;
+    if (retTaxOn && (!window.retTaxProfile || Object.keys(window.retTaxProfile).length === 0)) {
+      await loadRetTaxProfile();
+    }
+    const taxProfile = window.retTaxProfile || {};
+    const wdRebal = document.querySelector('input[name="wdRebal"]:checked').value;
+    const wdBand  = Number(document.getElementById('wdBandSlider').value) / 100;
+    const wdDiv   = document.querySelector('input[name="wdDividend"]:checked').value;
     body = {
       tickers:            retTickers.map(t => ({ code: t.code, name: t.name, weight: t.weight })),
       initial_capital:    parseFloat(document.getElementById('wdSeed').value) || 0,
@@ -828,12 +877,34 @@ async function runRetirement() {
       withdrawal_years:   parseInt(document.getElementById('wdYears').value) || 30,
       inflation:          parseFloat(document.getElementById('wdInflation').value) / 100 || 0,
       pension_start_age:  parseInt(document.getElementById('wdPensionStartAge')?.value) || 65,
-      dividend_mode:      document.querySelector('input[name="wdDividend"]:checked').value,
-      rebal_mode:         document.querySelector('input[name="wdRebal"]:checked').value,
-      band_width:         Number(document.getElementById('wdBandSlider').value) / 100,
+      dividend_mode:      wdDiv,
+      rebal_mode:         wdRebal,
+      band_width:         wdBand,
       target_percentile:  targetProb,
+      tax_enabled:        retTaxOn,
+      account_type:       (window.taxAccounts && window.taxAccounts[0]) ? (window.taxAccounts[0].type || '위탁') : '위탁',
+      gain_harvesting:    retTaxOn && (window.taxAccounts || []).some(a => a.type === '위탁'),
+      user_settings: retTaxOn ? {
+        age:           parseInt(taxProfile.age || 40),
+        earned_income: parseFloat(taxProfile.earned_income || 0),
+        isa_type:      taxProfile.isa_type || 'general',
+        pension_age:   parseInt(document.getElementById('wdPensionStartAge')?.value) || 65,
+      } : {},
       _withdrawal_only:   true,
     };
+    // 멀티계좌(인출기) — 계좌 2개 이상이면 accounts 부착(시작 목돈·미실현차익, 월적립 없음).
+    const _wdAp = retTaxOn ? buildWdAccountsPayload(wdRebal, wdBand, wdDiv) : null;
+    if (_wdAp === false) {
+      document.getElementById('retRunBtn').disabled = false;
+      document.getElementById('retLoading').style.display = 'none';
+      document.getElementById('retResultEmpty').style.display = 'flex';
+      retHideProgressUI && retHideProgressUI();
+      return;
+    }
+    if (_wdAp && _wdAp.length > 1) {
+      body.accounts = _wdAp;
+      body.distribution_policy = buildDistributionPolicy(_wdAp);
+    }
   }
 
   try {
@@ -1296,9 +1367,27 @@ function renderRetirement(data, body) {
     }).join('');
   }
 
-  // 멀티계좌(적립기) — 계좌별 종료자산 분포 + 절세 + 자금이동(공용모듈 렌더, calculator 동형)
+  // 멀티계좌 — 적립기=계좌별 적립 분포+절세+자금이동 / 인출기=계좌별 종료자산 분포(공용모듈).
   if (typeof renderMultiAccountSummary === 'function') {
-    renderMultiAccountSummary(showAcc ? data.multi_account : null, data.g2, data.savings, false);
+    const maData = (retMode === 'sim') ? (showAcc ? data.multi_account : null)
+                                       : (data.multi_account || null);
+    renderMultiAccountSummary(
+      maData,
+      (retMode === 'sim') ? data.g2 : null,
+      (retMode === 'sim') ? data.savings : null,
+      false,
+    );
+  }
+
+  // 인출기 연금소득세(가구 인출 중앙값) 표시.
+  const pensionTaxEl = document.getElementById('retWdPensionTax');
+  if (pensionTaxEl) {
+    if (retMode === 'wd' && data.median_pension_tax > 0) {
+      pensionTaxEl.innerHTML = `🧾 연금 인출 시 예상 연금소득세(중앙값): <b style="color:var(--text);">${fmtKRW(data.median_pension_tax)}</b>/년`;
+      pensionTaxEl.style.display = 'block';
+    } else {
+      pensionTaxEl.style.display = 'none';
+    }
   }
 
   // 인출기 종료자산 — p50 축적 시나리오 기준

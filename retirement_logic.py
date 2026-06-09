@@ -658,7 +658,118 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     }
 
 
+def _run_multi_account_withdrawal_logic(body: dict, progress_callback=None) -> dict:
+    """은퇴 인출기(standalone) 멀티계좌 + 세금 (G5-D).
+
+    sim(적립→인출)의 가구 디큐뮬레이션 엔진(analyze_household_withdrawal)을 인출기 탭에서도
+    직접 호출한다. 적립 분포가 없으므로(인출기는 시작 목돈을 사용자가 입력) analyze_household_samples
+    대신 단일 시작값으로 analyze_household_withdrawal를 부른다.
+    """
+    from modules.retirement.multi_account_withdrawal import analyze_household_withdrawal
+    from modules.data_preparation import prepare_scenario_data
+
+    portfolio_engine = _get_portfolio_engine()
+    accounts         = _normalize_multi_accounts(body)
+
+    withdrawal_years   = int(body['withdrawal_years'])
+    monthly_withdrawal = float(body['monthly_withdrawal'])
+    inflation          = float(body.get('inflation', 0.02))
+    dividend_mode      = body.get('dividend_mode', 'reinvest')
+    tax_enabled        = bool(body.get('tax_enabled', False))
+    user_settings      = body.get('user_settings', {})
+    pension_start_age  = int(body.get('pension_start_age', 65))
+
+    all_tickers: list[str] = []
+    for account in accounts:
+        for ticker in account['tickers']:
+            if ticker['code'] not in all_tickers:
+                all_tickers.append(ticker['code'])
+
+    data_end     = datetime.date.today().strftime('%Y-%m-%d')
+    usdkrw_start = portfolio_engine.loader.USD_KRW_START
+    for ticker in all_tickers:
+        try:
+            portfolio_engine.loader.get_price(ticker, usdkrw_start, data_end)
+        except Exception as e:
+            print(f"[withdrawal] {ticker} 데이터 로드 오류: {e}")
+
+    prep = prepare_scenario_data(
+        tickers          = all_tickers,
+        required_years   = withdrawal_years,
+        data_end         = data_end,
+        step_months      = 3,
+        allow_backfill   = True,
+        allow_synthetic  = True,
+        purpose          = "withdrawal",
+        price_db_path    = PRICE_DB_PATH,
+    )
+    data_start = prep["effective_start"]
+
+    tax_engine = None
+    if tax_enabled:
+        from modules.tax.base_tax import TaxEngine
+        tax_engine = TaxEngine(user_settings)
+
+    # 계좌별 시작 목돈 = initial_capital. 취득가 = 목돈 − 미실현차익(위탁·세금ON시 양도세 기준).
+    account_specs = []
+    for idx, account in enumerate(accounts):
+        value      = account['initial_capital']
+        unrealized = float(account.get('unrealized_gain', 0) or 0)
+        if tax_enabled and account['type'] == '위탁':
+            cost_basis = max(0.0, value - unrealized)
+        else:
+            cost_basis = None
+        account_specs.append({
+            'account_id':     idx,
+            'type':           account['type'],
+            'value':          value,
+            'cost_basis':     cost_basis,
+            'target_weights': {t['code']: t['weight'] for t in account['tickers']},
+            'rebal_mode':     account.get('rebal_mode', 'none'),
+            'band_width':     float(account.get('band_width', 0.05)),
+        })
+
+    wd_price_data, wd_dates = portfolio_engine.price_loader.load(
+        all_tickers, data_start, data_end,
+    )
+
+    report = analyze_household_withdrawal(
+        account_specs, wd_price_data, wd_dates, data_start, data_end,
+        withdrawal_years, monthly_withdrawal,
+        tax_engine=tax_engine, withdrawal_start_age=pension_start_age,
+        inflation=inflation, dividend_mode=dividend_mode, step_months=3,
+    )
+
+    return {
+        'multi_account': {
+            'enabled': True,
+            'accounts': [
+                {
+                    'account_id':   a['account_id'],
+                    'type':         a['type'],
+                    'distribution': {'end_value': a['end_value']},
+                }
+                for a in report['per_account']
+            ],
+        },
+        'survival_rate': report['survival_rate'],
+        'combined_summary': {
+            'survival_rate':      report['survival_rate'],
+            'combined_end_value': report['combined_end_value'],
+        },
+        'median_pension_tax': report['median_pension_tax'],
+        'n_real':             report['n_real'],
+        'n_synthetic':        report['n_synthetic'],
+        'data_start':         data_start,
+        'tax_enabled':        tax_enabled,
+    }
+
+
 def run_withdrawal_logic(body: dict, progress_callback=None) -> dict:
+    # 멀티계좌(2개 이상) → 가구 디큐뮬레이션 엔진. 단일계좌 → 기존 WithdrawalAnalyzer 경로.
+    if len(body.get('accounts') or []) > 1:
+        return _run_multi_account_withdrawal_logic(body, progress_callback)
+
     from modules.retirement.withdrawal_analyzer import WithdrawalAnalyzer
     from modules.data_preparation import prepare_scenario_data
 

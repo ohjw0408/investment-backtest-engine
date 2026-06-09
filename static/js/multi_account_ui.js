@@ -26,6 +26,10 @@ function _mmTotalAmount(kind) {
   const el = document.getElementById(id);
   return el ? (Number(el.value) || 0) : 0;
 }
+// 'accumulation'(투자계산기·은퇴 적립) | 'withdrawal'(은퇴 인출기 — 월적립 없음, 시작 목돈+미실현차익).
+function _mmMode() {
+  return (window.MMTAX && window.MMTAX.mode) || 'accumulation';
+}
 
 // 계좌 우선순위 순서로 분배 정책(자금이동 목적지 cascade) 생성.
 function buildDistributionPolicy(accountsPayload) {
@@ -190,6 +194,43 @@ function fmtTaxKRW(v) {
   return sign + '₩' + Math.round(abs).toLocaleString();
 }
 
+// 계좌 카드 금액 입력칸 — 모드별. 적립=초기+월적립 / 인출=시작목돈(+위탁 미실현차익).
+function _mmAmountFields(acc, i) {
+  const initInput = (label) => `
+          <label style="font-size:0.72rem;color:var(--text-muted);">${label}
+            <input type="number" value="${Number(acc.initial_capital || 0)}" min="0" step="1000000"
+              oninput="updateTaxAccountAmount(${i}, 'initial_capital', this.value)"
+              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
+          </label>`;
+  if (_mmMode() !== 'withdrawal') {
+    return `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          ${initInput('초기 투자금')}
+          <label style="font-size:0.72rem;color:var(--text-muted);">월 적립액
+            <input type="number" value="${Number(acc.monthly_contribution || 0)}" min="0" step="100000"
+              oninput="updateTaxAccountAmount(${i}, 'monthly_contribution', this.value)"
+              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
+          </label>
+        </div>`;
+  }
+  // 인출 모드: 위탁만 미실현차익(양도세 취득가 = 시작목돈 − 미실현차익).
+  if (acc.type === '위탁') {
+    return `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          ${initInput('시작 목돈')}
+          <label style="font-size:0.72rem;color:var(--text-muted);" title="현재 평가액 중 매수가 대비 이익(양도세 취득가 산정용)">미실현 차익
+            <input type="number" value="${Number(acc.unrealized_gain || 0)}" min="0" step="1000000"
+              oninput="updateTaxAccountAmount(${i}, 'unrealized_gain', this.value)"
+              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
+          </label>
+        </div>`;
+  }
+  return `
+        <div style="margin-bottom:8px;">
+          ${initInput('시작 목돈')}
+        </div>`;
+}
+
 function renderTaxAccounts() {
   const accs     = window.taxAccounts;
   const isSingle = accs.length <= 1;
@@ -227,8 +268,16 @@ function renderTaxAccounts() {
             <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
           </div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">
-            계좌 1은 상단 포트폴리오와 금액을 사용합니다. 초기 <b style="color:var(--text);">${fmtTaxKRW(totalI)}</b> · 월 <b style="color:var(--text);">${fmtTaxKRW(totalM)}</b>
+            ${_mmMode() === 'withdrawal'
+              ? `계좌 1은 상단 포트폴리오와 시작 목돈을 사용합니다. 시작 목돈 <b style="color:var(--text);">${fmtTaxKRW(totalI)}</b>`
+              : `계좌 1은 상단 포트폴리오와 금액을 사용합니다. 초기 <b style="color:var(--text);">${fmtTaxKRW(totalI)}</b> · 월 <b style="color:var(--text);">${fmtTaxKRW(totalM)}</b>`}
           </div>
+          ${_mmMode() === 'withdrawal' && acc.type === '위탁' ? `
+          <label style="display:block;font-size:0.72rem;color:var(--text-muted);margin-top:8px;" title="현재 평가액 중 매수가 대비 이익(양도세 취득가 산정용)">미실현 차익
+            <input type="number" value="${Number(acc.unrealized_gain || 0)}" min="0" step="1000000"
+              oninput="updateTaxAccountAmount(${i}, 'unrealized_gain', this.value)"
+              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
+          </label>` : ''}
         </div>`;
     }
 
@@ -246,18 +295,7 @@ function renderTaxAccounts() {
               style="width:42px;border:1.5px solid var(--border);border-radius:6px;padding:4px 5px;font-size:0.8rem;background:white;"></label>
           <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-          <label style="font-size:0.72rem;color:var(--text-muted);">초기 투자금
-            <input type="number" value="${Number(acc.initial_capital || 0)}" min="0" step="1000000"
-              oninput="updateTaxAccountAmount(${i}, 'initial_capital', this.value)"
-              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
-          </label>
-          <label style="font-size:0.72rem;color:var(--text-muted);">월 적립액
-            <input type="number" value="${Number(acc.monthly_contribution || 0)}" min="0" step="100000"
-              oninput="updateTaxAccountAmount(${i}, 'monthly_contribution', this.value)"
-              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
-          </label>
-        </div>
+        ${_mmAmountFields(acc, i)}
         <div style="position:relative;margin-top:6px;">
           <input type="text" id="accountTickerSearch${i}" placeholder="이 계좌 종목 검색"
             oninput="onAccountTickerSearch(${i}, this.value)"

@@ -14,6 +14,8 @@
 
 ⚠️ 브라우저 육안·서버 배포 검증 남음. **▶ 다음 = 커밋·Hetzner 배포·서버검증.**
 
+**[같은 날 추가] 배포·서버검증 완료:** 커밋 fe7c7af push → Hetzner 자동배포. 라이브 검증 PASS — `/simple` HTTP 200(20,617B), `simple_tools.js?v=20260610st` HTTP 200·로컬과 바이트 동일(diff 0), 홈/계산기/은퇴 nav 링크 노출, 4패널(compound/dividend/inflation/realvalue) HTML 존재. 잔여 = 브라우저 육안(오너).
+
 _작성: Claude (Fable 5)_
 
 ---

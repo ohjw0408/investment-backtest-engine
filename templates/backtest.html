@@ -21,7 +21,6 @@
   .bt-layout { flex-direction: column; padding: 14px 12px; }
   .bt-left { width: 100%; min-width: 0; max-width: 100%; }
   .bt-right { width: 100%; }
-  .bt-card { padding: 14px 12px; }
 }
 
 /* 결과 차트 — 고정 높이 래퍼 (Chart.js maintainAspectRatio:false) */
@@ -120,6 +119,11 @@
   padding: 0 2px; flex-shrink: 0;
 }
 .ticker-remove-btn:hover { color: var(--red); }
+
+/* 모바일 카드 패딩 축소 — base .bt-card보다 뒤에 둬야 적용됨 */
+@media (max-width: 860px) {
+  .bt-card { padding: 14px 12px; }
+}
 </style>
 {% endblock %}
 

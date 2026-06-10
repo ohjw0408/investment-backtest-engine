@@ -256,6 +256,10 @@ def dividend_target():
 def retirement():
     return render_template('retirement.html')
 
+@app.route('/simple')
+def simple_tools():
+    return render_template('simple.html')
+
 @app.route('/backtest')
 def backtest():
     return render_template('backtest.html')

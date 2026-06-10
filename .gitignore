@@ -59,3 +59,8 @@ data/meta/*.txt
 *.db
 
 .env
+# ----------------------------
+# Node (jsdom test deps)
+# ----------------------------
+node_modules/
+tests/_simple_rendered.html

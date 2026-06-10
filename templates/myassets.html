@@ -63,8 +63,47 @@
 
 @media (max-width: 768px) {
   .ma-wrap { padding: 14px 12px; }
-  .ma-tabs { width: 100%; }
-  .ma-tab { flex: 1; padding: 9px 8px; text-align: center; }
+  .ma-tabs { width: 100%; overflow-x: auto; }
+  .ma-tab { flex: 1; padding: 9px 6px; text-align: center; white-space: nowrap; font-size: 0.78rem; }
+  .ma-card { padding: 14px; }
+
+  /* 보유 종목 테이블 → 종목별 카드 스택 (가로 스크롤 제거) */
+  .holdings-table, .holdings-table tbody { display: block; width: 100%; }
+  .holdings-table thead { display: none; }
+  .holdings-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+  .holdings-table tr:hover td { background: transparent; }
+  .holdings-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: none;
+    padding: 2px 0;
+  }
+  .holdings-table td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .holdings-table td.h-code { grid-column: 1; font-size: 0.95rem; }
+  .holdings-table td.h-return { grid-column: 2; justify-content: flex-end; gap: 8px; }
+  .holdings-table td.h-actions { grid-column: 1 / -1; justify-content: flex-end; gap: 6px; padding-top: 6px; }
+  .holdings-table td.h-code::before, .holdings-table td.h-actions::before { content: none; }
+
+  /* 리밸런싱 — 밴드 카드·계산 행 줄바꿈 허용 */
+  .rebal-band-card { flex-wrap: wrap; }
+  .rebal-band-card > span:last-child { flex-basis: 100%; }
+  .rebal-row { flex-wrap: wrap; }
+  .rebal-action { min-width: 0; }
 }
 </style>
 {% endblock %}
@@ -135,7 +174,7 @@
 
   <!-- 리밸런싱 탭 -->
   <div id="tab-rebalance" style="display:none;">
-    <div class="ma-card" style="display:flex;align-items:center;gap:12px;flex-wrap:nowrap;min-height:56px;">
+    <div class="ma-card rebal-band-card" style="display:flex;align-items:center;gap:12px;min-height:56px;">
       <span style="font-size:0.85rem;font-weight:700;white-space:nowrap;flex-shrink:0;">경고 밴드</span>
       <input type="range" id="rebalBandSlider" min="0.5" max="20" value="5" step="0.5"
         oninput="syncRebalBand(parseFloat(this.value))"
@@ -354,28 +393,28 @@ function renderHoldings() {
           const ret  = h.avg_price > 0 ? (cur - h.avg_price) / h.avg_price : null;
           const gc   = h.group_color || '#90A4AE';
           return `<tr>
-            <td><b>${h.code}</b></td>
-            <td>
+            <td class="h-code"><b>${h.code}</b></td>
+            <td class="h-group" data-label="그룹">
               <select onchange="quickSetGroup(${h.id}, this.value)"
                 style="border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.75rem;background:var(--card);cursor:pointer;max-width:100px;color:var(--text);">
                 <option value="">그룹 없음</option>
                 ${groups.map(g => `<option value="${g.id}" ${h.group_id===g.id?'selected':''}>${g.name}</option>`).join('' )}
               </select>
             </td>
-            <td style="color:var(--text-muted);font-size:0.78rem;">${h.account_type}</td>
-            <td>${h.quantity.toLocaleString()}</td>
-            <td>${fmtKRW(cur)}</td>
-            <td><b>${fmtKRW(val)}</b></td>
-            <td>
+            <td data-label="계좌" style="color:var(--text-muted);font-size:0.78rem;">${h.account_type}</td>
+            <td data-label="수량">${h.quantity.toLocaleString()}</td>
+            <td data-label="현재가">${fmtKRW(cur)}</td>
+            <td data-label="평가금액"><b>${fmtKRW(val)}</b></td>
+            <td data-label="비중">
               <div style="min-width:60px;">
                 <span style="font-size:0.8rem;">${fmtPct(wt)}</span>
                 <div class="weight-progress"><div class="weight-fill" style="width:${(wt*100).toFixed(1)}%;background:${gc}"></div></div>
               </div>
             </td>
-            <td style="font-weight:700;color:${ret===null?'var(--text-muted)':ret>=0?'#2E7D32':'#C62828'}">
+            <td class="h-return" data-label="수익률" style="font-weight:700;color:${ret===null?'var(--text-muted)':ret>=0?'#2E7D32':'#C62828'}">
               ${ret===null?'—':(ret>=0?'+':'')+fmtPct(ret)}
             </td>
-            <td>
+            <td class="h-actions">
               <button class="icon-btn" onclick="openEditHolding(${h.id})" title="수정">✏️</button>
               <button class="icon-btn danger" onclick="deleteHolding(${h.id})" title="삭제">🗑</button>
             </td>

@@ -729,6 +729,8 @@ img, canvas, svg, video { max-width: 100%; }
   .main-content {
     grid-template-columns: 1fr;
   }
+  /* 자식 min-content가 트랙을 밀어내며 가로 스크롤 만드는 것 방지 */
+  .main-content > * { min-width: 0; max-width: 100%; }
   .right-panel { grid-column: 1; grid-row: auto; }
   .portfolio-card { grid-column: 1; }
   .market-card { grid-column: 1; }

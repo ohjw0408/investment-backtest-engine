@@ -18,8 +18,19 @@
 .bt-right { flex: 1; min-width: 0; }
 
 @media (max-width: 860px) {
-  .bt-layout { flex-direction: column; padding: 16px; }
-  .bt-left { width: 100%; min-width: 0; }
+  .bt-layout { flex-direction: column; padding: 14px 12px; }
+  .bt-left { width: 100%; min-width: 0; max-width: 100%; }
+  .bt-right { width: 100%; }
+}
+
+/* 결과 차트 — 고정 높이 래퍼 (Chart.js maintainAspectRatio:false) */
+.bt-chart-wrap { position: relative; height: 280px; }
+.bt-chart-wrap.annual { height: 220px; }
+.bt-chart-wrap.drawdown { height: 180px; }
+@media (max-width: 860px) {
+  .bt-chart-wrap { height: 240px; }
+  .bt-chart-wrap.annual { height: 190px; }
+  .bt-chart-wrap.drawdown { height: 160px; }
 }
 
 .bt-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 2px; }
@@ -33,7 +44,7 @@
 
 .date-row { display: flex; gap: 10px; align-items: center; }
 .date-row input[type=date] {
-  flex: 1; padding: 9px 12px;
+  flex: 1; min-width: 0; padding: 9px 12px;
   border: 1.5px solid var(--border); border-radius: 10px;
   font-size: 0.875rem; color: var(--text); background: var(--bg);
   outline: none;
@@ -321,19 +332,19 @@
       <!-- 포트폴리오 가치 차트 -->
       <div class="bt-card">
         <div class="bt-card-title">💹 포트폴리오 가치 추이</div>
-        <canvas id="btValueChart" height="130"></canvas>
+        <div class="bt-chart-wrap"><canvas id="btValueChart"></canvas></div>
       </div>
 
       <!-- 연간 수익률 -->
       <div class="bt-card">
         <div class="bt-card-title">📅 연간 수익률</div>
-        <canvas id="btAnnualChart" height="100"></canvas>
+        <div class="bt-chart-wrap annual"><canvas id="btAnnualChart"></canvas></div>
       </div>
 
       <!-- 낙폭 차트 -->
       <div class="bt-card">
         <div class="bt-card-title">📉 낙폭 (Drawdown)</div>
-        <canvas id="btDrawdownChart" height="80"></canvas>
+        <div class="bt-chart-wrap drawdown"><canvas id="btDrawdownChart"></canvas></div>
       </div>
 
       <!-- 종합과세 경고 + 분할매도 절세 패널 (Phase 2e) -->
@@ -1023,6 +1034,7 @@ function renderValueChart(history) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'top', labels: { font: { size: 11 } } },
@@ -1057,6 +1069,7 @@ function renderAnnualChart(annualReturns) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: {
         callbacks: { label: ctx => (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y.toFixed(2) + '%' }
       }},
@@ -1196,6 +1209,7 @@ function renderDrawdownChart(history) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: {
         callbacks: { label: ctx => ctx.parsed.y.toFixed(2) + '%' }
       }},

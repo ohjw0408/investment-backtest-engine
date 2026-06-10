@@ -1,5 +1,24 @@
 # Log
 
+## [2026-06-11] fix | 모바일 후속 — 백테스트·내자산 잔여 깨짐 (오너 실기기 피드백)
+
+오너 피드백: ① 내자산 칸이 넓어 좌우 스크롤 필요 ② 백테스트 우측 여백+애매한 가로 스크롤 ③ 결과 그래프 상하로 너무 짧음.
+
+**원인 실측 (라이브 Playwright, 백테스트 SPY 실제 실행):**
+- 가로 스크롤: scrollWidth 447 vs 뷰포트 390. `.bt-left` min-content 403px — `.date-row input[type=date]`가 flex item `min-width:auto` 기본값이라 내용 폭 이하로 축소 거부.
+- 그래프 왜소: 차트 3종 전부 **300×130/100/80 고정** — canvas `height` 속성 + `maintainAspectRatio` 기본값(aspect 모드)이라 responsive 리사이즈 실패.
+
+**수정:**
+- backtest.html: date input `min-width:0`, `.bt-chart-wrap` 고정높이 래퍼(가치 280px/연간 220/낙폭 180, 모바일 240/190/160) + `maintainAspectRatio:false` 3곳, 모바일 `.bt-left/.bt-right max-width:100%`.
+- style.css: 모바일 `.main-content > * { min-width:0; max-width:100% }` 일반 가드(同유형 재발 방지). 캐시 v20260611ui2.
+- myassets.html: 보유종목 테이블(9열) → ≤768px **종목별 카드 스택**(renderHoldings td에 `data-label` 부여 + CSS grid 2열, 종목코드/수익률 상단·액션 하단), 리밸 밴드카드 wrap 허용, `.rebal-row` wrap, 탭 nowrap+가로스크롤.
+
+**검증:** 로컬 myassets 샘플 주입 → overflow 0·카드형 렌더 스크린샷 확인. 배포 후 라이브 백테스트 동일 시나리오 재실행 → overflow 0·차트 높이 정상 확인(아래 추가 기록).
+
+_작성: Claude (Fable 5)_
+
+---
+
 ## [2026-06-11] feature | 모바일 반응형 + 다크모드 + UX 개편 (전 페이지)
 
 오너 요청: "모바일에서 다 깨짐 + 야간모드 없음 + UX/UI 불친절 — 부족한 부분 수정". 오너 결정 2건: 모바일 네비 = 햄버거 드로어, 다크모드 = 수동 토글 + 시스템 기본.

@@ -13,7 +13,7 @@
 - style.css: 모바일 `.main-content > * { min-width:0; max-width:100% }` 일반 가드(同유형 재발 방지). 캐시 v20260611ui2.
 - myassets.html: 보유종목 테이블(9열) → ≤768px **종목별 카드 스택**(renderHoldings td에 `data-label` 부여 + CSS grid 2열, 종목코드/수익률 상단·액션 하단), 리밸 밴드카드 wrap 허용, `.rebal-row` wrap, 탭 nowrap+가로스크롤.
 
-**검증:** 로컬 myassets 샘플 주입 → overflow 0·카드형 렌더 스크린샷 확인. 배포 후 라이브 백테스트 동일 시나리오 재실행 → overflow 0·차트 높이 정상 확인(아래 추가 기록).
+**검증:** 로컬 myassets 샘플 주입 → overflow 0·카드형 렌더 스크린샷 확인. 배포 후 라이브 백테스트(SPY 실제 실행, 390px) 재측정 — **scrollWidth 447→390(오버플로 0), 차트 300×130/100/80 → 316×240/190/160.** 후속 발견 1건: 모바일 `.bt-card` 패딩 룰을 base 정의보다 앞에 넣어 cascade에서 밀려 미적용 → 스타일 블록 끝으로 이동(b368573). 커밋 71d7fe0·6ad717c·b368573.
 
 _작성: Claude (Fable 5)_
 

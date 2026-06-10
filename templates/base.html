@@ -5,14 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Money Milestone{% endblock %}</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+  <script>
+    // 다크모드 FOUC 방지: CSS 로드 전에 테마 결정
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('mm-theme'); } catch (e) {}
+      if (t !== 'dark' && t !== 'light') {
+        t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260611ui">
   {% block head %}{% endblock %}
 </head>
 <body>
 
 <!-- ===== NAVBAR ===== -->
 <nav class="navbar">
+  <button class="nav-hamburger" id="navHamburger" aria-label="메뉴 열기">☰</button>
   <a href="/" class="logo" style="text-decoration:none;color:inherit;">
     <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Money Milestone" style="height:32px; vertical-align:middle;">
     Money <span>Milestone</span>
@@ -43,18 +55,20 @@
     {% else %}
       <a href="/auth/google" id="googleLoginBtn" onclick="return handleGoogleLogin(event)" style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:600;color:white;background:#1976D2;padding:6px 14px;border-radius:8px;text-decoration:none;">
         <svg width="16" height="16" viewBox="0 0 24 24"><path fill="white" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="white" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="white" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="white" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        Google로 로그인
+        <span class="g-login-full">Google로 로그인</span><span class="g-login-short">로그인</span>
       </a>
     {% endif %}
-    <div class="nav-icon-btn nav-help">⚙</div>
+    <button class="nav-icon-btn" id="themeToggle" aria-label="다크모드 전환" title="다크모드 전환">🌙</button>
   </div>
 </nav>
 
 <!-- ===== LAYOUT ===== -->
 <div class="layout">
 
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
   <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-label">메뉴</div>
     <a class="sidebar-item {% if request.path == '/' %}active{% endif %}" href="/">
       <span>🏠</span> 홈
@@ -93,10 +107,45 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=20260611ui"></script>
 {% block scripts %}{% endblock %}
 
 <script>
+// ── 다크모드 토글 ──
+(function () {
+  const btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  const cur = document.documentElement.getAttribute('data-theme');
+  btn.textContent = cur === 'dark' ? '☀️' : '🌙';
+  btn.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('mm-theme', next); } catch (e) {}
+    // 차트가 테마 색을 생성 시점에 읽으므로 리로드로 일괄 적용
+    location.reload();
+  });
+})();
+
+// ── 모바일 사이드바 드로어 ──
+(function () {
+  const burger  = document.getElementById('navHamburger');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  if (!burger || !sidebar || !overlay) return;
+
+  function closeDrawer() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('show');
+  }
+  burger.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('show');
+  });
+  overlay.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDrawer();
+  });
+})();
+
 // ── 네비 검색창 ──
 const navInput    = document.getElementById('navSearchInput');
 const navDropdown = document.getElementById('navSearchDropdown');

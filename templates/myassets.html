@@ -2,17 +2,17 @@
 {% block title %}내 자산 — Money Milestone{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260611ui">
 <style>
 .ma-wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
 
 /* 탭 */
 .ma-tabs { display: flex; gap: 0; margin-bottom: 20px; border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; width: fit-content; }
-.ma-tab  { padding: 9px 20px; background: white; cursor: pointer; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); border: none; }
+.ma-tab  { padding: 9px 20px; background:var(--card); cursor: pointer; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); border: none; }
 .ma-tab.active { background: var(--blue); color: white; }
 
 /* 카드 */
-.ma-card { background: white; border-radius: 14px; border: 1.5px solid var(--border); padding: 20px; margin-bottom: 16px; }
+.ma-card { background:var(--card); border-radius: 14px; border: 1.5px solid var(--border); padding: 20px; margin-bottom: 16px; }
 .ma-card-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
 
 /* 종목 테이블 */
@@ -30,14 +30,14 @@
 .group-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
 
 /* 액션 버튼 */
-.icon-btn { width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--border); background: white; cursor: pointer; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn { width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--border); background:var(--card); cursor: pointer; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; }
 .icon-btn:hover { border-color: var(--blue); color: var(--blue); }
-.icon-btn.danger:hover { border-color: #C62828; color: #C62828; }
+.icon-btn.danger:hover { border-color:var(--red); color:var(--red); }
 
 /* 모달 */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: none; align-items: center; justify-content: center; }
 .modal-overlay.show { display: flex; }
-.modal-box { background: white; border-radius: 16px; padding: 24px; width: 440px; max-width: 90vw; box-shadow: 0 8px 40px rgba(0,0,0,0.18); }
+.modal-box { background:var(--card); border-radius: 16px; padding: 24px; width: 440px; max-width: 90vw; box-shadow: 0 8px 40px rgba(0,0,0,0.18); }
 .modal-title { font-size: 1rem; font-weight: 800; margin-bottom: 16px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .btn-primary { padding: 9px 20px; background: var(--blue); color: white; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
@@ -47,10 +47,10 @@
 .rebal-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
 .rebal-row:last-child { border-bottom: none; }
 .rebal-action { font-weight: 700; padding: 3px 10px; border-radius: 6px; font-size: 0.78rem; min-width: 145px; text-align: center; flex-shrink: 0; }
-.rebal-buy   { background: #E8F5E9; color: #2E7D32; }
-.rebal-sell  { background: #FFEBEE; color: #C62828; }
-.rebal-ok    { background: #F5F5F5; color: #9E9E9E; }
-.rebal-alert { background: #FFF3E0; color: #E65100; font-weight: 600; }
+.rebal-buy   { background:var(--green-pale); color:var(--green); }
+.rebal-sell  { background:var(--red-pale); color:var(--red); }
+.rebal-ok    { background:var(--bg); color:var(--text-muted); }
+.rebal-alert { background:var(--gold-pale); color:var(--gold-deep); font-weight: 600; }
 .ma-period-btn { font-size:0.75rem; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:var(--card); color:var(--text-muted); cursor:pointer; }
 .ma-period-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
 
@@ -60,6 +60,12 @@
 .summary-value { font-size: 1.05rem; font-weight: 800; }
 
 .login-required { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+
+@media (max-width: 768px) {
+  .ma-wrap { padding: 14px 12px; }
+  .ma-tabs { width: 100%; }
+  .ma-tab { flex: 1; padding: 9px 8px; text-align: center; }
+}
 </style>
 {% endblock %}
 
@@ -351,7 +357,7 @@ function renderHoldings() {
             <td><b>${h.code}</b></td>
             <td>
               <select onchange="quickSetGroup(${h.id}, this.value)"
-                style="border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.75rem;background:white;cursor:pointer;max-width:100px;color:var(--text);">
+                style="border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.75rem;background:var(--card);cursor:pointer;max-width:100px;color:var(--text);">
                 <option value="">그룹 없음</option>
                 ${groups.map(g => `<option value="${g.id}" ${h.group_id===g.id?'selected':''}>${g.name}</option>`).join('' )}
               </select>
@@ -434,7 +440,7 @@ function renderWeightChart(totalValue) {
         callbacks: { label: ctx => ctx.parsed.x.toFixed(1)+'%' }
       }},
       scales: {
-        x: { ticks: { callback: v=>v+'%', font:{size:10}, color:'#90A4AE' }, grid:{color:'rgba(0,0,0,0.04)'} },
+        x: { ticks: { callback: v=>v+'%', font:{size:10}, color:'#90A4AE' }, grid:{color:MM_CHART_GRID} },
         y: { ticks: { font:{size:11}, color:'var(--text)' }, grid:{display:false} }
       }
     }
@@ -494,10 +500,10 @@ function renderRebalance() {
   const alertCount = rows.filter(r => r.outOfBand).length;
   const _bandPct = (_rebalBand * 100 % 1 === 0) ? Math.round(_rebalBand*100) : (_rebalBand*100).toFixed(1);
   const alertBanner = alertCount > 0
-    ? `<div style="background:#FFF3E0;border:1px solid #F57C00;border-radius:6px;padding:10px 14px;font-size:0.83rem;color:#E65100;">
+    ? `<div style="background:var(--gold-pale);border:1px solid #F57C00;border-radius:6px;padding:10px 14px;font-size:0.83rem;color:var(--gold-deep);">
         <strong>⚠ 리밸런싱 필요</strong> — ${alertCount}개 그룹이 목표 비중 ±${_bandPct}% 밴드를 이탈했습니다.
        </div>`
-    : `<div style="background:#E8F5E9;border:1px solid #66BB6A;border-radius:6px;padding:10px 14px;font-size:0.83rem;color:#2E7D32;">
+    : `<div style="background:var(--green-pale);border:1px solid #66BB6A;border-radius:6px;padding:10px 14px;font-size:0.83rem;color:var(--green);">
         ✅ 모든 그룹이 목표 비중 ±${_bandPct}% 이내입니다.
        </div>`;
 
@@ -505,14 +511,14 @@ function renderRebalance() {
   document.getElementById('rebalResult').innerHTML = rows.map(r => {
     const barColor = r.outOfBand ? '#F57C00' : '#66BB6A';
     const bandBadge = r.outOfBand
-      ? `<span style="font-size:0.72rem;background:#FFF3E0;color:#E65100;padding:2px 6px;border-radius:4px;margin-left:4px;">밴드 이탈 ${(r.absDiff*100).toFixed(1)}%p</span>`
+      ? `<span style="font-size:0.72rem;background:var(--gold-pale);color:var(--gold-deep);padding:2px 6px;border-radius:4px;margin-left:4px;">밴드 이탈 ${(r.absDiff*100).toFixed(1)}%p</span>`
       : '';
     const actionCls = r.action === 'buy' ? 'rebal-buy' : r.action === 'sell' ? 'rebal-sell' : 'rebal-ok';
     const actionText = r.action === 'ok' ? '✅ 적정'
       : r.action === 'buy' ? '▲ 매수 ' + fmtKRW(r.diffVal)
       : '▼ 매도 ' + fmtKRW(Math.abs(r.diffVal));
     return `
-    <div class="rebal-row" style="${r.outOfBand ? 'background:#FFFDE7;' : ''}">
+    <div class="rebal-row" style="${r.outOfBand ? 'background:var(--gold-pale);' : ''}">
       <span class="group-badge" style="background:${r.g.color}22;color:${r.g.color};min-width:70px;">${r.g.name}</span>
       <span style="flex:1;">
         <span style="color:var(--text-muted);">현재 ${fmtPct(r.curPct)} → 목표 ${fmtPct(r.tgtPct)}</span>

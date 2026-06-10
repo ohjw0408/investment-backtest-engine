@@ -2,7 +2,7 @@
 {% block title %}간편 계산기 — Money Milestone{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260611ui">
 <style>
 .st-wrap { max-width: 920px; margin: 0 auto; padding: 24px 16px 60px; }
 .st-header { margin-bottom: 18px; }
@@ -13,7 +13,7 @@
   cursor:pointer; font-family:inherit; transition:all 0.15s;
 }
 .st-tab-btn.active { border-color:var(--blue-bright); background:var(--blue-pale); color:var(--blue); }
-.st-panel-box { background:var(--card-bg, #fff); border:1.5px solid var(--border); border-radius:14px; padding:20px; }
+.st-panel-box { background:var(--card); border:1.5px solid var(--border); border-radius:14px; padding:20px; }
 .st-input-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px; margin-bottom:16px; }
 .st-field label { display:block; font-size:0.78rem; font-weight:700; color:var(--text-muted); margin-bottom:5px; }
 .st-toggle-row { display:flex; align-items:center; gap:8px; font-size:0.82rem; font-weight:600; color:var(--text-muted); padding-top:22px; }
@@ -23,8 +23,8 @@
 .st-sum-label { font-size:0.72rem; font-weight:700; color:var(--text-muted); margin-bottom:4px; }
 .st-sum-value { font-size:1.05rem; font-weight:800; }
 .st-sum-value.blue { color:var(--blue); }
-.st-sum-value.green { color:#2E7D32; }
-.st-sum-value.purple { color:#7B1FA2; }
+.st-sum-value.green { color:var(--green); }
+.st-sum-value.purple { color:#AB47BC; }
 .st-chart-box { height:300px; position:relative; margin:14px 0; }
 .st-table-wrap { max-height:320px; overflow-y:auto; border:1.5px solid var(--border); border-radius:10px; }
 .st-table { width:100%; border-collapse:collapse; font-size:0.78rem; }

@@ -1,5 +1,30 @@
 # Log
 
+## [2026-06-11] feature | 모바일 반응형 + 다크모드 + UX 개편 (전 페이지)
+
+오너 요청: "모바일에서 다 깨짐 + 야간모드 없음 + UX/UI 불친절 — 부족한 부분 수정". 오너 결정 2건: 모바일 네비 = 햄버거 드로어, 다크모드 = 수동 토글 + 시스템 기본.
+
+**① 반응형 (기존 미디어쿼리 0개 → 신설):**
+- ≤1400px: 상단 nav 링크 9개 숨김(좌측 사이드바가 동일 메뉴 제공) → **BUG-NAV-1(1280px 글자 세로 깨짐) 해소**
+- ≤1024px: 사이드바 → 햄버거(☰) 슬라이드 드로어 + 딤 오버레이(클릭/ESC 닫힘)
+- ≤768px: `calc-layout` 1열(계산기/배당 공유), 입력패널 sticky 해제, 분포/지표 그리드 축소, 테이블 가로 스크롤, **input 16px(iOS 포커스 줌 방지)**, 시장지수 2열
+- ≤480px: 로고 아이콘만 + "Google로 로그인"→"로그인" 축약(모바일 navbar 겹침 스크린샷서 발견·수정)
+- symbol 2열→1열·헤더 세로 스택, myassets 탭 풀폭, backtest/retirement는 기존 860px 쿼리 활용
+
+**② 다크모드:**
+- `html[data-theme=dark]`에 전체 팔레트 재정의(bg #0E141C·card #18212E·텍스트·보더·블루 계열 라이트닝). 기본은 OS `prefers-color-scheme`, navbar 🌙 버튼으로 수동 전환(localStorage `mm-theme`), head 인라인 스크립트로 FOUC 방지. 토글 시 리로드(차트가 생성 시점에 색을 읽으므로 일괄 적용).
+- Chart.js 전역 다크 기본색 + 페이지별 grid색 `MM_CHART_GRID` 상수화(charts.js). html2canvas 공유 이미지 배경도 테마 연동.
+
+**③ 색상 변수화 (다크 전제조건):** 신규 변수 `--green-pale/--red-pale/--gold-pale/--blue-soft/--gold-deep/--input-bg/--navbar-bg` 추가 후 템플릿 9종 + calculator.js/multi_account_ui.js 인라인 하드코딩 라이트 색상 ~200곳을 var()로 치환. **share.html/share_img.html은 standalone(style.css 미로딩)이라 라이트 고정 유지** — share.html 오치환을 git diff 검수에서 발견해 원복.
+
+**④ UX:** 동작 없던 ⚙ 버튼 제거 → 테마 토글로 교체.
+
+**검증:** 신규 `tests/test_responsive_dark.js`(Playwright, 로컬 Flask) — 9페이지 × 3뷰포트(390/768/1280) × 2테마에서 가로 오버플로우 없음·테마 적용·JS 런타임 에러 0 + 드로어 열림/닫힘 + 1280px 링크 숨김/1500px 노출(BUG-NAV-1 회귀) + 테마 토글 전환 = **168 PASS / 0 FAIL**. 스크린샷 육안: 홈·계산기·은퇴·세금설정·계산기 세금패널(멀티계좌 폼) 다크/모바일 전부 정상. 기존 simple calc 25 + dom 35 PASS, 전 라우트 HTTP 200. 캐시버전 v20260611ui 일괄 갱신.
+
+_작성: Claude (Fable 5)_
+
+---
+
 ## [2026-06-10] decision | Playwright 도입 + 다계좌 세금 E2E 계획 + 세션 동기화
 
 같은 날 간편계산기 배포 후 이어진 작업 3건 + 마무리 동기화.

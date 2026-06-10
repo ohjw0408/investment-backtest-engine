@@ -2,12 +2,8 @@
 {% block title %}투자 계산기 — Money Milestone{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260611ui">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<style>
-.share-pill { background:#E3F2FD;color:#1976D2;border:none;border-radius:20px;padding:5px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:inherit; }
-.share-pill:hover { background:#BBDEFB; }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -130,12 +126,12 @@
         <div id="taxWarnings" style="margin-top:4px;"></div>
 
         <!-- ISA 풍차돌리기 옵션 (ISA 선택 시만 표시) -->
-        <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:#E8F5E9;border-radius:8px;font-size:0.8rem;border:1px solid #A5D6A7;">
+        <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:var(--green-pale);border-radius:8px;font-size:0.8rem;border:1px solid var(--green-light);">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="isaRenewalCheck" style="width:14px;height:14px;">
             <div>
-              <span style="font-weight:700;color:#1B5E20;">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
-              <div style="color:#2E7D32;font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 200만원 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다. 위탁 배당 등 금융소득이 연 2,000만원을 넘으면 자동으로 종합과세 대상이 되어 그 시기 풍차가 중단됩니다.</div>
+              <span style="font-weight:700;color:var(--green);">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
+              <div style="color:var(--green);font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 200만원 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다. 위탁 배당 등 금융소득이 연 2,000만원을 넘으면 자동으로 종합과세 대상이 되어 그 시기 풍차가 중단됩니다.</div>
             </div>
           </label>
         </div>
@@ -148,29 +144,29 @@
         </div>
 
         <!-- 절세 매도 (위탁 계좌 선택 시 표시) -->
-        <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:#E3F2FD;border-radius:8px;font-size:0.8rem;border:1px solid #90CAF9;">
+        <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:var(--blue-pale);border-radius:8px;font-size:0.8rem;border:1px solid var(--blue-soft);">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="gainHarvestingCheck" style="width:14px;height:14px;">
             <div>
-              <span style="font-weight:700;color:#1565C0;">📉 절세 매도 (연 250만 공제 소진)</span>
-              <div style="color:#1976D2;font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
+              <span style="font-weight:700;color:var(--blue);">📉 절세 매도 (연 250만 공제 소진)</span>
+              <div style="color:var(--blue-mid);font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
             </div>
           </label>
         </div>
 
-        <div style="margin-top:8px;font-size:0.75rem;color:#E65100;background:#FFF3E0;padding:8px 10px;border-radius:6px;border:1px solid #FFCC02;">
+        <div style="margin-top:8px;font-size:0.75rem;color:var(--gold-deep);background:var(--gold-pale);padding:8px 10px;border-radius:6px;border:1px solid var(--gold);">
           ⚠ 직전 연도 금융소득 종합과세 대상자는 ISA 개설이 불가합니다.
         </div>
       </div>
     </div>
 
     <!-- 가상 데이터 옵트인 -->
-    <div class="calc-section" id="syntheticSection" style="padding:10px 12px;background:#FFF8E1;border-radius:8px;border:1px solid #FFE082;">
+    <div class="calc-section" id="syntheticSection" style="padding:10px 12px;background:var(--gold-pale);border-radius:8px;border:1px solid var(--gold);">
       <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:0.82rem;">
         <input type="checkbox" id="useSyntheticCheck" style="width:14px;height:14px;margin-top:2px;flex-shrink:0;">
         <div>
-          <span style="font-weight:600;color:#5C4400;">가상 데이터 사용</span><br>
-          <span style="color:#7B5E00;">실제 데이터가 부족한 경우에만 선택하세요. 통계적으로 생성된 데이터가 포함되어 결과 정확도가 낮아질 수 있습니다.</span>
+          <span style="font-weight:600;color:var(--gold-deep);">가상 데이터 사용</span><br>
+          <span style="color:var(--text-muted);">실제 데이터가 부족한 경우에만 선택하세요. 통계적으로 생성된 데이터가 포함되어 결과 정확도가 낮아질 수 있습니다.</span>
         </div>
       </label>
     </div>
@@ -186,11 +182,11 @@
   <div class="calc-result-panel" id="resultPanel">
 
     <!-- 에러 배너 (resultContent 밖 — 항상 DOM에 존재) -->
-    <div id="accountRestrictBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
+    <div id="accountRestrictBanner" style="display:none;background:var(--red-pale);border:2px solid var(--red-light);border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:var(--red);">
       <strong>⛔ 계좌 유형 제한 위반</strong>
       <div id="accountRestrictDetail" style="margin-top:6px;line-height:1.7;"></div>
     </div>
-    <div id="isaLimitErrorBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
+    <div id="isaLimitErrorBanner" style="display:none;background:var(--red-pale);border:2px solid var(--red-light);border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:var(--red);">
       <strong>⛔ ISA 납입 한도 초과</strong>
       <div id="isaLimitErrorDetail" style="margin-top:6px;line-height:1.7;"></div>
     </div>
@@ -220,21 +216,21 @@
       </div>
 
       <!-- ISA 총 1억원 캡 경고 배너 (결과 내부) -->
-      <div id="isaCapBanner" style="display:none;background:#FFF3E0;border:2px solid #F57C00;border-radius:8px;padding:16px 20px;margin-bottom:16px;font-size:0.92rem;color:#E65100;">
+      <div id="isaCapBanner" style="display:none;background:var(--gold-pale);border:2px solid var(--gold);border-radius:8px;padding:16px 20px;margin-bottom:16px;font-size:0.92rem;color:var(--gold-deep);">
         <strong>⚠ ISA 총 납입 한도 적용 — 시뮬레이션이 조정되었습니다</strong>
         <div id="isaCapDetail" style="margin-top:8px;line-height:1.8;"></div>
       </div>
 
       <!-- 가상 데이터 경고 배너 -->
-      <div id="synthWarningBanner" style="display:none;background:#FFF8E1;border:1px solid #F9A825;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:#795548;">
+      <div id="synthWarningBanner" style="display:none;background:var(--gold-pale);border:1px solid var(--gold);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:var(--text-muted);">
         <strong>⚠ 가상 데이터 포함</strong> — 실측 데이터가 부족해 통계적으로 추정된 가격이 포함됩니다. 결과 참고용으로만 사용하세요.
         <div id="synthWarningDetail" style="margin-top:5px;line-height:1.6;"></div>
       </div>
 
       <!-- 금융소득 종합과세 분할매도 패널 (Phase 2f) -->
-      <div id="calcSplitSalePanel" style="display:none;background:#FFEBEE;border:1px solid #EF9A9A;border-radius:6px;padding:12px 14px;margin-bottom:12px;">
-        <div style="font-weight:700;color:#b71c1c;margin-bottom:6px;">⚠ 금융소득 종합과세 주의 (중앙값 케이스)</div>
-        <div style="font-size:0.82rem;color:#555;margin-bottom:10px;">
+      <div id="calcSplitSalePanel" style="display:none;background:var(--red-pale);border:1px solid var(--red-light);border-radius:6px;padding:12px 14px;margin-bottom:12px;">
+        <div style="font-weight:700;color:var(--red);margin-bottom:6px;">⚠ 금융소득 종합과세 주의 (중앙값 케이스)</div>
+        <div style="font-size:0.82rem;color:var(--text);margin-bottom:10px;">
           종료 시 KR_FOREIGN 미실현 이익이 2천만원을 초과합니다.
           <strong>최종 자산은 일괄 청산 기준 그 해 배당과 합산한 종합과세를 이미 반영합니다.</strong>
           분할 매도 효과는 소득 구간에 따라 다릅니다.
@@ -246,11 +242,11 @@
           <span id="calcSplitYearsLabel" style="font-size:0.85rem;font-weight:700;min-width:30px;">5년</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;" id="calcSplitMetrics"></div>
-        <div style="font-size:0.72rem;color:#90A4AE;margin-top:8px;">※ 참고용. 실제 세무 처리는 세무사와 확인하세요.</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">※ 참고용. 실제 세무 처리는 세무사와 확인하세요.</div>
       </div>
 
       <!-- ISA 중도해지 경고 배너 -->
-      <div id="isaPartialCycleBanner" style="display:none;background:#FFF3E0;border:1px solid #FB8C00;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:#6D4C41;">
+      <div id="isaPartialCycleBanner" style="display:none;background:var(--gold-pale);border:1px solid var(--gold);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:var(--text-muted);">
         <strong>⚠ ISA 시뮬 기간이 3의 배수가 아닙니다</strong>
         — 기본값은 마지막 <span id="isaPartialYearsText">?</span>년을 <b>만기 해지(9.9%)</b>로 가정합니다.
         3년 이전 중도 해지 시 추가 세금이 발생할 수 있습니다.
@@ -350,6 +346,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260607c"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260607c"></script>
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260611ui"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260611ui"></script>
 {% endblock %}

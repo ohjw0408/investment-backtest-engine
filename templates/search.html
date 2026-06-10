@@ -6,7 +6,7 @@
 .search-page { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
 .search-bar {
   display: flex; align-items: center; gap: 10px;
-  background: white; border: 1.5px solid var(--border);
+  background:var(--card); border: 1.5px solid var(--border);
   border-radius: 12px; padding: 10px 16px; margin-bottom: 20px;
   box-shadow: var(--shadow); transition: border-color 0.2s;
 }
@@ -29,7 +29,7 @@
 }
 
 .result-card {
-  background: white; border: 1.5px solid var(--border);
+  background:var(--card); border: 1.5px solid var(--border);
   border-radius: 12px; padding: 14px 16px;
   cursor: pointer; text-decoration: none; color: var(--text);
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -48,8 +48,8 @@
 .card-change {
   font-size: 0.8rem; font-weight: 700; text-align: right;
 }
-.card-change.up   { color: #2E7D32; }
-.card-change.down { color: #C62828; }
+.card-change.up   { color:var(--green); }
+.card-change.down { color:var(--red); }
 .card-change.flat { color: var(--text-muted); }
 
 .search-hint { text-align: center; color: var(--text-muted); padding: 48px 0; font-size: 0.9rem; }

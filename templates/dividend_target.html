@@ -2,11 +2,11 @@
 {% block title %}배당금 계산기 — Money Milestone{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260611ui">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
-.share-pill { background:#E3F2FD;color:#1976D2;border:none;border-radius:20px;padding:5px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:inherit; }
-.share-pill:hover { background:#BBDEFB; }
+.share-pill { background:var(--blue-pale);color:var(--blue-mid);border:none;border-radius:20px;padding:5px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:inherit; }
+.share-pill:hover { background:var(--blue-soft); }
 .var-section { margin-bottom: 14px; }
 .var-header { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
 .var-name { font-size:0.8rem; font-weight:700; color:var(--text-muted); min-width:32px; }
@@ -18,7 +18,7 @@
   background:var(--bg); cursor:pointer; transition:all 0.15s;
 }
 .var-radio:checked + .var-radio-label { border-color:var(--blue-bright); background:var(--blue-pale); color:var(--blue); }
-.var-radio.auto:checked + .var-radio-label { border-color:#66BB6A; background:#E8F5E9; color:#2E7D32; }
+.var-radio.auto:checked + .var-radio-label { border-color:#66BB6A; background:var(--green-pale); color:var(--green); }
 .var-body { display:flex; gap:8px; align-items:center; }
 .var-range-extra { margin-top:6px; display:none; }
 .var-range-extra.show { display:flex; gap:8px; align-items:center; }
@@ -239,7 +239,7 @@
           <label class="rebal-option"><input type="radio" name="dtAccount" value="isa"><span class="rebal-label">ISA</span></label>
           <label class="rebal-option"><input type="radio" name="dtAccount" value="pension"><span class="rebal-label">연금</span></label>
         </div>
-        <div id="dtTaxProfileInfo" style="margin-top:8px;padding:8px 10px;background:#F5F5F5;border-radius:8px;font-size:11px;color:var(--text-muted);"></div>
+        <div id="dtTaxProfileInfo" style="margin-top:8px;padding:8px 10px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
 
@@ -248,7 +248,7 @@
       <span id="dtRunBtnSpinner" class="btn-spinner" style="display:none">⏳</span>
     </button>
 
-    <div style="margin-top:12px;padding:10px 12px;background:#FFF8E1;border-radius:8px;font-size:11px;color:#795548;line-height:1.7;">
+    <div style="margin-top:12px;padding:10px 12px;background:var(--gold-pale);border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.7;">
       ⚠ <b>자동</b> 모드 사용 시 계산에 <b>약 1~2분</b>이 소요될 수 있습니다.<br>
       ⚠ 실제 데이터보다 긴 기간 시뮬레이션 시 정확성이 떨어질 수 있습니다.<br>
       📊 본 시뮬레이션은 과거 데이터 기반 통계적 추정이며, <b>미래의 결과를 보장하지 않습니다.</b>
@@ -273,7 +273,7 @@
         <span id="dtProgressEta"></span>
       </div>
       <div style="text-align:center;margin-top:10px;">
-        <button onclick="dtCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:white;color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+        <button onclick="dtCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:var(--card);color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
       </div>
     </div>
     <div class="result-empty" id="dtResultEmpty">
@@ -930,7 +930,7 @@ function renderResult(data, body) {
     const btn = document.createElement('button');
     btn.id = 'dtSwapBtn';
     btn.textContent = '⇄ X축 / 선 전환';
-    btn.style.cssText = 'margin-top:10px;padding:6px 14px;border:1.5px solid var(--blue-bright);border-radius:8px;background:white;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;';
+    btn.style.cssText = 'margin-top:10px;padding:6px 14px;border:1.5px solid var(--blue-bright);border-radius:8px;background:var(--card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;';
     btn.onclick = () => { window._scenarioFlipped=!window._scenarioFlipped; drawScenarioChart(window._scenarioData, window._scenarioFlipped); };
     document.getElementById('dtProbCurveCard').appendChild(btn);
   }
@@ -1047,7 +1047,7 @@ function drawIsocurveChart(data) {
     const swapBtn = document.createElement('button');
     swapBtn.id = 'dtIsoSwapBtn';
     swapBtn.textContent = '⇄ X축 / 선 전환';
-    swapBtn.style.cssText = 'margin-bottom:10px;padding:6px 14px;border:1.5px solid var(--blue-bright);border-radius:8px;background:white;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;display:block;';
+    swapBtn.style.cssText = 'margin-bottom:10px;padding:6px 14px;border:1.5px solid var(--blue-bright);border-radius:8px;background:var(--card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;display:block;';
     swapBtn.onclick = () => {
       const d = window._isoOrigData;
       const isNormal = swapBtn.dataset.flipped !== '1';
@@ -1119,19 +1119,19 @@ async function divMakeCanvas() {
   const sd = window._divShareData || {};
   const condRows = sd.cond_rows || [];
   return html2canvas(el, {
-    scale: 2, backgroundColor: '#F0F4F8', useCORS: true, allowTaint: true,
+    scale: 2, backgroundColor: (typeof MM_DARK !== 'undefined' && MM_DARK) ? '#0E141C' : '#F0F4F8', useCORS: true, allowTaint: true,
     onclone: function(doc, clonedEl) {
       ['#divShareBtns','#divScenShareBtns','#divIsoShareBtns'].forEach(sel => {
         const e = clonedEl.querySelector(sel); if (e) e.style.display = 'none';
       });
       const hdr = doc.createElement('div');
       hdr.style.cssText = 'background:#1A2332;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin-bottom:4px;';
-      hdr.innerHTML = '<span style="color:#1976D2;font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
-                    + '<span style="color:#90A4AE;font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
+      hdr.innerHTML = '<span style="color:var(--blue-mid);font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
+                    + '<span style="color:var(--text-muted);font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
       clonedEl.insertBefore(hdr, clonedEl.firstChild);
       const cond = doc.createElement('div');
-      cond.style.cssText = 'background:white;border:1.5px solid #E0E7EF;border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';
-      cond.innerHTML = condRows.map(([l,v]) => '<div><span style="font-size:0.68rem;color:#90A4AE;display:block;">' + l + '</span><span style="font-size:0.82rem;font-weight:700;color:#1A2332;">' + v + '</span></div>').join('');
+      cond.style.cssText = 'background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';
+      cond.innerHTML = condRows.map(([l,v]) => '<div><span style="font-size:0.68rem;color:var(--text-muted);display:block;">' + l + '</span><span style="font-size:0.82rem;font-weight:700;color:#1A2332;">' + v + '</span></div>').join('');
       hdr.insertAdjacentElement('afterend', cond);
       const origCanvases = el.querySelectorAll('canvas');
       const clonedCanvases = clonedEl.querySelectorAll('canvas');

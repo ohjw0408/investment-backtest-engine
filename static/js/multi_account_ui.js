@@ -134,7 +134,7 @@ async function onAccountTickerSearch(idx, q) {
     const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
     const data = await res.json();
     if (!data.length) {
-      dropdown.innerHTML = '<div style="padding:10px;font-size:0.78rem;color:#90A4AE">검색 결과 없음</div>';
+      dropdown.innerHTML = '<div style="padding:10px;font-size:0.78rem;color:var(--text-muted)">검색 결과 없음</div>';
     } else {
       dropdown.innerHTML = data.map(item => `
         <div class="ticker-drop-item"
@@ -158,15 +158,15 @@ async function onAccountTickerSearch(idx, q) {
 function accountWeightWarnHtml(idx) {
   const accTickers = ensureAccountTickers(idx);
   const total = accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0);
-  if (total > 100) return '<span style="font-size:0.72rem;color:#C62828;">비중 합계가 100%를 초과했습니다.</span>';
-  if (total < 100) return `<span style="font-size:0.72rem;color:#78909C;">나머지 ${100-total}%는 현금으로 유지됩니다.</span>`;
+  if (total > 100) return '<span style="font-size:0.72rem;color:var(--red);">비중 합계가 100%를 초과했습니다.</span>';
+  if (total < 100) return `<span style="font-size:0.72rem;color:var(--text-muted);">나머지 ${100-total}%는 현금으로 유지됩니다.</span>`;
   return '';
 }
 
 function renderAccountTickerList(idx) {
   const accTickers = ensureAccountTickers(idx);
   if (accTickers.length === 0) {
-    return '<div style="font-size:0.76rem;color:#90A4AE;padding:8px 0;">종목을 추가하세요</div>';
+    return '<div style="font-size:0.76rem;color:var(--text-muted);padding:8px 0;">종목을 추가하세요</div>';
   }
   const warn = `<div id="acctWeightWarn${idx}" style="margin-top:4px;">${accountWeightWarnHtml(idx)}</div>`;
   return accTickers.map(t => `
@@ -200,7 +200,7 @@ function _mmAmountFields(acc, i) {
           <label style="font-size:0.72rem;color:var(--text-muted);">${label}
             <input type="number" value="${Number(acc.initial_capital || 0)}" min="0" step="1000000"
               oninput="updateTaxAccountAmount(${i}, 'initial_capital', this.value)"
-              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
+              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
           </label>`;
   if (_mmMode() !== 'withdrawal') {
     return `
@@ -209,7 +209,7 @@ function _mmAmountFields(acc, i) {
           <label style="font-size:0.72rem;color:var(--text-muted);">월 적립액
             <input type="number" value="${Number(acc.monthly_contribution || 0)}" min="0" step="100000"
               oninput="updateTaxAccountAmount(${i}, 'monthly_contribution', this.value)"
-              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
+              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
           </label>
         </div>`;
   }
@@ -221,7 +221,7 @@ function _mmAmountFields(acc, i) {
           <label style="font-size:0.72rem;color:var(--text-muted);" title="현재 평가액 중 매수가 대비 이익(양도세 취득가 산정용)">미실현 차익
             <input type="number" value="${Number(acc.unrealized_gain || 0)}" min="0" step="1000000"
               oninput="updateTaxAccountAmount(${i}, 'unrealized_gain', this.value)"
-              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
+              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
           </label>
         </div>`;
   }
@@ -245,7 +245,7 @@ function renderTaxAccounts() {
     if (isSingle) return `
       <div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
         <select onchange="updateTaxAccountType(${i},this.value)"
-          style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.85rem;background:white;">
+          style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.85rem;background:var(--input-bg);">
           ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
         </select>
         <span style="font-size:0.75rem;color:var(--text-muted);">상단 설정값 사용</span>
@@ -258,13 +258,13 @@ function renderTaxAccounts() {
           <div style="display:flex;align-items:center;gap:8px;">
             <div style="width:10px;height:10px;border-radius:50%;background:${colors[acc.type]||'#90A4AE'};flex-shrink:0;"></div>
             <select onchange="updateTaxAccountType(${i},this.value)"
-              style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.85rem;background:white;">
+              style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.85rem;background:var(--input-bg);">
               ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
             </select>
             <label title="자금이동 우선순위(낮을수록 먼저 채움)" style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:3px;">순위
               <input type="number" min="1" value="${Number(acc.priority ?? (i+1))}"
                 onchange="updateTaxAccountPriority(${i}, this.value)"
-                style="width:42px;border:1.5px solid var(--border);border-radius:6px;padding:4px 5px;font-size:0.8rem;background:white;"></label>
+                style="width:42px;border:1.5px solid var(--border);border-radius:6px;padding:4px 5px;font-size:0.8rem;background:var(--input-bg);"></label>
             <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
           </div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">
@@ -276,7 +276,7 @@ function renderTaxAccounts() {
           <label style="display:block;font-size:0.72rem;color:var(--text-muted);margin-top:8px;" title="현재 평가액 중 매수가 대비 이익(양도세 취득가 산정용)">미실현 차익
             <input type="number" value="${Number(acc.unrealized_gain || 0)}" min="0" step="1000000"
               oninput="updateTaxAccountAmount(${i}, 'unrealized_gain', this.value)"
-              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:white;">
+              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
           </label>` : ''}
         </div>`;
     }
@@ -286,20 +286,20 @@ function renderTaxAccounts() {
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
           <div style="width:10px;height:10px;border-radius:50%;background:${colors[acc.type]||'#90A4AE'};flex-shrink:0;"></div>
           <select onchange="updateTaxAccountType(${i},this.value)"
-            style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;background:white;">
+            style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:5px 8px;font-size:0.82rem;background:var(--input-bg);">
             ${ACCOUNT_TYPES.map(t=>`<option value="${t}" ${acc.type===t?'selected':''}>${t}</option>`).join('')}
           </select>
           <label title="자금이동 우선순위(낮을수록 먼저 채움)" style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:3px;">순위
             <input type="number" min="1" value="${Number(acc.priority ?? (i+1))}"
               onchange="updateTaxAccountPriority(${i}, this.value)"
-              style="width:42px;border:1.5px solid var(--border);border-radius:6px;padding:4px 5px;font-size:0.8rem;background:white;"></label>
+              style="width:42px;border:1.5px solid var(--border);border-radius:6px;padding:4px 5px;font-size:0.8rem;background:var(--input-bg);"></label>
           <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
         </div>
         ${_mmAmountFields(acc, i)}
         <div style="position:relative;margin-top:6px;">
           <input type="text" id="accountTickerSearch${i}" placeholder="이 계좌 종목 검색"
             oninput="onAccountTickerSearch(${i}, this.value)"
-            style="width:100%;border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;font-size:0.8rem;background:white;">
+            style="width:100%;border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;font-size:0.8rem;background:var(--input-bg);">
           <div class="ticker-dropdown" id="accountTickerDropdown${i}" style="left:0;right:0;"></div>
         </div>
         ${renderAccountTickerList(i)}
@@ -344,11 +344,11 @@ function checkTaxLimits() {
   const warnEl = document.getElementById('taxWarnings');
   if (warnEl) {
     let html = warnings.map(w =>
-      `<div style="font-size:0.75rem;color:#C62828;background:#FFEBEE;padding:6px 10px;border-radius:6px;margin-bottom:4px;">${w}</div>`
+      `<div style="font-size:0.75rem;color:var(--red);background:var(--red-pale);padding:6px 10px;border-radius:6px;margin-bottom:4px;">${w}</div>`
     ).join('');
     // 멀티계좌면 초과분이 분배 우선순위대로 다른 계좌로 이전됨을 안내(단일계좌는 이전 대상 없음).
     if (warnings.length && !isSingle) {
-      html += `<div style="font-size:0.73rem;color:#1B5E20;background:#E8F5E9;padding:6px 10px;border-radius:6px;margin-bottom:4px;">➜ 납입한도 초과분은 분배 우선순위에 따라 다른 계좌로 이전됩니다.</div>`;
+      html += `<div style="font-size:0.73rem;color:var(--green);background:var(--green-pale);padding:6px 10px;border-radius:6px;margin-bottom:4px;">➜ 납입한도 초과분은 분배 우선순위에 따라 다른 계좌로 이전됩니다.</div>`;
     }
     warnEl.innerHTML = html;
   }
@@ -366,16 +366,16 @@ function renderMultiAccountSummary(multiAccount, g2, savings, autoWindmill) {
   }
 
   let warnings = (multiAccount.contribution_warnings || []).map(w =>
-    `<div style="font-size:0.76rem;color:#C62828;background:#FFEBEE;border-radius:6px;padding:6px 8px;margin-top:6px;">${w}</div>`
+    `<div style="font-size:0.76rem;color:var(--red);background:var(--red-pale);border-radius:6px;padding:6px 8px;margin-top:6px;">${w}</div>`
   ).join('');
   // 멀티계좌 결과 — 한도 초과분은 분배 우선순위대로 이전됨을 안내.
   if ((multiAccount.contribution_warnings || []).length) {
-    warnings += `<div style="font-size:0.74rem;color:#1B5E20;background:#E8F5E9;border-radius:6px;padding:6px 8px;margin-top:6px;">➜ 납입한도 초과분은 분배 우선순위에 따라 다른 계좌로 이전됩니다.</div>`;
+    warnings += `<div style="font-size:0.74rem;color:var(--green);background:var(--green-pale);border-radius:6px;padding:6px 8px;margin-top:6px;">➜ 납입한도 초과분은 분배 우선순위에 따라 다른 계좌로 이전됩니다.</div>`;
   }
   const rows = multiAccount.accounts.map((acc, i) => {
     const d = acc.distribution?.end_value || {};
     return `
-      <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;">
           <div style="font-size:0.82rem;font-weight:800;color:var(--text);">계좌 ${i + 1}</div>
           <div style="font-size:0.72rem;color:var(--text-muted);">${acc.type || '위탁'}</div>
@@ -403,9 +403,9 @@ function renderMultiAccountSummary(multiAccount, g2, savings, autoWindmill) {
     if (reinvest) items.push(`세액공제 환급금 재투자 ${reinvest}회`);
     if (items.length) {
       g2Html = `
-        <div style="margin-top:10px;padding:10px 12px;background:#F1F8E9;border:1px solid #C5E1A5;border-radius:8px;">
-          <div style="font-size:0.78rem;font-weight:800;color:#33691E;margin-bottom:6px;">자금 이동 · 세액공제 (대표 시나리오)</div>
-          ${items.map(t => `<div style="font-size:0.76rem;color:#33691E;margin-top:3px;">• ${t}</div>`).join('')}
+        <div style="margin-top:10px;padding:10px 12px;background:var(--green-pale);border:1px solid var(--green-light);border-radius:8px;">
+          <div style="font-size:0.78rem;font-weight:800;color:var(--green);margin-bottom:6px;">자금 이동 · 세액공제 (대표 시나리오)</div>
+          ${items.map(t => `<div style="font-size:0.76rem;color:var(--green);margin-top:3px;">• ${t}</div>`).join('')}
         </div>`;
     }
   }
@@ -419,20 +419,20 @@ function renderMultiAccountSummary(multiAccount, g2, savings, autoWindmill) {
     const accRows = (savings.accounts || [])
       .filter(a => a.brokerage_assumed_tax > 0 || a.tax_saving > 0 || a.gain_harvest_saving > 0)
       .map(a => `
-        <div style="display:flex;justify-content:space-between;font-size:0.73rem;color:#33691E;margin-top:3px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.73rem;color:var(--green);margin-top:3px;">
           <span>${a.type || '계좌'}</span>
           <span>위탁가정 ${fmtKRW(a.brokerage_assumed_tax)} · 실제 ${fmtKRW(a.actual_tax)} · 절세 <b>${fmtKRW((a.tax_saving || 0) + (a.gain_harvest_saving || 0))}</b></span>
         </div>`).join('');
     const ghNote = (c.gain_harvest_saving > 0)
-      ? `<div style="font-size:0.68rem;color:#558B2F;margin-top:4px;">↳ 절세매도(연 250만 공제) 효과 ${fmtKRW(c.gain_harvest_saving)} 포함</div>`
+      ? `<div style="font-size:0.68rem;color:var(--green);margin-top:4px;">↳ 절세매도(연 250만 공제) 효과 ${fmtKRW(c.gain_harvest_saving)} 포함</div>`
       : '';
     savingsHtml = `
-      <div style="margin-top:10px;padding:12px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;">
-        <div style="font-size:0.8rem;font-weight:800;color:#1B5E20;margin-bottom:8px;">💰 세금 절감 효과 (중앙값 기준)</div>
+      <div style="margin-top:10px;padding:12px;background:var(--green-pale);border:1px solid var(--green-light);border-radius:8px;">
+        <div style="font-size:0.8rem;font-weight:800;color:var(--green);margin-bottom:8px;">💰 세금 절감 효과 (중앙값 기준)</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-          <div><div style="font-size:0.68rem;color:#558B2F;">전체 위탁 가정 세금</div><div style="font-size:0.9rem;font-weight:800;color:#33691E;">${fmtKRW(c.brokerage_assumed_tax)}</div></div>
-          <div><div style="font-size:0.68rem;color:#558B2F;">실제 세금</div><div style="font-size:0.9rem;font-weight:800;color:#33691E;">${fmtKRW(c.actual_tax)}</div></div>
-          <div><div style="font-size:0.68rem;color:#558B2F;">절세액</div><div style="font-size:0.98rem;font-weight:900;color:#2E7D32;">약 ${fmtKRW(totalSaving)}</div></div>
+          <div><div style="font-size:0.68rem;color:var(--green);">전체 위탁 가정 세금</div><div style="font-size:0.9rem;font-weight:800;color:var(--green);">${fmtKRW(c.brokerage_assumed_tax)}</div></div>
+          <div><div style="font-size:0.68rem;color:var(--green);">실제 세금</div><div style="font-size:0.9rem;font-weight:800;color:var(--green);">${fmtKRW(c.actual_tax)}</div></div>
+          <div><div style="font-size:0.68rem;color:var(--green);">절세액</div><div style="font-size:0.98rem;font-weight:900;color:var(--green);">약 ${fmtKRW(totalSaving)}</div></div>
         </div>
         ${ghNote}
         ${accRows}
@@ -442,7 +442,7 @@ function renderMultiAccountSummary(multiAccount, g2, savings, autoWindmill) {
 
   // 단일 풍차 ISA → 위탁계좌 자동 생성 안내(연 2천만 한도 초과분 위탁 운용).
   const autoWindmillHtml = autoWindmill ? `
-    <div style="margin-top:10px;padding:9px 12px;background:#E3F2FD;border:1px solid #90CAF9;border-radius:8px;font-size:0.75rem;color:#0D47A1;">
+    <div style="margin-top:10px;padding:9px 12px;background:var(--blue-pale);border:1px solid var(--blue-soft);border-radius:8px;font-size:0.75rem;color:var(--blue);">
       ℹ️ ISA 해지 시 전액 재입금이 불가하여(연 2,000만원 한도) 한도 초과분은 자동 생성된 위탁계좌(같은 종목·비중)에서 운용했습니다.
     </div>` : '';
 

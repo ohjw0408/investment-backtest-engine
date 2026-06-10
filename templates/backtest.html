@@ -2,7 +2,7 @@
 {% block title %}포트폴리오 분석 — Money Milestone{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260611ui">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 .bt-layout {
@@ -10,7 +10,7 @@
 }
 .bt-left {
   width: 380px; min-width: 340px; flex-shrink: 0;
-  background: white; border-radius: 16px;
+  background: var(--card); border-radius: 16px;
   border: 1.5px solid var(--border);
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
   padding: 20px;
@@ -38,12 +38,12 @@
   font-size: 0.875rem; color: var(--text); background: var(--bg);
   outline: none;
 }
-.date-row input[type=date]:focus { border-color: var(--blue); background: white; }
+.date-row input[type=date]:focus { border-color: var(--blue); background: var(--card); }
 .date-sep { color: var(--text-muted); font-size: 0.85rem; flex-shrink: 0; }
 
 /* 결과 카드 */
 .bt-card {
-  background: white; border-radius: 14px;
+  background: var(--card); border-radius: 14px;
   border: 1.5px solid var(--border); padding: 20px;
   margin-bottom: 16px;
 }
@@ -57,8 +57,8 @@
 .metric-item { padding: 12px 14px; background: var(--bg); border-radius: 10px; }
 .metric-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
 .metric-value { font-size: 1.05rem; font-weight: 800; color: var(--text); }
-.metric-value.up   { color: #2E7D32; }
-.metric-value.down { color: #C62828; }
+.metric-value.up   { color: var(--green); }
+.metric-value.down { color: var(--red); }
 
 .bt-empty {
   display: flex; align-items: center; justify-content: center;
@@ -84,8 +84,8 @@
   border: 1.5px solid var(--border);
 }
 .ticker-badge {
-  font-size: 0.72rem; font-weight: 700; color: #1976D2;
-  background: #E3F2FD; border-radius: 6px;
+  font-size: 0.72rem; font-weight: 700; color: var(--blue-mid);
+  background: var(--blue-pale); border-radius: 6px;
   padding: 2px 7px; white-space: nowrap; flex-shrink: 0;
 }
 .ticker-name {
@@ -95,25 +95,19 @@
 .ticker-weight-input {
   width: 46px; text-align: center; font-size: 0.82rem; font-weight: 700;
   border: 1.5px solid var(--border); border-radius: 6px;
-  padding: 3px 4px; background: white; color: var(--text);
+  padding: 3px 4px; background: var(--input-bg); color: var(--text);
   outline: none; flex-shrink: 0;
 }
 .ticker-weight-input:focus { border-color: var(--blue); }
 .ticker-weight-slider {
-  flex: 1; min-width: 40px; accent-color: #1976D2;
+  flex: 1; min-width: 40px; accent-color: var(--blue-mid);
 }
 .ticker-remove-btn {
   background: none; border: none; cursor: pointer;
   color: var(--text-muted); font-size: 1.1rem; line-height: 1;
   padding: 0 2px; flex-shrink: 0;
 }
-.ticker-remove-btn:hover { color: #C62828; }
-.share-pill {
-  background: #E3F2FD; color: #1976D2; border: none; border-radius: 20px;
-  padding: 5px 12px; font-size: 0.78rem; font-weight: 700; cursor: pointer;
-  font-family: inherit;
-}
-.share-pill:hover { background: #BBDEFB; }
+.ticker-remove-btn:hover { color: var(--red); }
 </style>
 {% endblock %}
 
@@ -228,12 +222,12 @@
         <div id="taxWarnings" style="margin-top:4px;"></div>
 
         <!-- ISA 풍차돌리기 옵션 (ISA 선택 시만 표시) -->
-        <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:#E8F5E9;border-radius:8px;font-size:0.8rem;border:1px solid #A5D6A7;">
+        <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:var(--green-pale);border-radius:8px;font-size:0.8rem;border:1px solid var(--green-light);">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="isaRenewalCheck" style="width:14px;height:14px;">
             <div>
-              <span style="font-weight:700;color:#1B5E20;">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
-              <div style="color:#2E7D32;font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 200만원 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다.</div>
+              <span style="font-weight:700;color:var(--green);">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
+              <div style="color:var(--green);font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 200만원 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다.</div>
             </div>
           </label>
         </div>
@@ -246,12 +240,12 @@
         </div>
 
         <!-- 절세 매도 (위탁 계좌 선택 시 표시) -->
-        <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:#E3F2FD;border-radius:8px;font-size:0.8rem;border:1px solid #90CAF9;">
+        <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:var(--blue-pale);border-radius:8px;font-size:0.8rem;border:1px solid var(--blue-soft);">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="gainHarvestingCheck" style="width:14px;height:14px;">
             <div>
-              <span style="font-weight:700;color:#1565C0;">📉 절세 매도 (연 250만 공제 소진)</span>
-              <div style="color:#1976D2;font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
+              <span style="font-weight:700;color:var(--blue);">📉 절세 매도 (연 250만 공제 소진)</span>
+              <div style="color:var(--blue-mid);font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
             </div>
           </label>
         </div>
@@ -264,12 +258,12 @@
     <div class="calc-warning">⚠ 과거 데이터 기반 시뮬레이션입니다. 미래 수익을 보장하지 않습니다.</div>
 
     <!-- 가상 데이터 옵트인 -->
-    <div class="calc-section" id="btSyntheticSection" style="background:#FFFDE7;border:1px solid #F9A825;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+    <div class="calc-section" id="btSyntheticSection" style="background:var(--gold-pale);border:1px solid var(--gold);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
         <input type="checkbox" id="btUseSyntheticCheck" style="margin-top:3px;flex-shrink:0;">
         <div>
           <span style="font-weight:700;font-size:0.87rem;">가상 데이터 사용</span>
-          <div style="font-size:0.77rem;color:#795548;margin-top:2px;">실제 데이터가 부족할 때 통계 추정 데이터로 보완합니다. 결과 정확도가 낮아질 수 있습니다.</div>
+          <div style="font-size:0.77rem;color:var(--text-muted);margin-top:2px;">실제 데이터가 부족할 때 통계 추정 데이터로 보완합니다. 결과 정확도가 낮아질 수 있습니다.</div>
         </div>
       </label>
     </div>
@@ -291,7 +285,7 @@
         <span id="btProgressEta"></span>
       </div>
       <div style="text-align:center;margin-top:10px;">
-        <button onclick="btCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:white;color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+        <button onclick="btCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:var(--card);color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
       </div>
     </div>
   </div>
@@ -303,7 +297,7 @@
     <div id="btResultContent" style="display:none;">
 
       <!-- 가상 데이터 경고 배너 -->
-      <div id="btSynthWarningBanner" style="display:none;background:#FFF8E1;border:1px solid #F9A825;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:#795548;">
+      <div id="btSynthWarningBanner" style="display:none;background:var(--gold-pale);border:1px solid var(--gold);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:var(--text-muted);">
         <strong>⚠ 가상 데이터 포함</strong> — 통계적으로 추정된 가격이 포함됩니다. 참고용으로만 사용하세요.
         <div id="btSynthWarningDetail" style="margin-top:5px;line-height:1.6;"></div>
       </div>
@@ -344,7 +338,7 @@
 
       <!-- 종합과세 경고 + 분할매도 절세 패널 (Phase 2e) -->
       <div id="btSplitSalePanel" style="display:none;" class="bt-card">
-        <div class="bt-card-title" style="color:#b71c1c;">⚠ 금융소득 종합과세 주의</div>
+        <div class="bt-card-title" style="color:var(--red);">⚠ 금융소득 종합과세 주의</div>
         <div style="font-size:0.83rem;color:#555;margin-bottom:12px;">
           시뮬레이션 종료 시점 KR_FOREIGN(국내상장 해외 ETF) 미실현 이익이 2천만원을 초과합니다.
           <strong>최종 자산은 일괄 청산 기준으로 그 해 배당과 합산한 금융소득 종합과세를 이미 반영합니다.</strong>
@@ -361,7 +355,7 @@
           <span id="btSplitYearsLabel" style="font-size:0.85rem;font-weight:700;min-width:30px;">5년</span>
         </div>
         <div class="metrics-grid" id="btSplitMetrics" style="margin-top:6px;"></div>
-        <div style="font-size:0.73rem;color:#90A4AE;margin-top:8px;">
+        <div style="font-size:0.73rem;color:var(--text-muted);margin-top:8px;">
           ※ 절세 시나리오는 참고용입니다. 실제 세무 처리는 세무사와 확인하세요.
         </div>
       </div>
@@ -372,7 +366,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260607c"></script>
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260611ui"></script>
 <script>
 // 오늘 날짜 기본값
 document.getElementById('btEndDate').value = new Date().toISOString().split('T')[0];
@@ -572,13 +566,13 @@ function btRenderMultiAccount(data) {
   if (!data.multi_account || accts.length <= 1) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
 
   const rows = accts.map((a, i) => `
-    <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;">
         <div style="font-size:0.82rem;font-weight:800;color:var(--text);">계좌 ${i + 1}</div>
         <div style="font-size:0.72rem;color:var(--text-muted);">${a.type || '위탁'}</div>
       </div>
       <div style="font-size:0.95rem;font-weight:800;color:var(--text);">${fmtKRW(a.end_value)}</div>
-      ${a.tax_paid ? `<div style="font-size:0.68rem;color:#C62828;margin-top:2px;">세금 ${fmtKRW(a.tax_paid)}</div>` : ''}
+      ${a.tax_paid ? `<div style="font-size:0.68rem;color:var(--red);margin-top:2px;">세금 ${fmtKRW(a.tax_paid)}</div>` : ''}
     </div>`).join('');
 
   // 절세액(세금 ON) — 계산기와 동일 savings 스키마.
@@ -588,12 +582,12 @@ function btRenderMultiAccount(data) {
     const c = sv.combined;
     const totalSaving = (c.tax_saving || 0) + (c.gain_harvest_saving || 0);
     savingsHtml = `
-      <div style="margin-top:10px;padding:12px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;">
-        <div style="font-size:0.8rem;font-weight:800;color:#1B5E20;margin-bottom:8px;">💰 세금 절감 효과</div>
+      <div style="margin-top:10px;padding:12px;background:var(--green-pale);border:1px solid var(--green-light);border-radius:8px;">
+        <div style="font-size:0.8rem;font-weight:800;color:var(--green);margin-bottom:8px;">💰 세금 절감 효과</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-          <div><div style="font-size:0.68rem;color:#558B2F;">전체 위탁 가정 세금</div><div style="font-size:0.9rem;font-weight:800;color:#33691E;">${fmtKRW(c.brokerage_assumed_tax)}</div></div>
-          <div><div style="font-size:0.68rem;color:#558B2F;">실제 세금</div><div style="font-size:0.9rem;font-weight:800;color:#33691E;">${fmtKRW(c.actual_tax)}</div></div>
-          <div><div style="font-size:0.68rem;color:#558B2F;">절세액</div><div style="font-size:0.98rem;font-weight:900;color:#2E7D32;">약 ${fmtKRW(totalSaving)}</div></div>
+          <div><div style="font-size:0.68rem;color:var(--green);">전체 위탁 가정 세금</div><div style="font-size:0.9rem;font-weight:800;color:var(--green);">${fmtKRW(c.brokerage_assumed_tax)}</div></div>
+          <div><div style="font-size:0.68rem;color:var(--green);">실제 세금</div><div style="font-size:0.9rem;font-weight:800;color:var(--green);">${fmtKRW(c.actual_tax)}</div></div>
+          <div><div style="font-size:0.68rem;color:var(--green);">절세액</div><div style="font-size:0.98rem;font-weight:900;color:var(--green);">약 ${fmtKRW(totalSaving)}</div></div>
         </div>
       </div>`;
   }
@@ -611,9 +605,9 @@ function btRenderMultiAccount(data) {
     if (g2.annual_deduction_credit > 0) items.push(`연 납입 세액공제 환급: ${fmtKRW(g2.annual_deduction_credit)}`);
     if (g2.pension_transfer_credit_total > 0) items.push(`ISA→연금 이전 세액공제: ${fmtKRW(g2.pension_transfer_credit_total)}`);
     if (items.length) g2Html = `
-      <div style="margin-top:10px;padding:10px 12px;background:#F1F8E9;border:1px solid #C5E1A5;border-radius:8px;">
-        <div style="font-size:0.78rem;font-weight:800;color:#33691E;margin-bottom:6px;">자금 이동 · 세액공제</div>
-        ${items.map(t => `<div style="font-size:0.76rem;color:#33691E;margin-top:3px;">• ${t}</div>`).join('')}
+      <div style="margin-top:10px;padding:10px 12px;background:var(--green-pale);border:1px solid var(--green-light);border-radius:8px;">
+        <div style="font-size:0.78rem;font-weight:800;color:var(--green);margin-bottom:6px;">자금 이동 · 세액공제</div>
+        ${items.map(t => `<div style="font-size:0.76rem;color:var(--green);margin-top:3px;">• ${t}</div>`).join('')}
       </div>`;
   }
 
@@ -1038,7 +1032,7 @@ function renderValueChart(history) {
       },
       scales: {
         x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => fmtKRW(v) }, grid: { color: 'rgba(0,0,0,0.04)' } }
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => fmtKRW(v) }, grid: { color: MM_CHART_GRID } }
       }
     }
   });
@@ -1068,7 +1062,7 @@ function renderAnnualChart(annualReturns) {
       }},
       scales: {
         x: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.04)' } }
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
       }
     }
   });
@@ -1112,7 +1106,7 @@ async function btMakeCanvas() {
   const rightW = rightPanel ? rightPanel.offsetWidth : 0;
 
   const rawCanvas = await html2canvas(layout, {
-    scale: 2, backgroundColor: '#F0F4F8', useCORS: true, allowTaint: true,
+    scale: 2, backgroundColor: (typeof MM_DARK !== 'undefined' && MM_DARK) ? '#0E141C' : '#F0F4F8', useCORS: true, allowTaint: true,
     onclone: function(doc, clonedLayout) {
       // Fix flex:1 width so html2canvas renders right panel correctly
       const cr = clonedLayout.querySelector('.bt-right');
@@ -1207,7 +1201,7 @@ function renderDrawdownChart(history) {
       }},
       scales: {
         x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.04)' } }
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
       }
     }
   });

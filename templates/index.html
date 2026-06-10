@@ -171,7 +171,7 @@ async function loadPortfolio(period = '1m') {
             color: '#90A4AE',
             callback: v => _homeHideAmounts ? '***' : '₩' + (v / 1000000).toFixed(1) + 'M'
           },
-          grid: { color: 'rgba(0,0,0,0.04)' }
+          grid: { color: MM_CHART_GRID }
         }
       }
     }

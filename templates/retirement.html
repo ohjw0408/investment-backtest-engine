@@ -2,18 +2,18 @@
 {% block title %}은퇴 설계 — Money Milestone{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260611ui">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
-.share-pill { background:#E3F2FD;color:#1976D2;border:none;border-radius:20px;padding:5px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:inherit; }
-.share-pill:hover { background:#BBDEFB; }
+.share-pill { background:var(--blue-pale);color:var(--blue-mid);border:none;border-radius:20px;padding:5px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:inherit; }
+.share-pill:hover { background:var(--blue-soft); }
 .ret-layout {
   display: flex; gap: 24px; align-items: flex-start; padding: 24px;
 }
 .ret-left  {
   width: 400px; min-width: 360px; flex-shrink: 0;
   display: flex; flex-direction: column; gap: 0;
-  background: white;
+  background:var(--card);
   border-radius: 16px;
   border: 1.5px solid var(--border);
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
@@ -40,7 +40,7 @@
   border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden;
 }
 .ret-mode-tab {
-  flex: 1; padding: 10px; background: white; cursor: pointer;
+  flex: 1; padding: 10px; background:var(--card); cursor: pointer;
   font-size: 0.82rem; font-weight: 700; color: var(--text-muted);
   text-align: center; transition: all 0.15s; border: none;
 }
@@ -64,7 +64,7 @@
   border-radius: 10px; padding: 10px 14px;
   transition: border-color 0.15s;
 }
-.ret-search-box:focus-within { border-color: var(--blue); background: white; }
+.ret-search-box:focus-within { border-color: var(--blue); background:var(--card); }
 .ret-search-box .search-icon { font-size: 1rem; flex-shrink: 0; color: var(--text-muted); }
 .ret-search-box input {
   border: none; outline: none; background: transparent;
@@ -119,12 +119,12 @@
   padding: 14px 16px; border-radius: 10px;
   font-size: 0.85rem; line-height: 1.7; margin-top: 12px;
 }
-.ret-msg-box.safe    { background: #E8F5E9; border: 1.5px solid #A5D6A7; color: #1B5E20; }
-.ret-msg-box.warning { background: #FFF8E1; border: 1.5px solid #FFE082; color: #E65100; }
-.ret-msg-box.danger  { background: #FFEBEE; border: 1.5px solid #EF9A9A; color: #B71C1C; }
+.ret-msg-box.safe    { background:var(--green-pale); border: 1.5px solid #A5D6A7; color:var(--green); }
+.ret-msg-box.warning { background:var(--gold-pale); border: 1.5px solid #FFE082; color:var(--gold-deep); }
+.ret-msg-box.danger  { background:var(--red-pale); border: 1.5px solid #EF9A9A; color:var(--red); }
 
 .acc-dist-card {
-  background: white; border-radius: 12px;
+  background:var(--card); border-radius: 12px;
   border: 1.5px solid var(--border); padding: 16px; margin-bottom: 16px;
 }
 .acc-dist-title { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-bottom: 12px; }
@@ -275,7 +275,7 @@
         </div>
 
         <!-- D5-a: 인플레이션 생활비 인포박스 -->
-        <div id="inflationInfoBox" style="background:#F3F4FD;border-radius:8px;padding:12px 16px;margin-top:10px;font-size:0.83rem;line-height:1.7;color:#3D405B;">
+        <div id="inflationInfoBox" style="background:var(--blue-pale);border-radius:8px;padding:12px 16px;margin-top:10px;font-size:0.83rem;line-height:1.7;color:var(--text);">
           <strong>💡 인플레이션 반영 생활비</strong>
           <div id="inflationInfoDetail" style="margin-top:6px;"></div>
         </div>
@@ -406,12 +406,12 @@
         <div id="taxWarnings" style="margin-top:4px;"></div>
 
         <!-- ISA 풍차돌리기 옵션 -->
-        <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:#E8F5E9;border-radius:8px;font-size:0.8rem;border:1px solid #A5D6A7;">
+        <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:var(--green-pale);border-radius:8px;font-size:0.8rem;border:1px solid var(--green-light);">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="isaRenewalCheck" style="width:14px;height:14px;">
             <div>
-              <span style="font-weight:700;color:#1B5E20;">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
-              <div style="color:#2E7D32;font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다.</div>
+              <span style="font-weight:700;color:var(--green);">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
+              <div style="color:var(--green);font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다.</div>
             </div>
           </label>
         </div>
@@ -424,12 +424,12 @@
         </div>
 
         <!-- 절세 매도 (위탁 계좌 시 표시) -->
-        <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:#E3F2FD;border-radius:8px;font-size:0.8rem;border:1px solid #90CAF9;">
+        <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:var(--blue-pale);border-radius:8px;font-size:0.8rem;border:1px solid var(--blue-soft);">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="gainHarvestingCheck" style="width:14px;height:14px;">
             <div>
-              <span style="font-weight:700;color:#1565C0;">📉 절세 매도 (연 250만 공제 소진)</span>
-              <div style="color:#1976D2;font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
+              <span style="font-weight:700;color:var(--blue);">📉 절세 매도 (연 250만 공제 소진)</span>
+              <div style="color:var(--blue-mid);font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
             </div>
           </label>
         </div>
@@ -465,7 +465,7 @@
         <span id="retProgressEta"></span>
       </div>
       <div style="text-align:center;margin-top:10px;">
-        <button onclick="retCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:white;color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+        <button onclick="retCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:var(--card);color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
       </div>
     </div>
   </div>
@@ -474,11 +474,11 @@
   <div class="ret-right">
 
     <!-- 에러 배너 (retResultContent 밖 — 항상 DOM에 존재) -->
-    <div id="retAccountRestrictBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
+    <div id="retAccountRestrictBanner" style="display:none;background:var(--red-pale);border:2px solid var(--red-light);border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:var(--red);">
       <strong>⛔ 계좌 유형 제한 위반</strong>
       <div id="retAccountRestrictDetail" style="margin-top:6px;line-height:1.7;"></div>
     </div>
-    <div id="retIsaLimitErrorBanner" style="display:none;background:#FFEBEE;border:2px solid #E53935;border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:#B71C1C;">
+    <div id="retIsaLimitErrorBanner" style="display:none;background:var(--red-pale);border:2px solid var(--red-light);border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:var(--red);">
       <strong>⛔ ISA 납입 한도 초과</strong>
       <div id="retIsaLimitErrorDetail" style="margin-top:6px;line-height:1.7;"></div>
     </div>
@@ -490,8 +490,8 @@
     <div id="retResultContent" style="display:none;">
 
       <!-- 금융소득 종합과세 분할매도 패널 (Phase 2f) -->
-      <div id="retSplitSalePanel" style="display:none;background:#FFEBEE;border:1px solid #EF9A9A;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
-        <div style="font-weight:700;color:#b71c1c;margin-bottom:6px;">⚠ 금융소득 종합과세 주의 (중앙값 케이스)</div>
+      <div id="retSplitSalePanel" style="display:none;background:var(--red-pale);border:1px solid var(--red-light);border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+        <div style="font-weight:700;color:var(--red);margin-bottom:6px;">⚠ 금융소득 종합과세 주의 (중앙값 케이스)</div>
         <div style="font-size:0.82rem;color:#555;margin-bottom:10px;">
           적립 종료 시 KR_FOREIGN 미실현 이익이 2천만원을 초과합니다.
           <strong>최종 자산은 일괄 청산 기준 그 해 배당과 합산한 종합과세를 반영합니다.</strong>
@@ -504,7 +504,7 @@
           <span id="retSplitYearsLabel" style="font-size:0.85rem;font-weight:700;min-width:30px;">5년</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;" id="retSplitMetrics"></div>
-        <div style="font-size:0.72rem;color:#90A4AE;margin-top:8px;">※ 참고용. 실제 세무 처리는 세무사와 확인하세요.</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">※ 참고용. 실제 세무 처리는 세무사와 확인하세요.</div>
       </div>
 
       <!-- 생존율 -->
@@ -597,7 +597,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260607g5d"></script>
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260611ui"></script>
 <script>
 let retTickers = [];
 let _retTaskId = null, _retCancelled = false;
@@ -1273,7 +1273,7 @@ function retUpdateSplitPlan(years) {
     { label: years + '년 세후 이익', value: fmtKRW(splitAfterTax),     cls: '' },
     { label: '절감액',             value: fmtKRW(saving),            cls: '' },
     { label: '최적 연수',          value: plan.optimal_years + '년 (세후 ' + fmtKRW(plan.optimal_after_tax ?? (plan.gain - plan.optimal_tax)) + ')', cls: '' },
-  ].map(item => `<div style="background:#fff;border:1px solid #eee;border-radius:6px;padding:8px 10px;">
+  ].map(item => `<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">
       <div style="font-size:0.68rem;color:var(--text-muted);">${item.label}</div>
       <div style="font-size:0.82rem;font-weight:800;">${item.value}</div>
     </div>`).join('');
@@ -1467,18 +1467,18 @@ async function retMakeCanvas() {
   const survival = m.survival !== undefined ? m.survival + '%' : '—';
   const years = m.years ? m.years + '년' : '—';
   return html2canvas(el, {
-    scale: 2, backgroundColor: '#F0F4F8', useCORS: true, allowTaint: true,
+    scale: 2, backgroundColor: (typeof MM_DARK !== 'undefined' && MM_DARK) ? '#0E141C' : '#F0F4F8', useCORS: true, allowTaint: true,
     onclone: function(doc, clonedEl) {
       const hdr = doc.createElement('div');
       hdr.style.cssText = 'background:#1A2332;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin-bottom:4px;';
-      hdr.innerHTML = '<span style="color:#1976D2;font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
-                    + '<span style="color:#90A4AE;font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
+      hdr.innerHTML = '<span style="color:var(--blue-mid);font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
+                    + '<span style="color:var(--text-muted);font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
       clonedEl.insertBefore(hdr, clonedEl.firstChild);
       const cond = doc.createElement('div');
-      cond.style.cssText = 'background:white;border:1.5px solid #E0E7EF;border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';
+      cond.style.cssText = 'background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';
       cond.innerHTML = [
         ['초기자산', initial], ['월적립', monthly], ['목표생존율', survival], ['기간', years],
-      ].map(([l,v]) => '<div><span style="font-size:0.68rem;color:#90A4AE;display:block;">' + l + '</span><span style="font-size:0.82rem;font-weight:700;color:#1A2332;">' + v + '</span></div>').join('');
+      ].map(([l,v]) => '<div><span style="font-size:0.68rem;color:var(--text-muted);display:block;">' + l + '</span><span style="font-size:0.82rem;font-weight:700;color:#1A2332;">' + v + '</span></div>').join('');
       hdr.insertAdjacentElement('afterend', cond);
       const origCanvases = el.querySelectorAll('canvas');
       const clonedCanvases = clonedEl.querySelectorAll('canvas');

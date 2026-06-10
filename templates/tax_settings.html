@@ -2,10 +2,10 @@
 {% block title %}세금 설정 — Money Milestone{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260611ui">
 <style>
 .tax-card {
-  background: white;
+  background:var(--card);
   border-radius: 12px;
   border: 1.5px solid var(--border);
   padding: 20px;
@@ -65,14 +65,14 @@
   font-size: 0.85rem; display: none; z-index: 9999;
 }
 .summary-card {
-  background: #F0F7FF;
-  border: 1.5px solid #BBDEFB;
+  background:var(--blue-pale);
+  border: 1.5px solid var(--blue-soft);
   border-radius: 12px;
   padding: 16px 20px;
   margin-bottom: 20px;
 }
 .summary-card-title {
-  font-size: 0.78rem; font-weight: 700; color: #1976D2;
+  font-size: 0.78rem; font-weight: 700; color:var(--blue-mid);
   text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
 }
 .summary-row {
@@ -204,7 +204,7 @@
 
   <button class="save-btn" onclick="saveSettings()">설정 저장</button>
 
-  <div style="margin-top:16px;padding:12px;background:#F5F5F5;border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.7;">
+  <div style="margin-top:16px;padding:12px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.7;">
     💡 <b>세금 계산 참고사항</b><br>
     - 금현물, 비트코인 배당(이자)은 별도 세율 적용<br>
     - 금융소득 종합과세: 연간 이자+배당 합계 2,000만원 초과 시<br>

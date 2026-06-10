@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
 
         if (!data.length) {
-          dropdown.innerHTML = '<div style="padding:12px;font-size:0.82rem;color:#90A4AE">검색 결과 없음</div>';
+          dropdown.innerHTML = '<div style="padding:12px;font-size:0.82rem;color:var(--text-muted)">검색 결과 없음</div>';
         } else {
           dropdown.innerHTML = data.map(item => `
             <div class="ticker-drop-item"
@@ -515,7 +515,7 @@ function showProgressUI() {
         <span id="progressEta"></span>
       </div>
       <div style="text-align:center;margin-top:10px;">
-        <button onclick="cancelCalcTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:white;color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+        <button onclick="cancelCalcTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:var(--card);color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
       </div>
     </div>`;
   document.getElementById('resultContent').style.display = 'none';
@@ -634,7 +634,7 @@ function calcUpdateSplitPlan(years) {
     { label: years + '년 세후 이익', value: fmtKRW(splitAfterTax),     cls: 'up' },
     { label: '절감액',             value: fmtKRW(saving),            cls: saving > 0 ? 'up' : '' },
     { label: '최적 연수',          value: plan.optimal_years + '년 (세후 ' + fmtKRW(plan.optimal_after_tax ?? (plan.gain - plan.optimal_tax)) + ')', cls: '' },
-  ].map(item => `<div style="background:#fff;border:1px solid #eee;border-radius:6px;padding:8px 10px;">
+  ].map(item => `<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">
       <div style="font-size:0.68rem;color:var(--text-muted);">${item.label}</div>
       <div style="font-size:0.82rem;font-weight:800;" class="${item.cls}">${item.value}</div>
     </div>`).join('');
@@ -832,7 +832,7 @@ function renderResult(data, payload) {
       const wrap = card && card.querySelector('.chart-wrap-sm');
       if (wrap) {
         wrap.innerHTML =
-          '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#90A4AE;font-size:0.82rem;">배당 데이터 없음</div>';
+          '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.82rem;">배당 데이터 없음</div>';
       }
       const statsEl = document.getElementById(`stats${cfg.id.replace('hist','')}`);
       if (statsEl) statsEl.innerHTML = '';
@@ -850,7 +850,7 @@ function renderResult(data, payload) {
       if (!note) {
         note = document.createElement('div');
         note.className = 'div-note';
-        note.style.cssText = 'font-size:0.7rem;color:#90A4AE;margin-top:4px;text-align:right;';
+        note.style.cssText = 'font-size:0.7rem;color:var(--text-muted);margin-top:4px;text-align:right;';
         card.appendChild(note);
       }
       note.textContent = divNote;
@@ -942,7 +942,7 @@ function renderHistogram(canvasId, values, color, fmtFn) {
         },
         y: {
           ticks: { font: { size: 9 }, color: '#90A4AE', stepSize: 1 },
-          grid: { color: 'rgba(0,0,0,0.04)' }
+          grid: { color: MM_CHART_GRID }
         }
       }
     }
@@ -988,7 +988,7 @@ function renderRollingChart(cases) {
       },
       scales: {
         x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { ticks: { font: { family: 'DM Mono', size: 10 }, color: '#90A4AE', callback: v => fmtKRW(v) }, grid: { color: 'rgba(0,0,0,0.04)' } }
+        y: { ticks: { font: { family: 'DM Mono', size: 10 }, color: '#90A4AE', callback: v => fmtKRW(v) }, grid: { color: MM_CHART_GRID } }
       }
     }
   });
@@ -1069,18 +1069,18 @@ async function calcMakeCanvas() {
   const p50 = m.p50 !== undefined ? Number(m.p50).toLocaleString() + '억' : '—';
   const cagr = m.cagr !== undefined ? Number(m.cagr).toFixed(1) + '%' : '—';
   return html2canvas(el, {
-    scale: 2, backgroundColor: '#F0F4F8', useCORS: true, allowTaint: true,
+    scale: 2, backgroundColor: (typeof MM_DARK !== 'undefined' && MM_DARK) ? '#0E141C' : '#F0F4F8', useCORS: true, allowTaint: true,
     onclone: function(doc, clonedEl) {
       const hdr = doc.createElement('div');
       hdr.style.cssText = 'background:#1A2332;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin-bottom:4px;';
-      hdr.innerHTML = '<span style="color:#1976D2;font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
-                    + '<span style="color:#90A4AE;font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
+      hdr.innerHTML = '<span style="color:var(--blue-mid);font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
+                    + '<span style="color:var(--text-muted);font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
       clonedEl.insertBefore(hdr, clonedEl.firstChild);
       const cond = doc.createElement('div');
-      cond.style.cssText = 'background:white;border:1.5px solid #E0E7EF;border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';
+      cond.style.cssText = 'background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';
       cond.innerHTML = [
         ['종목', label], ['기간', years], ['중간값', p50], ['CAGR', cagr],
-      ].map(([l,v]) => '<div><span style="font-size:0.68rem;color:#90A4AE;display:block;">' + l + '</span><span style="font-size:0.82rem;font-weight:700;color:#1A2332;">' + v + '</span></div>').join('');
+      ].map(([l,v]) => '<div><span style="font-size:0.68rem;color:var(--text-muted);display:block;">' + l + '</span><span style="font-size:0.82rem;font-weight:700;color:var(--text);">' + v + '</span></div>').join('');
       hdr.insertAdjacentElement('afterend', cond);
       const origCanvases = el.querySelectorAll('canvas');
       const clonedCanvases = clonedEl.querySelectorAll('canvas');

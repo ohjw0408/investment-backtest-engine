@@ -17,7 +17,7 @@ tags: [dev, bug]
 
 | # | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|---|
-| BUG-NAV-1 | navbar 링크 글자 세로 깨짐(1280px 뷰포트) — "계산기"가 계/산/기로 줄바꿈 | nav 링크 9개("간편 계산기" 추가로 +1) overflow → flex shrink → 글자 단위 wrap. `.nav-link`에 `white-space:nowrap` 없음. Playwright 스크린샷서 발견 (Claude, 2026-06-10) | `static/css/style.css` `.nav-links`/`.nav-link` | ⚠️ 활성 — nowrap만 넣으면 우측 검색/로그인 밀림. 좁은 폭 처리(E1 모바일과 연관) 같이 결정 필요 |
+| BUG-NAV-1 | navbar 링크 글자 세로 깨짐(1280px 뷰포트) — "계산기"가 계/산/기로 줄바꿈 | nav 링크 9개("간편 계산기" 추가로 +1) overflow → flex shrink → 글자 단위 wrap. `.nav-link`에 `white-space:nowrap` 없음. Playwright 스크린샷서 발견 (Claude, 2026-06-10) | `static/css/style.css` `.nav-links`/`.nav-link` | ✅ 수정 (2026-06-11 모바일 반응형 개편) — ≤1400px 상단 링크 숨김(사이드바가 동일 메뉴 제공) + nowrap. Playwright 1280px/1500px 검증 PASS |
 | BUG-1 | TF1/TF6/TF7 — 에러가 인라인 배너 대신 alert() 팝업으로 표시 | `pollTask` FAILURE 시 `_e._data` 미설정 or null → catch에서 `_handled=false` → `alert()` fallback | `static/js/calculator.js` (pollTask), `retirement.html` 에러 핸들링 없음 | ✅ 수정 (f35a611) |
 | BUG-2 | retirement.html — 에러/캡 배너 3종 미존재 | TF6/TF7(retirement 페이지) 에러가 모두 팝업으로 표시됨. ISA 캡 경고도 없음 | `templates/retirement.html`, 대응 JS | ✅ 확인 — 배너 이미 존재, BUG-1 fix로 함께 해결 |
 | BUG-3 | 연금 수령 시작 나이 입력 불가 | 은퇴 계산기에 "연금 수령 시작 나이" 입력칸 없음. `user_settings.age`(현재 나이) 사용 중 | `templates/retirement.html`, `retirement_logic.py`, `modules/tax/liquidation.py` | ✅ 수정 완료 |

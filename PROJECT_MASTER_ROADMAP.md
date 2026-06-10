@@ -1,6 +1,8 @@
 # Project Master Roadmap
 
-Last updated: 2026-06-03 (✅ **절세액 표시 P1 완료**(투자계산기, 위탁가정·실제·절세액 3종+GH) · **단일계좌 지원**(풍차 자동위탁 포함) · **KRX 금현물 거래가능 Phase 1+2**(위탁전용 시계열 + 현물/선물 ETF 백필) · **BUG-TAX-1**(위탁 배당세 누락)·**BUG-TAX-2**(위탁 인출 매도 양도세 누락)·**BUG-G1-2**(멀티계좌 입력 커서) 수정 · **deploy.yml** force-push 복구. → **진행 중 = Track G5 멀티계좌 탭 복제**: 백테스트 ✅(L10) → 은퇴 인출 엔진(G5-C, 토대 완료) → 통합 → UID 일괄)
+Last updated: 2026-06-09 (✅ **Track G5 멀티계좌 탭 복제 전체 완료**: G5-A 백테 ✅ → G5-B 은퇴적립 ✅ → G5-C 은퇴인출 엔진 ✅ → G5-D 인출기 standalone 멀티+세금 ✅ → **UI 4탭(계산기·백테·은퇴적립·은퇴인출) 전부 배선·배포** → **세금 커버리지 전탭 감사 = 신규 배선버그 0**. BUG-WD-TAX·GAP-WD-MULTI 해소. 발견 갭 1개 **GAP-DECUM-COMP**(인출 중 금융소득 종합과세 미모델링)=오너 보류. → **다음 = L7 실데이터 통합검증(브라우저) OR 신규 간편도구(간편계산기·세금계산기) OR GAP-DECUM-COMP**)
+
+> 이력: 2026-06-03 = 절세액 P1·단일계좌·KRX 금현물 Phase 1+2·BUG-TAX-1/2·BUG-G1-2·deploy.yml 복구 (당시 진행 중 = G5-C 토대).
 
 > ⚠️ **2026-05-30 정정:** 아래 "SCHD vs TIGER now converge" / "Phase 2c Gate 통과" / "Track A 완료"는 **가격(CAGR) 수렴만** 검증된 것이었음. `debug_dividend.py` 실측 결과, 배당 **액수**는 0임이 확인됨. 원인: Track A가 DJUSDIV_PROXY를 total-return(adj-close)로 구축 → 가격은 맞지만 배당이 가격에 임베딩되어 itemize 안 됨. 백필 가격 구간(1928~)에 배당 row 없음 + provenance 전부 0행. **이는 세금 Phase 2c(배당 역산)·2e(금종세)·Track G(다중계좌 세금)의 데이터 기반을 무효화한다.** 해결 owner: `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0`(범용 배당 백필 재설계). 우선순위는 아래 "Current Recommended Next Action" 참조.
 
@@ -20,7 +22,7 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 | `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | ✅ Complete (Phase 1~10, all screens). |
 | `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | **Backend complete (e8b7c1e). Frontend partially done. BUG-1~5 remain.** |
 | `PHASE4_PLAN.md § 4G` | Multi-account simulation engine + real ISA windmill (sequential/conditional flow). Requires Track F first. Key constraint: percentiles must be computed after per-scenario sum, not by summing individual percentiles. | ✅ 엔진+투자계산기 완료. → `trackG_multiaccount_plan.md`로 이관. |
-| `trackG_multiaccount_plan.md` | 다중계좌 엔진(G1~G4·2-4) + 배선/UI(B1~B3) + 탭복제(G5: 백테스트·은퇴) | ✅ 투자계산기 완료. **G5 진행**: 백테스트 백엔드+L10 ✅, 은퇴 인출(G5-C) 토대 ✅·엔진 본체 next, UI 일괄 대기. |
+| `trackG_multiaccount_plan.md` | 다중계좌 엔진(G1~G4·2-4) + 배선/UI(B1~B3) + 탭복제(G5: 백테스트·은퇴) | ✅ **G5 전체 완료(2026-06-09).** G5-A 백테·G5-B 은퇴적립·G5-C 은퇴인출 엔진·G5-D 인출기 standalone 멀티+세금·UI 4탭 배선·배포·세금감사(신규버그0) 전부 완료. 잔여=L7 실데이터 브라우저 검증·GAP-DECUM-COMP(보류). |
 | `절세액표시_plan.md` | 결과화면 절세액 3종(위탁가정·실제·절세액)+GH 절세. L-SAVE 검증설계. | ✅ **P1 완료**(투자계산기, 03f28cb+). 백테스트/은퇴는 G5 복제로 따라옴. P2/P3 후속. |
 | `금데이터백필_plan.md` | KRX 금현물 거래가능 시계열(위탁전용) + 금 ETF 상장전 백필 | ✅ **Phase 1**(위탁 KRW/g 시계열, 서버검증)+**Phase 2**(현물=KRX_GOLD·선물=GC=F 갈래 라우팅, 로컬검증) 완료. |
 | `간편계산기_plan.md` | 가정 기반 간편 계산기 묶음(복리·배당재투자 등, 시트 대체). 롤링 엔진과 별개. | 💡 아이디어 — 미착수. 우선순위 중상(quick win·시트대체). |
@@ -296,17 +298,15 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-> ✅ **2026-06-03 현재:** 투자계산기 멀티계좌·절세액 P1·단일계좌·금현물 전부 완료. **진행 중 = Track G5(멀티계좌 탭 복제).** 우선순위 ↓.
+> ✅ **2026-06-09 현재:** Track G5 멀티계좌 탭 복제 **전체 완료**(엔진 G5-A~D + UI 4탭 배선·배포 + 세금 전탭 감사=신규버그0). 멀티계좌·세금 작업 일단락. **다음 = 아래 P0 중 택1.**
 
-**[P0 — 진행 중] Track G5 멀티계좌 탭 복제 (`trackG_multiaccount_plan.md` §G5)**
-- ✅ G5-A 백테스트 단일윈도우 멀티계좌 백엔드 + L10(골든·불변식·세금ON/OFF).
-- ✅ G5-C 토대: `pension_separate_tax_annual`(연금 1500만 초과 전액 16.5%) + 정확값 7종.
-- ⬜ **다음 = G5-C 인출 엔진 본체** — 가구 단일 인출액 → 세금최적 순서(위탁→ISA→연금) 분배 오케스트레이터(루프 신규) + 연금소득세 + 합산고갈 생존율 + L12.
-- ⬜ G5 통합: `run_retirement_logic` 적립(MultiAccountAnalyzer)+인출 멀티.
-- ⬜ **UI 일괄**: backtest.js·retirement.js 멀티계좌(calculator.js 패턴 복제, 백엔드 3탭 확정 후 한 번에). 커서버그(BUG-G1-2) 이미 수정됨.
-- ⬜ L7 실데이터 통합 불변식(최종).
+**[P0 — Track G5 마무리 검증 & 보류건]**
+- ⬜ **L7 실데이터 통합검증(브라우저 육안)** — jsdom+E2E로 커버됐으나 실브라우저 4탭 미확인. 검증 패턴 = `smoketestguide.md`. 비개발자 오너가 직접 보기 좋은 마감.
+- ⏸️ **GAP-DECUM-COMP**(보류, 오너 판단 대기) — 은퇴 인출 중 금융소득 종합과세 미모델링(`multi_account_withdrawal.py:107` other_financial_income=0 하드코딩). 버그 아닌 보수적 근사. 구현 시 decum 위탁 배당을 세션 금융소득 누적→종합과세 판정. **오너 결정 전 착수 금지.**
 
-**[P1 — G5 후 신규 간편 도구 (오너 아이디어, quick win)]**
+> ✅ **완료 기록(2026-06-09):** G5-A 백테(L10)·G5-B 은퇴적립(L11)·G5-C 은퇴인출 엔진(L12)·G5-D 인출기 standalone 멀티+세금(L13, 커밋 759e393)·UI 4탭 배선·배포·세금 전탭 감사(421ac71). BUG-WD-TAX·GAP-WD-MULTI 해소. 상세 = `trackG_multiaccount_plan.md` 끝 + `wiki/dev/status.md` update 39~54 + log 감사항목.
+
+**[P1 — 신규 간편 도구 (오너 아이디어, quick win)]**
 - **간편 계산기 묶음** (`간편계산기_plan.md`) — 가정 기반 복리·배당재투자(시트 대체). 가볍고 비개발자 타겟에 직접 가치.
 - **세금 전환 계산기** (`세금계산기_plan.md`) — 위탁→ISA 전환 양도세 vs ISA 혜택. 세금 모트·액셔너블.
 

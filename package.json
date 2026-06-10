@@ -1,0 +1,9 @@
+{
+  "name": "investment-backtest-engine-devtools",
+  "private": true,
+  "description": "JS test tooling only (jsdom DOM smoke + playwright browser verification). App itself is Flask + vanilla JS.",
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "playwright": "^1.60.0"
+  }
+}

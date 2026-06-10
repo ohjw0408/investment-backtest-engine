@@ -1,16 +1,16 @@
 ---
-updated: 2026-06-03
+updated: 2026-06-10
 sources: [PROJECT_MASTER_ROADMAP.md, trackG_multiaccount_plan.md, 세금에서시작된완전리팩토링계획.plan.md]
 tags: [product, tech]
 ---
 
 # 개발 현황 + 블로커
 
-마지막 업데이트: 2026-06-03 기준.
+마지막 업데이트: 2026-06-10 기준. (최신 상세는 [[dev/status]]가 항상 우선)
 
 ## 현재 상태 한 줄 요약
 
-> ✅ **투자계산기 다중계좌(Track G2~G4)·절세액 P1·단일계좌·금현물·종합과세 배선 전부 완료.** 배당 데이터 블로커는 Stage A/B로 해소(완). **현재 1순위 = Track G5(백테스트·은퇴 탭 다중계좌 복제).** 백테스트 백엔드+L10 ✅, 은퇴 인출 엔진(G5-C) 진행 중. 상세 = `trackG_multiaccount_plan.md` §G5 + [[dev/status]].
+> ✅ **Track G5 다중계좌 4탭(계산기·백테·은퇴적립·은퇴인출) 전체 완료(2026-06-09, 세금감사 신규버그 0) + 간편 계산기 4종 `/simple` 배포(2026-06-10).** 블로커 없음. **다음 = 다계좌 세금 E2E 실브라우저 검증**(`다계좌세금_E2E검증_plan.md` 16건, Playwright 도입으로 자동화 가능) OR 세금계산기(P1). GAP-DECUM-COMP는 오너 보류. 상세 = [[dev/status]].
 
 ## 세금 리팩토링 진행 상황
 

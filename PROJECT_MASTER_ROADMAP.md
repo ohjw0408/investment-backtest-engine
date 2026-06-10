@@ -28,6 +28,7 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 | `간편계산기_plan.md` | 가정 기반 간편 계산기 묶음(복리·배당재투자 등, 시트 대체). 롤링 엔진과 별개. | ✅ **4종 구현·배포·서버검증 완료(2026-06-10, `/simple`, JS 전용, fe7c7af).** 잔여=브라우저 육안. |
 | `세금계산기_plan.md` | 위탁→ISA 전환 결정 도구(전환 양도세 vs ISA 세제혜택, 스위칭코스트). | 💡 아이디어 — 미착수. 우선순위 중상(세금 모트·액셔너블). |
 | `리스크리턴도표_plan.md` | 저장 포트폴리오 위험-수익 산점도(FunETF 류). | 💡 아이디어 — 미착수. **선행=포트폴리오 즐겨찾기(미구현)** → 후순위. |
+| `다계좌세금_E2E검증_plan.md` | 4탭(계산기·백테·은퇴sim·인출기) 멀티계좌 세금 배선 Playwright 실브라우저 자동검증 16건. **= P0 L7의 실행판.** | 📝 **계획 완료(2026-06-10)·실행 대기.** 셀렉터 실측 포함, Claude가 직접 실행 가능. |
 
 ## Current Situation
 
@@ -298,11 +299,11 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-> ✅ **2026-06-09 현재:** Track G5 멀티계좌 탭 복제 **전체 완료**(엔진 G5-A~D + UI 4탭 배선·배포 + 세금 전탭 감사=신규버그0). 멀티계좌·세금 작업 일단락. **다음 = 아래 P0 중 택1.**
+> ✅ **2026-06-10 현재:** G5 전체 완료(06-09) + **간편 계산기 4종 `/simple` 배포·검증 완료**(06-10, P1 첫 항목 소화) + **Playwright 실브라우저 검증 체계 도입** + **다계좌 세금 E2E 검증 계획 수립**(`다계좌세금_E2E검증_plan.md` 16건). **다음 = E2E 16건 실행(P0 L7 해소) OR 세금계산기(P1).** 잔여 곁가지: BUG-NAV-1(navbar 1280px 글자 깨짐, bugs.md).
 
-**[P0 — Track G5 마무리 검증 & 보류건]**
-- ⬜ **L7 실데이터 통합검증(브라우저 육안)** — jsdom+E2E로 커버됐으나 실브라우저 4탭 미확인. 검증 패턴 = `smoketestguide.md`. 비개발자 오너가 직접 보기 좋은 마감.
-- ⏸️ **GAP-DECUM-COMP**(보류, 오너 판단 대기) — 은퇴 인출 중 금융소득 종합과세 미모델링(`multi_account_withdrawal.py:107` other_financial_income=0 하드코딩). 버그 아닌 보수적 근사. 구현 시 decum 위탁 배당을 세션 금융소득 누적→종합과세 판정. **오너 결정 전 착수 금지.**
+**[P0 — Track G5 마무리 검증 & 보류건] (2026-06-10 갱신)**
+- ⬜ **L7 실데이터 통합검증** — **Playwright 도입(2026-06-10)으로 Claude가 직접 자동 실행 가능해짐.** 실행 계획 = `다계좌세금_E2E검증_plan.md`(4탭 16건, 셀렉터 실측, 라이브 서버 대상). 실행만 남음(~30분).
+- ⏸️ **GAP-DECUM-COMP** — 오너 재확인(2026-06-10): **계속 보류.** 은퇴 인출 중 금융소득 종합과세 미모델링(`multi_account_withdrawal.py:107` other_financial_income=0 하드코딩). 버그 아닌 보수적 근사. **오너 결정 전 착수 금지.**
 
 > ✅ **완료 기록(2026-06-09):** G5-A 백테(L10)·G5-B 은퇴적립(L11)·G5-C 은퇴인출 엔진(L12)·G5-D 인출기 standalone 멀티+세금(L13, 커밋 759e393)·UI 4탭 배선·배포·세금 전탭 감사(421ac71). BUG-WD-TAX·GAP-WD-MULTI 해소. 상세 = `trackG_multiaccount_plan.md` 끝 + `wiki/dev/status.md` update 39~54 + log 감사항목.
 

@@ -168,20 +168,22 @@ _검토/추가: Codex, 2026-05-28_
 
 ---
 
-## 현재 프로젝트 컨텍스트 (2026-05-30 갱신)
+## 현재 프로젝트 컨텍스트 (2026-06-10 갱신)
 
 **앱**: Flask 웹앱 + Celery 비동기 계산 + Redis + SQLite × 4개 DB.  
 **배포**: Hetzner VPS Ubuntu, SSH키 `~/.ssh/hetzner_ed25519`, IP `178.105.84.213`.
+라이브 `https://moneymilestone.duckdns.org` (main push = 자동배포).
 **언어**: Python (백엔드) + HTML/JS (프론트, 프레임워크 없음).
+**JS 테스트 도구**: `package.json` devDependencies — jsdom(DOM 스모크) + **Playwright Chromium**(실브라우저·스크린샷, 2026-06-10 도입).
 
-**현재 상태**: 배당 백필 Stage A 서버 적용 완료.
-- DJUSDIV_PROXY를 price-return 체인으로 재구축하고, SCHD/458730/446720/402970 백필 구간에
-  명시적 배당을 주입했다.
-- 서버 `debug_dividend.py`/`stage_a_verify.py`/계산기 직접 실행에서 배당 지표 p50 > 0 확인.
-- 다음 블로커는 데이터 0이 아니라 **정상 배당 데이터 기준 세금 Phase 2c/2e 재검증**.
-- → `wiki/dev/status.md`, `ETF_BACKFILL_ARCHITECTURE_PLAN.md § Phase 6.0` 참고.
+**현재 상태**: 블로커 없음.
+- Track G5 다중계좌 4탭(계산기·백테·은퇴적립·은퇴인출) 전체 완료 + 세금 전탭 감사 신규버그 0 (2026-06-09).
+- 간편 계산기 4종 `/simple` 배포·서버검증 완료 (2026-06-10).
+- GAP-DECUM-COMP(인출 중 금종세 미모델링) = 오너 결정 계속 보류.
+- → 최신 상세는 항상 `wiki/dev/status.md` 한 줄 요약 최상단.
 
 **다음 액션**:
 ```
-Phase 2c/2e 재검증해줘
+다계좌세금_E2E검증_plan.md 16건 실행해줘
 ```
+(또는 세금계산기_plan.md 착수)

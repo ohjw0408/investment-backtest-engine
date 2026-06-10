@@ -1,5 +1,21 @@
 # Log
 
+## [2026-06-10] decision | Playwright 도입 + 다계좌 세금 E2E 계획 + 세션 동기화
+
+같은 날 간편계산기 배포 후 이어진 작업 3건 + 마무리 동기화.
+
+**① Playwright 실브라우저 검증 체계 도입 (오너 지시).** `npm i playwright` + Chromium. 설치 중 npm이 package.json 부재로 jsdom 39패키지 prune하는 사고 → `package.json` 신설(devDeps: jsdom+playwright)로 재발 방지. 간편계산기 라이브 검증 10 PASS(`tests/test_simple_tools_browser.js` — 입력 재계산·과세 토글·탭 전환·차트 canvas·콘솔에러 0)로 체계 입증. **효과: 이제 "브라우저 육안 미확인" 잔여 항목을 Claude가 스크린샷 포함 직접 검증 가능.**
+
+**② BUG-NAV-1 발견·등록.** 1280px 스크린샷서 navbar 링크 글자 세로 깨짐("계산기"→계/산/기). 원인 = 링크 9개("간편 계산기" 추가) overflow + `.nav-link`에 nowrap 없음. 수정 보류 — nowrap만 넣으면 우측 검색/로그인 밀려서 좁은 폭 처리(E1 모바일)와 같이 결정.
+
+**③ 다계좌 세금 E2E 검증 계획 (오너 요청) = `다계좌세금_E2E검증_plan.md`.** 투자계산기(6)·백테스트(3)·은퇴sim(3)·인출기(4) = 16건. 라이브 서버 대상, 진짜 클릭 우선, 판정 3층(구조+API 응답 캡처+불변식: 세금ON≤OFF·절세액≥0·미실현차익↑→세금↑ 등). 셀렉터 전부 실측해 표로 고정. smoketestguide 손절차의 자동화+4탭 확장 = **roadmap P0 L7 실행판.** 실행 대기.
+
+**④ 세션 동기화 (오너 "정리해"):** 간편계산기 ✅를 ideas.md·features.md·product/dev-status.md·trackG plan 끝·README 컨텍스트(05-30 stale였음)에 반영. GAP-DECUM-COMP 오너 재확인 = **계속 보류.** roadmap P0/다음액션 갱신(다음 = E2E 16건 실행 OR 세금계산기).
+
+_작성: Claude (Fable 5)_
+
+---
+
 ## [2026-06-10] feature | 간편 계산기 4종 신규 (/simple — P1 quick win)
 
 오너 결정: 다음 작업 = P1 간편계산기(L7 실데이터검증·GAP-DECUM-COMP 보류 대신). 계획파일 `간편계산기_plan.md` 결정대기 4건 전부 확정 — ① 4종 전부 + 복리에도 세후·인플레조정 추가 ② 클라이언트 JS 전용 ③ 기존 배당금 계산기(롤링 역산)와 별개 신규 ④ 출력 자체 설계(입력만 잼투리식).

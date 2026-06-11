@@ -299,7 +299,7 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-> 🚧 **2026-06-12 추가 (절세액 P2/P3 마감 — 인출기 절세 패널, 배포/라이브 검증 진행):** 오너 지시로 P2/P3 실상 점검 → P2 백테스트·P3 적립기/연금수령세는 G5 복제로 기완료(로드맵 표현이 모호했던 것), 유일 갭 = 인출기(wd) 절세 패널 → 오너 결정 "구현". `sell_with_tax` 위탁가정 누적(이중집계 가드) + wd 절세 3종 + 렌더. 검증 = `test_l_save_wd.py` 6 PASS ±1원 + 회귀 246 PASS + 실데이터(위탁 절세 0 불변식·연금 절세 630만) + jsdom. 상세 = status update 62. **다음 = 배포·라이브 probe → 절세액 P1~P3 완전 마감 → 이후 P3 포트폴리오 즐겨찾기 OR 기타.**
+> ✅ **2026-06-12 추가 (절세액 P2/P3 완전 마감 — 인출기 절세 패널, 라이브 검증까지):** 오너 지시로 P2/P3 실상 점검 → P2 백테스트·P3 적립기/연금수령세는 G5 복제로 기완료, 유일 갭 = 인출기(wd) 절세 패널 → 오너 결정 "구현". `sell_with_tax` 위탁가정 누적(이중집계 가드) + wd 절세 3종 + 렌더. 검증 = `test_l_save_wd.py` 6 PASS ±1원 + 회귀 246 PASS + 실데이터 + jsdom + **라이브 probe PASS**(`probe_wd_savings_live.js`: 패널·각주·위탁 불변식 0·합산=Σ). 커밋 90649dc·f670e51. 상세 = status update 62. **절세액 P1~P3 마감(P4 배당금계산기 보류). 다음 = P3 포트폴리오 즐겨찾기(B1, 리스크리턴도표 선행) OR 기타 — 오너 결정.**
 
 > ✅ **2026-06-12 (ISA 전환 계산기 완료 — P1 세금계산기 v1, 배포·라이브 검증까지):** 오너 결정 = **(a) 분할 이전 모델 + 독립 페이지.** 신규 `/tax-switch`(A 위탁유지 vs B 연 1회 ISA 한도 분할이전, 세후 비교 + breakeven + 이전계획). 엔진 = `MultiAccountSimulationLoop` optional 확장(carried_cost_basis·switch_policy·yearly_after_tax_snapshot, 기본 OFF=기존 무변경) + `tax_switch_logic.py`. 검증 = 신규 8 PASS 손계산 ±1원 + 회귀 240 PASS + Playwright 186 PASS + **라이브 풀플로우 PASS**(`live_tax_switch.js`: 458730 5천만/3천만/5y → 212윈도우, B +49만, breakeven 4년차 84%, 콘솔에러 0). 커밋 c65cf80. 상세 = status update 61 + `세금계산기_plan.md`. **다음 = 절세액 P2/P3(P2) OR 포트폴리오 즐겨찾기(P3) OR 기타 — 오너 결정.**
 

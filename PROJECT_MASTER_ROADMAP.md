@@ -299,12 +299,14 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-> ✅ **2026-06-11 현재:** 06-10 상태에 더해 **모바일 반응형 + 다크모드 + UX 전 페이지 개편 완료·배포·라이브 검증**(오너 요청 곁가지, status update 57~58 + log 2건). BUG-NAV-1 해소. 신규 상시 검증자산 = `tests/test_responsive_dark.js`(9페이지×3뷰포트×2테마, 168체크). 오너 실기기 확인 완료("잘 작동한다"). **다음 = E2E 16건 실행(P0 L7 해소) OR 세금계산기(P1).**
+> ✅ **2026-06-11 현재 (L7 완료):** **다계좌 세금 E2E 16건 전부 PASS** — 실행 중 발견 2건(GAP-RET-KRDATA·BUG-WD-MULTI-LIVE)을 당일 조사(서버 SSH 실측)·수정(9486eee: 은퇴 탭 synthetic 옵션 + 인출 투영 별도 prep + 0윈도우 합성 폴백+라벨 + NaN race 가드)·라이브 재검(C·D 7/7)까지 완료. **P0 L7 = 완료.** 신규 상시 검증자산 = `tests/e2e_multitax/`(16건 자동 재실행 가능). 상세 = status update 59~60 + log 4건 + `tests/e2e_multitax/results/20260611_result.md`. **다음 = 금융소득 종합과세 완전 구현(Phase 2e, P2) OR 세금계산기(P1) — 오너 결정.**
+
+> (이전) ✅ **2026-06-11:** 모바일 반응형 + 다크모드 + UX 전 페이지 개편 완료·배포·라이브 검증(status update 57~58). BUG-NAV-1 해소. `tests/test_responsive_dark.js` 168체크. 오너 실기기 확인 완료.
 
 > (이전) ✅ **2026-06-10:** G5 전체 완료(06-09) + **간편 계산기 4종 `/simple` 배포·검증 완료**(06-10, P1 첫 항목 소화) + **Playwright 실브라우저 검증 체계 도입** + **다계좌 세금 E2E 검증 계획 수립**(`다계좌세금_E2E검증_plan.md` 16건).
 
-**[P0 — Track G5 마무리 검증 & 보류건] (2026-06-10 갱신)**
-- ⬜ **L7 실데이터 통합검증** — **Playwright 도입(2026-06-10)으로 Claude가 직접 자동 실행 가능해짐.** 실행 계획 = `다계좌세금_E2E검증_plan.md`(4탭 16건, 셀렉터 실측, 라이브 서버 대상). 실행만 남음(~30분).
+**[P0 — Track G5 마무리 검증 & 보류건] (2026-06-11 갱신)**
+- ✅ **L7 실데이터 통합검증 — 완료(2026-06-11).** `다계좌세금_E2E검증_plan.md` 16건 라이브 전부 PASS(발견 2건 당일 수정 포함, 커밋 98afdbf~9486eee). 결과 = `tests/e2e_multitax/results/20260611_result.md`.
 - ⏸️ **GAP-DECUM-COMP** — 오너 재확인(2026-06-10): **계속 보류.** 은퇴 인출 중 금융소득 종합과세 미모델링(`multi_account_withdrawal.py:107` other_financial_income=0 하드코딩). 버그 아닌 보수적 근사. **오너 결정 전 착수 금지.**
 
 > ✅ **완료 기록(2026-06-09):** G5-A 백테(L10)·G5-B 은퇴적립(L11)·G5-C 은퇴인출 엔진(L12)·G5-D 인출기 standalone 멀티+세금(L13, 커밋 759e393)·UI 4탭 배선·배포·세금 전탭 감사(421ac71). BUG-WD-TAX·GAP-WD-MULTI 해소. 상세 = `trackG_multiaccount_plan.md` 끝 + `wiki/dev/status.md` update 39~54 + log 감사항목.

@@ -1,5 +1,24 @@
 # Log
 
+## [2026-06-11] fix | GAP-RET-KRDATA 해소 ①②③ + NaN race 가드 — E2E 16/16 PASS, P0 L7 완료
+
+오너 결정("셋다 + race 가드까지") 구현. 커밋 9486eee, 배포·라이브 검증 완료.
+
+**구멍 3개 (은퇴 sim만 "실데이터 최대 + 가상 피팅" 원칙 미배선이던 것):**
+- **①** 은퇴 탭에 가상 데이터 체크박스 신설(계산기와 동일 문구·스타일) + sim body `use_synthetic` 배선. 단독 인출기는 기존대로 항상 합성 허용(변경 없음).
+- **②** 인출 투영용 `prepare_scenario_data`를 적립 prep과 **별도로** 인출기간 기준 호출(단일 `run_retirement_logic`·멀티 `_run_multi_account_retirement_logic`). 적립 prep을 늘리지 않은 이유 = 적립 케이스 수가 범위에 비례 폭증(성능). `wd_data_start = min(적립 시작, 인출 prep 시작)`.
+- **③** 실윈도우 0개면 하드에러 대신 **전량 GBM 합성 폴백** — 단일(`WithdrawalAnalyzer._run_rolling`)·멀티(`analyze_household_withdrawal`) 공통, 기존 MIN_CASES 패딩 메커니즘 재사용. 결과에 `n_windows_real/synthetic`(멀티 combined_summary)·`wd_n_real/synthetic`(단일) 노출 + 화면 `#retWdSynthNote` "실측 N + 가상 M" 경고 라벨(sim/wd 양쪽).
+
+**race 가드 (BUG-WD-MULTI-LIVE 재발 방지):** `simulate_household_window` — 가격 유한성(`isfinite && >0`) 검사, 전 계좌 종목 가격이 유효해진 날부터 초기 매수(부분 데이터 가드), 종료가 유한 폴백. 합집합 달력 reindex+ffill의 리딩 NaN이 포트를 오염시키던 경로 차단.
+
+**검증:** 신규 `tests/test_wd_synthetic_fallback.py` 3종(멀티/단일 0윈도우 폴백 + 리딩 NaN 가드) + 인출·은퇴 회귀 **104 PASS** + 로컬 브라우저 스모크 4 PASS(`tests/check_retirement_page.js` — 체크박스·body 배선·JS 에러 0). 라이브: C1 probe 해소(윈도우 0개 에러 → 생존율 100%·"실측 0+가상 30" 라벨) + **E2E C·D 재검 7/7 PASS**(`run_cd.js`, 4분) — D4 미실현차익 방향성도 라이브 작동(0=34,159만 vs 2억=33,694만 악화 ✓).
+
+**→ E2E 16건 전부 PASS. 계획 §8 완료 기준 충족 = roadmap P0 "L7 실데이터 통합검증" 완료.** 잔여(소, 비차단): cleanup 스크립트 stale provenance 정리 · 로컬 DB 구체인 재빌드 · DB 합성 단일경로 다양화(기존 9.4 후순위) · `median_pension_tax` UI "/년" 라벨 정합 확인.
+
+_작성: Claude (Fable 5)_
+
+---
+
 ## [2026-06-11] investigate | DATA-458730-BACKFILL 서버 실측 — 데이터 버그 아님(설계 의도), 파생 이슈 4건 등록
 
 오너 승인 받아 서버 SSH(읽기 전용 sqlite) 실측. 결론: **서버는 설계대로, 로컬이 낡은 쪽.**

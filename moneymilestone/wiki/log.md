@@ -1,5 +1,24 @@
 # Log
 
+## [2026-06-11] investigate | DATA-458730-BACKFILL 서버 실측 — 데이터 버그 아님(설계 의도), 파생 이슈 4건 등록
+
+오너 승인 받아 서버 SSH(읽기 전용 sqlite) 실측. 결론: **서버는 설계대로, 로컬이 낡은 쪽.**
+
+**실측 사실:**
+- 서버 458730 = 실측+DJUSDIV_PROXY 2003-11-07~2026(경계 연속, 합성 2003-09 ~2,600원→실측 2003-11 ~2,780원 — 단위점프 없음, anchor 수정 유효 확인) + 1981~2003 GBM 합성(`price_daily_synthetic` 분리 저장).
+- 2003-11 경계 = `build_djdiv_proxy.py` **의도적 설계**: "^GSPC segment removed — 광역지수는 DJ 배당전략 대표 못함, no pre-DVY backfill"(Phase 6.0 Stage A). 체인 = SCHD(2011~)←SDY(2005~)←DVY(2003-11~). 끝.
+- 05-30 12:01 `cleanup_synthetic_contamination.py` + 재백필 = 구체인(^GSPC 포함) 오염 제거 마이그레이션. 같은 날 아침 run들이 1928~를 썼던 건 구체인 잔재.
+- **로컬 DB가 구버전 체인(1928~, 90년대 강세+환율로 연 15% 경로) 보유 — 로컬-서버 시뮬 괴리(위탁 p50 22억 vs 0)의 진짜 원인.** 라이브 비관 결과는 보수적 합성 설계의 정상 출력(가격 3.5%+배당 2.9% ≈ 총수익 6.5%/y).
+- **race 물증**: backfill_runs 7a2cc0fa(synthetic_gbm_v1, 1981~2003, 5,846행) 완료시각 12:12:51 = E2E D2 실행 중. 생존율 0% 일시현상 = 생성-시뮬 경합 확정.
+
+**파생 이슈 4건(bugs.md DATA-458730-BACKFILL 항목에 통합 기록):** ① RACE-LAZY-GEN 가드 필요 ② DB 합성 단일 고정 경로의 표본 편향(개선 선택) ③ cleanup 스크립트 price_daily_source 미정리(서버에 stale provenance 잔존) ④ 로컬 DB 재빌드 필요.
+
+**남는 본선 문제 = GAP-RET-KRDATA 하나.** 이건 데이터가 아니라 구조(은퇴 sim이 인출 요구량을 데이터 준비에 전달 안 함 + synthetic 옵션 부재) — ①②③ 결정 대기 그대로.
+
+_작성: Claude (Fable 5)_
+
+---
+
 ## [2026-06-11] investigate | BUG-WD-MULTI-LIVE 조사 — 일시 현상으로 강등, 신규 DATA-458730-BACKFILL 등록
 
 E2E에서 발견한 인출기 멀티 생존율 0% 조사 (오너 지시, 수정 없이 조사만).

@@ -26,7 +26,7 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 | `절세액표시_plan.md` | 결과화면 절세액 3종(위탁가정·실제·절세액)+GH 절세. L-SAVE 검증설계. | ✅ **P1 완료**(투자계산기, 03f28cb+). 백테스트/은퇴는 G5 복제로 따라옴. P2/P3 후속. |
 | `금데이터백필_plan.md` | KRX 금현물 거래가능 시계열(위탁전용) + 금 ETF 상장전 백필 | ✅ **Phase 1**(위탁 KRW/g 시계열, 서버검증)+**Phase 2**(현물=KRX_GOLD·선물=GC=F 갈래 라우팅, 로컬검증) 완료. |
 | `간편계산기_plan.md` | 가정 기반 간편 계산기 묶음(복리·배당재투자 등, 시트 대체). 롤링 엔진과 별개. | ✅ **4종 구현·배포·서버검증 완료(2026-06-10, `/simple`, JS 전용, fe7c7af).** 잔여=브라우저 육안. |
-| `세금계산기_plan.md` | 위탁→ISA 전환 결정 도구(전환 양도세 vs ISA 세제혜택, 스위칭코스트). | 💡 아이디어 — 미착수. 우선순위 중상(세금 모트·액셔너블). |
+| `세금계산기_plan.md` | 위탁→ISA 전환 결정 도구(전환 양도세 vs ISA 세제혜택, 스위칭코스트). | ✅ **v1 완료(2026-06-12, c65cf80).** `/tax-switch` 독립 페이지, (a) 분할이전 모델(오너 결정). 라이브 검증 PASS. |
 | `리스크리턴도표_plan.md` | 저장 포트폴리오 위험-수익 산점도(FunETF 류). | 💡 아이디어 — 미착수. **선행=포트폴리오 즐겨찾기(미구현)** → 후순위. |
 | `다계좌세금_E2E검증_plan.md` | 4탭(계산기·백테·은퇴sim·인출기) 멀티계좌 세금 배선 Playwright 실브라우저 자동검증 16건. **= P0 L7의 실행판.** | 📝 **계획 완료(2026-06-10)·실행 대기.** 셀렉터 실측 포함, Claude가 직접 실행 가능. |
 
@@ -299,7 +299,7 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-> 🚧 **2026-06-12 현재 (ISA 전환 계산기 구현·로컬 검증 완료, 배포/라이브 검증 진행):** 오너 결정 = **(a) 분할 이전 모델 + 독립 페이지.** 신규 `/tax-switch`(A 위탁유지 vs B 연 1회 ISA 한도 분할이전, 세후 비교 + breakeven + 이전계획). 엔진 = `MultiAccountSimulationLoop` optional 확장(carried_cost_basis·switch_policy·yearly_after_tax_snapshot, 기본 OFF=기존 무변경) + `tax_switch_logic.py`. 검증 = 신규 8 PASS 손계산 ±1원 + 회귀 240 PASS + 실데이터 686윈도우 + Playwright 186 PASS. 상세 = status update 61 + `세금계산기_plan.md` v1 설계. **다음 = 배포·라이브 검증 → 세금계산기 완료 처리.**
+> ✅ **2026-06-12 현재 (ISA 전환 계산기 완료 — P1 세금계산기 v1, 배포·라이브 검증까지):** 오너 결정 = **(a) 분할 이전 모델 + 독립 페이지.** 신규 `/tax-switch`(A 위탁유지 vs B 연 1회 ISA 한도 분할이전, 세후 비교 + breakeven + 이전계획). 엔진 = `MultiAccountSimulationLoop` optional 확장(carried_cost_basis·switch_policy·yearly_after_tax_snapshot, 기본 OFF=기존 무변경) + `tax_switch_logic.py`. 검증 = 신규 8 PASS 손계산 ±1원 + 회귀 240 PASS + Playwright 186 PASS + **라이브 풀플로우 PASS**(`live_tax_switch.js`: 458730 5천만/3천만/5y → 212윈도우, B +49만, breakeven 4년차 84%, 콘솔에러 0). 커밋 c65cf80. 상세 = status update 61 + `세금계산기_plan.md`. **다음 = 절세액 P2/P3(P2) OR 포트폴리오 즐겨찾기(P3) OR 기타 — 오너 결정.**
 
 > ✅ **2026-06-11 (L7 완료):** **다계좌 세금 E2E 16건 전부 PASS** — 실행 중 발견 2건(GAP-RET-KRDATA·BUG-WD-MULTI-LIVE)을 당일 조사(서버 SSH 실측)·수정(9486eee: 은퇴 탭 synthetic 옵션 + 인출 투영 별도 prep + 0윈도우 합성 폴백+라벨 + NaN race 가드)·라이브 재검(C·D 7/7)까지 완료. **P0 L7 = 완료.** 신규 상시 검증자산 = `tests/e2e_multitax/`(16건 자동 재실행 가능). 상세 = status update 59~60 + log 4건 + `tests/e2e_multitax/results/20260611_result.md`. ~~다음 = 금융소득 종합과세(P2) OR 세금계산기(P1) — 오너 결정~~ → **2026-06-12 정리: 금종세는 Phase 2f로 이미 완료(4100ecd, 2026-05-31)였음(이 줄이 stale). 따라서 다음 = 세금 전환 계산기(P1, `세금계산기_plan.md`).**
 
@@ -315,7 +315,7 @@ Completion note - YYYY-MM-DD
 
 **[P1 — 신규 간편 도구 (오너 아이디어, quick win)]**
 - ✅ **간편 계산기 묶음** (`간편계산기_plan.md`) — **완료·배포·서버검증(2026-06-10, fe7c7af).** `/simple` 4종(복리·배당재투자·인플레 생활비·실질 구매력), JS 전용, 손계산 25+jsdom 35 PASS, 라이브 200·JS 바이트 동일. 잔여 = 브라우저 육안.
-- 🚧 **세금 전환 계산기** (`세금계산기_plan.md`) — 위탁→ISA 전환 양도세 vs ISA 혜택. **2026-06-12 v1 구현·로컬 검증 완료(오너 결정 (a) 분할이전+독립페이지), 배포/라이브 검증 진행.**
+- ✅ **세금 전환 계산기** (`세금계산기_plan.md`) — **v1 완료(2026-06-12, c65cf80).** `/tax-switch` 독립 페이지, (a) 분할이전 모델. 손계산 8 PASS + 회귀 240 + 라이브 풀플로우 PASS.
 
 **[P2 — 절세액 P2/P3 + 데이터 토대]**
 - 절세액 P2/P3(백테스트/은퇴는 G5 복제로 따라옴, 연금 인출세 P3).

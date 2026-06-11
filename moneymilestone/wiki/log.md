@@ -18,7 +18,7 @@
 - 검증: `tests/test_tax_switch.py` 8 PASS — 손계산 ±1원 (A 일괄 46,150,000 / B 분할 47,250,000 = 250만 공제
   3회로 정확히 +110만 / KR_FOREIGN flat A==B / 차익0 불변식 / 손실 전환세 0 / 총1억 한도 5년 중단 / 연말 스냅샷
   / 기본 OFF 무변경). 전체 회귀 240 PASS. 실데이터 로컬: 458730 5천만/3천만 5y → 686윈도우, B +405만,
-  breakeven 1년차(98%). 로컬 Playwright 스모크 + `test_responsive_dark.js` 186 PASS(신규 페이지 포함).
+  breakeven 1년차(98%, 로컬 stale DB 기준 — 서버는 4년차). 로컬 Playwright 스모크 + `test_responsive_dark.js` 186 PASS(신규 페이지 포함).
 
 ## [2026-06-11] fix | GAP-RET-KRDATA 해소 ①②③ + NaN race 가드 — E2E 16/16 PASS, P0 L7 완료
 

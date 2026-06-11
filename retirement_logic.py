@@ -790,6 +790,8 @@ def _run_multi_account_withdrawal_logic(body: dict, progress_callback=None) -> d
             'combined_end_value': report['combined_end_value'],
         },
         'median_pension_tax': report['median_pension_tax'],
+        # 절세액 3종(위탁가정·실제·절세) — 인출 페이즈(절세액 P3). 세금 OFF면 None.
+        'savings':            _build_savings_summary(report.get('savings') or {}),
         'n_real':             report['n_real'],
         'n_synthetic':        report['n_synthetic'],
         'data_start':         data_start,

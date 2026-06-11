@@ -1,5 +1,26 @@
 # Log
 
+## [2026-06-12] feature | 절세액 P3 마감 — 인출기(wd) 절세 3종 패널
+
+오너 지시 "P2/P3 구현됐는지부터 확인" → 점검 결과 P2(백테스트)·P3 적립기/연금수령세(1,500만 전액 16.5%,
+06-03 결정)는 G5 복제로 기완료. 유일 갭 = 인출기(wd) 절세 패널 → 오너 결정 "구현".
+
+- `order_executor.py`: 인출 매도(`sell_with_tax` 직접호출)도 위탁가정 `_brk_krf_gain`/`_brk_us_by_year` 누적.
+  execute_orders 경로는 기존 `_accrue_brokerage_gain`과 이중집계 방지(`_suspend_brk_accrual` 플래그,
+  내부를 `_execute_orders_inner`로 분리해 try/finally 보장). GH(`portfolio.sell` 직행)는 영향 없음.
+- `multi_account_withdrawal.py`: 윈도우 루프에 gross 배당 분류별 + 실제 배당세(gross−net) + 계좌별
+  연금소득세 누적 → 윈도우 종료 시 per_account 절세 3종. **잔여 미실현 미가산** — wd end_value는
+  무청산(gross)이라 실제세금에도 청산세 없음 → 양쪽 다 제외해야 위탁 불변식(절세 0) 유지(설계 핵심).
+  `analyze_household_withdrawal`: 계좌별 p50 + 합산(계좌별 p50 단순합, 적립 규약 동일) → `savings` 반환.
+- `retirement_logic.py` wd 응답에 `savings`(build_savings_summary). `retirement.html` wd 모드도
+  공용 절세 패널 렌더. `multi_account_ui.js` 각주 모드 분기(wd = "실제 세금에 연금소득세 포함").
+- 검증: 신규 `tests/test_l_save_wd.py` 6 PASS 손계산 ±1원 — ① 위탁 차익 인출: 가정==실제(신규 누적이
+  실제 과세와 정확 일치 증명) → 절세 0 ② 차익0 전부 0 ③ 연금 단독: 월 연금세 1,000,000×0.055/0.945 =
+  58,201.06원 × 12회 정확, 절세 0 하한 ④ ISA 배당: 절세 = 500,000×15.4% = 77,000원 ⑤ 혼합 드레인 순서
+  ⑥ 세금 OFF 필드 부재. 전체 회귀 246 PASS(L-SAVE 26 = 이중집계 없음 가드). 실데이터(위탁3억[미실현
+  1억]+연금2억, 458730/069500, 10y): 위탁 절세 0 ✓ · 연금 절세 6,303,878원 · survival 1.0.
+  jsdom 렌더 4체크 PASS. 라이브 probe = `probe_wd_savings_live.js`.
+
 ## [2026-06-12] feature | ISA 전환 계산기 신규 (/tax-switch) — P1 세금계산기 v1
 
 오너 결정: ISA 연 2천만 한도 처리 = **(a) 분할 이전 모델**, UI = **독립 페이지**.

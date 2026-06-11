@@ -1380,14 +1380,14 @@ function renderRetirement(data, body) {
     }).join('');
   }
 
-  // 멀티계좌 — 적립기=계좌별 적립 분포+절세+자금이동 / 인출기=계좌별 종료자산 분포(공용모듈).
+  // 멀티계좌 — 적립기=계좌별 적립 분포+절세+자금이동 / 인출기=계좌별 종료자산 분포+절세(공용모듈).
   if (typeof renderMultiAccountSummary === 'function') {
     const maData = (retMode === 'sim') ? (showAcc ? data.multi_account : null)
                                        : (data.multi_account || null);
     renderMultiAccountSummary(
       maData,
       (retMode === 'sim') ? data.g2 : null,
-      (retMode === 'sim') ? data.savings : null,
+      data.savings || null,   // 절세액 P3: 인출기도 절세 3종 표시(세금 ON 멀티)
       false,
     );
   }

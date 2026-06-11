@@ -436,7 +436,11 @@ function renderMultiAccountSummary(multiAccount, g2, savings, autoWindmill) {
         </div>
         ${ghNote}
         ${accRows}
-        <div style="font-size:0.67rem;color:#7CB342;margin-top:8px;">※ 근사치 — 금융소득종합과세 가산·연금 인출세 미반영(연금 인출세는 은퇴 탭에서). ISA는 세후 재투자 가정.</div>
+        <div style="font-size:0.67rem;color:#7CB342;margin-top:8px;">${
+          _mmMode() === 'withdrawal'
+            ? '※ 근사치 — 금융소득종합과세 가산 미반영. 실제 세금에 연금소득세 포함. ISA는 세후 재투자 가정.'
+            : '※ 근사치 — 금융소득종합과세 가산·연금 인출세 미반영(연금 인출세는 은퇴 탭에서). ISA는 세후 재투자 가정.'
+        }</div>
       </div>`;
   }
 

@@ -123,6 +123,9 @@ class TaxedOrderExecutor(OrderExecutor):
         self._brk_krf_gain     = 0.0   # KR_FOREIGN 실현차익(이익분만, 손익통산 없음)
         self._brk_us_by_year   = {}    # US_DIRECT 실현차익 연도별(손익통산)
         self._brk_us_harvested_total = 0.0  # GH 절세매도로 실현·기준리셋한 누적차익(GH 절세 산출용)
+        # 인출 매도(sell_with_tax 직접 호출)도 위탁가정에 누적하되, execute_orders 경로는
+        # 이미 _accrue_brokerage_gain(orders)이 처리하므로 이중집계 방지 플래그.
+        self._suspend_brk_accrual = False
 
     # ── US 양도차익 YTD (세션 있으면 세션, 없으면 자체) ──
     def _ytd_us(self) -> float:
@@ -154,7 +157,14 @@ class TaxedOrderExecutor(OrderExecutor):
 
         # 절세액(위탁 가정): 계좌유형 무관하게 매도 실현차익을 분류별 누적(과세 전 단계).
         self._accrue_brokerage_gain(portfolio, orders, price_dict, date)
+        # 아래 sell_with_tax 호출은 위에서 이미 누적됨 — 이중집계 방지.
+        self._suspend_brk_accrual = True
+        try:
+            self._execute_orders_inner(portfolio, orders, price_dict, date)
+        finally:
+            self._suspend_brk_accrual = False
 
+    def _execute_orders_inner(self, portfolio, orders, price_dict, date) -> None:
         # ISA / 연금저축 / IRP: CG세 없음
         if self.account_type in ("ISA", "연금저축", "IRP"):
             super().execute_orders(portfolio, orders, price_dict)
@@ -224,6 +234,20 @@ class TaxedOrderExecutor(OrderExecutor):
         if avg_cost is None:
             avg_cost = price  # 취득단가 불명 → 차익 0 (보수적 처리)
         realized_gain = (price - avg_cost) * quantity
+
+        # 절세액(위탁 가정): 인출 매도 등 직접 호출도 분류별 누적.
+        # execute_orders 경로는 _accrue_brokerage_gain이 이미 처리(_suspend로 이중 방지).
+        if not self._suspend_brk_accrual:
+            asset_type = self.tax_engine.classify_asset(ticker)
+            if asset_type == "KR_FOREIGN":
+                if realized_gain > 0:
+                    self._brk_krf_gain += realized_gain
+            elif asset_type == "US_DIRECT":
+                year = (self._session.year if self._session is not None
+                        else self._current_year) or 0
+                self._brk_us_by_year[year] = (
+                    self._brk_us_by_year.get(year, 0.0) + realized_gain
+                )
 
         portfolio.sell(ticker, quantity, price)
 

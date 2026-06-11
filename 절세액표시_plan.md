@@ -153,3 +153,17 @@ estimate_brokerage_tax(gross_div_by_class, kr_foreign_gain, us_gain_by_year) -> 
 - "약 ₩…" — 근사치(ISA net 재투자·종합과세 가산 생략).
 - 연금 1,500만 한도는 은퇴 탭만 반영.
 - 배당금계산기 미지원(후속).
+
+## P2(백테스트)·P3(은퇴) 완료 — 2026-06-12 정리
+
+- **P2 백테스트**: G5-A 멀티계좌 복제(fd41f65·9cface8, 124f82f 복구)로 기완료 —
+  `backtest_logic.py` savings 산출 + `backtest.html` 절세 패널(계산기 동일 스키마).
+- **P3 은퇴 적립기**: G5-B 복제로 기완료(`retirement.html` sim 모드 절세 패널).
+- **P3 연금 수령세**: `pension_separate_tax_annual`(1,500만 이하 나이별 3.3~5.5%, 초과 **전액**
+  16.5% — 오너 결정 2026-06-03 현행법) G5-C/D 인출 엔진 적용 + `median_pension_tax` 표시.
+  ⏳였던 "과세베이스=수익+공제원금" 러프 산식은 위 결정으로 대체(전액 분리과세 근사).
+- **P3 인출기 절세 패널 (2026-06-12 오너 결정 "구현")**: `sell_with_tax` 위탁가정 누적
+  (이중집계 가드) + `simulate_household_window` 절세 3종 + wd 응답·렌더.
+  설계 핵심 = wd 무청산이라 **잔여 미실현 양쪽 다 미가산** → 위탁 불변식 유지.
+  검증 = `tests/test_l_save_wd.py` 6 PASS(±1원) + 회귀 246 PASS + 실데이터 + jsdom.
+- 잔여 = P4 배당금계산기(보류, 별도 엔진).

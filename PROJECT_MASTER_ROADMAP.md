@@ -299,7 +299,9 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-> ✅ **2026-06-12 현재 (ISA 전환 계산기 완료 — P1 세금계산기 v1, 배포·라이브 검증까지):** 오너 결정 = **(a) 분할 이전 모델 + 독립 페이지.** 신규 `/tax-switch`(A 위탁유지 vs B 연 1회 ISA 한도 분할이전, 세후 비교 + breakeven + 이전계획). 엔진 = `MultiAccountSimulationLoop` optional 확장(carried_cost_basis·switch_policy·yearly_after_tax_snapshot, 기본 OFF=기존 무변경) + `tax_switch_logic.py`. 검증 = 신규 8 PASS 손계산 ±1원 + 회귀 240 PASS + Playwright 186 PASS + **라이브 풀플로우 PASS**(`live_tax_switch.js`: 458730 5천만/3천만/5y → 212윈도우, B +49만, breakeven 4년차 84%, 콘솔에러 0). 커밋 c65cf80. 상세 = status update 61 + `세금계산기_plan.md`. **다음 = 절세액 P2/P3(P2) OR 포트폴리오 즐겨찾기(P3) OR 기타 — 오너 결정.**
+> 🚧 **2026-06-12 추가 (절세액 P2/P3 마감 — 인출기 절세 패널, 배포/라이브 검증 진행):** 오너 지시로 P2/P3 실상 점검 → P2 백테스트·P3 적립기/연금수령세는 G5 복제로 기완료(로드맵 표현이 모호했던 것), 유일 갭 = 인출기(wd) 절세 패널 → 오너 결정 "구현". `sell_with_tax` 위탁가정 누적(이중집계 가드) + wd 절세 3종 + 렌더. 검증 = `test_l_save_wd.py` 6 PASS ±1원 + 회귀 246 PASS + 실데이터(위탁 절세 0 불변식·연금 절세 630만) + jsdom. 상세 = status update 62. **다음 = 배포·라이브 probe → 절세액 P1~P3 완전 마감 → 이후 P3 포트폴리오 즐겨찾기 OR 기타.**
+
+> ✅ **2026-06-12 (ISA 전환 계산기 완료 — P1 세금계산기 v1, 배포·라이브 검증까지):** 오너 결정 = **(a) 분할 이전 모델 + 독립 페이지.** 신규 `/tax-switch`(A 위탁유지 vs B 연 1회 ISA 한도 분할이전, 세후 비교 + breakeven + 이전계획). 엔진 = `MultiAccountSimulationLoop` optional 확장(carried_cost_basis·switch_policy·yearly_after_tax_snapshot, 기본 OFF=기존 무변경) + `tax_switch_logic.py`. 검증 = 신규 8 PASS 손계산 ±1원 + 회귀 240 PASS + Playwright 186 PASS + **라이브 풀플로우 PASS**(`live_tax_switch.js`: 458730 5천만/3천만/5y → 212윈도우, B +49만, breakeven 4년차 84%, 콘솔에러 0). 커밋 c65cf80. 상세 = status update 61 + `세금계산기_plan.md`. **다음 = 절세액 P2/P3(P2) OR 포트폴리오 즐겨찾기(P3) OR 기타 — 오너 결정.**
 
 > ✅ **2026-06-11 (L7 완료):** **다계좌 세금 E2E 16건 전부 PASS** — 실행 중 발견 2건(GAP-RET-KRDATA·BUG-WD-MULTI-LIVE)을 당일 조사(서버 SSH 실측)·수정(9486eee: 은퇴 탭 synthetic 옵션 + 인출 투영 별도 prep + 0윈도우 합성 폴백+라벨 + NaN race 가드)·라이브 재검(C·D 7/7)까지 완료. **P0 L7 = 완료.** 신규 상시 검증자산 = `tests/e2e_multitax/`(16건 자동 재실행 가능). 상세 = status update 59~60 + log 4건 + `tests/e2e_multitax/results/20260611_result.md`. ~~다음 = 금융소득 종합과세(P2) OR 세금계산기(P1) — 오너 결정~~ → **2026-06-12 정리: 금종세는 Phase 2f로 이미 완료(4100ecd, 2026-05-31)였음(이 줄이 stale). 따라서 다음 = 세금 전환 계산기(P1, `세금계산기_plan.md`).**
 
@@ -318,7 +320,7 @@ Completion note - YYYY-MM-DD
 - ✅ **세금 전환 계산기** (`세금계산기_plan.md`) — **v1 완료(2026-06-12, c65cf80).** `/tax-switch` 독립 페이지, (a) 분할이전 모델. 손계산 8 PASS + 회귀 240 + 라이브 풀플로우 PASS.
 
 **[P2 — 절세액 P2/P3 + 데이터 토대]**
-- 절세액 P2/P3(백테스트/은퇴는 G5 복제로 따라옴, 연금 인출세 P3).
+- ✅ **절세액 P2/P3 완료(2026-06-12 정리+마감).** P2 백테스트·P3 적립기/연금수령세 = G5 복제로 기완료였음(점검으로 확인). 잔여 갭이던 **인출기(wd) 절세 패널** 구현(오너 결정) — test_l_save_wd 6 PASS + 회귀 246. 잔여 = P4 배당금계산기(보류). 상세 = `절세액표시_plan.md` 끝 + status update 62.
 - ~~금융소득 종합과세 완전 구현(2e 배선)~~ ✅ Phase 2f로 완료(2026-05-31, 4100ecd). 잔여 = 배당금계산기 탭(별도 엔진, 곁가지 참조).
 
 **[P3 — PHASE4 제품 기능]**

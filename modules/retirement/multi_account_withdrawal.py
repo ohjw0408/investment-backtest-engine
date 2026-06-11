@@ -73,6 +73,10 @@ def _build_account_runtime(spec, first_price_dict, tax_engine, session):
             drift_threshold=drift_threshold,
         ),
         "target_weights": weights,
+        # 절세액(위탁 가정) 입력 — 인출 페이즈 누적(적립 _finalize_account와 동형).
+        "cf_gross_div_by_class": {},
+        "dividend_tax_paid":     0.0,
+        "pension_tax_paid":      0.0,
     }
 
 
@@ -153,11 +157,28 @@ def simulate_household_window(
             # 시작월로 초기화하는 단일 엔진과 동일 — 은퇴 시작 첫 달 무인출).
             last_wd_month = current_month
 
-        # 계좌별 배당
+        # 계좌별 배당 — 절세액용 gross(세전) 분류별 누적 + 실제 배당세(gross−net) 누적.
         for rt in runtimes:
-            rt["div_engine"].process(
+            gross_by_ticker = {}
+            if tax_engine is not None:
+                for ticker, pos in rt["portfolio"].positions.items():
+                    if ticker not in price_data or date not in valid_index[ticker]:
+                        continue
+                    div = price_data[ticker].loc[date, "dividend"]
+                    if div > 0:
+                        gross_by_ticker[ticker] = float(div) * float(pos.quantity)
+            net_by_ticker = rt["div_engine"].process(
                 rt["portfolio"], price_data, price_dict, date, dividend_mode
             )
+            if gross_by_ticker:
+                cls_acc = rt["cf_gross_div_by_class"]
+                for ticker, gross in gross_by_ticker.items():
+                    cls = tax_engine.classify_asset(ticker)
+                    cls_acc[cls] = cls_acc.get(cls, 0.0) + gross
+                rt["dividend_tax_paid"] += sum(
+                    max(0.0, g - float(net_by_ticker.get(t, 0.0)))
+                    for t, g in gross_by_ticker.items()
+                )
 
         # 가구 인출 — 월 1회
         if success and last_wd_month != current_month:
@@ -175,6 +196,10 @@ def simulate_household_window(
                 tax_engine=tax_engine, age=age,
             )
             total_pension_tax += sum(p["pension_tax"] for p in res["per_account"])
+            # 절세액용: 계좌별 연금소득세 누적(실제세금 구성요소).
+            _ptax_by_id = {p["account_id"]: p["pension_tax"] for p in res["per_account"]}
+            for rt in runtimes:
+                rt["pension_tax_paid"] += float(_ptax_by_id.get(rt["account_id"], 0.0))
             if res["depleted"]:
                 success = False
                 fail_month = elapsed_months
@@ -208,10 +233,33 @@ def simulate_household_window(
     combined = 0.0
     for rt in runtimes:
         ev = rt["portfolio"].total_value(last_price)
-        per_account.append({
+        entry = {
             "account_id": rt["account_id"], "type": rt["type"],
             "end_value": round(ev, 2),
-        })
+        }
+        # 절세액 3종(위탁가정·실제·절세).
+        # 위탁가정 = 세전 배당 + 실현차익(인출·리밸 매도)을 위탁 세율로.
+        # ⚠ 적립(_finalize_account)과 달리 **잔여 미실현차익 미가산** — wd end_value는
+        # 무청산(gross)이라 실제세금에도 청산세가 없음. 양쪽 다 제외해야 위탁 불변식(절세 0) 유지.
+        # 실제 = 배당세 + 양도세(위탁 매도) + 연금소득세. 절세 = max(0, 가정 − 실제).
+        if tax_engine is not None:
+            from modules.tax.saving_estimate import estimate_brokerage_tax
+            executor = rt["executor"]
+            if hasattr(executor, "_brk_us_by_year"):
+                assumed = estimate_brokerage_tax(
+                    rt["cf_gross_div_by_class"],
+                    executor._brk_krf_gain,
+                    executor._brk_us_by_year,
+                )
+                actual = (
+                    float(rt["dividend_tax_paid"])
+                    + float(getattr(executor, "total_cg_tax_paid", 0.0))
+                    + float(rt["pension_tax_paid"])
+                )
+                entry["brokerage_assumed_tax"] = round(assumed, 2)
+                entry["actual_tax"]            = round(actual, 2)
+                entry["tax_saving"]            = round(max(0.0, assumed - actual), 2)
+        per_account.append(entry)
         combined += ev
 
     return {
@@ -377,6 +425,33 @@ def analyze_household_withdrawal(
 
     pension_taxes = [r["total_pension_tax"] for r in case_results]
 
+    # 절세액 요약 — 계좌별 p50 + 합산(계좌별 p50 단순합, 적립 _build_savings와 동일 규약).
+    savings = None
+    if tax_engine is not None and case_results and \
+            "tax_saving" in case_results[0]["per_account"][0]:
+        sav_accounts = []
+        for k in range(n_acc):
+            def _p50(field, _k=k):
+                vals = [r["per_account"][_k].get(field, 0.0) for r in case_results]
+                return round(float(np.median(vals)), 2)
+            sav_accounts.append({
+                "account_id":            accounts[k]["account_id"],
+                "type":                  accounts[k]["type"],
+                "brokerage_assumed_tax": _p50("brokerage_assumed_tax"),
+                "actual_tax":            _p50("actual_tax"),
+                "tax_saving":            _p50("tax_saving"),
+                "gain_harvest_saving":   0.0,   # 인출 페이즈 GH 미지원
+            })
+        savings = {
+            "accounts": sav_accounts,
+            "combined": {
+                "brokerage_assumed_tax": round(sum(a["brokerage_assumed_tax"] for a in sav_accounts), 2),
+                "actual_tax":            round(sum(a["actual_tax"] for a in sav_accounts), 2),
+                "tax_saving":            round(sum(a["tax_saving"] for a in sav_accounts), 2),
+                "gain_harvest_saving":   0.0,
+            },
+        }
+
     return {
         "survival_rate":      round(survival_rate, 4),
         "n_windows":          len(case_results),
@@ -385,6 +460,7 @@ def analyze_household_withdrawal(
         "combined_end_value": _pct_dist(combined_vals),
         "per_account":        per_account_dist,
         "median_pension_tax": round(float(np.median(pension_taxes)), 2),
+        "savings":            savings,
     }
 
 

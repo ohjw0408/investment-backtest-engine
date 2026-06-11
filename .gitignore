@@ -67,3 +67,4 @@ tests/_simple_rendered.html
 
 # Playwright 스크린샷 산출물
 tests/shots*/
+tests/e2e_multitax/results/shots/

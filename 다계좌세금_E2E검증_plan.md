@@ -1,6 +1,7 @@
 # 다계좌 세금 E2E 검증 계획 (Playwright 실브라우저)
 
-작성: 2026-06-10 (Claude). 상태: 📝 **계획 — 실행 대기.**
+작성: 2026-06-10 (Claude). 상태: ✅ **실행 완료 (2026-06-11) — 11 PASS / 4 FAIL / 1 SKIP.**
+결과: `tests/e2e_multitax/results/20260611_result.md`. FAIL 4 = 발견 2건(GAP-RET-KRDATA, BUG-WD-MULTI-LIVE — bugs.md 등록, 오너 결정 대기). 해소 후 C1~C3·D2·D4 재실행하면 L7 완료 처리 가능.
 대상: **투자계산기 · 포트폴리오 분석(백테스트) · 은퇴 설계(시뮬레이션 + 인출기)** 4개 화면의 멀티계좌 세금 배선.
 
 ---

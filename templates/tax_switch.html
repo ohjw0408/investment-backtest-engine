@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}ISA 전환 계산기 — Money Milestone{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260611ui">
+<style>
+.ts-wrap { max-width: 920px; margin: 0 auto; padding: 24px 16px 60px; }
+.ts-header { margin-bottom: 18px; }
+.ts-panel-box { background:var(--card); border:1.5px solid var(--border); border-radius:14px; padding:20px; margin-bottom:16px; }
+.ts-input-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px; margin-bottom:16px; }
+.ts-field label { display:block; font-size:0.78rem; font-weight:700; color:var(--text-muted); margin-bottom:5px; }
+.ts-search-wrap { position:relative; margin-bottom:10px; }
+.ts-search-wrap input { width:100%; box-sizing:border-box; }
+.ts-dropdown {
+  position:absolute; top:100%; left:0; right:0; z-index:30; display:none;
+  background:var(--card); border:1.5px solid var(--border); border-radius:10px;
+  margin-top:4px; max-height:260px; overflow-y:auto; box-shadow:0 6px 18px rgba(0,0,0,0.12);
+}
+.ts-dd-item { padding:9px 12px; cursor:pointer; font-size:0.82rem; display:flex; gap:8px; align-items:center; }
+.ts-dd-item:hover { background:var(--blue-pale); }
+.ts-badge { font-size:0.62rem; font-weight:800; color:#fff; border-radius:5px; padding:2px 6px; }
+.ts-ticker-list { display:flex; flex-direction:column; gap:6px; margin-bottom:6px; }
+.ts-ticker-row {
+  display:flex; align-items:center; gap:8px; background:var(--bg);
+  border:1.5px solid var(--border); border-radius:10px; padding:8px 12px; font-size:0.82rem;
+}
+.ts-ticker-row .name { flex:1; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ts-ticker-row input { width:64px; text-align:right; }
+.ts-remove-btn { border:none; background:none; color:var(--text-muted); cursor:pointer; font-size:0.9rem; }
+.ts-run-btn {
+  width:100%; padding:13px; border:none; border-radius:12px; cursor:pointer;
+  background:var(--blue-bright); color:#fff; font-size:0.95rem; font-weight:800; font-family:inherit;
+}
+.ts-run-btn:disabled { opacity:0.55; cursor:default; }
+.ts-progress { display:none; margin-top:12px; font-size:0.82rem; color:var(--text-muted); }
+.ts-bar-track { height:8px; background:var(--bg); border-radius:6px; overflow:hidden; margin-top:6px; border:1px solid var(--border); }
+.ts-bar-fill { height:100%; width:0%; background:var(--blue-bright); transition:width 0.4s; }
+.ts-results { display:none; }
+.ts-verdict {
+  border-radius:14px; padding:18px 20px; margin-bottom:14px; border:1.5px solid var(--border);
+  background:var(--card);
+}
+.ts-verdict .headline { font-size:1.05rem; font-weight:900; margin-bottom:4px; }
+.ts-verdict .sub { font-size:0.8rem; color:var(--text-muted); line-height:1.6; }
+.ts-sum-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:10px; margin:14px 0; }
+.ts-sum-card { background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:12px 14px; }
+.ts-sum-label { font-size:0.72rem; font-weight:700; color:var(--text-muted); margin-bottom:4px; }
+.ts-sum-value { font-size:1.02rem; font-weight:800; }
+.ts-sum-range { font-size:0.7rem; color:var(--text-muted); margin-top:3px; }
+.ts-sum-value.blue { color:var(--blue); }
+.ts-sum-value.green { color:var(--green); }
+.ts-sum-value.red { color:#E53935; }
+.ts-chart-box { height:300px; position:relative; margin:14px 0; }
+.ts-table-wrap { max-height:280px; overflow-y:auto; border:1.5px solid var(--border); border-radius:10px; }
+.ts-table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+.ts-table th { position:sticky; top:0; background:var(--bg); font-weight:700; color:var(--text-muted); padding:8px 10px; text-align:right; border-bottom:1.5px solid var(--border); }
+.ts-table th:first-child, .ts-table td:first-child { text-align:left; }
+.ts-table td { padding:7px 10px; text-align:right; border-bottom:1px solid var(--border); font-variant-numeric:tabular-nums; }
+.ts-note { font-size:0.72rem; color:var(--text-muted); margin-top:10px; line-height:1.7; }
+.ts-error { display:none; margin-top:12px; font-size:0.82rem; color:#E53935; font-weight:600; line-height:1.6; }
+.ts-profile-info { font-size:0.75rem; color:var(--text-muted); margin-top:8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ts-wrap">
+
+  <div class="ts-header">
+    <h2 class="calc-title">ISA 전환 계산기</h2>
+    <p class="calc-sub">지금 위탁 자산을 팔아서(양도세 내고) ISA로 옮기는 게 이득일까? — 과거 데이터 롤링 시뮬레이션으로 두 전략을 정면 비교해요</p>
+  </div>
+
+  <!-- ===== 입력 ===== -->
+  <div class="ts-panel-box">
+    <div class="ts-field" style="margin-bottom:4px;"><label>보유 종목 (위탁 계좌)</label></div>
+    <div class="ts-search-wrap">
+      <input type="text" id="tsSearchInput" class="calc-input" placeholder="종목 또는 ETF 검색 (예: TIGER 미국S&P500, SCHD)" autocomplete="off">
+      <div class="ts-dropdown" id="tsDropdown"></div>
+    </div>
+    <div class="ts-ticker-list" id="tsTickerList"></div>
+
+    <div class="ts-input-grid" style="margin-top:14px;">
+      <div class="ts-field">
+        <label>현재 평가액</label>
+        <div class="input-group"><input type="number" id="tsCurrentValue" class="calc-input" value="50000000" min="0" step="1000000"><span class="unit">원</span></div>
+      </div>
+      <div class="ts-field">
+        <label>총 취득가 (산 가격 합계)</label>
+        <div class="input-group"><input type="number" id="tsCostBasis" class="calc-input" value="30000000" min="0" step="1000000"><span class="unit">원</span></div>
+      </div>
+      <div class="ts-field">
+        <label>앞으로 투자 기간</label>
+        <div class="input-group"><input type="number" id="tsYears" class="calc-input" value="10" min="1" max="30" step="1"><span class="unit">년</span></div>
+      </div>
+    </div>
+
+    <button class="ts-run-btn" id="tsRunBtn">두 전략 비교하기</button>
+    <div class="ts-profile-info" id="tsProfileInfo"></div>
+    <div class="ts-progress" id="tsProgress">
+      <span id="tsProgressText">계산 중...</span>
+      <div class="ts-bar-track"><div class="ts-bar-fill" id="tsProgressBar"></div></div>
+    </div>
+    <div class="ts-error" id="tsError"></div>
+  </div>
+
+  <!-- ===== 결과 ===== -->
+  <div class="ts-results" id="tsResults">
+
+    <div class="ts-verdict" id="tsVerdict">
+      <div class="headline" id="tsVerdictHeadline">—</div>
+      <div class="sub" id="tsVerdictSub"></div>
+    </div>
+
+    <div class="ts-panel-box">
+      <div class="ts-sum-grid">
+        <div class="ts-sum-card">
+          <div class="ts-sum-label">A) 위탁 유지 — 세후 자산 (중앙값)</div>
+          <div class="ts-sum-value" id="tsAEnd">—</div>
+          <div class="ts-sum-range" id="tsARange"></div>
+        </div>
+        <div class="ts-sum-card">
+          <div class="ts-sum-label">B) ISA 분할 이전 — 세후 자산 (중앙값)</div>
+          <div class="ts-sum-value blue" id="tsBEnd">—</div>
+          <div class="ts-sum-range" id="tsBRange"></div>
+        </div>
+        <div class="ts-sum-card">
+          <div class="ts-sum-label">차이 (B − A, 중앙값)</div>
+          <div class="ts-sum-value" id="tsDiff">—</div>
+        </div>
+        <div class="ts-sum-card">
+          <div class="ts-sum-label">전환 양도세 총액 (중앙값)</div>
+          <div class="ts-sum-value red" id="tsSwitchTax">—</div>
+        </div>
+        <div class="ts-sum-card">
+          <div class="ts-sum-label">손익분기 (B가 A를 따라잡는 해)</div>
+          <div class="ts-sum-value green" id="tsBreakeven">—</div>
+          <div class="ts-sum-range" id="tsBreakevenSub"></div>
+        </div>
+      </div>
+
+      <div class="ts-chart-box"><canvas id="tsChart"></canvas></div>
+
+      <div class="ts-field" style="margin:14px 0 6px;"><label>연도별 이전 계획 (대표 사례 — 결과 중앙값에 가장 가까운 시작 시점)</label></div>
+      <div class="ts-table-wrap"><table class="ts-table" id="tsScheduleTable"></table></div>
+
+      <div class="ts-note" id="tsNotes"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/tax_switch.js') }}?v=20260612ts"></script>
+{% endblock %}

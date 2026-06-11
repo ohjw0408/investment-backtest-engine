@@ -1,5 +1,25 @@
 # Log
 
+## [2026-06-12] feature | ISA 전환 계산기 신규 (/tax-switch) — P1 세금계산기 v1
+
+오너 결정: ISA 연 2천만 한도 처리 = **(a) 분할 이전 모델**, UI = **독립 페이지**.
+"지금 위탁 자산을 팔아(양도세) ISA로 옮길까 vs 위탁 유지?" — 두 전략 세후 정면 비교.
+
+- 선행 정리: 로드맵 stale 수정 — "다음=금종세 완전구현(2e)"은 Phase 2f(4100ecd, 05-31)로 이미 완료였음.
+- 엔진: `MultiAccountSimulationLoop` optional 확장(기본 OFF = 기존 G경로 무변경)
+  - `carried_cost_basis`: 기보유 자산 취득가 주입 (day-0 매수 후 avg_cost 비례축소)
+  - `switch_policy`: 연 1회 위탁 비례매도(sell_with_tax → 공유 세션 합산 = 종합과세 정확) → 순현금 ISA 이전.
+    `ContributionLimitTracker` 연 2천만/총 1억. dest ISA 만기세 원금 = cycle_contribution(내부이전은 cash_flow 미기록).
+  - `yearly_after_tax_snapshot`: 연말 가상청산 세후 combined → breakeven 산출 입력.
+- `tax_switch_logic.py`: A(단일 위탁+취득가) vs B(위탁+ISA+switch)를 동일 롤링 윈도우로 페어 실행.
+  출력 = A/B p25/50/75, 전환양도세, breakeven(역전 연차 중앙값 + 발생 비율), 연도별 세후 궤적, 대표 이전 스케줄.
+- API: `/api/tax-switch/submit`(celery) + `/run`(sync 검증용). UI: `templates/tax_switch.html` + `static/js/tax_switch.js`
+  (종목검색·비중·평가액/취득가/기간, Chart.js A vs B, 이전계획 표, 다크/모바일). nav·sidebar에 "ISA 전환" 추가.
+- 검증: `tests/test_tax_switch.py` 8 PASS — 손계산 ±1원 (A 일괄 46,150,000 / B 분할 47,250,000 = 250만 공제
+  3회로 정확히 +110만 / KR_FOREIGN flat A==B / 차익0 불변식 / 손실 전환세 0 / 총1억 한도 5년 중단 / 연말 스냅샷
+  / 기본 OFF 무변경). 전체 회귀 240 PASS. 실데이터 로컬: 458730 5천만/3천만 5y → 686윈도우, B +405만,
+  breakeven 1년차(98%). 로컬 Playwright 스모크 + `test_responsive_dark.js` 186 PASS(신규 페이지 포함).
+
 ## [2026-06-11] fix | GAP-RET-KRDATA 해소 ①②③ + NaN race 가드 — E2E 16/16 PASS, P0 L7 완료
 
 오너 결정("셋다 + race 가드까지") 구현. 커밋 9486eee, 배포·라이브 검증 완료.

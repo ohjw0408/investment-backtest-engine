@@ -184,6 +184,8 @@ class MultiAccountAnalyzer:
         manual_comprehensive_years=None,
         reinvest_tax_credit: bool = False,
         apply_final_liquidation: bool = True,
+        switch_policy: dict | None = None,
+        yearly_after_tax_snapshot: bool = False,
     ):
         self.portfolio_engine = portfolio_engine
         self.accounts = accounts
@@ -204,6 +206,9 @@ class MultiAccountAnalyzer:
         self.reinvest_tax_credit = bool(reinvest_tax_credit)
         # 투자계산기=True(끝에 일괄청산). 은퇴 적립=False(무청산 인계).
         self.apply_final_liquidation = bool(apply_final_liquidation)
+        # 세금계산기(전환 시뮬) 전용 — 기본 OFF.
+        self.switch_policy = switch_policy
+        self.yearly_after_tax_snapshot = bool(yearly_after_tax_snapshot)
         self._synth_params: dict = {}
 
     def run(self) -> dict:
@@ -353,10 +358,13 @@ class MultiAccountAnalyzer:
                     "gain_harvesting": account.get("gain_harvesting", False),
                     "isa_years_held": account.get("isa_years_held", 3),
                     "isa_renewal": account.get("isa_renewal", False),
+                    "carried_cost_basis": account.get("carried_cost_basis"),
                 })
 
             run_result = MultiAccountSimulationLoop(
                 transfers_enabled=self.transfers_enabled,
+                switch_policy=self.switch_policy,
+                yearly_after_tax_snapshot=self.yearly_after_tax_snapshot,
             ).run(
                 accounts=loop_accounts,
                 price_data=price_data,
@@ -401,6 +409,11 @@ class MultiAccountAnalyzer:
                 ar.get("kr_foreign_unrealized_gain", 0.0) for ar in run_result.account_results
             ))
             metrics["financial_income_by_year"] = dict(run_result.financial_income_by_year or {})
+            # 세금계산기(전환 시뮬) 결과 surfacing — 기본 OFF 시 빈 값.
+            if self.switch_policy or self.yearly_after_tax_snapshot:
+                metrics["after_tax_by_year"] = dict(run_result.after_tax_by_year or {})
+                metrics["switch_log"] = list(run_result.switch_log or [])
+                metrics["switch_cg_tax_total"] = float(run_result.switch_cg_tax_total)
             if final_value != raw_final:
                 positive_cf = history_df.loc[history_df["cash_flow"] > 0, "cash_flow"].sum()
                 if positive_cf > 0 and final_value > 0 and self.accumulation_years > 0:

@@ -16,6 +16,7 @@ const PAGES = [
   ['calculator', '/calculator'],
   ['dividend', '/dividend-target'],
   ['simple', '/simple'],
+  ['taxswitch', '/tax-switch'],
   ['retirement', '/retirement'],
   ['backtest', '/backtest'],
   ['myassets', '/myassets'],

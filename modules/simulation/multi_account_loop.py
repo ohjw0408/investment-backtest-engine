@@ -25,13 +25,22 @@ class MultiAccountRunResult:
     comprehensive_years: tuple = ()                                # 종합과세 대상 연도(>2천만 ∪ 수동)
     annual_deduction_credit: float = 0.0       # G4 연 납입 세액공제 환급 누계
     pension_transfer_credit_total: float = 0.0  # G3 ISA→연금 이전공제 환급 누계
+    after_tax_by_year: dict = field(default_factory=dict)  # 세금계산기: 연말 가상청산 세후 combined
+    switch_log: list[dict[str, Any]] = field(default_factory=list)  # 세금계산기: 위탁→ISA 전환 기록
+    switch_cg_tax_total: float = 0.0           # 세금계산기: 전환 양도세 누계
 
 
 class MultiAccountSimulationLoop:
     """N개 계좌를 하나의 날짜 루프에서 동시에 운용하는 오케스트레이터."""
 
-    def __init__(self, transfers_enabled: bool = False):
+    def __init__(self, transfers_enabled: bool = False,
+                 switch_policy: dict | None = None,
+                 yearly_after_tax_snapshot: bool = False):
+        # switch_policy / yearly_after_tax_snapshot = 세금 전환 계산기 전용(기본 OFF → 기존 경로 무변경).
+        # switch_policy = {"source_id": 위탁 계좌 id, "dest_id": ISA 계좌 id}: 연 1회 위탁 비례매도→ISA 이전.
         self.transfers_enabled = transfers_enabled
+        self.switch_policy = switch_policy
+        self.yearly_after_tax_snapshot = bool(yearly_after_tax_snapshot)
 
     def run(
         self,
@@ -89,6 +98,20 @@ class MultiAccountSimulationLoop:
         self._ref_tax_engine = next(
             (rt["tax_engine"] for rt in runtimes if rt.get("tax_engine") is not None), None
         )
+
+        # 세금계산기(전환 시뮬): 위탁→ISA 연 1회 분할 이전 상태 (switch_policy 없으면 전부 미사용)
+        switch_log: list[dict[str, Any]] = []
+        after_tax_by_year: dict[int, float] = {}
+        self._switch_tracker = None
+        self._switch_last_year: int | None = None
+        self._switch_cg_tax_total = 0.0
+        if self.switch_policy:
+            from modules.tax.account_tax import ContributionLimitTracker
+            self._switch_tracker = ContributionLimitTracker()
+            dest_id = int(self.switch_policy.get("dest_id", 1))
+            for rt in runtimes:
+                if rt["account_id"] == dest_id:
+                    rt["_switch_dest"] = True  # 최종 ISA 청산 원금 = cycle_contribution(이전 누계)
 
         # G2 라우팅 상태(transfers OFF면 전부 미사용 → G1 동작 그대로)
         tracker = None
@@ -192,6 +215,25 @@ class MultiAccountSimulationLoop:
                     **account_values,
                 })
 
+            # 세금계산기: 연 1회(각 해 첫 거래일, day0 포함) 위탁→ISA 분할 이전.
+            # 스텝·기록 후 실행 — 당일 기록은 이전 전 값, 다음 거래일부터 반영(1일 현금 드래그 = 현실적).
+            if self._switch_tracker is not None and (
+                self._switch_last_year is None or date.year != self._switch_last_year
+            ):
+                self._switch_last_year = date.year
+                self._switch_tracker.touch(date)
+                self._do_switch_transfer(
+                    runtimes, price_array, valid_index, i, date, switch_log
+                )
+
+            # 세금계산기: 연말(각 해 마지막 거래일 + sim 마지막 날) 가상청산 세후 combined 기록.
+            if self.yearly_after_tax_snapshot:
+                is_last = i == total_dates - 1
+                if is_last or dates[i + 1].year != date.year:
+                    after_tax_by_year[date.year] = self._after_tax_combined(
+                        runtimes, price_array, valid_index, i, date
+                    )
+
             if progress_callback and i % update_step == 0:
                 progress_callback(
                     current=i + 1,
@@ -226,6 +268,9 @@ class MultiAccountSimulationLoop:
             financial_income_by_year=financial_income_by_year,
             comprehensive_years=comprehensive_years,
             annual_deduction_credit=float(self._annual_deduction_total),
+            after_tax_by_year=after_tax_by_year,
+            switch_log=switch_log,
+            switch_cg_tax_total=float(self._switch_cg_tax_total),
             pension_transfer_credit_total=float(
                 sum(r.get("pension_transfer_credit", 0.0) for r in account_results)
             ),
@@ -608,6 +653,8 @@ class MultiAccountSimulationLoop:
             "config": config,
             "strategy": account["strategy"],
             "tax_engine": tax_engine,
+            # 세금계산기: 기보유 자산 취득가(첫 매수 후 avg_cost 비례축소 → 초기 미실현차익 재현)
+            "carried_cost_basis": account.get("carried_cost_basis"),
             "isa_years_held": int(account.get("isa_years_held", 3)),
             "isa_renewal": bool(account.get("isa_renewal", False)),
             "cycle_contribution": init_capital,
@@ -654,6 +701,117 @@ class MultiAccountSimulationLoop:
             price_dict[ticker] = float(price)
         return price_dict
 
+    def _do_switch_transfer(
+        self, runtimes, price_array, valid_index, i, date,
+        switch_log: list[dict[str, Any]],
+    ) -> None:
+        """세금계산기 B전략: 위탁(source) 비례 매도(양도세) → 순현금을 ISA(dest)로 연 1회 이전.
+
+        gross 매도 목표 = min(위탁 평가액, ISA 잔여 capacity(연2천만/총1억)).
+        순입금 = 매도대금 − 양도세 ≤ capacity (세금 누수만큼 미달 = 보수적).
+        내부 이동(cash_flow 미기록) — MWR 왜곡 없음. dest 매수는 다음 거래일 allocate_cash가 수행.
+        실현차익은 sell_with_tax → 공유 세션 합산(종합과세 정확).
+        """
+        rt_by_id = {rt["account_id"]: rt for rt in runtimes}
+        src = rt_by_id.get(int(self.switch_policy.get("source_id", 0)))
+        dst = rt_by_id.get(int(self.switch_policy.get("dest_id", 1)))
+        if src is None or dst is None:
+            return
+        portfolio = src["portfolio"]
+        price_dict = self._price_dict_for_account(
+            src["config"].tickers, price_array, valid_index, i, date
+        )
+        pos_value = sum(
+            float(pos.quantity) * price_dict[t]
+            for t, pos in portfolio.positions.items()
+            if t in price_dict and pos.quantity > 0
+        )
+        src_cash = max(0.0, float(portfolio.cash))
+        capacity = self._switch_tracker.capacity(dst["account_id"], "ISA")
+        gross_target = min(pos_value + src_cash, capacity)
+        if gross_target <= 0:
+            return
+
+        executor = src["executor"]
+        cg_before = float(getattr(executor, "total_cg_tax_paid", 0.0))
+        # 보유 현금 우선 충당, 부족분만 포지션 비례 매도
+        sell_target = max(0.0, gross_target - src_cash)
+        if sell_target > 0 and pos_value > 0:
+            for t, pos in list(portfolio.positions.items()):
+                if t not in price_dict or pos.quantity <= 0:
+                    continue
+                price = price_dict[t]
+                value_t = float(pos.quantity) * price
+                qty = int(min(sell_target * (value_t / pos_value), value_t) / price)
+                if qty <= 0:
+                    continue
+                if hasattr(executor, "sell_with_tax"):
+                    executor.sell_with_tax(portfolio, t, qty, price)
+                else:
+                    portfolio.sell(t, qty, price)
+        cg_tax = float(getattr(executor, "total_cg_tax_paid", 0.0)) - cg_before
+
+        transfer_amt = min(max(0.0, float(portfolio.cash)), capacity)
+        if transfer_amt <= 0:
+            return
+        portfolio.cash -= transfer_amt
+        dst["portfolio"].cash += transfer_amt
+        # ISA 원금(만기세 계산용) = 이전 누계. cash_flow 미기록이라 history 합계론 못 구함.
+        dst["cycle_contribution"] = float(dst.get("cycle_contribution", 0.0)) + transfer_amt
+        self._switch_tracker.record(dst["account_id"], "ISA", transfer_amt)
+        self._switch_cg_tax_total += cg_tax
+        switch_log.append({
+            "date": date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else str(date),
+            "year": date.year,
+            "gross_sold": round(gross_target, 2),
+            "cg_tax": round(cg_tax, 2),
+            "transferred": round(transfer_amt, 2),
+            "isa_capacity_left": round(
+                self._switch_tracker.capacity(dst["account_id"], "ISA"), 2
+            ),
+        })
+
+    def _after_tax_combined(
+        self, runtimes, price_array, valid_index, i, date,
+    ) -> float:
+        """모든 계좌를 당일 가격으로 가상 청산했을 때의 세후 합계(상태 무변경).
+
+        세금계산기 breakeven 입력. ISA 보유기간 = 경과 개월/12 (3년 미만 = 중도해지 규칙).
+        """
+        from modules.tax.liquidation import apply_liquidation_tax
+
+        session = getattr(self, "_tax_session", None)
+        total = 0.0
+        for rt in runtimes:
+            price_dict = self._price_dict_for_account(
+                rt["config"].tickers, price_array, valid_index, i, date
+            )
+            portfolio = rt["portfolio"]
+            value = float(portfolio.total_value(price_dict)) if price_dict \
+                else max(0.0, float(portfolio.cash))
+            tax_engine = rt.get("tax_engine")
+            if tax_engine is None or value <= 0:
+                total += value
+                continue
+            held_years = max(0, int(rt.get("elapsed_months", 0)) // 12)
+            total += float(apply_liquidation_tax(
+                end_value=value,
+                portfolio=portfolio,
+                last_prices=price_dict,
+                tax_engine=tax_engine,
+                account_type=rt["account_type"],
+                total_contribution=float(rt.get("cycle_contribution", 0.0)),
+                ytd_us_realized_gains=(
+                    float(session.ytd_us_realized_gains) if session is not None else 0.0
+                ),
+                age=getattr(tax_engine, "age", 40),
+                isa_years_held=held_years,
+                ytd_financial_income=(
+                    float(session.ytd_financial_income) if session is not None else 0.0
+                ),
+            ))
+        return total
+
     def _step_account(
         self, rt: dict[str, Any], price_data, price_dict, date,
         contribution_override: float | None = None,
@@ -676,6 +834,20 @@ class MultiAccountSimulationLoop:
             cash_target = config.target_weights.get("CASH", 0)
             if cash_target == 0 and portfolio.cash > 0:
                 rt["cash_allocator"].allocate_cash(portfolio, price_dict, config.target_weights)
+            # 세금계산기: 기보유 자산 취득가 주입 — day-0 매수가(=현재가) 기준 avg_cost를
+            # 취득가 합계로 비례 축소 → 첫 매도부터 (현재가−취득가) 차익 과세.
+            # simulation_loop.py carried_cost_basis와 동일 메커니즘.
+            carried = rt.get("carried_cost_basis")
+            if carried and hasattr(portfolio, "_avg_costs") and portfolio._avg_costs:
+                invested = sum(
+                    portfolio._avg_costs[t] * portfolio.positions[t].quantity
+                    for t in portfolio._avg_costs
+                    if t in portfolio.positions and portfolio.positions[t].quantity > 0
+                )
+                if invested > 0:
+                    scale = float(carried) / invested
+                    for t in list(portfolio._avg_costs.keys()):
+                        portfolio._avg_costs[t] *= scale
 
         gross_dividend_by_ticker = self._gross_dividend_by_ticker(
             portfolio,
@@ -835,8 +1007,11 @@ class MultiAccountSimulationLoop:
             if apply_final_liq:
                 ytd_us_gains = getattr(rt["executor"], "_ytd_us_gains", 0.0)
                 # 풍차 ISA: 최종 청산세 원가는 마지막 사이클 납입액(전 기간 누적 아님).
+                # 전환 dest ISA: 내부이전은 cash_flow 미기록 → 원금 = cycle_contribution(이전 누계).
                 tc_for_tax = total_contribution
-                if rt["account_type"] == "ISA" and rt.get("isa_renewal"):
+                if rt["account_type"] == "ISA" and (
+                    rt.get("isa_renewal") or rt.get("_switch_dest")
+                ):
                     tc_for_tax = float(rt.get("cycle_contribution", total_contribution))
                 end_value = apply_liquidation_tax(
                     end_value=raw_end_value,

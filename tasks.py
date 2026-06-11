@@ -209,6 +209,25 @@ def run_retirement_task(self, payload: dict) -> dict:
 
 
 @celery.task(bind=True)
+def run_tax_switch_task(self, payload: dict) -> dict:
+    cb = _make_progress_callback(self)
+    _t = time.time()
+    def _run():
+        try:
+            from tax_switch_logic import run_tax_switch_logic
+            result = run_tax_switch_logic(payload, progress_callback=cb)
+            record_task_duration(time.time() - _t)
+            return {'status': 'SUCCESS', 'result': result}
+        except Exception as e:
+            if check_cancel_flag(self.request.id):
+                clear_cancel_flag(self.request.id)
+                return {'status': 'CANCELLED'}
+            import traceback
+            return {'status': 'FAILURE', 'error': str(e), 'traceback': traceback.format_exc()}
+    return _task_wrap(_run, self.request.id)
+
+
+@celery.task(bind=True)
 def run_backtest_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
     _t = time.time()

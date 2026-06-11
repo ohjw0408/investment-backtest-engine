@@ -17,7 +17,7 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 | File | Role | Status |
 |---|---|---|
 | `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed (A1/A2/A3/A5/A6/B5/C3/C5/D3 done) |
-| `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 1~3 + 2c/2d 완료. 🔴 **다음 = 금융소득 종합과세 완전 구현(Phase 2e 배선 + phase1-api).** 엔진 수학은 완료, 갭 = `other_financial_income` 자동산출·전탭배선·`_ytd_income` 주입(데이터 토대 완성돼 블로커 없음). |
+| `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 1~3 + 2c/2d 완료. ✅ **Phase 2f(금융소득 종합과세) 완료(2026-05-31, 4100ecd)** — 중간실현 합산·`other_financial_income` 자동산출·`_ytd_income` 주입·분할매도 슬라이더 전탭(배당탭은 별도엔진 제외). 검증 = test_phase2f 7/7 + tax_truth 64/64 + Gate 2a/2b/2c. 잔여 = Phase 3 정리·문서(낮음). |
 | `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | ✅ **Phase 6.0 Stage A + Stage B 완료**(주식 배당 + 채권/MMF·환헤지비용·US 채권 키워드 자동분류·통화가드, 서버검증). Phase 3+ (etf_master, etf_proxy_map, confidence grading)는 이후. |
 | `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | ✅ Complete (Phase 1~10, all screens). |
 | `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | **Backend complete (e8b7c1e). Frontend partially done. BUG-1~5 remain.** |
@@ -47,7 +47,7 @@ UI 실측/추정 필드를 확인했다.
 - ✅ **완료:** 배당 백필 Stage A + ^GSPC 제거(2003) — `ETF_BACKFILL § Phase 6.0 Stage A`
 - ✅ **완료:** 배당 백필 Stage B(채권/MMF) — 한국 채권 전유형·환헤지비용·US 채권 자동분류·통화가드, 서버검증 — `ETF_BACKFILL § Phase 7 addendum`
 - ✅ **완료:** 세금 Phase 2c 재검증 (2e 엔진 검증 완료, 2e 배선 갭은 빌드 잔여)
-- 🔴 **지금/다음:** 금융소득 종합과세 완전 구현(세금 Phase 2e 배선 + phase1-api `_ytd_income` 주입) — 데이터 토대 완성, 블로커 없음
+- ✅ **완료(2026-05-31, 4100ecd):** 금융소득 종합과세 완전 구현(Phase 2f) — 중간실현 합산·자동산출·`_ytd_income` 주입·분할매도 슬라이더 전탭(배당탭 제외). ※ 이 줄은 과거 "지금/다음"이었으나 2026-06-12 stale 정리로 완료 반영.
 - ✅ **Track G 대거 진척(2026-06-02):** G1 ✅ + **G2 자금이동**(2-1 라우팅·2-2 만기분배)·**G3 연금이전공제**·**2-4 금종세 풍차중단**·**G4 연납입공제** 엔진 전부 완료(L0~L9 결정론 40+케이스). **B1**(analyzer/logic 배선)·**B2**(API 서버검증)·**B3**(투자계산기 UI: 우선순위·풍차토글·재투자·결과패널) 완료. 잔여: 은퇴/백테스트 탭 복제·L7 실데이터·**절세액 표시**(신규 계획).
 
 완료 (가격/구조 레벨 — 단, 배당 액수 정확성은 별개):
@@ -61,7 +61,7 @@ UI 실측/추정 필드를 확인했다.
 - ✅ ETF_BACKFILL Phase 0~2 provenance 스키마는 Stage A 백필 가격/배당 기록에 사용됨.
 - ✅ PHASE4: A1/A2/A3/A5/A6/B5/C3/C5/D3 done.
 
-Current blocker: **없음.** 배당 Stage A/B + Phase 2c 재검증 완료. 다음 = **금융소득 종합과세 완전 구현**(2e 배선 + `_ytd_income` 주입). (2026-05-31 갱신)
+Current blocker: **없음.** 배당 Stage A/B + Phase 2c 재검증 + Phase 2f(금종세 완전 구현, 4100ecd) 완료. 다음 = **세금 전환 계산기**(`세금계산기_plan.md`, P1). (2026-06-12 갱신)
 
 ## Decision
 
@@ -299,7 +299,9 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
-> ✅ **2026-06-11 현재 (L7 완료):** **다계좌 세금 E2E 16건 전부 PASS** — 실행 중 발견 2건(GAP-RET-KRDATA·BUG-WD-MULTI-LIVE)을 당일 조사(서버 SSH 실측)·수정(9486eee: 은퇴 탭 synthetic 옵션 + 인출 투영 별도 prep + 0윈도우 합성 폴백+라벨 + NaN race 가드)·라이브 재검(C·D 7/7)까지 완료. **P0 L7 = 완료.** 신규 상시 검증자산 = `tests/e2e_multitax/`(16건 자동 재실행 가능). 상세 = status update 59~60 + log 4건 + `tests/e2e_multitax/results/20260611_result.md`. **다음 = 금융소득 종합과세 완전 구현(Phase 2e, P2) OR 세금계산기(P1) — 오너 결정.**
+> 🚧 **2026-06-12 현재 (ISA 전환 계산기 구현·로컬 검증 완료, 배포/라이브 검증 진행):** 오너 결정 = **(a) 분할 이전 모델 + 독립 페이지.** 신규 `/tax-switch`(A 위탁유지 vs B 연 1회 ISA 한도 분할이전, 세후 비교 + breakeven + 이전계획). 엔진 = `MultiAccountSimulationLoop` optional 확장(carried_cost_basis·switch_policy·yearly_after_tax_snapshot, 기본 OFF=기존 무변경) + `tax_switch_logic.py`. 검증 = 신규 8 PASS 손계산 ±1원 + 회귀 240 PASS + 실데이터 686윈도우 + Playwright 186 PASS. 상세 = status update 61 + `세금계산기_plan.md` v1 설계. **다음 = 배포·라이브 검증 → 세금계산기 완료 처리.**
+
+> ✅ **2026-06-11 (L7 완료):** **다계좌 세금 E2E 16건 전부 PASS** — 실행 중 발견 2건(GAP-RET-KRDATA·BUG-WD-MULTI-LIVE)을 당일 조사(서버 SSH 실측)·수정(9486eee: 은퇴 탭 synthetic 옵션 + 인출 투영 별도 prep + 0윈도우 합성 폴백+라벨 + NaN race 가드)·라이브 재검(C·D 7/7)까지 완료. **P0 L7 = 완료.** 신규 상시 검증자산 = `tests/e2e_multitax/`(16건 자동 재실행 가능). 상세 = status update 59~60 + log 4건 + `tests/e2e_multitax/results/20260611_result.md`. ~~다음 = 금융소득 종합과세(P2) OR 세금계산기(P1) — 오너 결정~~ → **2026-06-12 정리: 금종세는 Phase 2f로 이미 완료(4100ecd, 2026-05-31)였음(이 줄이 stale). 따라서 다음 = 세금 전환 계산기(P1, `세금계산기_plan.md`).**
 
 > (이전) ✅ **2026-06-11:** 모바일 반응형 + 다크모드 + UX 전 페이지 개편 완료·배포·라이브 검증(status update 57~58). BUG-NAV-1 해소. `tests/test_responsive_dark.js` 168체크. 오너 실기기 확인 완료.
 
@@ -313,11 +315,11 @@ Completion note - YYYY-MM-DD
 
 **[P1 — 신규 간편 도구 (오너 아이디어, quick win)]**
 - ✅ **간편 계산기 묶음** (`간편계산기_plan.md`) — **완료·배포·서버검증(2026-06-10, fe7c7af).** `/simple` 4종(복리·배당재투자·인플레 생활비·실질 구매력), JS 전용, 손계산 25+jsdom 35 PASS, 라이브 200·JS 바이트 동일. 잔여 = 브라우저 육안.
-- **세금 전환 계산기** (`세금계산기_plan.md`) — 위탁→ISA 전환 양도세 vs ISA 혜택. 세금 모트·액셔너블.
+- 🚧 **세금 전환 계산기** (`세금계산기_plan.md`) — 위탁→ISA 전환 양도세 vs ISA 혜택. **2026-06-12 v1 구현·로컬 검증 완료(오너 결정 (a) 분할이전+독립페이지), 배포/라이브 검증 진행.**
 
 **[P2 — 절세액 P2/P3 + 데이터 토대]**
 - 절세액 P2/P3(백테스트/은퇴는 G5 복제로 따라옴, 연금 인출세 P3).
-- 금융소득 종합과세 완전 구현(2e 배선) — `세금에서시작된완전리팩토링계획.plan.md`.
+- ~~금융소득 종합과세 완전 구현(2e 배선)~~ ✅ Phase 2f로 완료(2026-05-31, 4100ecd). 잔여 = 배당금계산기 탭(별도 엔진, 곁가지 참조).
 
 **[P3 — PHASE4 제품 기능]**
 - 포트폴리오 즐겨찾기(B1) ← 리스크리턴도표 선행. D1 TDF·D2 연금통합·A4 종목상세·C1/C2.

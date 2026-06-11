@@ -260,6 +260,10 @@ def retirement():
 def simple_tools():
     return render_template('simple.html')
 
+@app.route('/tax-switch')
+def tax_switch():
+    return render_template('tax_switch.html')
+
 @app.route('/backtest')
 def backtest():
     return render_template('backtest.html')
@@ -540,6 +544,29 @@ def calculator_submit():
     from tasks import run_simulation_task, add_to_queue
     payload = request.get_json()
     task    = run_simulation_task.delay(payload)
+    add_to_queue(task.id)
+    return jsonify({'task_id': task.id, 'status': 'PENDING'})
+
+
+@app.route('/api/tax-switch/run', methods=['POST'])
+def tax_switch_run():
+    """세금 전환 계산기 동기 실행 (로컬 검증용 — 프론트는 submit 사용)."""
+    try:
+        from tax_switch_logic import run_tax_switch_logic
+        return jsonify(run_tax_switch_logic(request.get_json()))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tax-switch/submit', methods=['POST'])
+def tax_switch_submit():
+    from tasks import run_tax_switch_task, add_to_queue
+    payload = request.get_json()
+    task    = run_tax_switch_task.delay(payload)
     add_to_queue(task.id)
     return jsonify({'task_id': task.id, 'status': 'PENDING'})
 

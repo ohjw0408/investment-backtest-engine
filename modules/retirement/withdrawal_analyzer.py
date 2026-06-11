@@ -225,7 +225,10 @@ class WithdrawalAnalyzer:
             run_id += 1
 
         if not windows:
-            return []
+            # GAP-RET-KRDATA: 실데이터 < 인출기간 → 실윈도우 0개 — 전량 합성 폴백.
+            # 기존 MIN_CASES 패딩과 동일 GBM(실측 수익률 통계 기반), is_synthetic 마킹.
+            mu, sigma = self._get_return_stats(full_price_data)
+            return self._run_synthetic_cases(MIN_CASES, mu, sigma, start_id=1)
 
         # 3. 파라미터 직렬화
         strategy_instance = self.strategy_factory()

@@ -111,6 +111,9 @@ def simulate_household_window(
         price_array[ticker] = df["close"].values
         valid_index[ticker] = df.index
 
+    # 전 계좌가 필요로 하는 종목 — 초기 매수는 전부 유효가격이 있는 날부터(부분 데이터 가드).
+    needed_tickers = {t for s in accounts for t in s["target_weights"] if t != "CASH"}
+
     runtimes = None
     last_wd_month = None
     last_infl_month = None
@@ -123,7 +126,11 @@ def simulate_household_window(
         price_dict = {}
         for ticker in price_data:
             if date in valid_index[ticker]:
-                price_dict[ticker] = price_array[ticker][i]
+                px = price_array[ticker][i]
+                # 리딩 NaN 가드 — 합집합 달력 reindex+ffill은 첫 행 이전을 NaN으로 남김.
+                # NaN/0 가격이 초기 매수·매도에 들어가면 포트 전체가 오염된다(라이브 일시 0% 사고).
+                if np.isfinite(px) and px > 0:
+                    price_dict[ticker] = px
         if not price_dict:
             continue
 
@@ -134,8 +141,10 @@ def simulate_household_window(
             elapsed_months += 1
             last_infl_month = current_month
 
-        # 첫 유효일: 계좌 런타임 구성(초기 매수)
+        # 첫 유효일: 계좌 런타임 구성(초기 매수) — 전 종목 가격 유효한 날까지 대기.
         if runtimes is None:
+            if not needed_tickers.issubset(price_dict.keys()):
+                continue
             runtimes = [
                 _build_account_runtime(s, price_dict, tax_engine, session)
                 for s in accounts
@@ -185,11 +194,15 @@ def simulate_household_window(
     last_i = len(dates) - 1
     for ticker in price_data:
         if dates[last_i] in valid_index[ticker]:
-            last_price[ticker] = price_array[ticker][last_i]
-    # 마지막 유효 가격 폴백
+            px = price_array[ticker][last_i]
+            if np.isfinite(px) and px > 0:
+                last_price[ticker] = px
+    # 마지막 유효(유한) 가격 폴백
     for ticker in price_data:
         if ticker not in last_price:
-            last_price[ticker] = price_array[ticker][-1]
+            arr = np.asarray(price_array[ticker], dtype=float)
+            finite = arr[np.isfinite(arr) & (arr > 0)]
+            last_price[ticker] = float(finite[-1]) if len(finite) else 0.0
 
     per_account = []
     combined = 0.0
@@ -303,8 +316,8 @@ def analyze_household_withdrawal(
             break
         windows.append((cur, end))
         cur += relativedelta(months=step_months)
-    if not windows:
-        raise ValueError("롤링 윈도우가 0개입니다 (데이터 부족).")
+    # 실윈도우 0개(데이터 < 인출기간, GAP-RET-KRDATA)여도 raise 안 함 —
+    # 아래 합성 보충이 전량 합성으로 폴백해 결과를 낸다(n_real=0, 화면에 가상 표시).
 
     case_results = []
     for w_start, w_end in windows:
@@ -325,10 +338,8 @@ def analyze_household_withdrawal(
             continue
         case_results.append(r)
 
-    if not case_results:
-        raise ValueError("유효 윈도우가 0개입니다.")
-
-    # ── 합성 보충: 실윈도우 < MIN_CASES_WD면 GBM 합성으로 패딩 (단일과 동형) ──
+    # ── 합성 보충: 실윈도우 < MIN_CASES_WD면 GBM 합성으로 패딩 (단일과 동형).
+    #    실윈도우 0개면 전량 합성 폴백(GAP-RET-KRDATA) ──
     n_real = len(case_results)
     n_needed = max(0, MIN_CASES_WD - n_real)
     if n_needed > 0:
@@ -347,6 +358,9 @@ def analyze_household_withdrawal(
             except Exception:
                 continue
     n_synthetic = len(case_results) - n_real
+
+    if not case_results:
+        raise ValueError("롤링 윈도우가 0개입니다 (데이터 부족 — 합성 생성도 실패).")
 
     survival_rate = float(np.mean([1.0 if r["success"] else 0.0 for r in case_results]))
     combined_vals = [r["combined_end_value"] for r in case_results]
@@ -405,6 +419,7 @@ def analyze_household_samples(
     반환: {sample_results, combined_summary, message}.
     """
     sample_results = []
+    wd_n_real = wd_n_synthetic = None  # 윈도우 구성은 샘플 간 동일 — 마지막 호출 값 사용
     for pct in SAMPLE_PERCENTILES:
         accounts = []
         initial_capital = 0.0
@@ -433,6 +448,7 @@ def analyze_household_samples(
             "end_value_p50":   wd["combined_end_value"]["p50"],
             "n_windows":       wd["n_windows"],
         })
+        wd_n_real, wd_n_synthetic = wd["n_real"], wd["n_synthetic"]
 
     success_rates = np.array([r["success_rate"] for r in sample_results])
     end_values    = np.array([r["end_value_p50"] for r in sample_results])
@@ -456,6 +472,9 @@ def analyze_household_samples(
         "sample_success_rates":    success_rates.tolist(),
         "sample_initial_capitals": [r["initial_capital"] for r in sample_results],
         "n_samples":               len(sample_results),
+        # 인출 투영 윈도우 구성(실측/가상) — 화면에서 가상 보충 표시용(GAP-RET-KRDATA).
+        "n_windows_real":          wd_n_real,
+        "n_windows_synthetic":     wd_n_synthetic,
     }
     is_safe = survival_rate >= target_percentile
     return {

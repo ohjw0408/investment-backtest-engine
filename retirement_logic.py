@@ -348,12 +348,24 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
                 'rebal_mode':     account.get('rebal_mode', 'none'),
                 'band_width':     float(account.get('band_width', 0.05)),
             })
+        # 인출 투영용 범위 — 적립 prep과 별도로 인출기간 기준 준비(GAP-RET-KRDATA).
+        wd_prep = prepare_scenario_data(
+            tickers          = all_tickers,
+            required_years   = withdrawal_years,
+            data_end         = data_end,
+            step_months      = 6,
+            allow_backfill   = True,
+            allow_synthetic  = use_synthetic,
+            purpose          = "retirement_withdrawal",
+            price_db_path    = PRICE_DB_PATH,
+        )
+        wd_data_start = min(data_start, wd_prep["effective_start"])
         wd_price_data, wd_dates = portfolio_engine.price_loader.load(
-            all_tickers, data_start, data_end,
+            all_tickers, wd_data_start, data_end,
         )
         wd_report = analyze_household_samples(
             account_specs, per_account_values,
-            wd_price_data, wd_dates, data_start, data_end,
+            wd_price_data, wd_dates, wd_data_start, data_end,
             withdrawal_years, monthly_withdrawal,
             tax_engine=tax_engine if tax_enabled else None,
             withdrawal_start_age=withdrawal_start_age,
@@ -453,6 +465,23 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     data_start     = prep["effective_start"]
     synthetic_info = prep["synthetic_info"]
     backfilled     = prep["backfilled"]
+
+    # 인출 투영용 범위 — 적립(years) 기준 prep과 별도로 인출기간 기준으로 준비.
+    # (GAP-RET-KRDATA: 인출 N년 윈도우 요구가 데이터 준비에 전달되지 않아 윈도우 0개 하드에러.)
+    # 적립 prep을 늘리지 않는 이유: 적립 케이스 수가 범위에 비례해 폭증(성능).
+    wd_data_start = data_start
+    if monthly_withdrawal > 0 and withdrawal_years > 0:
+        wd_prep = prepare_scenario_data(
+            tickers          = ticker_codes,
+            required_years   = withdrawal_years,
+            data_end         = data_end,
+            step_months      = 6,
+            allow_backfill   = True,
+            allow_synthetic  = use_synthetic,
+            purpose          = "retirement_withdrawal",
+            price_db_path    = PRICE_DB_PATH,
+        )
+        wd_data_start = min(data_start, wd_prep["effective_start"])
 
     div_starts = [_get_dividend_start(portfolio_engine, t) for t in ticker_codes]
     div_starts = [d for d in div_starts if d]
@@ -575,7 +604,7 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
             "portfolio_engine":   portfolio_engine,
             "tickers":            ticker_codes,
             "strategy_factory":   strategy_factory,
-            "data_start":         data_start,
+            "data_start":         wd_data_start,  # 인출기간 기준 범위(GAP-RET-KRDATA)
             "data_end":           data_end,
             "withdrawal_years":   withdrawal_years,
             "dividend_mode":      dividend_mode,
@@ -644,6 +673,9 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
         "acc_cases_count":   len(acc_result["cases"]),
         "acc_n_real":        acc_result.get("n_real"),
         "acc_n_synthetic":   acc_result.get("n_synthetic"),
+        # 인출 투영 윈도우 구성(실측/가상) — 가상 보충 표시용(GAP-RET-KRDATA).
+        "wd_n_real":      report["sample_results"][0]["wd_result"]["n_real"] if report["sample_results"] else None,
+        "wd_n_synthetic": report["sample_results"][0]["wd_result"]["n_synthetic"] if report["sample_results"] else None,
         "acc_values":        [round(c["end_value"]) for c in acc_result["cases"]],
         "wd_values": [
             v

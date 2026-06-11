@@ -375,6 +375,17 @@
       </div>
     </div>
 
+    <!-- 가상 데이터 옵트인 (계산기와 동일 — 적립·인출 투영의 상장 전 구간 합성 보충) -->
+    <div class="calc-section" id="retSyntheticSection" style="padding:10px 12px;background:var(--gold-pale);border-radius:8px;border:1px solid var(--gold);">
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:0.82rem;">
+        <input type="checkbox" id="retUseSyntheticCheck" style="width:14px;height:14px;margin-top:2px;flex-shrink:0;">
+        <div>
+          <span style="font-weight:600;color:var(--gold-deep);">가상 데이터 사용</span><br>
+          <span style="color:var(--text-muted);">실제 데이터가 부족한 경우에만 선택하세요. 통계적으로 생성된 데이터가 포함되어 결과 정확도가 낮아질 수 있습니다.</span>
+        </div>
+      </label>
+    </div>
+
     <!-- 세금 적용 섹션 -->
     <div class="calc-section" id="retTaxSection">
       <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
@@ -590,6 +601,7 @@
         </div>
         <canvas id="retWdChart" height="140"></canvas>
         <div id="retWdPensionTax" style="display:none;margin-top:10px;font-size:0.8rem;color:var(--text-muted);background:var(--bg);border-radius:8px;padding:8px 10px;"></div>
+        <div id="retWdSynthNote" style="display:none;margin-top:8px;font-size:0.76rem;color:var(--gold-deep);background:var(--gold-pale);border:1px solid var(--gold);border-radius:8px;padding:8px 10px;"></div>
       </div>
     </div>
   </div>
@@ -835,6 +847,7 @@ async function runRetirement() {
       inflation:            parseFloat(document.getElementById('simInflation').value) / 100 || 0,
       pension_start_age:    parseInt(document.getElementById('simPensionStartAge')?.value) || 65,
       target_percentile:    targetProb,
+      use_synthetic:        document.getElementById('retUseSyntheticCheck')?.checked ?? false,
       tax_enabled:          retTaxOn,
       account_type:         (window.taxAccounts && window.taxAccounts[0]) ? (window.taxAccounts[0].type || '위탁') : '위탁',
       isa_renewal:          retTaxOn && (document.getElementById('isaRenewalCheck')?.checked ?? false),
@@ -1387,6 +1400,22 @@ function renderRetirement(data, body) {
       pensionTaxEl.style.display = 'block';
     } else {
       pensionTaxEl.style.display = 'none';
+    }
+  }
+
+  // 인출 투영 가상 윈도우 보충 표시 — 실측 데이터 < 인출기간이면 GBM 합성으로 채움(GAP-RET-KRDATA).
+  const synthNoteEl = document.getElementById('retWdSynthNote');
+  if (synthNoteEl) {
+    const wdReal  = (retMode === 'wd') ? data.n_real
+                  : (data.wd_n_real ?? (data.combined_summary || {}).n_windows_real);
+    const wdSynth = (retMode === 'wd') ? data.n_synthetic
+                  : (data.wd_n_synthetic ?? (data.combined_summary || {}).n_windows_synthetic);
+    if (wdSynth > 0) {
+      synthNoteEl.innerHTML = `⚠️ 인출 투영: 실측 윈도우 <b>${wdReal || 0}개</b> + 가상 <b>${wdSynth}개</b>`
+        + ` — 실제 데이터가 인출 기간보다 짧아 부족분을 통계 기반 가상 시나리오로 보충했습니다. 결과 정확도가 낮을 수 있습니다.`;
+      synthNoteEl.style.display = 'block';
+    } else {
+      synthNoteEl.style.display = 'none';
     }
   }
 

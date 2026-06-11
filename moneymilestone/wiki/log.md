@@ -1,5 +1,23 @@
 # Log
 
+## [2026-06-11] investigate | BUG-WD-MULTI-LIVE 조사 — 일시 현상으로 강등, 신규 DATA-458730-BACKFILL 등록
+
+E2E에서 발견한 인출기 멀티 생존율 0% 조사 (오너 지시, 수정 없이 조사만).
+
+**방법:** ① 로컬 재현(`tests/debug_wd_multi_live.py` — D2 body로 `run_withdrawal_logic` 직접) ② 라이브 API 직접 probe(`tests/e2e_multitax/probe_d2_live.js`·`probe_c1_live.js`) ③ 로컬 계측(`tests/debug_wd_d4_basis.py` — 취득가 스케일·자산분류·미실현차익 방향성).
+
+**결론 4건:**
+1. **생존율 0% = 일시 현상.** ~1h 후 동일 body 4회 연속 정상(생존율 100%·n_real 61·data_start 1981). 유력 메커니즘 = E2E가 (458730,360750,30y) 조합 최초 요청이라 lazy 백필+합성 생성 race/워커 캐시 stale 중에 시뮬. 초기 가설(DB 합성 USD anchor)은 기각(BUG-SYNTH-FX 때 양 경로 수정 확인).
+2. **엔진 배선 정상.** 로컬 계측: 분류 KR_FOREIGN ✓, 취득가 스케일 작동(avg_cost 241.6→80.5) ✓, 미실현 2억 → combined p50 −2,420만 악화(방향 ✓).
+3. **신규 발견 DATA-458730-BACKFILL:** 서버 458730 장기 백필 경로가 사실상 하락(라이브 단일 30y: 3억→중앙값 0.69억, OFF도 1.16억) vs 360750 연 ~9% 정상. 로컬 DB에선 위탁 p50 22억으로 건강 → 서버 백필 체인 품질 문제(환율/배당 미반영 프록시 의심). 라이브 D4 무효과(0 vs 2억 동일)도 이것의 파생(전부 손실 매도 → CG세 0).
+4. **GAP-RET-KRDATA는 지속 재현 확인**(C1 probe 지금도 "롤링 윈도우 0개") — 진짜 갭, 해소 결정 대기 그대로.
+
+**E2E 판정 갱신:** D2·D3·D4 invariant은 현재 라이브에서 전부 성립 → 잔여 FAIL은 C1·C2(+C3 SKIP)만, 원인 = GAP-RET-KRDATA 단일. **▶ 다음 = 오너 결정 2건: ① GAP-RET-KRDATA 방향(②+③ 조합 추천) ② DATA-458730-BACKFILL 서버 DB 실측 착수.**
+
+_작성: Claude (Fable 5)_
+
+---
+
 ## [2026-06-11] verify | 다계좌 세금 E2E 16건 실행 (P0 L7 실행판) — 11 PASS / 4 FAIL / 1 SKIP + 버그 2건 발견
 
 `다계좌세금_E2E검증_plan.md` 16건을 Playwright로 라이브 서버에서 전부 실행. 신규 `tests/e2e_multitax/`(helpers + a/b/c/d 스위트 + run_all, 케이스별 진짜 클릭·API 캡처·불변식 판정). 세금 프로필은 비로그인 localStorage(서버 쓰기 없음). 소요 ~5분, 콘솔에러 0.

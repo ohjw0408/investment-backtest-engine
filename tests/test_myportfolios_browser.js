@@ -96,6 +96,25 @@ const SEARCH_MOCK = [
   await calc.waitForTimeout(200);
   const state = await calc.evaluate('tickers.map(t=>[t.code,t.weight])');
   ok('계산기 불러오기 → 60/40', state.length === 2 && state[0][1] === 60 && state[1][1] === 40);
+
+  // ── 5b. 멀티계좌(세금 ON + 계좌 추가) 카드에서도 즐겨찾기 불러오기 ──
+  await calc.evaluate(() => {
+    if (!window.taxEnabled) toggleTax();   // 계좌 1 자동 생성
+    addTaxAccount();                       // 계좌 2 → 종목 입력 카드
+  });
+  await calc.waitForSelector('.acct-fav-select', { timeout: 5000 });
+  // 비동기 목록 로드 후 옵션 채워질 때까지 대기
+  await calc.waitForFunction(() =>
+    document.querySelector('.acct-fav-select')?.options.length > 1, { timeout: 5000 });
+  const acctOpts = await calc.$$eval('.acct-fav-select option', els => els.map(e => e.textContent));
+  ok('계좌 카드 즐겨찾기 select에 표시', acctOpts.includes('E2E수정'));
+  await calc.selectOption('.acct-fav-select', { label: 'E2E수정' });
+  await calc.waitForTimeout(200);
+  const acctState = await calc.evaluate('window.taxAccounts[1].tickers.map(t=>[t.code,t.weight])');
+  ok('계좌 카드 불러오기 → 60/40', acctState.length === 2 &&
+     acctState[0][0] === '069500' && acctState[0][1] === 60 && acctState[1][1] === 40);
+  ok('계좌 카드 종목 행 렌더', (await calc.$$eval('#taxAccountList input[type="number"]',
+     els => els.length)) > 0);
   await calc.close();
 
   // ── 6. 삭제 ──

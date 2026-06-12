@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> ✅ **2026-06-12 업데이트 66 (멀티계좌 카드 즐겨찾기):** 세금 ON+계좌 추가 시 계좌별 종목 입력에 `★ 즐겨찾기 불러오기` select(`multi_account_ui.js` 공용 — 3탭+wd 자동). 첫 렌더 1회 로드+포커스 재조회, `_mmEsc` XSS 가드, 캐시 fav2. 검증 = E2E 18 PASS(계좌 카드 표시·불러오기 60/40·행 렌더 추가) + 스크린샷. **▶ 다음 = 리스크리턴도표 OR P4.**
+
 > ✅ **2026-06-12 업데이트 65 (내 포트폴리오 관리 페이지 + 자산구성 파이차트):** 오너 요청 2건. ① **`/myportfolios` 신규** — 사이드바 "⭐ 내 포트폴리오"(내 자산 위). 즐겨찾기 카드 목록·생성/수정 모달(종목검색+비중+균등분배)·삭제. 기존 `/api/portfolio/*` 재사용(백엔드 변경 = 라우트 1개). ② **자산 구성 bar→pie** (`renderWeightChart`): 260px 래퍼+maintainAspectRatio:false, legend right/모바일 bottom. **검증:** 신규 `test_myportfolios_browser.js` **15 PASS** = 실서버+실DB 로그인 E2E(`mint_session.py` dev 쿠키 서명으로 OAuth 우회) — 게이팅/생성/수정/계산기 ★ 연동/삭제/파이 type·데이터/JS에러 0 + 기존 fav 스위트(31+20+5) 재PASS + 스크린샷 육안. 전체 pytest는 오너 지시로 미실행(타겟만). **▶ 다음 = 리스크리턴도표 OR P4.**
 
 > ✅ **2026-06-12 업데이트 64 (B1 포트폴리오 즐겨찾기 — 5탭 공용 위젯, PHASE4 착수):** 오너 결정 = 종목+비중 1세트 / 로그인 전용 / 5탭 전부 / 한도 20(`get_portfolio_limit()` 단일 변경점, 요금제 차등 대비). **구현:** `saved_portfolios` 테이블+CRUD(`auth_manager.py`) / `/api/portfolio/list·save·DELETE`(myassets 401 패턴, 이름 1~50자·종목 1~30개 검증) / 신규 공용 위젯 `portfolio_favorites.js`(`MMFav.init`, 규약=[{code,name,badge,weight%}], 동명 confirm 덮어쓰기, 비로그인 비활성+안내, XSS 가드=textContent 전용) / 5탭 배선(계산기·배당·ISA전환=% 그대로, 백테·은퇴=0~1 변환 어댑터). **검증 4층:** API 5 PASS(401·왕복·400 7케이스·한도 신규만 차단·소유권 격리, 임시 DB) + jsdom 20 PASS(XSS·깊은복사·payload 규약) + Playwright 로컬 31 PASS(5탭 렌더·JS에러 0·**어댑터 왕복**=불러오기→상태→저장 payload % 재변환) + **전체 회귀 255 PASS**(250+5) + 라이트/다크/모바일 스크린샷 육안 정상. ⚠️ 로그인 실계정 플로우만 오너 육안 잔여(OAuth 자동화 불가). **▶ 리스크리턴도표 선행조건 해소 — 다음 = 리스크리턴도표 OR P4 배당 절세.**

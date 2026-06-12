@@ -86,6 +86,53 @@ function ensureAccountTickers(idx) {
   return acc.tickers;
 }
 
+// ── 계좌별 포트폴리오 즐겨찾기 (B1 연동) ─────────────────────────
+// 계좌 2+ 카드의 종목 입력에 저장된 포트폴리오 불러오기 select 제공.
+let _mmFavList = null;        // null=미로드, []=비로그인/없음
+let _mmFavStarted = false;
+
+function _mmEsc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+async function _mmFavFetch() {
+  try {
+    // /api/me 선확인 — 비로그인 401 콘솔 노이즈 방지(MMFav 위젯과 동일 패턴)
+    const me = await fetch('/api/me').then(r => r.json());
+    if (!me.logged_in) { _mmFavList = []; return; }
+    const res = await fetch('/api/portfolio/list');
+    _mmFavList = res.ok ? await res.json() : [];
+  } catch (e) { _mmFavList = []; }
+}
+
+function _mmFavOptionsHtml() {
+  const items = _mmFavList || [];
+  const ph = items.length ? '★ 즐겨찾기 불러오기' : '★ 저장된 포트폴리오 없음';
+  return `<option value="">${_mmFavList === null ? '★ 즐겨찾기 불러오기' : ph}</option>` +
+    items.map(p => `<option value="${p.id}">${_mmEsc(p.name)}</option>`).join('');
+}
+
+// 포커스 시 재조회 — 같은 페이지에서 방금 저장한 즐겨찾기도 바로 보이게.
+async function refreshAccountFavSelect(sel) {
+  await _mmFavFetch();
+  const v = sel.value;
+  sel.innerHTML = _mmFavOptionsHtml();
+  sel.value = v;
+}
+
+function applyFavToAccount(idx, favId) {
+  const id = Number(favId);
+  if (!id) return;
+  const fav = (_mmFavList || []).find(p => p.id === id);
+  if (!fav || !window.taxAccounts[idx]) return;
+  window.taxAccounts[idx].tickers = fav.tickers.map(t => ({
+    code: t.code, name: t.name || t.code, badge: t.badge || '',
+    weight: Math.round(Number(t.weight) || 0),
+  }));
+  renderTaxAccounts();
+}
+
 function redistributeAccountWeights(idx) {
   const accTickers = ensureAccountTickers(idx);
   const n = accTickers.length;
@@ -241,6 +288,12 @@ function renderTaxAccounts() {
 
   const colors = { '위탁':'#1976D2','ISA':'#2E7D32','연금저축':'#7B1FA2','IRP':'#E65100' };
 
+  // 멀티계좌 첫 렌더 시 즐겨찾기 목록 1회 로드 → 도착하면 select 옵션 채워 재렌더.
+  if (!_mmFavStarted && accs.length > 1) {
+    _mmFavStarted = true;
+    _mmFavFetch().then(() => renderTaxAccounts());
+  }
+
   list.innerHTML = accs.map((acc, i) => {
     if (isSingle) return `
       <div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
@@ -296,6 +349,11 @@ function renderTaxAccounts() {
           <button onclick="removeTaxAccount(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;">✕</button>
         </div>
         ${_mmAmountFields(acc, i)}
+        <select class="acct-fav-select" id="accountFavSelect${i}"
+          onfocus="refreshAccountFavSelect(this)" onchange="applyFavToAccount(${i}, this.value)"
+          style="width:100%;margin-top:6px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.78rem;background:var(--input-bg);color:var(--text);">
+          ${_mmFavOptionsHtml()}
+        </select>
         <div style="position:relative;margin-top:6px;">
           <input type="text" id="accountTickerSearch${i}" placeholder="이 계좌 종목 검색"
             oninput="onAccountTickerSearch(${i}, this.value)"

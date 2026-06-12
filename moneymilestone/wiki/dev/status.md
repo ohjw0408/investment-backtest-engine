@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> ✅ **2026-06-12 업데이트 67 (리스크-리턴 도표 — P3 완료):** 오너 결정 = CAGR+일간√252(총수익)/공통 겹침 기간/고정 5종+사용자 추가/독립 페이지. 신규 `risk_return_logic.py`(고정비중 일별 근사, 현금 드래그·정규화·skipped 제외) + `POST /api/risk-return` + `/risk-return` 페이지(scatter, 벤치마크 칩 추가, 3년 미만 ⚠). 검증 = 손계산 7 PASS(FakeLoader) + 로그인 E2E 8 PASS(실DB) + 스크린샷. 벤치마크 영속화는 후속(세금설정 json 충돌 회피). **▶ P3 리스크리턴 마감 — 다음 = P4 배당 절세 OR PHASE4 잔여(D1/D2/A4/C1/C2) — 오너 결정.**
+
 > ✅ **2026-06-12 업데이트 66 (멀티계좌 카드 즐겨찾기):** 세금 ON+계좌 추가 시 계좌별 종목 입력에 `★ 즐겨찾기 불러오기` select(`multi_account_ui.js` 공용 — 3탭+wd 자동). 첫 렌더 1회 로드+포커스 재조회, `_mmEsc` XSS 가드, 캐시 fav2. 검증 = E2E 18 PASS(계좌 카드 표시·불러오기 60/40·행 렌더 추가) + 스크린샷. **▶ 다음 = 리스크리턴도표 OR P4.**
 
 > ✅ **2026-06-12 업데이트 65 (내 포트폴리오 관리 페이지 + 자산구성 파이차트):** 오너 요청 2건. ① **`/myportfolios` 신규** — 사이드바 "⭐ 내 포트폴리오"(내 자산 위). 즐겨찾기 카드 목록·생성/수정 모달(종목검색+비중+균등분배)·삭제. 기존 `/api/portfolio/*` 재사용(백엔드 변경 = 라우트 1개). ② **자산 구성 bar→pie** (`renderWeightChart`): 260px 래퍼+maintainAspectRatio:false, legend right/모바일 bottom. **검증:** 신규 `test_myportfolios_browser.js` **15 PASS** = 실서버+실DB 로그인 E2E(`mint_session.py` dev 쿠키 서명으로 OAuth 우회) — 게이팅/생성/수정/계산기 ★ 연동/삭제/파이 type·데이터/JS에러 0 + 기존 fav 스위트(31+20+5) 재PASS + 스크린샷 육안. 전체 pytest는 오너 지시로 미실행(타겟만). **▶ 다음 = 리스크리턴도표 OR P4.**

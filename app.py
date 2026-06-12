@@ -270,6 +270,10 @@ def tax_switch():
 def backtest():
     return render_template('backtest.html')
 
+@app.route('/risk-return')
+def risk_return_page():
+    return render_template('risk_return.html')
+
 @app.route('/myportfolios')
 def myportfolios():
     return render_template('myportfolios.html')
@@ -1529,6 +1533,27 @@ def portfolio_delete(portfolio_id):
         return jsonify({'error': '로그인 필요'}), 401
     delete_portfolio(session['user_id'], portfolio_id)
     return jsonify({'ok': True})
+
+
+@app.route('/api/risk-return', methods=['POST'])
+def risk_return():
+    """저장 포트폴리오 + 벤치마크 위험-수익 산점도 데이터 (P3 리스크리턴도표)."""
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    from risk_return_logic import compute_risk_return, DEFAULT_BENCHMARKS
+    body = request.get_json(silent=True) or {}
+    extra = []
+    for b in (body.get('benchmarks') or [])[:10]:
+        if isinstance(b, dict) and b.get('code'):
+            extra.append({'code': str(b['code']), 'name': str(b.get('name') or b['code'])})
+    portfolios = get_portfolios(session['user_id'])
+    try:
+        result = compute_risk_return(
+            portfolios, DEFAULT_BENCHMARKS + extra, portfolio_engine.loader,
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': f'산출 실패: {e}'}), 500
 
 # -----------------------------------------------
 # 백테스트 API

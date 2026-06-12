@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}리스크-리턴 도표 — Money Milestone{% endblock %}
+
+{% block head %}
+<style>
+.rr-wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
+.rr-title { font-size: 1.15rem; font-weight: 800; }
+.rr-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+.rr-card { background: var(--card); border-radius: 14px; border: 1.5px solid var(--border); padding: 18px 20px; margin-top: 16px; }
+.rr-chart-wrap { position: relative; height: 480px; }
+.rr-period { font-size: 0.76rem; color: var(--text-muted); margin-top: 10px; }
+.rr-warn { font-size: 0.76rem; color: var(--gold-deep, #B26A00); background: var(--gold-pale, #FFF8E1); border-radius: 8px; padding: 7px 10px; margin-top: 8px; }
+.rr-empty { text-align: center; padding: 50px 20px; color: var(--text-muted); }
+.rr-bench-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.rr-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1.5px solid var(--border); border-radius: 16px; font-size: 0.76rem; background: var(--bg); }
+.rr-chip button { border: none; background: none; cursor: pointer; color: var(--text-muted); font-size: 0.8rem; padding: 0; }
+.rr-chip button:hover { color: var(--red, #C62828); }
+.rr-search-wrap { position: relative; flex: 1; min-width: 180px; }
+.rr-input { width: 100%; padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 0.8rem; font-family: inherit; box-sizing: border-box; }
+.rr-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; margin-top: 4px; max-height: 200px; overflow-y: auto; z-index: 50; display: none; box-shadow: var(--shadow-lg); }
+.rr-dd-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 0.78rem; }
+.rr-dd-item:hover { background: var(--bg); }
+.login-required { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+@media (max-width: 768px) {
+  .rr-wrap { padding: 14px 12px; }
+  .rr-chart-wrap { height: 360px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rr-wrap">
+
+  {% if not user %}
+  <div class="login-required">
+    <div style="font-size:2rem;margin-bottom:12px;">🔒</div>
+    <div style="font-weight:700;font-size:1rem;margin-bottom:8px;">로그인이 필요합니다</div>
+    <div style="font-size:0.85rem;">리스크-리턴 도표는 저장한 포트폴리오를 사용해요.</div>
+    <a href="/auth/google" style="display:inline-block;margin-top:16px;padding:10px 24px;background:var(--blue);color:white;border-radius:8px;text-decoration:none;font-weight:700;">Google로 로그인</a>
+  </div>
+  {% else %}
+
+  <div class="rr-title">🎯 리스크-리턴 도표</div>
+  <div class="rr-sub">저장한 포트폴리오가 위험(연 변동성) 대비 수익(CAGR)에서 어디쯤인지 벤치마크와 비교해요. 배당 재투자(총수익)·공통 겹침 기간 기준.</div>
+
+  <div class="rr-card">
+    <div class="rr-bench-row">
+      <span style="font-size:0.78rem;font-weight:700;color:var(--text-muted);">벤치마크</span>
+      <span id="rrChips"></span>
+      <div class="rr-search-wrap">
+        <input type="text" id="rrSearch" class="rr-input" placeholder="벤치마크 추가 (종목/ETF 검색)" autocomplete="off">
+        <div class="rr-dropdown" id="rrDropdown"></div>
+      </div>
+    </div>
+    <div id="rrStatus" style="text-align:center;padding:40px;color:var(--text-muted);">⏳ 산출 중...</div>
+    <div class="rr-chart-wrap" style="display:none;" id="rrChartWrap"><canvas id="rrChart"></canvas></div>
+    <div class="rr-period" id="rrPeriod"></div>
+    <div id="rrWarn"></div>
+  </div>
+
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if user %}
+<script>
+let rrChart = null;
+let rrExtraBenchmarks = [];   // 사용자 추가 [{code,name}] — 페이지 세션 한정
+let rrSearchTimer = null;
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+const RR_COLORS = ['#1976D2', '#2E7D32', '#E65100', '#7B1FA2', '#C62828',
+                   '#00838F', '#F9A825', '#5D4037', '#455A64', '#AD1457'];
+
+async function rrLoad() {
+  const status = document.getElementById('rrStatus');
+  status.style.display = 'block';
+  status.textContent = '⏳ 산출 중...';
+  document.getElementById('rrChartWrap').style.display = 'none';
+  try {
+    const res = await fetch('/api/risk-return', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ benchmarks: rrExtraBenchmarks }),
+    });
+    const data = await res.json();
+    if (!res.ok) { status.textContent = data.error || '산출에 실패했어요.'; return; }
+    rrRender(data);
+  } catch (e) { status.textContent = '산출에 실패했어요. 네트워크를 확인해주세요.'; }
+}
+
+function rrRender(data) {
+  const status = document.getElementById('rrStatus');
+  const wrap = document.getElementById('rrChartWrap');
+  const periodEl = document.getElementById('rrPeriod');
+  const warnEl = document.getElementById('rrWarn');
+
+  const ports = data.points.filter(p => p.kind === 'portfolio');
+  const benches = data.points.filter(p => p.kind === 'benchmark');
+
+  if (!data.points.length) {
+    status.innerHTML = `<div class="rr-empty">
+      <div style="font-size:1.8rem;margin-bottom:10px;">🎯</div>
+      <div style="font-weight:700;margin-bottom:6px;">표시할 점이 없어요</div>
+      <div style="font-size:0.82rem;">⭐ <a href="/myportfolios" style="color:var(--blue);">내 포트폴리오</a>에서 포트폴리오를 저장하면 여기에 표시돼요.</div>
+    </div>`;
+    periodEl.textContent = ''; warnEl.innerHTML = '';
+    return;
+  }
+
+  status.style.display = 'none';
+  wrap.style.display = 'block';
+
+  const toXY = p => ({ x: p.vol * 100, y: p.cagr * 100, name: p.name, sharpe: p.sharpe });
+  if (rrChart) rrChart.destroy();
+  rrChart = new Chart(document.getElementById('rrChart').getContext('2d'), {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: '내 포트폴리오',
+          data: ports.map(toXY),
+          backgroundColor: ports.map((_, i) => RR_COLORS[i % RR_COLORS.length]),
+          pointRadius: 8, pointHoverRadius: 10, pointStyle: 'circle',
+        },
+        {
+          label: '벤치마크',
+          data: benches.map(toXY),
+          backgroundColor: MM_DARK ? '#8FA3B8' : '#90A4AE',
+          pointRadius: 6, pointHoverRadius: 8, pointStyle: 'rectRot',
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const d = ctx.raw;
+              return `${d.name} — CAGR ${d.y.toFixed(1)}% · 변동성 ${d.x.toFixed(1)}% · 샤프 ${d.sharpe.toFixed(2)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { title: { display: true, text: '연 변동성 (%)' },
+             ticks: { callback: v => v + '%' }, grid: { color: MM_CHART_GRID } },
+        y: { title: { display: true, text: 'CAGR (%)' },
+             ticks: { callback: v => v + '%' }, grid: { color: MM_CHART_GRID } },
+      },
+    },
+  });
+
+  // 점 라벨(이름) — 데이터 적을 때 가독성. Chart.js 기본 플러그인 없이 캔버스에 직접.
+  periodEl.textContent = data.period
+    ? `비교 기간: ${data.period.start} ~ ${data.period.end} (${data.period.years}년, 전 종목 공통 겹침 구간)`
+      + (data.skipped?.length ? ` · 데이터 없음 제외: ${data.skipped.join(', ')}` : '')
+    : '';
+  warnEl.innerHTML = data.period?.warning
+    ? `<div class="rr-warn">⚠ ${esc(data.period.warning)}</div>` : '';
+}
+
+// ── 벤치마크 추가/제거 ──
+function rrRenderChips() {
+  document.getElementById('rrChips').innerHTML = rrExtraBenchmarks.map((b, i) => `
+    <span class="rr-chip">${esc(b.name)}<button onclick="rrRemoveBench(${i})">✕</button></span>
+  `).join('');
+}
+function rrRemoveBench(i) {
+  rrExtraBenchmarks.splice(i, 1);
+  rrRenderChips();
+  rrLoad();
+}
+function rrAddBench(code, name) {
+  if (rrExtraBenchmarks.some(b => b.code === code) || rrExtraBenchmarks.length >= 10) return;
+  rrExtraBenchmarks.push({ code, name });
+  rrRenderChips();
+  document.getElementById('rrSearch').value = '';
+  document.getElementById('rrDropdown').style.display = 'none';
+  rrLoad();
+}
+
+document.getElementById('rrSearch').addEventListener('input', e => {
+  const q = e.target.value.trim();
+  const dd = document.getElementById('rrDropdown');
+  clearTimeout(rrSearchTimer);
+  if (!q) { dd.style.display = 'none'; return; }
+  rrSearchTimer = setTimeout(async () => {
+    try {
+      const data = await fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json());
+      if (!data.length) { dd.innerHTML = '<div class="rr-dd-item">검색 결과 없음</div>'; dd.style.display = 'block'; return; }
+      dd.innerHTML = data.slice(0, 8).map(item => `
+        <div class="rr-dd-item" data-code="${esc(item.code)}" data-name="${esc(item.name)}">
+          <span style="font-weight:700;">${esc(item.code)}</span>
+          <span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(item.name)}</span>
+        </div>`).join('');
+      dd.style.display = 'block';
+      dd.querySelectorAll('.rr-dd-item[data-code]').forEach(el => {
+        el.addEventListener('click', () => rrAddBench(el.dataset.code, el.dataset.name));
+      });
+    } catch (err) {}
+  }, 250);
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('.rr-search-wrap'))
+    document.getElementById('rrDropdown').style.display = 'none';
+});
+
+rrLoad();
+</script>
+{% endif %}
+{% endblock %}

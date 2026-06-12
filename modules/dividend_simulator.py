@@ -501,6 +501,10 @@ class DividendSimulator:
         return results
 
     def _run_rolling(self, seed, monthly, years) -> List[float]:
+        # 기간 자동(_find_anchor_years)이 float(22.0)을 반환 → 합성 경로 range(years*12)에서
+        # 'float' object cannot be interpreted as an integer (BUG-DIV-YEARS). 입구에서 정규화 —
+        # 캐시 키 분열(22.0 vs 22)도 함께 방지. 엔진 의미상 years는 정수.
+        years = max(1, int(round(float(years))))
         cache_key = f"{round(seed,-4)}_{round(monthly,-4)}_{years}"
         if cache_key in self._sim_cache:
             return self._sim_cache[cache_key]

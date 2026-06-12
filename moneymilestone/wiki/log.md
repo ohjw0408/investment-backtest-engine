@@ -1,5 +1,22 @@
 # Log
 
+## [2026-06-13] bugfix | BUG-DIV-YEARS — 배당계산기 기간 자동 크래시 (오너 라이브 발견)
+
+오너 실사용 발견: 저장 포폴(SCHD/QQQM/GLD)·목표 100만·확률 50%·시드 1억·기간 자동 →
+`오류: 'float' object cannot be interpreted as an integer`.
+
+- **원인:** `_find_anchor_years`가 `float(yy)` 반환 → **서버는 QQQM 백필 없음** → 합성 보충 폴백 →
+  `_simulate_synthetic`의 `range(years*12)`가 float 거부. 로컬은 QQQM 백필 23,305행 있어 합성 경로
+  안 타서 재현 불가(서버-로컬 데이터 괴리의 전형). 기존 잠복 버그 — 오늘 엔진 통합과 무관(구 코드도 동일 경로).
+- **수정:** `_run_rolling` 입구 `years = max(1, int(round(float(years))))` — 하류 전체(실측/합성/캐시)
+  일괄 + 캐시 키 분열(`22.0` vs `22` 별도 키로 이중 계산) 부수 해결.
+- **검증:** 신규 `test_float_years_with_synthetic_fallback`(짧은 데이터로 합성 폴백 강제 + float/int
+  결과 동일) + 기존 10 PASS. 라이브 = 오너 시나리오 동일 호출 재검(배포 후).
+- 곁가지 기록: 기간 자동(optimize) 중 진행률 % 미표시(모래시계만) — progress_callback이 anchor 탐색
+  단계에서 미발행. 기능 무관 UX, 후속 후보.
+
+_작성: Claude (Sonnet 4.6)_
+
 ## [2026-06-13] feature | P4 배당계산기 절세액 3종 — 마감 (절세액 전 탭 완성)
 
 엔진 통합(divrefactoring) 직후 본체. 설계 = wd(인출기)와 동일 무청산 규약: 결과가 배당 흐름이라

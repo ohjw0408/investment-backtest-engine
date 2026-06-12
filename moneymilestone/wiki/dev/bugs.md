@@ -17,6 +17,7 @@ tags: [dev, bug]
 
 | # | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|---|
+| BUG-DIV-YEARS | 배당계산기 기간 자동 + 합성 보충 조합에서 `'float' object cannot be interpreted as an integer` (오너 라이브 발견 2026-06-13: SCHD/QQQM/GLD·기간 자동) | `_find_anchor_years`가 `float(yy)` 반환 → 서버는 QQQM 백필 없어 합성 폴백 진입 → `_simulate_synthetic`의 `range(years*12)`가 float 거부. 로컬은 백필 있어 합성 경로 안 타 재현 불가였음(기존 잠복 — 엔진 통합과 무관) | `modules/dividend_simulator.py` | ✅ 수정 (2026-06-13): `_run_rolling` 입구 `years = max(1, int(round(float(years))))` — 전 하류 + 캐시 키 분열(22.0 vs 22)도 해결. 회귀 `test_float_years_with_synthetic_fallback`(합성 폴백 강제 + float/int 캐시 일치) (Claude) |
 | BUG-NAV-1 | navbar 링크 글자 세로 깨짐(1280px 뷰포트) — "계산기"가 계/산/기로 줄바꿈 | nav 링크 9개("간편 계산기" 추가로 +1) overflow → flex shrink → 글자 단위 wrap. `.nav-link`에 `white-space:nowrap` 없음. Playwright 스크린샷서 발견 (Claude, 2026-06-10) | `static/css/style.css` `.nav-links`/`.nav-link` | ✅ 수정 (2026-06-11 모바일 반응형 개편) — ≤1400px 상단 링크 숨김(사이드바가 동일 메뉴 제공) + nowrap. Playwright 1280px/1500px 검증 PASS |
 | BUG-1 | TF1/TF6/TF7 — 에러가 인라인 배너 대신 alert() 팝업으로 표시 | `pollTask` FAILURE 시 `_e._data` 미설정 or null → catch에서 `_handled=false` → `alert()` fallback | `static/js/calculator.js` (pollTask), `retirement.html` 에러 핸들링 없음 | ✅ 수정 (f35a611) |
 | BUG-2 | retirement.html — 에러/캡 배너 3종 미존재 | TF6/TF7(retirement 페이지) 에러가 모두 팝업으로 표시됨. ISA 캡 경고도 없음 | `templates/retirement.html`, 대응 JS | ✅ 확인 — 배너 이미 존재, BUG-1 fix로 함께 해결 |

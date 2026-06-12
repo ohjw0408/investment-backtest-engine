@@ -94,6 +94,18 @@ def test_savings_summary_p50_and_untaxed_none():
     assert sim2.get_savings_summary(10_000_000.0, 0.0, 5) is None
 
 
+# ── 3b. BUG-DIV-YEARS 회귀: float years × 합성 보충 경로 ──
+def test_float_years_with_synthetic_fallback():
+    """기간 자동(_find_anchor_years)이 float 반환 → 합성 경로 range(years*12) 크래시였음.
+    짧은 데이터(3y)로 합성 폴백 강제 + years=5.0 float → 정상 + int 경로와 캐시 일치."""
+    frames = {"069500": _daily_const("2022-01-01", "2024-12-31")}
+    sim, _ = _sim("위탁", frames=frames)
+    out_f = sim._run_rolling(10_000_000.0, 0.0, 5.0)   # float — 크래시 회귀 지점
+    assert len(out_f) >= sim.MIN_CASES                  # 합성 보충 발동 확인
+    out_i = sim._run_rolling(10_000_000.0, 0.0, 5)      # int — 같은 캐시 키로 정규화
+    assert out_f == out_i                               # 22.0/22 캐시 분열 방지
+
+
 # ── 4. dividend_logic 응답 배선: savings 키 + 계좌유형 ──
 def test_logic_response_has_savings(monkeypatch):
     import dividend_logic

@@ -1,5 +1,30 @@
 # Log
 
+## [2026-06-13] feature | 배당계산기 멀티계좌 (G5-E) — 멀티계좌 전 탭 완성
+
+오너 결정: ① **자동 역산 지원** — 역산 변수(시드/월납) = 계좌 1(상단) 값, 나머지 고정.
+② **G2 풀 라우팅** — ISA 한도 cascade·풍차·연금 G3/G4 = `MultiAccountSimulationLoop` 그대로.
+
+- **엔진(`modules/dividend_multi.py` 신규):** `MultiDividendSimulator(DividendSimulator)` —
+  역산/곡선/시나리오 레이어 부모 상속, `_simulate_one`만 멀티 루프(월별 주입 — divrefactoring 수법,
+  멀티 루프도 dates 주도라 무수정)로 교체. 무청산(`apply_final_liquidation=False`) + 가구 합산
+  `dividend_income` 마지막 1년. 합성 폴백 = 계좌별 단일 합성의 합(G2 라우팅 미모델 근사, 라벨).
+  절세 = `_finalize_account` 필드 surface → 계좌별 p50 + 합산(G5 규약).
+- **배선(`dividend_logic.py`):** `accounts ≥ 2` → `_run_multi_dividend_logic`(backtest_logic 패턴 미러 —
+  normalize·initial_capital 한도·계좌별 규제검증·DistributionPolicy). 응답 `multi_account` + `savings`.
+- **UI(`dividend_target.html`):** 공용 `multi_account_ui.js` 이식(계좌 카드 + 즐겨찾기 select 자동 포함).
+  구 dtAccount 라디오 제거 → 카드의 유형 select로 통일. MMTAX 결합 = dtTickers·dtSeedVal/dtMonthlyVal.
+  멀티+자동 모드 안내 노트("역산 = 계좌 1"). 절세 패널 계좌별 분해 줄.
+- **검증:** 손계산 결정론 `tests/test_div_multi.py` **7 PASS** — ① 멀티1==단일 ±1원(정합 앵커)
+  ② 2계좌 == 단독 합 ③ 역산 변수 = 계좌1만(시드 0 → 계좌2 배당만 정확 일치) ④ 종합과세 개인합산
+  (합동 < 단독합) ⑤ **G2 ISA 한도 cascade**(연 2,400만 납입 → 초과분 위탁 굴러 한도컷 단독보다 큼)
+  ⑥ 절세 계좌별+합산·위탁 불변식 ⑦ logic 멀티 분기+역산 응답. 실브라우저 **13 PASS**(카드/노트/payload
+  빌더/실DB sync API 멀티+절세 86윈도우/패널 분해/JS 에러 0) + 스크린샷 육안(ISA 절세 35만·위탁 0).
+
+**▶ 멀티계좌 = 5탭 전부(계산기·백테·은퇴적립·은퇴인출·배당) 완성.**
+
+_작성: Claude (Sonnet 4.6)_
+
 ## [2026-06-13] bugfix | BUG-DIV-YEARS — 배당계산기 기간 자동 크래시 (오너 라이브 발견)
 
 오너 실사용 발견: 저장 포폴(SCHD/QQQM/GLD)·목표 100만·확률 50%·시드 1억·기간 자동 →

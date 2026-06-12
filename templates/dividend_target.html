@@ -234,13 +234,16 @@
         <span id="dtTaxToggleLabel" style="font-size:12px;color:var(--text-muted);">OFF</span>
       </div>
       <div id="dtTaxAccountWrap" style="display:none;">
-        <label style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;display:block;">투자 계좌</label>
-        <div class="rebal-options">
-          <label class="rebal-option"><input type="radio" name="dtAccount" value="general" checked><span class="rebal-label">일반</span></label>
-          <label class="rebal-option"><input type="radio" name="dtAccount" value="isa"><span class="rebal-label">ISA</span></label>
-          <label class="rebal-option"><input type="radio" name="dtAccount" value="pension"><span class="rebal-label">연금</span></label>
+        <div id="dtTaxProfileInfo" style="margin-bottom:8px;padding:8px 10px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--text-muted);"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:0.82rem;font-weight:700;">계좌 설정</span>
+          <button onclick="addTaxAccount()" style="padding:5px 12px;background:var(--blue);color:white;border:none;border-radius:7px;font-size:0.76rem;font-weight:700;cursor:pointer;">+ 계좌 추가</button>
         </div>
-        <div id="dtTaxProfileInfo" style="margin-top:8px;padding:8px 10px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--text-muted);"></div>
+        <div id="taxAccountList"></div>
+        <div id="taxWarnings"></div>
+        <div id="dtMultiAutoNote" style="display:none;margin-top:6px;padding:7px 10px;background:var(--blue-pale, #E3F2FD);border-radius:8px;font-size:11px;color:var(--blue);">
+          ℹ️ 멀티계좌에서 시드/월납을 <b>자동</b>으로 두면 <b>계좌 1(상단 입력)</b> 값을 역산합니다. 나머지 계좌는 입력값 고정.
+        </div>
       </div>
     </div>
 
@@ -327,6 +330,7 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260613div"></script>
 <script>
 let dtTickers = [], dtSearchTimer = null, dtCharts = {};
 let _dtTaskId = null, _dtCancelled = false;
@@ -429,11 +433,20 @@ document.getElementById('dtProbSlider').addEventListener('input', function() {
   document.getElementById('dtProbLabel').textContent = this.value+'%';
 });
 
-// ── 세금 토글 ──
+// ── 세금 토글 + 멀티계좌(공용 모듈 multi_account_ui.js 결합) ──
 let dtTaxOn = false;
 window.dtTaxProfile = {};
+window.taxEnabled = false;          // 공용 모듈 호환
+window.taxAccounts = [];
+// 결합점: 상단 포트폴리오 = dtTickers(% 그대로), 총 금액 = 시드/월납 center 입력
+window.MMTAX = {
+  portfolioTickers: () => dtTickers,
+  totalInitId: 'dtSeedVal',
+  totalMonId:  'dtMonthlyVal',
+};
 function toggleTax() {
   dtTaxOn = !dtTaxOn;
+  window.taxEnabled = dtTaxOn;
   const btn   = document.getElementById('dtTaxToggle');
   const knob  = document.getElementById('dtTaxToggleKnob');
   const label = document.getElementById('dtTaxToggleLabel');
@@ -443,7 +456,62 @@ function toggleTax() {
   label.textContent     = dtTaxOn ? 'ON' : 'OFF';
   label.style.color     = dtTaxOn ? 'var(--blue)' : 'var(--text-muted)';
   wrap.style.display    = dtTaxOn ? 'block' : 'none';
-  if (dtTaxOn) loadTaxProfile();
+  if (dtTaxOn) {
+    loadTaxProfile();
+    if (window.taxAccounts.length === 0) addTaxAccount();
+    else renderTaxAccounts();
+    dtUpdateMultiNote();
+  }
+}
+
+// 멀티 + 자동 모드 안내(역산 변수 = 계좌 1)
+function dtUpdateMultiNote() {
+  const note = document.getElementById('dtMultiAutoNote');
+  if (note) note.style.display = (window.taxAccounts.length > 1) ? 'block' : 'none';
+}
+// 공용 모듈의 renderTaxAccounts 후 호출되도록 래핑
+const _dtOrigRender = window.renderTaxAccounts;
+window.renderTaxAccounts = function () {
+  if (_dtOrigRender) _dtOrigRender();
+  dtUpdateMultiNote();
+};
+
+// 멀티계좌 payload — 계좌 1 = 상단(dtTickers + 시드/월납 center), 2+ = 카드 (calculator 규약 미러)
+function buildDtAccountsPayload() {
+  const accs = window.taxAccounts;
+  const rebalMode    = document.querySelector('input[name="dtRebal"]:checked').value;
+  const dividendMode = document.querySelector('input[name="dtDividend"]:checked').value;
+  const bandWidth    = Number(document.getElementById('dtBandSlider').value) / 100;
+  const primary = {
+    type: accs[0]?.type || '위탁',
+    initial_capital: parseFloat(document.getElementById('dtSeedVal').value) || 0,
+    monthly_contribution: parseFloat(document.getElementById('dtMonthlyVal').value) || 0,
+    tickers: dtTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: t.weight / 100 })),
+    rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
+    priority: Number(accs[0]?.priority ?? 1),
+  };
+  const accounts = [primary];
+  for (let i = 1; i < accs.length; i++) {
+    const accTickers = ensureAccountTickers(i);
+    if (accTickers.length === 0) {
+      alert(`계좌 ${i + 1}에 종목을 최소 1개 이상 추가해주세요.`);
+      return false;
+    }
+    const totalWeight = accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0);
+    if (totalWeight > 100) {
+      alert(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`);
+      return false;
+    }
+    accounts.push({
+      type: accs[i].type || '위탁',
+      initial_capital: Number(accs[i].initial_capital || 0),
+      monthly_contribution: Number(accs[i].monthly_contribution || 0),
+      tickers: accTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: (Number(t.weight) || 0) / 100 })),
+      rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
+      priority: Number(accs[i].priority ?? (i + 1)),
+    });
+  }
+  return accounts;
 }
 
 async function loadTaxProfile() {
@@ -470,10 +538,7 @@ async function loadTaxProfile() {
   info.innerHTML = `연소득 ${fmtKRW(s.earned_income||0)} · 나이 ${s.age||40}세`;
 }
 
-// 계좌 변경 시 프로필 업데이트
-document.querySelectorAll('input[name="dtAccount"]').forEach(el => {
-  el.addEventListener('change', loadTaxProfile);
-});
+// (계좌 유형은 공용 멀티계좌 카드에서 선택 — 구 dtAccount 라디오 제거, 2026-06-13 G5-E)
 
 // ── 모드 변경 핸들러 ──
 function getMode(name) {
@@ -594,9 +659,8 @@ async function runDividendTarget() {
     await loadTaxProfile();
   }
   const taxProfile = window.dtTaxProfile || {};
-  const accountType = dtTaxOn
-    ? (document.querySelector('input[name="dtAccount"]:checked')?.value || 'general')
-    : 'none';
+  // 계좌 유형 = 멀티계좌 카드(계좌 1)의 type — 한글 값('위탁' 등)도 백엔드 매핑 지원
+  const accountType = dtTaxOn ? (window.taxAccounts[0]?.type || '위탁') : 'none';
 
   const body = {
     tickers:            dtTickers.map(t=>({code:t.code, name:t.name, badge:t.badge, weight:t.weight/100})),
@@ -608,10 +672,24 @@ async function runDividendTarget() {
     account_type:       accountType,
     earned_income:      taxProfile.earned_income || 50000000,
     isa_type:           taxProfile.isa_type || 'general',
+    user_settings:      dtTaxOn ? taxProfile : undefined,
     seed:    mkCfg('seed'),
     monthly: mkCfg('monthly'),
     years:   mkCfg('years'),
   };
+
+  // 멀티계좌(G5-E): 계좌 2개 이상이면 accounts + 분배정책 동봉 → 백엔드 멀티 분기
+  if (dtTaxOn && window.taxAccounts.length > 1) {
+    const accountsPayload = buildDtAccountsPayload();
+    if (accountsPayload === false) {
+      btn.disabled=false; btnText.textContent='시뮬레이션 실행'; spinner.style.display='none';
+      dtHideProgressUI(); document.getElementById('dtResultEmpty').style.display='block';
+      return;
+    }
+    body.accounts = accountsPayload;
+    body.tax_enabled = true;
+    body.distribution_policy = buildDistributionPolicy(accountsPayload);
+  }
 
   try {
     const res = await fetch('/api/dividend-target/submit', {
@@ -835,6 +913,14 @@ function renderDtSavings(data) {
   const s = data.savings;
   if (!s || !(s.brokerage_assumed_tax > 0)) { el.style.display = 'none'; el.innerHTML = ''; return; }
   const acct = data.savings_account_type || '';
+  // 멀티계좌: 계좌별 분해 줄 (G5-E)
+  const accRows = (s.accounts || [])
+    .filter(a => a.brokerage_assumed_tax > 0 || a.tax_saving > 0)
+    .map(a => `
+      <div style="display:flex;justify-content:space-between;font-size:0.73rem;color:var(--green);margin-top:3px;">
+        <span>계좌 ${(a.account_id ?? 0) + 1} · ${a.type || ''}</span>
+        <span>위탁가정 ${fmtKRW(a.brokerage_assumed_tax)} · 실제 ${fmtKRW(a.actual_tax)} · 절세 <b>${fmtKRW((a.tax_saving || 0) + (a.gain_harvest_saving || 0))}</b></span>
+      </div>`).join('');
   el.innerHTML = `
     <div style="margin-top:12px;padding:12px;background:var(--green-pale);border:1px solid var(--green-light);border-radius:8px;">
       <div style="font-size:0.8rem;font-weight:800;color:var(--green);margin-bottom:8px;">💰 세금 절감 효과 (중앙값 기준${acct ? ' · ' + acct : ''})</div>
@@ -843,6 +929,7 @@ function renderDtSavings(data) {
         <div><div style="font-size:0.68rem;color:var(--green);">실제 세금</div><div style="font-size:0.9rem;font-weight:800;color:var(--green);">${fmtKRW(s.actual_tax)}</div></div>
         <div><div style="font-size:0.68rem;color:var(--green);">절세액</div><div style="font-size:0.98rem;font-weight:900;color:var(--green);">약 ${fmtKRW(s.tax_saving)}</div></div>
       </div>
+      ${accRows}
       <div style="font-size:0.67rem;color:#7CB342;margin-top:8px;">※ 근사치 — 전체 투자기간 누적(실측 ${s.n_windows}개 윈도우 중앙값). 무청산 기준(잔여 미실현차익 양쪽 미가산). 금융소득종합과세 가산·연금 인출세 미반영. ISA/연금은 세후 재투자 가정.</div>
     </div>`;
   el.style.display = 'block';

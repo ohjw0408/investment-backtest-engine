@@ -111,6 +111,20 @@
   }
   renderTickers();
 
+  // 포트폴리오 즐겨찾기 (B1) — weight는 % (0~100) 그대로
+  if (window.MMFav) window.MMFav.init({
+    mount: 'favBar',
+    getTickers: () => tickers.map(t => ({ ...t })),
+    setTickers: (list) => {
+      tickers.length = 0;
+      list.forEach(t => tickers.push({
+        code: t.code, name: t.name || t.code, badge: t.badge || '',
+        weight: Math.round(Number(t.weight) || 0),
+      }));
+      renderTickers();
+    },
+  });
+
   // ── 세금 프로필 ──
   window.taxProfile = {};
   (async function loadProfile() {

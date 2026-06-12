@@ -73,6 +73,7 @@
   <!-- ===== 입력 ===== -->
   <div class="ts-panel-box">
     <div class="ts-field" style="margin-bottom:4px;"><label>보유 종목 (위탁 계좌)</label></div>
+    <div id="favBar"></div>
     <div class="ts-search-wrap">
       <input type="text" id="tsSearchInput" class="calc-input" placeholder="종목 또는 ETF 검색 (예: TIGER 미국S&P500, SCHD)" autocomplete="off">
       <div class="ts-dropdown" id="tsDropdown"></div>
@@ -150,5 +151,6 @@
 
 </div>
 
-<script src="{{ url_for('static', filename='js/tax_switch.js') }}?v=20260612ts"></script>
+<script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
+<script src="{{ url_for('static', filename='js/tax_switch.js') }}?v=20260612fav"></script>
 {% endblock %}

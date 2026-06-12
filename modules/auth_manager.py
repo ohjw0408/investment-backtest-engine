@@ -196,3 +196,75 @@ def delete_holding(user_id, holding_id):
     c = _get_conn()
     c.execute("DELETE FROM holdings WHERE id=? AND user_id=?", (holding_id, user_id))
     c.commit()
+
+
+# ── 포트폴리오 즐겨찾기 (B1) ──────────────────────────────
+PORTFOLIOS_DDL = """
+CREATE TABLE IF NOT EXISTS saved_portfolios (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    name         TEXT NOT NULL,
+    tickers_json TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+"""
+
+# 사용자당 저장 한도. 추후 요금제별 차등 시 get_portfolio_limit만 바꾸면 됨.
+MAX_SAVED_PORTFOLIOS = 20
+
+
+def get_portfolio_limit(user_id):
+    """사용자별 즐겨찾기 한도. 현재는 전원 동일 — 요금제 차등의 단일 변경점."""
+    return MAX_SAVED_PORTFOLIOS
+
+
+def init_portfolios_db():
+    """즐겨찾기 테이블 초기화."""
+    c = _get_conn()
+    c.executescript(PORTFOLIOS_DDL)
+    c.commit()
+
+
+def get_portfolios(user_id):
+    rows = _get_conn().execute(
+        "SELECT * FROM saved_portfolios WHERE user_id=? ORDER BY name", (user_id,)
+    ).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["tickers"] = json.loads(d.pop("tickers_json"))
+        out.append(d)
+    return out
+
+
+def upsert_portfolio(user_id, name, tickers, portfolio_id=None):
+    """저장/수정. 신규 생성 시 한도 초과면 ValueError."""
+    now = datetime.now().isoformat()
+    c   = _get_conn()
+    tickers_json = json.dumps(tickers, ensure_ascii=False)
+    if portfolio_id:
+        c.execute(
+            "UPDATE saved_portfolios SET name=?, tickers_json=?, updated_at=? "
+            "WHERE id=? AND user_id=?",
+            (name, tickers_json, now, portfolio_id, user_id)
+        )
+    else:
+        count = c.execute(
+            "SELECT COUNT(*) FROM saved_portfolios WHERE user_id=?", (user_id,)
+        ).fetchone()[0]
+        if count >= get_portfolio_limit(user_id):
+            raise ValueError(f"즐겨찾기는 최대 {get_portfolio_limit(user_id)}개까지 저장할 수 있어요.")
+        c.execute(
+            "INSERT INTO saved_portfolios (user_id, name, tickers_json, created_at, updated_at) "
+            "VALUES (?,?,?,?,?)",
+            (user_id, name, tickers_json, now, now)
+        )
+    c.commit()
+
+
+def delete_portfolio(user_id, portfolio_id):
+    c = _get_conn()
+    c.execute("DELETE FROM saved_portfolios WHERE id=? AND user_id=?", (portfolio_id, user_id))
+    c.commit()

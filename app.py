@@ -12,6 +12,7 @@ from modules.auth_manager import (
     get_groups, upsert_group, delete_group,
     get_holdings, upsert_holding, delete_holding,
     init_holdings_db, get_settings, save_settings,
+    init_portfolios_db, get_portfolios, upsert_portfolio, delete_portfolio,
 )
 
 load_dotenv()
@@ -56,6 +57,7 @@ SHARE_IMG_DIR  = Path(__file__).parent / "share_images"
 SHARE_IMG_DIR.mkdir(exist_ok=True)
 
 init_holdings_db()
+init_portfolios_db()
 data_engine          = DataEngine()
 info_engine          = InfoEngine()
 portfolio_engine     = PortfolioEngine()
@@ -1464,6 +1466,64 @@ def myassets_delete_group(group_id):
     if not session.get('user_id'):
         return jsonify({'error': '로그인 필요'}), 401
     delete_group(session['user_id'], group_id)
+    return jsonify({'ok': True})
+
+# -----------------------------------------------
+# 포트폴리오 즐겨찾기 API (B1)
+# -----------------------------------------------
+
+@app.route('/api/portfolio/list', methods=['GET'])
+def portfolio_list():
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    items = get_portfolios(session['user_id'])
+    return jsonify([
+        {'id': p['id'], 'name': p['name'], 'tickers': p['tickers'],
+         'updated_at': p['updated_at']}
+        for p in items
+    ])
+
+
+@app.route('/api/portfolio/save', methods=['POST'])
+def portfolio_save():
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    body = request.get_json(silent=True) or {}
+    name    = str(body.get('name', '')).strip()
+    tickers = body.get('tickers')
+    if not name or len(name) > 50:
+        return jsonify({'error': '이름은 1~50자로 입력해주세요.'}), 400
+    if not isinstance(tickers, list) or not tickers or len(tickers) > 30:
+        return jsonify({'error': '종목은 1~30개여야 합니다.'}), 400
+    cleaned = []
+    for t in tickers:
+        if not isinstance(t, dict) or not t.get('code'):
+            return jsonify({'error': '잘못된 종목 형식입니다.'}), 400
+        try:
+            weight = float(t.get('weight', 0))
+        except (TypeError, ValueError):
+            return jsonify({'error': '비중은 숫자여야 합니다.'}), 400
+        cleaned.append({
+            'code':   str(t['code']),
+            'name':   str(t.get('name', t['code'])),
+            'badge':  str(t.get('badge', '')),
+            'weight': weight,
+        })
+    try:
+        upsert_portfolio(
+            session['user_id'], name, cleaned,
+            portfolio_id=body.get('id') or None,
+        )
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True})
+
+
+@app.route('/api/portfolio/<int:portfolio_id>', methods=['DELETE'])
+def portfolio_delete(portfolio_id):
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    delete_portfolio(session['user_id'], portfolio_id)
     return jsonify({'ok': True})
 
 # -----------------------------------------------

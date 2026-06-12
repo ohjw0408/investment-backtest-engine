@@ -1,5 +1,37 @@
 # Log
 
+## [2026-06-12] feature | B1 포트폴리오 즐겨찾기 — 5탭 공용 위젯 (PHASE4)
+
+오너 결정 4건: 저장 단위 = 종목+비중 1세트 / 로그인 전용(서버 저장) / 5탭 전부 / 한도 20개(요금제
+차등 대비 하드코딩 금지 → `get_portfolio_limit()` 단일 변경점).
+
+- **DB/CRUD** (`auth_manager.py`): `saved_portfolios`(user_id, name, tickers_json) + get/upsert/delete.
+  신규 생성만 한도 체크(수정은 통과). `MAX_SAVED_PORTFOLIOS=20` + `get_portfolio_limit(user_id)`.
+- **API** (`app.py`): GET `/api/portfolio/list` · POST `/api/portfolio/save` · DELETE `/api/portfolio/<id>`.
+  myassets와 동일 401 패턴. 검증 = 이름 1~50자·종목 1~30개·code 필수·weight 숫자.
+- **위젯** (`static/js/portfolio_favorites.js`, 신규): `MMFav.init({mount, getTickers, setTickers})`.
+  규약 = [{code,name,badge,weight(%)}]. select(불러오기)+저장+삭제. 동명 저장 → confirm 후 기존 id
+  덮어쓰기. 비로그인 = select 비활성+안내(`/api/me` 선확인 — list 401 콘솔 노이즈 방지).
+  사용자 입력 이름은 전부 textContent(DOM API)로 — innerHTML 미사용(XSS 가드). CSS `.fav-*`(다크 변수).
+- **5탭 배선**: 투자계산기(% 그대로)·백테스트/은퇴(내부 0~1 ↔ 위젯 % 변환)·배당(%)·ISA전환(IIFE 내부).
+  각 탭 `#favBar` 마운트 + 어댑터. 캐시 v20260612fav.
+
+**검증 4층:**
+① API `tests/test_saved_portfolios.py` **5 PASS** — 401 3종 / 한글·badge·weight 왕복 / 검증 400 7케이스 /
+   한도(신규만 차단·수정 허용, limit 패치로 단일 변경점 증명) / 소유권 격리(타인 id 삭제 무효).
+   users.db는 임시 경로 패치(dev DB 무오염).
+② 위젯 jsdom `tests/test_fav_dom.js` **20 PASS** — 비로그인 list 미호출·XSS 무해·깊은복사·
+   저장 payload(trim/신규 id null/동명 덮어쓰기 id)·삭제 플로우·빈 구성 차단.
+③ 실브라우저 Playwright `tests/test_fav_browser.js` 로컬 **31 PASS** — 5탭 위젯 렌더·비로그인 동작·
+   JS 에러 0 + **어댑터 왕복**(route mock 로그인 위장: 불러오기 → 페이지 상태[60/40, bt·ret는 0.6/0.4] →
+   저장 payload % 규약 재변환) + API 401.
+④ 전체 회귀 **255 PASS**(250+5) + 스크린샷 육안(라이트/다크/모바일 정상).
+
+⚠️ 로그인 실계정 저장 플로우는 OAuth 자동화 불가 — 라이브에서 오너 육안 1회 권장.
+**▶ 다음 = 리스크리턴도표(선행조건 해소됨) OR P4 배당금계산기 절세.**
+
+_작성: Claude (Sonnet 4.6)_
+
 ## [2026-06-12] verify | GAP-DECUM-COMP 해소 확인 — 감사 항목 stale, decum 종합과세 기배선 증명
 
 오너 보류 해제("gap하자") → 코드 점검 결과 **구현할 게 없었음**. 감사(2026-06-09, 421ac71) 주장

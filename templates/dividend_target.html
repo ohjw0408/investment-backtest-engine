@@ -38,6 +38,7 @@
     <!-- 01. 포트폴리오 -->
     <div class="calc-section">
       <div class="calc-section-title"><span class="calc-section-num">01</span> 포트폴리오 구성</div>
+      <div id="favBar"></div>
       <div class="ticker-search-wrap">
         <div class="ticker-search-box">
           <span class="ts-icon">🔍</span>
@@ -324,6 +325,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
 <script>
 let dtTickers = [], dtSearchTimer = null, dtCharts = {};
 let _dtTaskId = null, _dtCancelled = false;
@@ -361,6 +363,19 @@ function dtAddTicker(code, name, badge) {
   dtTickers.push({code, name, badge, weight: dtTickers.length===0?100:0});
   renderDtTickers(); dtDropdown.style.display='none'; dtInput.value='';
 }
+
+// 포트폴리오 즐겨찾기 (B1) — weight는 % (0~100) 그대로
+if (window.MMFav) MMFav.init({
+  mount: 'favBar',
+  getTickers: () => dtTickers.map(t => ({ ...t })),
+  setTickers: (list) => {
+    dtTickers = list.map(t => ({
+      code: t.code, name: t.name || t.code, badge: t.badge || '',
+      weight: Math.round(Number(t.weight) || 0),
+    }));
+    renderDtTickers();
+  },
+});
 function dtRemoveTicker(code) { dtTickers=dtTickers.filter(t=>t.code!==code); renderDtTickers(); }
 function dtUpdateWeight(code, val) {
   const t=dtTickers.find(t=>t.code===code);

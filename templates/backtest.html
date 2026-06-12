@@ -138,6 +138,7 @@
     <!-- 포트폴리오 -->
     <div class="calc-section">
       <div class="calc-section-title"><span class="calc-section-num">01</span> 포트폴리오</div>
+      <div id="favBar"></div>
       <div id="btTickerList"></div>
       <div id="btTickerPlaceholder" class="ticker-placeholder">종목을 검색해서 추가해보세요</div>
       <div class="ticker-search-wrap" style="margin-top:8px;">
@@ -383,6 +384,7 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260612wd"></script>
+<script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
 <script>
 // 오늘 날짜 기본값
 document.getElementById('btEndDate').value = new Date().toISOString().split('T')[0];
@@ -482,6 +484,22 @@ function btAddTicker(code, name) {
   btDropdown.style.display = 'none';
   updateBtWeightUI();
 }
+
+// 포트폴리오 즐겨찾기 (B1) — 내부 weight는 0~1, 위젯 규약은 % (0~100)
+if (window.MMFav) MMFav.init({
+  mount: 'favBar',
+  getTickers: () => btTickers.map(t => ({
+    code: t.code, name: t.name || t.code, badge: t.badge || '',
+    weight: Math.round(t.weight * 100),
+  })),
+  setTickers: (list) => {
+    btTickers = list.map(t => ({
+      code: t.code, name: t.name || t.code,
+      weight: (Number(t.weight) || 0) / 100,
+    }));
+    updateBtWeightUI();
+  },
+});
 
 // 힌트
 document.getElementById('btSeed').addEventListener('input', function() {

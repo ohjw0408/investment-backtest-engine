@@ -20,6 +20,7 @@
     <!-- 01. 포트폴리오 구성 -->
     <div class="calc-section">
       <div class="calc-section-title"><span class="calc-section-num">01</span> 포트폴리오 구성</div>
+      <div id="favBar"></div>
       <div class="ticker-search-wrap">
         <div class="ticker-search-box">
           <span class="ts-icon">🔍</span>
@@ -347,5 +348,6 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260612wd"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260611ui"></script>
+<script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260612fav"></script>
 {% endblock %}

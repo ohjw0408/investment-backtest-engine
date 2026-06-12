@@ -1,5 +1,26 @@
 # Log
 
+## [2026-06-12] feature | 내 포트폴리오 관리 페이지 + 자산구성 파이차트
+
+오너 요청 2건: ① "내 포트폴리오" 탭(사이드바 내 자산 위) — 즐겨찾기 생성·수정·삭제 관리 화면
+② 내 자산 "자산 구성" 그래프를 가로바 → 파이차트로.
+
+- **`/myportfolios` 신규** (`templates/myportfolios.html` + app.py 라우트 + base.html nav/사이드바 ⭐):
+  서버 렌더 로그인 게이팅(myassets 패턴). 카드 목록(이름·수정일·종목 badge/code/비중바·합계),
+  생성/수정 모달(종목 검색 + 비중 입력 + 균등분배, 동명 confirm 덮어쓰기), 삭제 confirm.
+  기존 `/api/portfolio/*` 그대로 재사용(백엔드 무변경, 라우트 1개만 추가). 사용자 문자열 esc() 처리.
+- **자산 구성 파이차트** (`myassets.html` renderWeightChart): type bar→pie, 고정높이 260px 래퍼 +
+  maintainAspectRatio:false(모바일 차트 왜소 패턴 회피), legend right(모바일 bottom), 툴팁 `라벨: N%`.
+  그룹별 합산·색상 로직 무변경.
+- **검증:** 신규 `tests/test_myportfolios_browser.js` **15 PASS** — 실서버+실DB 로그인 E2E
+  (신규 `tests/mint_session.py`로 dev 세션 쿠키 서명 — OAuth 우회, 로컬 전용):
+  비로그인 게이팅 / 생성(균등 50/50)→카드 렌더 / 수정(이름+60/40) / **계산기 ★ 위젯 연동**
+  (저장한 포폴이 드롭다운에 뜨고 불러오면 60/40 반영) / 삭제 / 파이차트 type·데이터 60/40 / JS 에러 0.
+  + 기존 fav 스위트 재실행: 브라우저 31·jsdom 20·API 5 전부 PASS. 데스크탑/모바일/모달 스크린샷 육안 정상.
+  (전체 pytest 회귀는 오너 지시로 미실행 — 백엔드 변경이 라우트 1개라 타겟 테스트로 충분.)
+
+_작성: Claude (Sonnet 4.6)_
+
 ## [2026-06-12] feature | B1 포트폴리오 즐겨찾기 — 5탭 공용 위젯 (PHASE4)
 
 오너 결정 4건: 저장 단위 = 종목+비중 1세트 / 로그인 전용(서버 저장) / 5탭 전부 / 한도 20개(요금제

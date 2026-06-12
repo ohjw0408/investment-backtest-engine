@@ -270,6 +270,10 @@ def tax_switch():
 def backtest():
     return render_template('backtest.html')
 
+@app.route('/myportfolios')
+def myportfolios():
+    return render_template('myportfolios.html')
+
 @app.route('/myassets')
 def myassets():
     return render_template('myassets.html')

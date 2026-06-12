@@ -31,6 +31,26 @@ def fmtKRW_py(v):
     return f'{round(v):,}'
 
 
+class _GrossRecordingDividendEngine:
+    """DividendEngine 래퍼 — 세전(gross) 배당을 티커별로 누적 (절세액 P4).
+
+    TaxedDividendEngine의 base_engine 자리에 끼워 gross 흐름을 가로챈다.
+    (TaxedDividendEngine은 net만 반환하므로 gross는 여기서만 관측 가능.)
+    """
+
+    def __init__(self, sink: dict):
+        from modules.simulation.dividend_engine import DividendEngine
+        self._inner = DividendEngine()
+        self._sink = sink
+
+    def process(self, portfolio, price_data, price_dict, date, dividend_mode):
+        gross = self._inner.process(portfolio, price_data, price_dict, date, dividend_mode)
+        for t, g in gross.items():
+            if g > 0:
+                self._sink[t] = self._sink.get(t, 0.0) + g
+        return gross
+
+
 class DividendSimulator:
 
     TICKER_REGION_MAP = {
@@ -81,6 +101,9 @@ class DividendSimulator:
         self._isa_total_limit = isa_total_limit
         self._price_cache: Dict[str, pd.DataFrame] = {}
         self._sim_cache:   Dict[str, List[float]]   = {}
+        # 절세액 P4 — _sim_cache와 같은 키, 윈도우별 {assumed, actual, saving} (실측 윈도우만)
+        self._savings_cache: Dict[str, list] = {}
+        self._last_savings = None
 
     def _load(self, ticker: str) -> pd.DataFrame:
         if ticker in self._price_cache:
@@ -178,12 +201,14 @@ class DividendSimulator:
             drift_threshold=self.band_width if self.rebal_mode == "band" else None,
         )
 
+        gross_sink: Dict[str, float] = {}
         if self.tax_engine is not None:
             from modules.tax.account_tax import TaxedDividendEngine
             from modules.tax.session import TaxSessionState
             session = TaxSessionState(other_financial_income=0.0)  # 윈도우별 독립 연도 풀
             portfolio  = TaxTrackedPortfolio(float(seed))
-            div_engine = TaxedDividendEngine(DividendEngine(), self.tax_engine,
+            div_engine = TaxedDividendEngine(_GrossRecordingDividendEngine(gross_sink),
+                                             self.tax_engine,
                                              self._account_type, session=session)
             executor   = TaxedOrderExecutor(self.tax_engine, self._account_type,
                                             session=session)
@@ -196,7 +221,30 @@ class DividendSimulator:
                               executor, CashAllocator())
         recorder = HistoryRecorder()
         loop.run(portfolio, strategy, cfg, m_data, m_dates, recorder)
-        return last_year_dividend(recorder.to_dataframe(), end)
+        history_df = recorder.to_dataframe()
+
+        # ── 절세액 3종 (P4) — 무청산 규약: 결과 = 배당 흐름이라 end_value 미사용 →
+        #    잔여 미실현차익은 가정/실제 양쪽 다 미가산(wd와 동일, 위탁 불변식 유지) ──
+        self._last_savings = None
+        if self.tax_engine is not None and not history_df.empty:
+            from modules.tax.saving_estimate import estimate_brokerage_tax
+            cls_acc: Dict[str, float] = {}
+            for t, g in gross_sink.items():
+                cls = self.tax_engine.classify_asset(t)
+                cls_acc[cls] = cls_acc.get(cls, 0.0) + g
+            assumed = estimate_brokerage_tax(
+                cls_acc, executor._brk_krf_gain, executor._brk_us_by_year,
+            )
+            total_gross = sum(gross_sink.values())
+            total_net = float(history_df["dividend_income"].sum())
+            actual = max(0.0, total_gross - total_net) + float(executor.total_cg_tax_paid)
+            self._last_savings = {
+                "brokerage_assumed_tax": assumed,
+                "actual_tax":            actual,
+                "tax_saving":            max(0.0, assumed - actual),
+            }
+
+        return last_year_dividend(history_df, end)
 
     MIN_CASES = 30  # 롤링 케이스 최소 보장 개수
 
@@ -438,8 +486,9 @@ class DividendSimulator:
                 candidates.append(ts)
         return max(candidates) if candidates else pd.Timestamp("1900-01-01")
 
-    def _roll_window(self, seed, monthly, years, start_dt, end_dt) -> List[float]:
-        """[start_dt, end_dt]를 step_months 간격으로 롤링해 케이스 생성."""
+    def _roll_window(self, seed, monthly, years, start_dt, end_dt, savings_acc=None) -> List[float]:
+        """[start_dt, end_dt]를 step_months 간격으로 롤링해 케이스 생성.
+        savings_acc가 주어지면 유효 윈도우의 절세액 3종도 같이 누적(P4)."""
         results = []
         if start_dt <= end_dt:
             roll_starts = pd.date_range(start_dt, end_dt, freq=f"{self.step_months}ME")
@@ -447,6 +496,8 @@ class DividendSimulator:
                 val = self._simulate_one(seed, monthly, years, start.strftime("%Y-%m-%d"))
                 if val > 0:
                     results.append(val)
+                    if savings_acc is not None and self._last_savings is not None:
+                        savings_acc.append(self._last_savings)
         return results
 
     def _run_rolling(self, seed, monthly, years) -> List[float]:
@@ -465,21 +516,43 @@ class DividendSimulator:
         # 3단 폴백: 실측을 버리지 않고, 부족분만 가상으로 보충한다.
         # 1단 — 실데이터(volume>0) 구간만 롤링. 실측 역사가 충분하면 그대로 사용.
         real_start = max(actual_start_dt, real_data_start)
-        real_only  = self._roll_window(seed, monthly, years, real_start, sim_end_latest)
+        real_sav: list = []
+        real_only  = self._roll_window(seed, monthly, years, real_start, sim_end_latest,
+                                       savings_acc=real_sav)
         if len(real_only) >= self.MIN_CASES:
-            results = real_only
+            results, savings = real_only, real_sav
         else:
             # 2단 — 백필 포함 전구간 롤링. 실측+백필 경로를 최대한 사용.
-            full = self._roll_window(seed, monthly, years, actual_start_dt, sim_end_latest)
+            full_sav: list = []
+            full = self._roll_window(seed, monthly, years, actual_start_dt, sim_end_latest,
+                                     savings_acc=full_sav)
             if len(full) >= self.MIN_CASES:
-                results = full
+                results, savings = full, full_sav
             else:
                 # 3단 — 부족분만 가상으로 보충 (실측/백필 케이스는 유지).
-                # [SYNTHETIC_PATH: In-Memory] DB 기록 없음. ScenarioDataPreparer 경유 불필요.
+                # [SYNTHETIC_PATH: In-Memory] DB 기록 없음. 합성 윈도우는 절세액 미산출.
                 need    = self.MIN_CASES - len(full)
                 results = full + self._run_synthetic_rolling(seed, monthly, years, need)
+                savings = full_sav
         self._sim_cache[cache_key] = results
+        self._savings_cache[cache_key] = savings
         return results
+
+    def get_savings_summary(self, seed, monthly, years):
+        """절세액 3종 p50 요약 (P4). 실측/백필 윈도우 기준 — 합성만 있으면 None.
+
+        _run_rolling과 같은 캐시 키 — 시나리오 실행에서 이미 돈 콤보면 공짜.
+        """
+        self._run_rolling(seed, monthly, years)
+        cache_key = f"{round(seed,-4)}_{round(monthly,-4)}_{years}"
+        savings = self._savings_cache.get(cache_key) or []
+        if not savings:
+            return None
+        out = {}
+        for field in ("brokerage_assumed_tax", "actual_tax", "tax_saving"):
+            out[field] = round(float(np.median([s[field] for s in savings])), 2)
+        out["n_windows"] = len(savings)
+        return out
 
     def _check_prob(self, divs, target_monthly, probability) -> bool:
         if not divs:

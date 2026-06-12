@@ -88,7 +88,7 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
     monthly_cfg = body.get('monthly', {"center": 500000, "step": 0, "n": 0, "mode": "fixed"})
     years_cfg   = body.get('years',   {"center": 20,     "step": 0, "n": 0, "mode": "fixed"})
 
-    return sim.run_scenario(
+    response = sim.run_scenario(
         target_monthly_div = float(body['target_monthly_div']),
         probability        = float(body.get('probability', 0.50)),
         seed_cfg           = seed_cfg,
@@ -97,3 +97,17 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
         progress_callback  = progress_callback,
         cancel_check       = cancel_check,
     )
+
+    # ── 절세액 3종 (P4) — 대표 콤보(역산이면 solved 값) 기준 p50. 세금 ON일 때만. ──
+    if tax_enabled and isinstance(response, dict) and not response.get('error'):
+        try:
+            _res = response.get('result') or {}
+            _seed    = float(_res.get('solved_seed',    seed_cfg.get('center', 0)) or 0)
+            _monthly = float(_res.get('solved_monthly', monthly_cfg.get('center', 0)) or 0)
+            _years   = int(_res.get('solved_years',     years_cfg.get('center', 20)) or 20)
+            response['savings'] = sim.get_savings_summary(_seed, _monthly, _years)
+            response['savings_account_type'] = account_type
+        except Exception:
+            response['savings'] = None   # 절세 표시는 부가 정보 — 본 결과를 막지 않는다
+
+    return response

@@ -1,5 +1,32 @@
 # Log
 
+## [2026-06-13] feature | P4 배당계산기 절세액 3종 — 마감 (절세액 전 탭 완성)
+
+엔진 통합(divrefactoring) 직후 본체. 설계 = wd(인출기)와 동일 무청산 규약: 결과가 배당 흐름이라
+end_value 미사용 → 잔여 미실현차익 가정/실제 양쪽 미가산 → 위탁 불변식(절세 0) 유지.
+
+- **엔진(`dividend_simulator.py`):** `_GrossRecordingDividendEngine`(TaxedDividendEngine base 자리에
+  끼워 gross 배당 가로챔) → `_simulate_one`이 윈도우별 절세 3종 산출(가정 = `estimate_brokerage_tax`
+  (분류별 gross 배당 + executor `_brk_*`), 실제 = (Σgross−Σnet) + `total_cg_tax_paid`).
+  `_run_rolling`이 `_savings_cache`에 병행 누적(실측 윈도우만 — 합성 보충 미포함, 3단 폴백 정합).
+  공개 API = `get_savings_summary(seed, monthly, years)` → p50 3종 + n_windows(같은 캐시 키라
+  시나리오 실행 후엔 공짜).
+- **배선(`dividend_logic.py`):** 응답에 `savings`(대표 콤보 — 역산이면 solved 값) + `savings_account_type`.
+  부가정보 규약: 절세 산출 실패가 본 결과를 막지 않음(try/except → None).
+- **stale 통일 발견:** sync `/api/dividend-target/scenario` 라우트가 app.py 인라인 복제(세금 미배선!)
+  → `run_dividend_scenario_logic` 위임으로 통일(celery 경로와 단일소스). + 디버깅 중 리스크리턴 세션의
+  잔존 로컬 서버가 포트 점유 중이었던 것도 발견·정리.
+- **UI(`dividend_target.html`):** `renderDtSavings` — 공용 절세 패널과 동일 포맷(초록 3칸) + 배당탭
+  전용 각주(전 기간 누적·실측 N윈도우 중앙값·무청산·금종세 가산 미반영).
+- **검증:** `tests/test_div_savings.py` **4 PASS** 손계산 — ① 위탁 불변식(가정==실제, 절세 0)
+  ② ISA 절세 = Σgross×15.4% 독립재현(과세이연 → 실제 0) ③ p50 요약·합성 제외·무세금 None·캐시 정합
+  ④ dividend_logic 응답 배선(+세금 OFF 시 키 없음). 실브라우저 7 PASS(패널 렌더·숨김·실서버 API:
+  ISA 절세 321만/실제 0·위탁 절세 0/209윈도우·JS 에러 0). 타겟 회귀 15 PASS.
+
+**▶ 절세액 표시 = 전 탭 완성(P1~P4). 다음 후보 = 배당탭 멀티계좌(G2 확장) OR PHASE4(D4·A4·D1·D2·C1·C2).**
+
+_작성: Claude (Sonnet 4.6)_
+
 ## [2026-06-13] feature | 배당계산기 엔진 통합 (divrefactoring) — 게이트 PASS, P4 선행 완료
 
 오너 결정 = 게이트 방식(3-1/3-2 → 벤치마크 게이트 → 통과 시에만 교체. 미달 시 즉시 중단·보고).

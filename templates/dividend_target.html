@@ -318,6 +318,7 @@
         </div>
         <div style="height:420px;position:relative;"><canvas id="dtIsocurveChart"></canvas></div>
       </div>
+      <div id="dtSavingsPanel" style="display:none;"></div>
     </div>
   </div>
 
@@ -827,9 +828,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ── 결과 렌더링 ──
 const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0','#00BCD4','#FF5722','#607D8B'];
 
+// 절세액 3종 패널 (P4) — 대표 콤보(역산이면 solved 값) 윈도우 p50. 합성-only면 미표시.
+function renderDtSavings(data) {
+  const el = document.getElementById('dtSavingsPanel');
+  if (!el) return;
+  const s = data.savings;
+  if (!s || !(s.brokerage_assumed_tax > 0)) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const acct = data.savings_account_type || '';
+  el.innerHTML = `
+    <div style="margin-top:12px;padding:12px;background:var(--green-pale);border:1px solid var(--green-light);border-radius:8px;">
+      <div style="font-size:0.8rem;font-weight:800;color:var(--green);margin-bottom:8px;">💰 세금 절감 효과 (중앙값 기준${acct ? ' · ' + acct : ''})</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        <div><div style="font-size:0.68rem;color:var(--green);">전체 위탁 가정 세금</div><div style="font-size:0.9rem;font-weight:800;color:var(--green);">${fmtKRW(s.brokerage_assumed_tax)}</div></div>
+        <div><div style="font-size:0.68rem;color:var(--green);">실제 세금</div><div style="font-size:0.9rem;font-weight:800;color:var(--green);">${fmtKRW(s.actual_tax)}</div></div>
+        <div><div style="font-size:0.68rem;color:var(--green);">절세액</div><div style="font-size:0.98rem;font-weight:900;color:var(--green);">약 ${fmtKRW(s.tax_saving)}</div></div>
+      </div>
+      <div style="font-size:0.67rem;color:#7CB342;margin-top:8px;">※ 근사치 — 전체 투자기간 누적(실측 ${s.n_windows}개 윈도우 중앙값). 무청산 기준(잔여 미실현차익 양쪽 미가산). 금융소득종합과세 가산·연금 인출세 미반영. ISA/연금은 세후 재투자 가정.</div>
+    </div>`;
+  el.style.display = 'block';
+}
+
 function renderResult(data, body) {
   document.getElementById('dtResultEmpty').style.display   = 'none';
   document.getElementById('dtResultContent').style.display = 'block';
+  renderDtSavings(data);
   document.getElementById('dtSolveSection').style.display  = 'none';
   document.getElementById('dtProbCurveCard').style.display = 'none';
   document.getElementById('dtIsocurveCard').style.display  = 'none';

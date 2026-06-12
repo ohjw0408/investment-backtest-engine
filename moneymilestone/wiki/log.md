@@ -1,5 +1,32 @@
 # Log
 
+## [2026-06-13] docs | 전체 동기화 — 플랜 파일 전수 점검 + 진행상황 통일 (오너 지시)
+
+오너 "모든 플랜 파일 읽고 진행상황 동기화" → README 동기화 절차 전체 수행. 루트 plan 25개 + wiki 전부 정독,
+코드 실상 대조(자동산출/_ytd_income/sim/tax_engine.py 삭제는 grep·파일 존재로 확인).
+
+**종결 처리한 plan:** `trackG_multiaccount_plan.md`(L7 16/16 + GAP-DECUM-COMP 해소 — 미결 0) ·
+`isafix.md`(BUG-1~5 + 세금 재검증까지) · `다계좌세금_E2E검증_plan.md`(기완료 표기 확인) ·
+`리스크리턴도표_plan.md`(기완료). PHASE1/PHASE3 = 운영중 표기(과거 기록용).
+
+**완료 정정(코드 확인 기반):** 세금리팩토링 plan frontmatter `phase1-tax-profile-api`·`phase2e`·`phase2f`
+→ done(전부 2f 4100ecd로 충족 — 자동산출=`recurring_financial_income` 3탭, `_ytd_income`=account_tax:243,
+전탭배선). 본문 표·갭 목록에 2026-06-13 정정 노트. bugs.md 기술부채 2건(_ytd_income·sim/tax_engine.py) ✅.
+phases.md 2c/2e/2f/phase1-api/Stage B/PHASE4 줄 전부 최신화. dev-status.md 한줄요약·세금표·종합과세
+실제상태(❌ 3건→✅)·다음트랙·사업일정(로그인+즐겨찾기 = 2개월 선행) 갱신. features.md 금종세 행 완료.
+ideas.md 자동산출 미구현 주석·세금계산기·리스크리턴 정정.
+
+**roadmap:** Last updated 06-13 + Source Plans 표 6행 갱신(PHASE4/isafix/trackG/절세액/리스크리턴/E2E +
+합성상관·divrefactoring 행 신규) + Current blocker + Dependency Order(현재 위치 = PHASE4 잔여 + P4) +
+Track E 표(B1·D6·E1 완료 반영) 재구성. PHASE4_PLAN 헤더 갱신. SYNTHETIC plan에 은퇴 체크박스·Stage B 추가 노트.
+index.md plan 표 최신화.
+
+**동기화 후 잔여 전모(미결 전부):** P4 배당 절세(선행 divrefactoring) / PHASE4 D4·B2-a·A4·D1·D2·C1·C2·B4·
+C4·E2~E4 / 합성상관 서버검증 / 벤치마크 영속화 / KQ150 티커·갭채움 스케줄러 / ideas.md 인코딩 복구 /
+ETF_BACKFILL V2 Ph.3+. 블로커 0.
+
+_작성: Claude (Sonnet 4.6)_
+
 ## [2026-06-12] feature | 리스크-리턴 도표 (/risk-return) — P3, 즐겨찾기 후속
 
 오너 결정 4건: 지표 = **CAGR(y) + 일간 std×√252(x), 총수익(배당 재투자)** / 기간 = **전 점 공통

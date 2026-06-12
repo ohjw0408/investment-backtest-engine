@@ -133,7 +133,7 @@ tags: [dev, bug]
 | `volume=0`으로 백필/가격 오류 | ⚠️ 미확인 | 일부 종목에서 가격 대신 배당 표시 가능성 |
 | **백필 provenance 전부 0행** | ✅ Stage A에서 해결 (2026-05-30, Codex) | SCHD/458730/446720/402970 백필 가격·배당 provenance 기록 확인. 과거 run_id 없는 백필 이력은 서버 재백필로 교체됨 |
 | provenance 테이블 없음 | ⚠️ 미확인 | 합성 데이터 출처 적재 제거됨 |
-| `TaxedDividendEngine._ytd_income` 초기값 0 | ⏳ 미완료 | `other_financial_income` 연동 필요 |
-| `modules/sim/tax_engine.py` 덮어씀 | ⏳ 미완료 | Phase 2c 이후 정리 예정 |
+| `TaxedDividendEngine._ytd_income` 초기값 0 | ✅ 해결 (Phase 2f, 4100ecd) | `account_tax.py:243` `_ytd_income = other_financial_income` 주입 + 공유 세션. 2026-06-13 동기화 확인 |
+| `modules/sim/tax_engine.py` 덮어씀 | ✅ 해결 | 파일 삭제됨(Phase 2c 정리). 2026-06-13 확인 |
 | T1~T4 수동 테스트 미완료 | ⚠️ 미확인 | T1 배너, T2 종합과세 패널, T4 ISA 풍차 체크박스 — 브라우저 직접 확인 필요 |
 | **GAP-DECUM-COMP — 인출(decum) 중 금융소득 종합과세 미모델링** | ✅ 해소 확인 (2026-06-12) — **감사 항목이 stale였음** | 오너 보류 해제 후 코드 점검 결과 C3.2(89c927a)부터 이미 모델링되어 있었음: `simulate_household_window`가 `TaxSessionState`를 전 계좌 공유 → 위탁 배당 gross(`TaxedDividendEngine`)·KR_FOREIGN 인출/리밸 매도차익(`_calc_cg_tax`)이 한 풀로 합산, 2천만 초과분 종합과세 가산(연도별 리셋·개인 합산 포함). 감사 주장("배당 2천만 초과해도 가산 안 함")은 코드 실상과 불일치. 검증 = `tests/test_decum_comprehensive.py` 4종(재현 등치·임계 미만 플랫·2계좌 개인합산·KRF 차익 풀 합산) 전부 PASS. 잔여 = `other_financial_income=0` 베이스라인(외부 금융소득) — 프런트가 해당 필드를 아예 안 보냄(수동입력 금지 설계) → 별도 항목 "other_financial_income 전탭 자동산출"에 귀속, decum 고유 갭 아님 |

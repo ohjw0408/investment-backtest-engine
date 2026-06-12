@@ -1,6 +1,8 @@
 # 배당금 계산기 메인 엔진 통합 계획
 
 작성일: 2026-05-30  
+> **상태 (2026-06-13 동기화):** 💡 미착수. roadmap 곁가지 "배당금계산기 G2/절세액 미지원(별도 엔진)" = P4 배당 절세의 선행 후보. 착수 시 이 문서가 정본.
+
 목표: `DividendSimulator._simulate_one`의 자체 루프를 제거하고, 투자계산기·백테스트와 동일한 `TaxableSimulationRunner + SimulationLoop` 파이프라인을 공유하게 만들기.
 
 ---

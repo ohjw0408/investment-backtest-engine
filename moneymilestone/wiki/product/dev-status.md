@@ -1,16 +1,16 @@
 ---
-updated: 2026-06-10
+updated: 2026-06-13
 sources: [PROJECT_MASTER_ROADMAP.md, trackG_multiaccount_plan.md, 세금에서시작된완전리팩토링계획.plan.md]
 tags: [product, tech]
 ---
 
 # 개발 현황 + 블로커
 
-마지막 업데이트: 2026-06-10 기준. (최신 상세는 [[dev/status]]가 항상 우선)
+마지막 업데이트: 2026-06-13 기준. (최신 상세는 [[dev/status]]가 항상 우선)
 
 ## 현재 상태 한 줄 요약
 
-> ✅ **Track G5 다중계좌 4탭(계산기·백테·은퇴적립·은퇴인출) 전체 완료(2026-06-09, 세금감사 신규버그 0) + 간편 계산기 4종 `/simple` 배포(2026-06-10).** 블로커 없음. **다음 = 다계좌 세금 E2E 실브라우저 검증**(`다계좌세금_E2E검증_plan.md` 16건, Playwright 도입으로 자동화 가능) OR 세금계산기(P1). GAP-DECUM-COMP는 오너 보류. 상세 = [[dev/status]].
+> ✅ **P0~P3 전부 마감 (2026-06-13 동기화).** Track G5 4탭 + L7 E2E 16/16 + 절세액 P1~P3 + 간편계산기(`/simple`) + ISA전환(`/tax-switch`) + B1 즐겨찾기(`/myportfolios`+5탭 위젯) + 리스크리턴도표(`/risk-return`) + 모바일·다크모드 전부 완료·배포. GAP-DECUM-COMP·BUG-PENSION-1 = 기해소 확인(stale 정리). 블로커 없음. **다음 후보 = P4 배당 절세(`divrefactoring.md` 선행) OR PHASE4 잔여(D4·B2-a·A4·D1·D2·C1·C2) — 오너 결정.** 상세 = [[dev/status]].
 
 ## 세금 리팩토링 진행 상황
 
@@ -21,17 +21,17 @@ tags: [product, tech]
 | Phase 2b | 투자계산기 + 은퇴 적립 Runner 전환 | ✅ 완료 (Gate 2b 통과) |
 | Phase 2c | 배당 역산 Runner 전환 | ✅ 완료 (Gate 2c 재검증 PASS, 2026-05-31) |
 | Phase 2d | 은퇴 인출 세금 주입 | ✅ 완료 (Gate 2d 5/5) ⚠️ BUG-TAX-2: 인출 매도 위탁 양도세 누락은 수정됨(공유 sell_with_tax) |
-| Phase 2e/2f | 금융소득 종합과세 + 분할매도 패널 | ✅ 다중계좌 배선 완료(공유세션 개인합산·comprehensive_years). 단일계좌도 surface. ⚠️ other_financial_income 전탭 자동산출만 잔여 |
+| Phase 2e/2f | 금융소득 종합과세 + 분할매도 패널 | ✅ 완료 (4100ecd) — 자동산출·전탭배선·_ytd_income 주입·인출(decum) 경로까지 확인(06-12) |
 | Phase 3 | 정리, ISA Runner 통일, 문서화 | ✅ 완료 |
-| phase1-api | TaxProfile API 통일 (other_financial_income 주입) | ⏳ 미완료 (전탭 자동산출) |
+| phase1-api | TaxProfile API 통일 (other_financial_income 주입) | ✅ 완료 (2026-06-13 정리 — 2f로 충족) |
 
-**종합과세(Phase 2e) 실제 상태** (코드 확인 2026-05-30):
-- ✅ 계산 엔진 (`base_tax._comprehensive_tax`/2천만 임계/비례공제) — 완전, `tax_truth_test` 단위검증 통과
-- ✅ 시뮬 내 당해연도 배당 YTD 누적 트리거 (`account_tax.TaxedDividendEngine`)
-- ⚠️ 분할매도/종합과세 패널 — `backtest_logic.py`에만 배선. 계산기/배당/연금 미배선
-- ❌ `other_financial_income` 자동산출 미구현 (backtest가 user_settings 수동값/0 — plan 금지 방식)
-- ❌ `_ytd_income` 0 고정 — 기존 금융소득 미주입
-- 🔁 종합과세 입력 = 배당. Stage A 정상 배당 데이터 기준으로 실제 발동/금액 재검증 필요
+**종합과세(Phase 2e/2f) 실제 상태** (2026-06-13 코드 재확인):
+- ✅ 계산 엔진 (`base_tax._comprehensive_tax`/2천만 임계/비례공제) — `tax_truth_test` 단위검증 통과
+- ✅ 시뮬 내 당해연도 배당+KR_FOREIGN 실현차익 YTD 합산 (공유 `TaxSessionState`)
+- ✅ 분할매도/종합과세 패널 — backtest·calculator·retirement 배선 (배당탭만 별도엔진 제외)
+- ✅ `other_financial_income` 자동산출 (`recurring_financial_income`, 직전 완료년도)
+- ✅ `_ytd_income` 주입 (`account_tax.py:243`)
+- ✅ 인출(decum) 경로 — `test_decum_comprehensive.py` 4 PASS (2026-06-12)
 
 ## ✅ 해결된 블로커: 배당 데이터 근본 버그
 
@@ -53,32 +53,31 @@ tags: [product, tech]
 - 서버 `stage_a_verify.py`, `debug_dividend.py`, 계산기 직접 실행에서 배당 p50 > 0 확인.
 - UI가 `div_real_start`/`div_backfill_start` 기준 실측/추정 구분 표시.
 
-## 다음 실행 트랙 (의존성 순서)
+## 다음 실행 트랙 (2026-06-13 — P0~P3 전부 마감)
 
 ```
-[P0] Track G5 다중계좌 탭 복제 — 현재 진행
-  ✅ G5-A 백테스트 백엔드+L10  ✅ G5-C 토대(연금 분리과세)
-  → G5-C 인출 엔진 본체(가구 인출 오케스트레이터+연금소득세+생존율+L12)
-  → 통합(run_retirement_logic 적립+인출 멀티) → UI 일괄(backtest.js·retirement.js)
-[P1] 신규 간편 도구 — 간편계산기 묶음 / 세금 전환 계산기
-[P2] 절세액 P2/P3 · 종합과세 other_financial_income 전탭 자동산출
-[P3] PHASE4 (즐겨찾기→리스크리턴도표, D1/D2/A4/C1/C2)
+✅ [P0] Track G5 + L7 E2E 16/16        ✅ [P1] 간편계산기 + ISA전환 계산기
+✅ [P2] 절세액 P1~P3 + 금종세(2f)       ✅ [P3] B1 즐겨찾기 + 리스크리턴도표
+남은 후보 — 오너 결정:
+  · P4 배당금계산기 절세 (선행 = divrefactoring.md 엔진 통합)
+  · PHASE4 잔여: D4 수수료 / B2-a 홈토글 / A4 종목상세 / D1 TDF / D2 연금통합 / C1 / C2 / B4
+  · 곁가지: KQ150 티커, 데이터 갭채움 스케줄러, 합성상관 서버검증, 벤치마크 영속화
 ```
 
 ### 다음 실행 명령어
 ```
-G5-C 은퇴 인출 엔진 구현해줘
+(오너 결정 대기 — 예: "P4 배당 절세 하자" / "D1 TDF 하자")
 ```
 
 ## 사업 일정 대비 현재 위치
 
 | 기간 | 계획 | 현황 |
 |---|---|---|
-| 2026.06 | 시뮬레이션 엔진 개발 | ⏳ 세금 리팩 완성 필요 |
-| 2026.07 | 기타 엔진 (배당, 알림, TDF) | ⏳ 배당 세금 연동 블로커 |
-| 2026.08 | 로그인, 개인 계정, 즐겨찾기 | ⏳ 대기 |
-| 2026.09 | 코드 안정화 (Windows/iOS/Android) | ⏳ 대기 |
-| 2026.10 | 수익 모델 (구독, 광고) | ⏳ 대기 |
+| 2026.06 | 시뮬레이션 엔진 개발 | ✅ 사실상 완료 (세금 리팩·다중계좌·E2E 검증까지) — 일정 선행 |
+| 2026.07 | 기타 엔진 (배당, 알림, TDF) | ⏳ 배당 엔진 통합(divrefactoring)·D1 TDF 후보로 준비됨 |
+| 2026.08 | 로그인, 개인 계정, 즐겨찾기 | ✅ 로그인·계정·즐겨찾기 완료 (2026-06-12, 일정 2개월 선행) |
+| 2026.09 | 코드 안정화 (Windows/iOS/Android) | ⏳ 대기 (모바일 웹 반응형은 완료) |
+| 2026.10 | 수익 모델 (구독, 광고) | ⏳ 대기 (즐겨찾기 한도 = `get_portfolio_limit()` 요금제 차등 지점 준비됨) |
 | 2026.11 | 마케팅 + 앱스토어 배포 | 🎯 목표 |
 
 → 전체 기능 목록: [[product/features]]

@@ -3,6 +3,8 @@
 > **상태 (2026-05-30):** ✅ Phase 0~4 완료 (Track C, 2026-05-28) — `ScenarioDataPreparer` facade, `DataPreparer` allow_backfill/allow_synthetic 플래그, 투자계산기·백테스트 opt-in 체크박스 + 경고 배너. Phase 5~10(포트폴리오 분석, 은퇴 facade 전환, 배당 분리, provenance 정렬)은 💡 나중에.
 >
 > ⚠️ **혼동 주의:** 이 계획의 "합성 데이터"는 opt-in GBM 가격 생성(데이터 부족 시 사용자 선택). **배당 백필(`ETF_BACKFILL § Phase 6.0`)과 별개.** 합성은 완료, 배당 백필 Stage A도 서버 적용 완료. 채권/MMF Stage B는 후속.
+>
+> ✅ **2026-06-13 추가:** 배당 백필 Stage B(채권/MMF)도 완료(2026-05-31, 서버검증). **은퇴 탭 합성 체크박스**는 GAP-RET-KRDATA 해소(2026-06-11, 9486eee)로 추가 — 계산기·백테·은퇴 전 탭 opt-in 가능. 멀티계좌 합성 보충(가구 인출 GBM 폴백)도 동작. 종목 간 상관 복원은 `합성상관계수_plan.md`(구현 완료, 서버 실데이터 검증 대기).
 
 ## Purpose
 

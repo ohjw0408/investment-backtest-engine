@@ -1,6 +1,6 @@
 # Project Master Roadmap
 
-Last updated: 2026-06-11 (✅ **모바일 반응형+다크모드+UX 전 페이지 개편** — 햄버거 드로어·`data-theme=dark` 팔레트·인라인 색상 ~200곳 변수화·BUG-NAV-1 해소·백테/내자산 모바일 후속 수정. Playwright 168체크+라이브 검증+오너 실기기 확인 완료. 상세 = status update 57~58. 이전: 2026-06-10 ✅ **간편 계산기 4종 신규 `/simple`** — 오너 결정으로 P1 착수: 복리(세후·인플레)·배당재투자(잼투리식)·인플레 생활비·실질 구매력, 전부 클라이언트 JS. 손계산 25 + jsdom 35 PASS. GAP-DECUM-COMP = 오너 결정 **계속 보류**. 이전: 2026-06-09 **Track G5 멀티계좌 탭 복제 전체 완료**: G5-A 백테 ✅ → G5-B 은퇴적립 ✅ → G5-C 은퇴인출 엔진 ✅ → G5-D 인출기 standalone 멀티+세금 ✅ → **UI 4탭(계산기·백테·은퇴적립·은퇴인출) 전부 배선·배포** → **세금 커버리지 전탭 감사 = 신규 배선버그 0**. BUG-WD-TAX·GAP-WD-MULTI 해소. 발견 갭 1개 **GAP-DECUM-COMP**(인출 중 금융소득 종합과세 미모델링)=오너 보류. → **다음 = L7 실데이터 통합검증(브라우저) OR 신규 간편도구(간편계산기·세금계산기) OR GAP-DECUM-COMP**)
+Last updated: 2026-06-13 (✅ **전체 동기화** — 2026-06-12~13 완료분 반영: B1 즐겨찾기(5탭 위젯+멀티계좌 카드+`/myportfolios`)·리스크리턴도표(`/risk-return`)·ISA 전환 계산기(`/tax-switch`)·절세액 P1~P3 마감·GAP-DECUM-COMP/BUG-PENSION-1 stale 정리·자산구성 파이차트. 계획 파일 전수 점검: trackG/isafix/E2E plan 종결, 세금리팩토링 phase1-api·2e·2f 완료 정정, PHASE4 헤더 갱신. **다음 후보 = P4 배당 절세(`divrefactoring.md` 선행) OR PHASE4 잔여(D4·B2-a·A4·D1·D2·C1·C2) — 오너 결정.** 이전: 2026-06-11 ✅ **모바일 반응형+다크모드+UX 전 페이지 개편** — 햄버거 드로어·`data-theme=dark` 팔레트·인라인 색상 ~200곳 변수화·BUG-NAV-1 해소·백테/내자산 모바일 후속 수정. Playwright 168체크+라이브 검증+오너 실기기 확인 완료. 상세 = status update 57~58. 이전: 2026-06-10 ✅ **간편 계산기 4종 신규 `/simple`** — 오너 결정으로 P1 착수: 복리(세후·인플레)·배당재투자(잼투리식)·인플레 생활비·실질 구매력, 전부 클라이언트 JS. 손계산 25 + jsdom 35 PASS. GAP-DECUM-COMP = 오너 결정 **계속 보류**. 이전: 2026-06-09 **Track G5 멀티계좌 탭 복제 전체 완료**: G5-A 백테 ✅ → G5-B 은퇴적립 ✅ → G5-C 은퇴인출 엔진 ✅ → G5-D 인출기 standalone 멀티+세금 ✅ → **UI 4탭(계산기·백테·은퇴적립·은퇴인출) 전부 배선·배포** → **세금 커버리지 전탭 감사 = 신규 배선버그 0**. BUG-WD-TAX·GAP-WD-MULTI 해소. 발견 갭 1개 **GAP-DECUM-COMP**(인출 중 금융소득 종합과세 미모델링)=오너 보류. → **다음 = L7 실데이터 통합검증(브라우저) OR 신규 간편도구(간편계산기·세금계산기) OR GAP-DECUM-COMP**)
 
 > 이력: 2026-06-03 = 절세액 P1·단일계좌·KRX 금현물 Phase 1+2·BUG-TAX-1/2·BUG-G1-2·deploy.yml 복구 (당시 진행 중 = G5-C 토대).
 
@@ -16,19 +16,21 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 
 | File | Role | Status |
 |---|---|---|
-| `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed (A1/A2/A3/A5/A6/B5/C3/C5/D3 done) |
+| `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed (A1~A3/A5/A6/B1/B2-b/B2-c/B3/B5/C3/C5/D3/D5/D6/E1/F1/4G done — 2026-06-13 갱신). 잔여 = D4·B2-a·A4·B4·C1·C2·C4·D1·D2·E2~E4 |
 | `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 1~3 + 2c/2d 완료. ✅ **Phase 2f(금융소득 종합과세) 완료(2026-05-31, 4100ecd)** — 중간실현 합산·`other_financial_income` 자동산출·`_ytd_income` 주입·분할매도 슬라이더 전탭(배당탭은 별도엔진 제외). 검증 = test_phase2f 7/7 + tax_truth 64/64 + Gate 2a/2b/2c. 잔여 = Phase 3 정리·문서(낮음). |
 | `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | ✅ **Phase 6.0 Stage A + Stage B 완료**(주식 배당 + 채권/MMF·환헤지비용·US 채권 키워드 자동분류·통화가드, 서버검증). Phase 3+ (etf_master, etf_proxy_map, confidence grading)는 이후. |
 | `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | ✅ Complete (Phase 1~10, all screens). |
-| `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | **Backend complete (e8b7c1e). Frontend partially done. BUG-1~5 remain.** |
+| `isafix.md` | Korean regulatory compliance: account-type investment restrictions (ISA/연금저축/IRP), ISA contribution limits, ISA windmill block, COMMODITY_ETF classification for IRP | ✅ **종결(2026-06-13 동기화).** 백엔드+BUG-1~5 전부 해결(2026-05-30), 세금 재검증·E2E 16건으로 추가 검증. |
 | `PHASE4_PLAN.md § 4G` | Multi-account simulation engine + real ISA windmill (sequential/conditional flow). Requires Track F first. Key constraint: percentiles must be computed after per-scenario sum, not by summing individual percentiles. | ✅ 엔진+투자계산기 완료. → `trackG_multiaccount_plan.md`로 이관. |
-| `trackG_multiaccount_plan.md` | 다중계좌 엔진(G1~G4·2-4) + 배선/UI(B1~B3) + 탭복제(G5: 백테스트·은퇴) | ✅ **G5 전체 완료(2026-06-09).** G5-A 백테·G5-B 은퇴적립·G5-C 은퇴인출 엔진·G5-D 인출기 standalone 멀티+세금·UI 4탭 배선·배포·세금감사(신규버그0) 전부 완료. 잔여=L7 실데이터 브라우저 검증·GAP-DECUM-COMP(보류). |
-| `절세액표시_plan.md` | 결과화면 절세액 3종(위탁가정·실제·절세액)+GH 절세. L-SAVE 검증설계. | ✅ **P1 완료**(투자계산기, 03f28cb+). 백테스트/은퇴는 G5 복제로 따라옴. P2/P3 후속. |
+| `trackG_multiaccount_plan.md` | 다중계좌 엔진(G1~G4·2-4) + 배선/UI(B1~B3) + 탭복제(G5: 백테스트·은퇴) | ✅ **종결(2026-06-13).** G5 전체 완료(06-09) + L7 E2E 16/16(06-11) + GAP-DECUM-COMP 해소 확인(06-12). 미결 없음. |
+| `절세액표시_plan.md` | 결과화면 절세액 3종(위탁가정·실제·절세액)+GH 절세. L-SAVE 검증설계. | ✅ **P1~P3 마감(2026-06-12, 인출기 wd 패널 포함).** 잔여 = P4 배당금계산기(별도 엔진, `divrefactoring.md` 선행, 보류). |
 | `금데이터백필_plan.md` | KRX 금현물 거래가능 시계열(위탁전용) + 금 ETF 상장전 백필 | ✅ **Phase 1**(위탁 KRW/g 시계열, 서버검증)+**Phase 2**(현물=KRX_GOLD·선물=GC=F 갈래 라우팅, 로컬검증) 완료. |
 | `간편계산기_plan.md` | 가정 기반 간편 계산기 묶음(복리·배당재투자 등, 시트 대체). 롤링 엔진과 별개. | ✅ **4종 구현·배포·서버검증 완료(2026-06-10, `/simple`, JS 전용, fe7c7af).** 잔여=브라우저 육안. |
 | `세금계산기_plan.md` | 위탁→ISA 전환 결정 도구(전환 양도세 vs ISA 세제혜택, 스위칭코스트). | ✅ **v1 완료(2026-06-12, c65cf80).** `/tax-switch` 독립 페이지, (a) 분할이전 모델(오너 결정). 라이브 검증 PASS. |
-| `리스크리턴도표_plan.md` | 저장 포트폴리오 위험-수익 산점도(FunETF 류). | 💡 아이디어 — 미착수. **선행=포트폴리오 즐겨찾기(미구현)** → 후순위. |
-| `다계좌세금_E2E검증_plan.md` | 4탭(계산기·백테·은퇴sim·인출기) 멀티계좌 세금 배선 Playwright 실브라우저 자동검증 16건. **= P0 L7의 실행판.** | 📝 **계획 완료(2026-06-10)·실행 대기.** 셀렉터 실측 포함, Claude가 직접 실행 가능. |
+| `리스크리턴도표_plan.md` | 저장 포트폴리오 위험-수익 산점도(FunETF 류). | ✅ **완료(2026-06-12, `/risk-return`, e92f8f8).** 잔여 = 벤치마크 영속화(후속). |
+| `다계좌세금_E2E검증_plan.md` | 4탭(계산기·백테·은퇴sim·인출기) 멀티계좌 세금 배선 Playwright 실브라우저 자동검증 16건. **= P0 L7의 실행판.** | ✅ **완료(2026-06-11) — 16/16 PASS.** 상시 재실행 자산 = `tests/e2e_multitax/run_all.js`. |
+| `합성상관계수_plan.md` | 합성 pre-history 종목 간 상관 복원(조건부 다변량) | ✅ 구현 완료(2026-06-06, `synthetic_mvn.py`). ⚠️ 서버 실데이터 검증 대기. |
+| `divrefactoring.md` | 배당금계산기 엔진을 공용 Runner 파이프라인으로 통합 | 💡 미착수 — P4 배당 절세의 선행 후보. |
 
 ## Current Situation
 
@@ -61,7 +63,7 @@ UI 실측/추정 필드를 확인했다.
 - ✅ ETF_BACKFILL Phase 0~2 provenance 스키마는 Stage A 백필 가격/배당 기록에 사용됨.
 - ✅ PHASE4: A1/A2/A3/A5/A6/B5/C3/C5/D3 done.
 
-Current blocker: **없음.** 배당 Stage A/B + Phase 2c 재검증 + Phase 2f(금종세 완전 구현, 4100ecd) 완료. 다음 = **세금 전환 계산기**(`세금계산기_plan.md`, P1). (2026-06-12 갱신)
+Current blocker: **없음.** (2026-06-13 갱신) P0~P3 전부 마감 — G5·L7 E2E·절세액 P1~P3·간편계산기·ISA전환·B1 즐겨찾기·리스크리턴도표. 다음 후보 = **P4 배당 절세(`divrefactoring.md` 엔진 통합 선행)** OR **PHASE4 잔여(D4·B2-a·A4·D1·D2·C1·C2)** — 오너 결정.
 
 ## Decision
 
@@ -107,22 +109,19 @@ Do not implement client-canonical storage. First implement server diagnostics, `
 ✅ PHASE4 부분 완료: A1/A2/A3/A5/A6/B5/C3/C5/D3
 ✅ ETF_BACKFILL Stage A: price-return + 명시 배당으로 SCHD/458730/446720/402970 서버 적용
 
-현재 위치 ↓
+✅ [1] 세금 Phase 2c/2e 재검증 — 완료(2026-05-31, Gate 2c 3/3 + Phase 2f)
+✅ [2] 배당 백필 Stage B (채권/MMF) — 완료(2026-05-31, 서버검증)
+✅ [3] Track G 전체 (G1~G5 + L7 E2E 16/16 + GAP-DECUM-COMP 해소) — 종결(2026-06-13)
+✅ [4] 절세액 P1~P3 · 간편계산기 · ISA전환 계산기 · B1 즐겨찾기 · 리스크리턴도표 · E1 모바일+다크 — 완료
 
-[1] 🔁 세금 Phase 2c(배당 역산)/2e(금종세) 재검증 — 정상 배당 데이터로  ← 지금
+현재 위치 ↓ (2026-06-13)
 
-[2] 🔴 배당 백필 Stage B (채권/MMF, 필수) — ETF_BACKFILL § Phase 7
-    → 금리 수치 → 듀레이션 가격 모델 + 쿠폰을 분배금으로 명시 주입
+[5] PHASE4 잔여: D4 수수료 / B2-a 홈토글 / A4 종목상세 / D1 TDF / D2 연금통합 / C1 watchlist / C2 자산군비교 / B4 거래트래킹
+    + P4 배당 절세(divrefactoring.md 엔진 통합 선행)
 
-[3] ⏸️ Track G 재개 (세금 재검증 후)
-    → G1 후속: ② 입력 커서 유실 ③ UI 통일 (① 배당 0은 Stage A로 해소)
-    → 은퇴/백테스트 탭 확장 → G2 자금이동 → G3 ISA→연금 이전
+[6] ETF_BACKFILL V2 Phase 3+: etf_master/etf_proxy_map, confidence A~F, 전체 US 유니버스
 
-[5] ETF_BACKFILL V2 Phase 3+: etf_master/etf_proxy_map, confidence A~F, 전체 US 유니버스
-
-[6] PHASE4 핵심 기능: D1/D2/B1/A4/C1/C2/B4
-
-[7] E1 모바일 / E2~E4 최적화 / C4 온보딩 (마지막)
+[7] E2~E4 최적화 / C4 온보딩 (마지막)
 ```
 
 **핵심 규칙:**
@@ -199,7 +198,7 @@ Exit criteria (original — partially met):
 
 Owner plan: `PHASE4_PLAN.md`
 
-**완료:** A1/A2/A3/A5/A6/B5/C3/C5/D3 + F1/B2-b/B2-c/B3/D5
+**완료:** A1/A2/A3/A5/A6/B5/C3/C5/D3 + F1/B2-b/B2-c/B3/D5 + **B1(즐겨찾기)·D6(합성 체크박스 전탭)·E1(모바일+다크) — 2026-06-13 갱신**
 
 **남은 항목 (의존성 없음):**
 
@@ -207,13 +206,6 @@ Owner plan: `PHASE4_PLAN.md`
 |------|--------|-----------|
 | D4 거래수수료 설정 | 1~2일 | 없음 |
 | B2-a 홈 화면 자산 토글 | 0.5일 | 없음 |
-| D6 합성 데이터 백테스트 체크박스 | 1~2일 | Track C ✅ |
-
-**Track G 이후 또는 병렬 가능:**
-
-| 항목 | 난이도 | 선행 조건 |
-|------|--------|-----------|
-| B1 포트폴리오 즐겨찾기/저장 | 2~3일 | 없음 |
 | A4 종목 상세 개선 + 캔들차트 | 3~4일 | 없음 |
 | D1 TDF 기능 | 3~4일 | Tax 2d ✅ |
 | D2 연금 통합 계산기 | 4~5일 | Tax 2d ✅ |
@@ -225,7 +217,6 @@ Owner plan: `PHASE4_PLAN.md`
 | 항목 | 난이도 | 선행 조건 |
 |------|--------|-----------|
 | B4 거래트래킹 + 추가매수 고도화 | 3~4일 | B2/B3 |
-| E1 모바일 반응형 | 5~7일 | 전체 기능 안정화 후 |
 | C4 온보딩 튜토리얼 | 1~2주 | B4 + 전체 |
 | E2/E3/E4 최적화/캐시 | 1~3일 | 트래픽 확인 후 |
 
@@ -333,4 +324,4 @@ Completion note - YYYY-MM-DD
 - 배당금계산기 G2/절세액 미지원(별도 엔진, 후속).
 - ~~리스크리턴도표~~ ✅ 완료(2026-06-12, `/risk-return`).
 
-**[6] 마지막 — 인프라/UX 마감:** E1 모바일, E2/E3/E4 최적화, C4 온보딩.
+**[6] 마지막 — 인프라/UX 마감:** ~~E1 모바일~~ ✅(2026-06-11), E2/E3/E4 최적화, C4 온보딩.

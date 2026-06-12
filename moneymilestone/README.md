@@ -185,14 +185,12 @@ _검토/추가: Codex, 2026-05-28_
 **언어**: Python (백엔드) + HTML/JS (프론트, 프레임워크 없음).
 **JS 테스트 도구**: `package.json` devDependencies — jsdom(DOM 스모크) + **Playwright Chromium**(실브라우저·스크린샷, 2026-06-10 도입).
 
-**현재 상태**: 블로커 없음.
-- Track G5 다중계좌 4탭(계산기·백테·은퇴적립·은퇴인출) 전체 완료 + 세금 전탭 감사 신규버그 0 (2026-06-09).
-- 간편 계산기 4종 `/simple` 배포·서버검증 완료 (2026-06-10).
-- GAP-DECUM-COMP(인출 중 금종세) = ✅ 해소 확인(2026-06-12) — 감사 항목 stale, C3.2부터 기배선. 검증 테스트 4종 추가.
+**현재 상태**: 블로커 없음. (2026-06-13 전체 동기화)
+- P0~P3 전부 마감: G5 4탭 + L7 E2E 16/16 + 절세액 P1~P3 + `/simple` + `/tax-switch` + B1 즐겨찾기(`/myportfolios`+5탭 위젯) + `/risk-return` + 모바일·다크.
+- GAP-DECUM-COMP·BUG-PENSION-1 = 기해소 확인(stale 정리). trackG·isafix·E2E plan 종결.
 - → 최신 상세는 항상 `wiki/dev/status.md` 한 줄 요약 최상단.
 
-**다음 액션**:
+**다음 액션** (오너 결정 대기):
 ```
-다계좌세금_E2E검증_plan.md 16건 실행해줘
+P4 배당 절세 (선행=divrefactoring.md) OR PHASE4 잔여(D4/B2-a/A4/D1/D2/C1/C2)
 ```
-(또는 세금계산기_plan.md 착수)

@@ -370,12 +370,12 @@ tags: [dev]
 | ✅ **배당 백필 Stage B** | 한국 채권 전유형 + 환헤지비용 + US 채권 키워드 자동분류 + 통화가드. 서버검증 완료 | 완료 | — |
 | ✅ 세금 2c 재검증 | Gate 2c PASSED 3/3 (정상 배당 데이터 기준) | 완료 | — |
 | ✅ **금융소득 종합과세 (Phase 2f)** | **완성** — ① 청산+중간실현 KR_FOREIGN을 배당과 합산 종합과세(공유 `TaxSessionState`) ② `_ytd_income` 외부소득 주입 ③ 연도별 종합과세 대상 트래킹 ④ other_financial_income 자동산출 ⑤ 분할매도 슬라이더 패널 backtest/calculator/retirement 전탭 배선. 테스트 7/7 + 회귀 무손상. 배당금탭은 별도엔진 제외 | 완료(프론트 브라우저 스모크 권장) | — |
-| 🔴 **Track G2 + 금종세자 ISA 풍차 중단** | 2f 트래킹을 입력으로 소비. transfer 엔진(현 NotImplementedError) 신규 + ISA 1억 리라우팅 + 풍차 중단·무한유지 | **2f 잔여 후 / G2** | `Track G2 구현해줘` |
-| ⏸️ Track G | 다중계좌 — G1 ✅(Codex, 배당0은 Stage A로 해소). ② 커서 ③ UI + G2 자금이동 | 종합과세 후 | `Track G 재개해줘` |
-| ✅ Track F | ISA/계좌 규제 — 백엔드 + BUG-1~5 완료 | — | (완료, 미관 잔여만) |
-| PHASE4 핵심 | D4 D1/D2/B1/A4/C1/C2/B4 | 배당 토대 후/병렬 | `PHASE4 다음 안전한 항목 진행해줘` |
+| ✅ **Track G2 + 금종세 ISA 풍차 중단** | 2-1 라우팅·2-2 만기분배·2-4 풍차중단·G3/G4 공제 전부 구현(2026-06-02) → G5로 4탭 확장 완료 | 완료 | — |
+| ✅ Track G 전체 | G1~G5 + L7 E2E 16/16 + GAP-DECUM-COMP 해소 — plan 종결(2026-06-13) | 완료 | — |
+| ✅ Track F | ISA/계좌 규제 — 백엔드 + BUG-1~5 완료 | 완료 | — |
+| PHASE4 잔여 | D4·B2-a·A4·D1·D2·C1·C2·B4 (B1·D6·E1은 완료, 2026-06-13 갱신) | 병렬 가능 | `PHASE4 다음 안전한 항목 진행해줘` |
 | ETF_BACKFILL V2 Ph.3+ | etf_master/etf_proxy_map, confidence A~F | Stage A/B 후 | `ETF_BACKFILL Phase 3부터` |
-| E1 모바일 / C4 온보딩 | 반응형 / 튜토리얼 | 전체 기능 안정화 후 | — |
+| ~~E1 모바일~~ ✅(06-11) / C4 온보딩 | 반응형 완료 / 튜토리얼 | C4는 전체 안정화 후 | — |
 
 ---
 
@@ -385,7 +385,7 @@ tags: [dev]
 - [ ] D4 거래수수료 설정 (1~2일) — Runner 안정 후
 - [x] D5 인플레이션 검증 + 실질 생활비 표시 ✅ 7182ad1
 - [ ] A4 종목 상세 개선 + 시간봉 차트 (3~4일)
-- [ ] B1 포트폴리오 즐겨찾기/저장 (2~3일)
+- [x] B1 포트폴리오 즐겨찾기/저장 ✅ a9cc1f2~e92f8f8 (2026-06-12 — 5탭 위젯+멀티계좌 카드+/myportfolios+리스크리턴도표 후속)
 - [x] B2-b 자산 추이 차트 (myassets 하단) ✅ 02cb3e8
 - [x] B2-c 내자산 현재가 Redis 캐싱 ✅ 1c5db23
 - [x] B3 리밸런싱 경고 밴드 ✅ 02cb3e8

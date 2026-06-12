@@ -17,6 +17,17 @@
 - 새 페이지 만들었으면 `moneymilestone/wiki/index.md` 갱신
 - **wiki 변경사항 git commit + push (코드 커밋에 포함하거나 별도 커밋)**
 
+## 테스트 실행 규칙 (오너 지시, 2026-06-12)
+
+- **전체 pytest(`pytest tests/`) 회귀 금지.** ~10분 소요 — 변경 범위에 맞는 타겟 테스트만 실행한다.
+  - API/라우트 변경 → 해당 API 테스트 (예: `tests/test_saved_portfolios.py`)
+  - 특정 엔진/모듈 변경 → 그 모듈의 테스트 파일만
+  - UI/템플릿/JS 변경 → jsdom·Playwright 스위트 (브라우저 검증이 주력)
+- 예외: 공유 엔진 코드(`modules/simulation`, `modules/tax`, `modules/execution` 등 여러 탭이 공유하는
+  경로) 변경 시에만 전체 회귀를 고려하되, **돌리기 전에 오너에게 먼저 물을 것.**
+- 검증의 중심은 결정론 타겟 테스트 + 실브라우저(Playwright) + 라이브 probe.
+  로그인 필요한 E2E는 `tests/mint_session.py`(dev 세션 쿠키 서명, 로컬 전용)로 OAuth 우회 가능.
+
 ## 인코딩 규칙
 
 - 모든 wiki 파일은 UTF-8. 파일 전체 덮어쓰기 금지.

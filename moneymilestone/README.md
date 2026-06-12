@@ -116,6 +116,15 @@ moneymilestone/
 - `wiki/dev/ideas.md`에 바로 기록
 - 채팅에서 논의한 내용이 사라지면 손실 → wiki가 기억
 
+### 테스트 실행 규칙 (오너 지시, 2026-06-12)
+
+- **전체 pytest 회귀(`pytest tests/`) 금지** — ~10분 소요. 변경 범위에 맞는 **타겟 테스트만** 실행.
+- 예외: 여러 탭이 공유하는 엔진 코드(`modules/simulation`·`modules/tax`·`modules/execution` 등)
+  변경 시에만 전체 회귀 고려 — 그때도 **오너에게 먼저 확인**.
+- 검증 중심 = 결정론 타겟 테스트 + 실브라우저(Playwright) + 라이브 probe.
+  로그인 E2E는 `tests/mint_session.py`(dev 세션 쿠키, 로컬 전용)로 OAuth 우회.
+- 상세는 repo 루트 `CLAUDE.md` "테스트 실행 규칙" 참조.
+
 ---
 
 ## 페이지 포맷

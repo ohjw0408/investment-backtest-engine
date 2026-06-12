@@ -1,5 +1,27 @@
 # Log
 
+## [2026-06-12] verify | GAP-DECUM-COMP 해소 확인 — 감사 항목 stale, decum 종합과세 기배선 증명
+
+오너 보류 해제("gap하자") → 코드 점검 결과 **구현할 게 없었음**. 감사(2026-06-09, 421ac71) 주장
+"인출 중 위탁 배당 2천만 초과해도 종합과세 가산 안 함"은 코드 실상과 불일치 — C3.2(89c927a)부터
+`simulate_household_window`가 `TaxSessionState`를 전 계좌 공유:
+- 위탁 배당 gross → `TaxedDividendEngine.process`가 풀 누적 + `after_tax_dividend`(ytd) 초과분 가산
+- KR_FOREIGN 인출/리밸 매도차익 → `TaxedOrderExecutor._calc_cg_tax`가 같은 풀 합산 + 가산
+- 연도별 리셋(`session.touch`)·계좌간 개인 합산 전부 동작.
+
+**검증 = 신규 `tests/test_decum_comprehensive.py` 4 PASS** (배선 검증 — 순수함수 정확값은 test_phase2f):
+① 연 배당 3천만+근로 1억, 2개년: 종료값 == `after_tax_dividend` 순차 재현 합 ±1원 + 가산 실발생
+② 임계 미만(연 120만): 플랫 15.4% 등치(스퓨리어스 가산 없음)
+③ 위탁 2계좌 각 1,440만(합산 2,880만): 가구 합동 종료값 < 단독 합(개인 합산 풀 증명)
+④ KRF 인출매도 차익: 타계좌 배당이 임계 채우면 동일 매도의 actual_tax 증가(풀 합산 증명).
+전체 회귀 **250 PASS**(246+4).
+
+잔여 = `other_financial_income=0` 베이스라인(외부 금융소득). 프런트가 필드 자체를 안 보냄(수동입력
+금지 설계) → decum 고유 갭 아니라 기존 "other_financial_income 전탭 자동산출" 항목에 귀속.
+bugs.md·roadmap·README 동기화. **로드맵/감사 stale 4번째 사례** — 착수 전 코드 실상 grep 관례 유효.
+
+_작성: Claude (Sonnet 4.6)_
+
 ## [2026-06-12] feature | 절세액 P3 마감 — 인출기(wd) 절세 3종 패널
 
 오너 지시 "P2/P3 구현됐는지부터 확인" → 점검 결과 P2(백테스트)·P3 적립기/연금수령세(1,500만 전액 16.5%,

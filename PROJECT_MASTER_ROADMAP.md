@@ -311,7 +311,7 @@ Completion note - YYYY-MM-DD
 
 **[P0 — Track G5 마무리 검증 & 보류건] (2026-06-11 갱신)**
 - ✅ **L7 실데이터 통합검증 — 완료(2026-06-11).** `다계좌세금_E2E검증_plan.md` 16건 라이브 전부 PASS(발견 2건 당일 수정 포함, 커밋 98afdbf~9486eee). 결과 = `tests/e2e_multitax/results/20260611_result.md`.
-- ⏸️ **GAP-DECUM-COMP** — 오너 재확인(2026-06-10): **계속 보류.** 은퇴 인출 중 금융소득 종합과세 미모델링(`multi_account_withdrawal.py:107` other_financial_income=0 하드코딩). 버그 아닌 보수적 근사. **오너 결정 전 착수 금지.**
+- ✅ **GAP-DECUM-COMP 해소 확인(2026-06-12, 오너 보류 해제 후 점검).** 감사 항목이 stale — C3.2부터 decum도 공유 `TaxSessionState`로 위탁 배당+KR_FOREIGN 매도차익 합산 종합과세 기배선. 검증 `tests/test_decum_comprehensive.py` 4종 PASS. 잔여(외부 금융소득 베이스라인)는 "other_financial_income 전탭 자동산출" 항목에 귀속.
 
 > ✅ **완료 기록(2026-06-09):** G5-A 백테(L10)·G5-B 은퇴적립(L11)·G5-C 은퇴인출 엔진(L12)·G5-D 인출기 standalone 멀티+세금(L13, 커밋 759e393)·UI 4탭 배선·배포·세금 전탭 감사(421ac71). BUG-WD-TAX·GAP-WD-MULTI 해소. 상세 = `trackG_multiaccount_plan.md` 끝 + `wiki/dev/status.md` update 39~54 + log 감사항목.
 

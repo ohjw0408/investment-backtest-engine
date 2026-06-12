@@ -106,6 +106,30 @@ class DividendSimulator:
         return max(starts).strftime("%Y-%m-%d") if starts else None
 
     def _simulate_one(self, seed, monthly, years, start_date) -> float:
+        """1윈도우 시뮬 — 메인 엔진(SimulationLoop) 월별 모드로 실행 (divrefactoring 3-5).
+
+        기존 자체 월별 루프를 제거하고 투자계산기·백테스트와 같은 파이프라인을 공유한다.
+        월별 모드 = 월말 리샘플 데이터 주입(루프 무변경, `monthly_mode.to_monthly_price_data`).
+        반환은 동일하게 "마지막 1년 순배당 합계"(`last_year_dividend`, 경계 = start+years − 1년).
+
+        구엔진 대비 의도된 차이(게이트 벤치 2026-06-13, 중앙 ~1%·최대 ~3.3%):
+        - 월내 순서가 배당→적립(구: 적립→배당) — 그 달 적립분은 그 달 배당 미수령(ex-date 정합).
+        - 리밸런싱이 TaxedOrderExecutor 경유 → 위탁 양도세 실제 부과(구: 수량 조정만, 무세금).
+        - 비중합<100% 잔여는 CashAllocator가 전액 투자(구: 미투자 방치). UI는 합 100 강제.
+        ※ self.fee_engine은 프로덕션 미사용(항상 None) — 신 경로 미반영.
+        """
+        from modules.config.simulation_config import SimulationConfig
+        from modules.core.portfolio import Portfolio, TaxTrackedPortfolio
+        from modules.execution.order_executor import OrderExecutor, TaxedOrderExecutor
+        from modules.execution.cash_allocator import CashAllocator
+        from modules.simulation.dividend_engine import DividendEngine
+        from modules.simulation.contribution_engine import ContributionEngine
+        from modules.simulation.withdrawal_engine import WithdrawalEngine
+        from modules.simulation.history_recorder import HistoryRecorder
+        from modules.simulation.simulation_loop import SimulationLoop
+        from modules.simulation.monthly_mode import to_monthly_price_data, last_year_dividend
+        from modules.rebalance.periodic import PeriodicRebalance
+
         start = pd.Timestamp(start_date)
         end   = start + pd.DateOffset(years=years)
 
@@ -119,112 +143,60 @@ class DividendSimulator:
                 return 0.0
             data[t] = sliced
 
-        # 월별 날짜 + 월 시작일 미리 계산 (매 루프마다 계산 방지)
-        months = pd.date_range(start, end, freq="ME")
-        month_starts = months - pd.offsets.MonthBegin(1)
+        m_data, m_dates = to_monthly_price_data(data)
+        # 종목별 시작 시차 → 전 종목 유효한 첫 월부터 (leading NaN 가격 오염 방지)
+        valid_froms = [df["close"].first_valid_index() for df in m_data.values()]
+        if any(v is None for v in valid_froms):
+            return 0.0
+        valid_from = max(valid_froms)
+        m_dates = [d for d in m_dates if d >= valid_from]
+        if not m_dates:
+            return 0.0
+        m_data = {t: df.loc[m_dates[0]:] for t, df in m_data.items()}
 
-        quantities = {t: 0.0 for t in self.tickers}
-
-        if seed > 0:
-            for t in self.tickers:
-                price = float(data[t]["close"].iloc[0])
-                if price > 0:
-                    quantities[t] += (seed * self.weights[t]) / price
-
-        paid_div_dates = {t: set() for t in self.tickers}
-        last_year_start = end - pd.DateOffset(years=1)
-        last_year_div   = 0.0
-        ytd_income: Dict[int, float] = {}  # year → ytd gross dividend (종합과세 판단용)
-
-        # 배당 데이터 미리 numpy 배열로 변환 (iterrows 대신 itertuples)
-        div_data = {}
-        for t in self.tickers:
-            df = data[t]
-            div_df = df[df["dividend"] > 0]
-            div_data[t] = list(div_df.itertuples())  # iterrows보다 3~5배 빠름
-
-        _contrib_end = None
+        # ISA 총한도 → 납입 중단 개월 (구엔진 _contrib_end와 동일 공식)
+        contrib_end = None
         if self._isa_total_limit and monthly > 0:
-            _remaining = max(0.0, self._isa_total_limit - seed)
-            _contrib_end = int(_remaining / monthly)
+            remaining = max(0.0, self._isa_total_limit - seed)
+            contrib_end = int(remaining / monthly)
 
-        for month_idx, (month_end, month_start_d) in enumerate(zip(months, month_starts)):
-            _effective_monthly = monthly if (_contrib_end is None or month_idx < _contrib_end) else 0.0
-            # 월 적립 매수
-            if _effective_monthly > 0:
-                for t in self.tickers:
-                    close_series = data[t]["close"]
-                    idx = close_series.index.searchsorted(month_end, side='right') - 1
-                    if idx >= 0:
-                        price = float(close_series.iloc[idx])
-                        if price > 0:
-                            amt = _effective_monthly * self.weights[t]
-                            if self.fee_engine:
-                                amt -= self.fee_engine.calc_buy_fee(amt)
-                            quantities[t] += amt / price
+        cfg = SimulationConfig(
+            start_date=str(m_dates[0].date()), end_date=str(end.date()),
+            tickers=list(self.tickers), target_weights=dict(self.weights),
+            initial_capital=float(seed), monthly_contribution=float(monthly),
+            contribution_end_months=contrib_end,
+            withdrawal_amount=0, dividend_mode=self.div_mode,
+            rebalance_frequency=(
+                None if self.rebal_mode in ("none", "band") else self.rebal_mode
+            ),
+            inflation=0.0,
+        )
 
-            # 배당 처리 (기존 로직 그대로, itertuples로 교체)
-            for t in self.tickers:
-                for row in div_data[t]:
-                    div_date = row.Index
-                    if div_date < month_start_d or div_date > month_end:
-                        continue
-                    if div_date in paid_div_dates[t]:
-                        continue
-                    paid_div_dates[t].add(div_date)
-                    gross_div = quantities[t] * float(row.dividend)
-                    if gross_div <= 0:
-                        continue
-                    # 세금 차감
-                    if self.tax_engine:
-                        ytd = ytd_income.get(div_date.year, 0.0)
-                        net_div = self.tax_engine.after_tax_dividend(
-                            gross_div, t, self._account_type, ytd
-                        )
-                        ytd_income[div_date.year] = ytd + gross_div
-                    else:
-                        net_div = gross_div
-                    if div_date >= last_year_start:
-                        last_year_div += net_div
-                    if self.div_mode == "reinvest":
-                        price = float(row.close)
-                        if price > 0:
-                            quantities[t] += net_div / price
+        strategy = PeriodicRebalance(
+            dict(self.weights),
+            rebalance_frequency=cfg.rebalance_frequency,
+            drift_threshold=self.band_width if self.rebal_mode == "band" else None,
+        )
 
-            # 리밸런싱
-            if self.rebal_mode != 'none' and len(self.tickers) > 1:
-                prices_now = {}
-                for t in self.tickers:
-                    idx = data[t]["close"].index.searchsorted(month_end, side='right') - 1
-                    if idx >= 0:
-                        prices_now[t] = float(data[t]["close"].iloc[idx])
+        if self.tax_engine is not None:
+            from modules.tax.account_tax import TaxedDividendEngine
+            from modules.tax.session import TaxSessionState
+            session = TaxSessionState(other_financial_income=0.0)  # 윈도우별 독립 연도 풀
+            portfolio  = TaxTrackedPortfolio(float(seed))
+            div_engine = TaxedDividendEngine(DividendEngine(), self.tax_engine,
+                                             self._account_type, session=session)
+            executor   = TaxedOrderExecutor(self.tax_engine, self._account_type,
+                                            session=session)
+        else:
+            portfolio  = Portfolio(float(seed))
+            div_engine = DividendEngine()
+            executor   = OrderExecutor()
 
-                total_val = sum(quantities[t] * prices_now.get(t, 0.0) for t in self.tickers)
-
-                should_rebal = False
-                if total_val > 0:
-                    if self.rebal_mode == 'monthly':
-                        should_rebal = True
-                    elif self.rebal_mode == 'quarterly':
-                        should_rebal = (month_end.month % 3 == 0)
-                    elif self.rebal_mode == 'yearly':
-                        should_rebal = (month_end.month == 12)
-                    elif self.rebal_mode == 'band':
-                        for t in self.tickers:
-                            p = prices_now.get(t, 0.0)
-                            if p > 0:
-                                current_w = (quantities[t] * p) / total_val
-                                if abs(current_w - self.weights[t]) > self.band_width:
-                                    should_rebal = True
-                                    break
-
-                if should_rebal:
-                    for t in self.tickers:
-                        p = prices_now.get(t, 0.0)
-                        if p > 0:
-                            quantities[t] = (self.weights[t] * total_val) / p
-
-        return last_year_div
+        loop = SimulationLoop(div_engine, ContributionEngine(), WithdrawalEngine(),
+                              executor, CashAllocator())
+        recorder = HistoryRecorder()
+        loop.run(portfolio, strategy, cfg, m_data, m_dates, recorder)
+        return last_year_dividend(recorder.to_dataframe(), end)
 
     MIN_CASES = 30  # 롤링 케이스 최소 보장 개수
 

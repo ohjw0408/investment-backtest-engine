@@ -1,5 +1,28 @@
 # Log
 
+## [2026-06-13] feature | 배당계산기 엔진 통합 (divrefactoring) — 게이트 PASS, P4 선행 완료
+
+오너 결정 = 게이트 방식(3-1/3-2 → 벤치마크 게이트 → 통과 시에만 교체. 미달 시 즉시 중단·보고).
+
+- **핵심 발견: 월별 모드 = 루프 무변경.** SimulationLoop이 dates 주도라 월말 리샘플 데이터 주입으로 끝 —
+  신규 `modules/simulation/monthly_mode.py`(`to_monthly_price_data` + `last_year_dividend`). plan의
+  "SimulationLoop 월별 모드 추가" 공정이 데이터 헬퍼로 축소, 기존 일별 경로 무위험.
+- **게이트 (실데이터 458730 15y×40윈도우):** 속도 세금ON 동조건 **x2.14**(기준 5배), 드리프트 중앙
+  **1%**·최대 **3.3%**(기준 5%) — **PASS.** 방향 = 신이 낮음(정확): 월내 배당→적립(ex-date 정합) +
+  리밸 양도세 실부과(구는 무세금 수량조정).
+- **교체:** `DividendSimulator._simulate_one` 내부만 메인 엔진 조립으로(자체 루프 ~120줄 제거). 상위
+  역산·캐시·합성(선택지 A 유지) 무변경 → plan 3-3 별도 Runner 불필요. 세금 ON = 윈도우별 TaxSessionState
+  공유 세션(종합과세 포함) — G2/절세 토대.
+- **보너스 핫스팟 픽스:** `TaxEngine._classify_kr_etf` 호출마다 sqlite connect → 인스턴스 캐시.
+  전 탭 세금 시뮬 ~10배 가속(벤치 세금ON 구엔진 1.53→0.15s, 신 1.73→0.32s).
+- **검증:** test_monthly_mode 6(닫힌형 진리값 앵커 ±5원 포함) + 세금 영향권 35 + zero-weight PASS.
+  시나리오 풀플로우: 확률 3.2s(189윈도우)·역산 solved_seed 1.91억/34s(구엔진 추정 30s급과 동급)·탐색 곡선.
+  벤치 재실행 = `tests/bench_div_monthly.py`.
+
+**▶ 다음 = P4 본체: 배당탭 절세액 3종 표시(이제 기존 패턴 복제). 그 뒤 후보 = 배당탭 멀티계좌(G2).**
+
+_작성: Claude (Sonnet 4.6)_
+
 ## [2026-06-13] docs | 전체 동기화 — 플랜 파일 전수 점검 + 진행상황 통일 (오너 지시)
 
 오너 "모든 플랜 파일 읽고 진행상황 동기화" → README 동기화 절차 전체 수행. 루트 plan 25개 + wiki 전부 정독,

@@ -1,7 +1,7 @@
 # 배당금 계산기 메인 엔진 통합 계획
 
 작성일: 2026-05-30  
-> **상태 (2026-06-13 동기화):** 💡 미착수. roadmap 곁가지 "배당금계산기 G2/절세액 미지원(별도 엔진)" = P4 배당 절세의 선행 후보. 착수 시 이 문서가 정본.
+> **상태: ✅ 통합 완료 (2026-06-13, 게이트 방식 — 오너 승인).** 진행 기록은 문서 끝 "구현 완료" 섹션.
 
 목표: `DividendSimulator._simulate_one`의 자체 루프를 제거하고, 투자계산기·백테스트와 동일한 `TaxableSimulationRunner + SimulationLoop` 파이프라인을 공유하게 만들기.
 
@@ -188,3 +188,37 @@ AccumulationAnalyzer와 구조적으로 동일하지만, 반환값이 `last_year
 3. 합성 데이터를 DB 기록 없이 in-memory로만 처리할 수 있는 경로가 확보되어야 한다.
 
 이 세 가지 중 하나라도 충족되지 않으면 통합을 전면 재검토해야 한다.
+
+---
+
+## ✅ 구현 완료 (2026-06-13, Claude Sonnet 4.6)
+
+오너 결정 = **게이트 방식**: 3-1/3-2 먼저 → 실데이터 벤치마크 게이트(속도 ≤5배·수치 ≤5%) 통과 시에만 교체.
+
+**구현 (plan 대비 단순화):**
+- **3-1 월별 모드 = 루프 무변경.** `SimulationLoop`은 dates 리스트 주도라 코드 수정 없이
+  월말 리샘플 데이터 주입으로 해결 — 신규 `modules/simulation/monthly_mode.py`
+  `to_monthly_price_data()`(합집합 ME 달력·close last·dividend 월합·ffill·leading NaN 유지).
+- **3-2** `last_year_dividend(history_df, window_end)` — 경계 = (start+years)−1년, 구엔진과 동일 정의.
+- **3-5** `DividendSimulator._simulate_one` 내부만 메인 엔진 조립으로 교체(자체 월별 루프 ~120줄 제거).
+  상위 레이어(`_run_rolling`·캐시·역산·곡선·시나리오) 무변경 — plan 3-3의 별도 Runner 클래스 불필요해짐.
+  ISA 총한도 = `contribution_end_months`(기보유 필드) 재사용. 세금 ON = 윈도우별 독립 `TaxSessionState`
+  + `TaxedDividendEngine`/`TaxedOrderExecutor`/`TaxTrackedPortfolio`(공유 세션 종합과세 포함 — **G2/절세
+  토대 확보**).
+- **3-4 합성 = 선택지 A**(in-memory `_simulate_synthetic` 유지, plan 권장대로).
+- **3-7** `dividend_logic.py` 무변경(인터페이스 보존).
+- **보너스: `TaxEngine._classify_kr_etf` 인스턴스 캐시** — 호출마다 sqlite connect였음(벤치 0.62s 중
+  0.38s). 전 탭 세금 시뮬 공통 ~10배 가속(구엔진 세금ON 1.53→0.15s).
+
+**게이트 결과 (tests/bench_div_monthly.py, 458730 15y×40윈도우):**
+- 속도: 무세금 x2.40 / 세금ON 동조건 **x2.14** (기준 ≤5배 **PASS**)
+- 수치 드리프트: 중앙 **0.9~1.0%** / 최대 **3.3%** (기준 ≤5% **PASS**). 방향 = 신엔진이 낮음(정확한 쪽):
+  ① 월내 순서 배당→적립(구는 그 달 적립분도 배당 수령 = ex-date 위반 과대) ② 리밸 양도세 실부과(구는 무세금).
+
+**검증:** `tests/test_monthly_mode.py` 6 PASS(월별 리샘플 손계산·경계·**닫힌형 진리값 앵커**
+(상수가격 qty_n=10만×1.005^n, ±5원)·위임 등치) + 세금 영향권 타겟 35 PASS(tax_truth·phase2f·decum·
+l_save_wd·tax_switch·연금배선) + zero-weight 회귀 + 시나리오 풀플로우 E2E(확률 3.2s/189윈도우·역산
+solved_seed 1.91억/34s/plausible·탐색 곡선).
+
+**얻은 것:** 배당탭이 단일 세금 파이프라인 합류 — 종합과세 세션·리밸 양도세·취득가 추적 자동 적용.
+후속(P4 절세액 표시·G2 멀티계좌)이 기존 패턴 복제로 가능해짐.

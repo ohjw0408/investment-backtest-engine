@@ -184,6 +184,8 @@ class TaxEngine:
         self.pension_age   = int(user_settings.get("pension_age", 65))
         # 'earned'(근로소득자, 총급여 5,500만 기준) | 'comprehensive'(종합소득자, 4,500만 기준)
         self.income_type   = user_settings.get("income_type", "earned")
+        # 분류 캐시 — _classify_kr_etf가 호출마다 sqlite connect(시뮬 핫스팟, 벤치 0.62s 중 0.38s)
+        self._classify_cache: dict = {}
 
     # ═══════════════════════════════════════════════════════════
     # 1. 배당 세후 금액
@@ -579,7 +581,19 @@ class TaxEngine:
         국내 상장 종목이 해외주식형 ETF인지 판별.
         symbol_master.db의 category 필드로 1차 판별,
         없으면 KR_DOMESTIC으로 처리.
+        결과는 엔진 인스턴스에 캐시(티커 분류는 시뮬 중 불변).
         """
+        cache = getattr(self, "_classify_cache", None)
+        if cache is None:
+            cache = self._classify_cache = {}
+        cached = cache.get(ticker)
+        if cached is not None:
+            return cached
+        result = self._classify_kr_etf_uncached(ticker)
+        cache[ticker] = result
+        return result
+
+    def _classify_kr_etf_uncached(self, ticker: str) -> str:
         try:
             from pathlib import Path
             import sqlite3

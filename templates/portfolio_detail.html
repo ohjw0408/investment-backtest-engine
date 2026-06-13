@@ -36,6 +36,7 @@
 .summary-value { font-size:1.05rem; font-weight:800; }
 
 .pd-hint { text-align:center; padding:24px 20px; color:var(--text-muted); font-size:0.85rem; }
+.pd-hist-wrap { position:relative; height:180px; }
 
 .ma-period-btn { font-size:0.75rem; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:var(--card); color:var(--text-muted); cursor:pointer; }
 .ma-period-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
@@ -67,6 +68,7 @@
   .div-month-grid { grid-template-columns:repeat(4,1fr); }
   .pd-amount-box { flex-wrap:wrap; }
   .pd-amount-box .btn-primary { width:100%; }
+  .pd-hist-wrap { height:340px; }
   .ma-card-title .btn-primary, .ma-card-title .btn-secondary { font-size:0.78rem; padding:6px 12px; }
 }
 </style>
@@ -137,7 +139,7 @@
         <button class="ma-period-btn" onclick="setHistPeriod(0,this)">전체</button>
       </div>
     </div>
-    <canvas id="pdHistChart" height="120"></canvas>
+    <div class="pd-hist-wrap" id="pdHistWrap"><canvas id="pdHistChart"></canvas></div>
     <div id="pdHistHint" class="pd-hint">총 투자금액을 입력하면 자산 추이가 표시됩니다.</div>
   </div>
 
@@ -216,7 +218,7 @@ async function applyAmount(){
   renderWeight();
   if (pdAmount <= 0) {
     document.getElementById('pdHistHint').style.display = 'block';
-    document.getElementById('pdHistChart').style.display = 'none';
+    document.getElementById('pdHistWrap').style.display = 'none';
     document.getElementById('divHint').style.display = 'block';
     document.getElementById('divChart').style.display = 'none';
     document.getElementById('divYearTabs').innerHTML = '';
@@ -291,12 +293,12 @@ function renderHist(){
   if (!d || d.empty || !d.labels || !d.labels.length) {
     document.getElementById('pdHistHint').textContent = '이 종목 구성의 과거 가격 데이터가 없습니다.';
     document.getElementById('pdHistHint').style.display = 'block';
-    document.getElementById('pdHistChart').style.display = 'none';
+    document.getElementById('pdHistWrap').style.display = 'none';
     if (_histChart) { _histChart.destroy(); _histChart = null; }
     return;
   }
   document.getElementById('pdHistHint').style.display = 'none';
-  document.getElementById('pdHistChart').style.display = 'block';
+  document.getElementById('pdHistWrap').style.display = 'block';
   renderHistChart(30);
 }
 function setHistPeriod(days, btn){
@@ -314,7 +316,7 @@ function renderHistChart(days){
   _histChart = new Chart(ctx, {
     type:'line',
     data:{ labels, datasets:[{ data: values, borderColor:'#1a73e8', backgroundColor:'rgba(26,115,232,0.08)', fill:true, tension:0.3, pointRadius:0, borderWidth:2 }]},
-    options:{ responsive:true, plugins:{ legend:{display:false},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false},
       tooltip:{ callbacks:{ label: ctx => hideAmounts ? '***원' : Math.round(ctx.parsed.y).toLocaleString()+'원' } } },
       scales:{ x:{ ticks:{ maxTicksLimit:6, font:{size:11} }, grid:{display:false} },
                y:{ ticks:{ maxTicksLimit:4, font:{size:11}, callback: v => hideAmounts ? '***' : (v>=1e8 ? (v/1e8).toFixed(1)+'억' : (v/1e4).toFixed(0)+'만') } } } }

@@ -38,6 +38,14 @@
 .rr-table th:first-child, .rr-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); font-weight: 700; }
 .rr-table th:first-child { background: var(--bg); }
 .rr-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+/* 모바일 항목 카드 (표 대체) */
+.rr-mcard { border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.rr-mcard-head { font-weight: 800; font-size: 0.92rem; margin-bottom: 8px; display: flex; align-items: center; }
+.rr-mgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.rr-mrow { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.rr-mrow .l { color: var(--text-muted); }
+.rr-mrow .v { font-weight: 700; }
 .rr-kind { font-size: 0.68rem; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
 
 .rr-chart-wrap { position: relative; height: 440px; }
@@ -111,7 +119,7 @@
       <!-- 수치표 -->
       <div class="rr-card">
         <div class="rr-card-title">📋 핵심 지표</div>
-        <div class="rr-table-wrap"><table class="rr-table" id="rrTable"></table></div>
+        <div id="rrTableHost"></div>
         <div class="rr-period" id="rrPeriod"></div>
         <div id="rrWarn"></div>
       </div>
@@ -159,6 +167,9 @@ let rrSelected = new Set();     // 선택된 포폴 id
 let rrBench = DEFAULT_BENCH.slice();
 let rrSearchTimer = null;
 let rrItems = [];               // 결과 items
+let rrLastData = null;          // 마지막 compare 응답(리사이즈 재렌더용)
+let rrTableCols = null;
+let rrResizeTimer = null;
 let rrVisible = [];             // 스파이더 표시여부(items와 동일 인덱스)
 let rrOpacity = 0.18;
 let rrScatterChart = null, rrSpiderChart = null;
@@ -264,6 +275,7 @@ async function rrCompare(){
 
 // ── 수치표 ──
 function rrRenderTable(data){
+  rrLastData = data;
   const cols = [
     ['수익률(CAGR)', it => pct(it.cagr), '연평균 복리 성장률. 높을수록 좋음.'],
     ['변동성', it => pct(it.vol), '수익률이 연 단위로 출렁이는 정도. 낮을수록 안정적.'],
@@ -276,14 +288,27 @@ function rrRenderTable(data){
     ['승률(월)', it => pct(it.win_rate, 0), '월간 수익이 플러스였던 달의 비율.'],
     ['베타', it => it.beta?.toFixed(2) ?? '—', 'S&P500(SPY) 대비 민감도. 1보다 크면 시장보다 더 출렁임.'],
   ];
-  let html = '<thead><tr><th>대상</th>' + cols.map(c => `<th title="${esc(c[2])}">${c[0]} <span style="opacity:0.5;font-weight:400;">ⓘ</span></th>`).join('') + '</tr></thead><tbody>';
-  rrItems.forEach((it,i) => {
-    const kind = it.kind === 'portfolio' ? '내포폴' : '벤치';
-    html += `<tr><td><span class="rr-dot" style="background:${colorOf(i)}"></span>${esc(it.name)}<span class="rr-kind">${kind}</span></td>` +
-      cols.map(c => `<td>${c[1](it)}</td>`).join('') + '</tr>';
-  });
-  html += '</tbody>';
-  document.getElementById('rrTable').innerHTML = html;
+  rrTableCols = cols;
+  const host = document.getElementById('rrTableHost');
+  if (window.matchMedia('(max-width:768px)').matches) {
+    // 모바일 — 항목별 카드(가로스크롤 제거)
+    host.innerHTML = rrItems.map((it,i) => {
+      const kind = it.kind === 'portfolio' ? '내포폴' : '벤치';
+      const rows = cols.map(c => `<div class="rr-mrow"><span class="l">${c[0]}</span><span class="v">${c[1](it)}</span></div>`).join('');
+      return `<div class="rr-mcard"><div class="rr-mcard-head"><span class="rr-dot" style="background:${colorOf(i)}"></span>${esc(it.name)}<span class="rr-kind">${kind}</span></div><div class="rr-mgrid">${rows}</div></div>`;
+    }).join('');
+  } else {
+    // 데스크탑 — 표
+    let html = '<div class="rr-table-wrap"><table class="rr-table"><thead><tr><th>대상</th>'
+      + cols.map(c => `<th title="${esc(c[2])}">${c[0]} <span style="opacity:0.5;font-weight:400;">ⓘ</span></th>`).join('') + '</tr></thead><tbody>';
+    rrItems.forEach((it,i) => {
+      const kind = it.kind === 'portfolio' ? '내포폴' : '벤치';
+      html += `<tr><td><span class="rr-dot" style="background:${colorOf(i)}"></span>${esc(it.name)}<span class="rr-kind">${kind}</span></td>`
+        + cols.map(c => `<td>${c[1](it)}</td>`).join('') + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    host.innerHTML = html;
+  }
 
   document.getElementById('rrPeriod').textContent = data.period
     ? `비교 기간: ${data.period.start} ~ ${data.period.end} (${data.period.years}년, 전 종목 공통 겹침 구간)`
@@ -462,6 +487,12 @@ function rrDownloadImg(){
     a.click();
   });
 }
+
+// 표↔카드 전환 (모바일/데스크탑 경계 넘을 때)
+window.addEventListener('resize', () => {
+  clearTimeout(rrResizeTimer);
+  rrResizeTimer = setTimeout(() => { if (rrItems.length && rrLastData) rrRenderTable(rrLastData); }, 200);
+});
 
 // init
 rrRenderChips();

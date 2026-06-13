@@ -25,6 +25,8 @@
 - **배포·라이브검증:** push(25d4009)→Hetzner 자동배포→4탭 전부 `limit_guard.js?v=20260613lim` 라이브 서빙.
   `tests/e2e_multitax/probe_limit_soft_live.js`(계산기 풀 동작) **6 PASS**: 모달 위반문구(ISA 2,000만)·
   예→override→하단 배너·아니오 닫힘·"오늘 하루 묻지 않기" 스킵 기록·스킵 당일 모달 생략·콘솔에러 0. 스크린샷 3종.
+  `probe_limit_soft_live3.js`(백테·은퇴·배당 3탭) **4 PASS**: 각 탭 모달 위반문구→예→override→하단 배너 + 콘솔에러 0.
+  → **4탭 전부 라이브 검증 완료.**
 
 ## [2026-06-13] feature | 배당계산기 멀티계좌 (G5-E) — 멀티계좌 전 탭 완성
 

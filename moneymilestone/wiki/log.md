@@ -1,5 +1,18 @@
 # Log
 
+## [2026-06-14] feature | 포트폴리오 비교 탭 (리스크-리턴 → 종목선택+11지표표+산점도+레이더+공유)
+
+오너: 포트폴리오끼리 비교 — 리스크리턴만으론 부족. 브레인스토밍 후 채택 = ④스파이더 + ⑤몬테카를로 부채꼴. **단 몬테카를로는 대공사라 이번엔 제외**(추후). 기존 `/risk-return`을 **"포트폴리오 비교"** 탭으로 확장.
+
+- **결정(2026-06-14)**: 지표 필수+고급(CAGR·변동성·MDD·Sharpe·배당률 + Sortino·최고/최저연·승률·베타) / 공통 겹침 기간 자동 / 벤치마크 기본셋 유지(SPY·QQQ·GLD·069500·TLT, 삭제·추가 가능) / 몬테카를로 제외 / 스파이더 표시토글+투명도 슬라이더 / 이미지·링크 저장(계산기 share 재사용).
+- **백엔드** `risk_return_logic.py`: `_metrics_full()` (기존 cagr/vol/sharpe + mdd·sortino·연최고/최저·월승률·베타) + `compute_comparison(portfolios, benchmarks, loader)`. 베타 기준 = SPY 항상 로드(표시무관). 배당률 = 종목별 직전1년 배당합÷마지막종가 → 비중가중. 기존 `compute_risk_return` 보존.
+- **API** `app.py`: `POST /api/portfolio/compare` ({portfolio_ids, benchmarks}). portfolio_ids 빈배열=선택0, 키부재=전체. 기존 `/api/risk-return` 보존.
+- **프론트** `risk_return.html` 전면 개편: 내 포트폴리오 체크박스(전체 기본선택)+벤치마크 칩(기본셋+검색)+[비교하기] → 11지표 수치표 + 리스크리턴 산점도(점=항목) + 레이더 6축(CAGR·안정성=1−vol·방어력=1−|mdd|·배당률·Sharpe·Sortino, 상대 min-max 정규화·클수록 좋음) + 항목별 표시 체크·투명도 슬라이더 + 🔗링크/📷이미지(html2canvas→/api/share/upload).
+- **nav** `base.html`: "리스크-리턴" → "포트폴리오 비교" (📊).
+- 계획 = `포트폴리오비교_plan.md`.
+
+검증(venv test_client): compare(2포폴+SPY/GLD) 200 — **SPY 베타=1.0 sanity·TLT혼합 0.62·QQQ MDD-80%(닷컴)·GLD 배당0**. 페이지 200(제목 확인). 벤치마크-only(포폴 0) 200. JS `node --check` OK. ⚠️ 실브라우저 미검증.
+
 ## [2026-06-14] fix | 포트폴리오 상세 후속 — 월칸 토글버그·CTA 상단확대·기본금액 1천만
 
 오너 피드백 3건. ① 월별 네모칸 버그: 분기배당(3·6·9·12월만)일 때 3월 클릭하면 배당 없는 1·2·4·5월까지 파랗게 선택됨. **원인 = `classList.toggle('active', cond)`에서 빈 달은 `dataset.month` undefined → `undefined && ...` = undefined → toggle 2번째 인자 undefined면 force 무시되고 매번 토글되어 active 추가**. 수정 = `!!(...)`로 boolean 강제. (myassets·portfolio_detail 동일 버그 둘 다.) ② 백테/계산기 유도 CTA 일반 사용자가 못 찾음 → 배당 박스 **밖, 자산현황 탭 맨 위 정적 배너**로 이동·확대(아이콘 2rem·제목 1.1rem 볼드·본문 0.92rem, 연파랑 유지). myassets는 `#divCta` 동적 채우기 제거 후 tab-overview 첫 카드로, portfolio_detail은 제목 아래 배너. ③ portfolio_detail 총 투자금액 **기본값 1천만원** — 진입 즉시 자동 계산(localStorage 저장값 있으면 그것, 없으면 10000000). 변경 = `templates/myassets.html`·`templates/portfolio_detail.html`(JS·HTML만, 백엔드 무변경). 검증 = JS `node --check` 2파일 OK.

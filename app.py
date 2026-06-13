@@ -1640,6 +1640,41 @@ def risk_return():
     except Exception as e:
         return jsonify({'error': f'산출 실패: {e}'}), 500
 
+
+@app.route('/api/portfolio/compare', methods=['POST'])
+def portfolio_compare():
+    """포트폴리오 비교 탭 — 선택 포폴 + 벤치마크의 11지표.
+
+    body: {portfolio_ids:[int], benchmarks:[{code,name}]}
+    portfolio_ids 비면 전체 저장 포폴. benchmarks 없으면 기본셋.
+    """
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    from risk_return_logic import compute_comparison, DEFAULT_BENCHMARKS
+    body = request.get_json(silent=True) or {}
+
+    all_p = get_portfolios(session['user_id'])
+    ids = body.get('portfolio_ids')
+    if ids is None:
+        selected = all_p           # 키 부재 = 전체
+    else:
+        idset = {int(i) for i in ids}
+        selected = [p for p in all_p if p['id'] in idset]   # 빈 배열 = 선택 0
+
+    benchmarks = []
+    for b in (body.get('benchmarks') or [])[:15]:
+        if isinstance(b, dict) and b.get('code'):
+            benchmarks.append({'code': str(b['code']), 'name': str(b.get('name') or b['code'])})
+    if not benchmarks:
+        benchmarks = DEFAULT_BENCHMARKS
+
+    try:
+        result = compute_comparison(selected, benchmarks, portfolio_engine.loader)
+        return jsonify(result)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': f'산출 실패: {e}'}), 500
+
 # -----------------------------------------------
 # 백테스트 API
 # -----------------------------------------------

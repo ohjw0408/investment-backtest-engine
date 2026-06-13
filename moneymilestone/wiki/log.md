@@ -1,5 +1,26 @@
 # Log
 
+## [2026-06-13] feature | D4 거래수수료 — 계산기·백테 (탭레벨 v1)
+
+오너 결정: 롤아웃 계산기+백테 먼저 · 수수료율 1개 통합(매수=매도) · 슬리피지 미구현 ·
+프리셋+직접입력 · 국내주식 매도 거래세 0.18% 자동가산 · 결과 총수수료만 · 기본 OFF(opt-in).
+UI는 **탭레벨 v1**(전 계좌 공통율, 계좌별 차등은 fast-follow).
+
+- **엔진(`modules/core/portfolio.py`):** `Portfolio.buy/sell` 최저 집행층에 수수료 주입 —
+  매수 `cost×율`, 매도 `proceeds×(율+거래세)`, 개별주식(`stock_tickers`=국내 is_etf=0)만
+  거래세 0.18%(`STOCK_SELL_TAX`). `total_fees` 누적. 기본 0 → 전 경로 동작 무변경.
+- **배선:** taxable_runner(단일·config 폴백)·multi_account_loop(계좌별 fee_rate)·portfolio_engine·
+  SimulationConfig·AccumulationAnalyzer·MultiAccountAnalyzer 전부 fee 패스스루 + total_fees(중앙값) surface.
+  fee_engine 신규 `build_stock_tickers`(국내주식 거래세 대상 조회).
+- **logic:** calculator/backtest_logic이 body `fee_enabled`+`fee_rate`(decimal) → 엔진, 결과에 `total_fees`.
+  normalize_multi_accounts가 계좌별 값 없으면 body 탭레벨 율 공통 적용.
+- **UI:** 계산기·백테 입력에 "거래수수료" 섹션(opt-in 체크 + 증권사 프리셋 키움/삼성/토스/직접 + 율%) +
+  결과 하단 "총 지불 거래수수료 ₩X"(`renderFeeSummary`). calculator.js v20260613fee.
+- **검증:** `test_portfolio_fee` 6 + `test_d4_fee_logic` 2 PASS(매수/매도/거래세/취득가무관/게이팅 +
+  백테 관통 total_fees>0·종료값 하락) + 멀티 회귀 50 PASS(fee=0 무변경). **배포·라이브 probe 3 PASS**
+  (`probe_fee_live.js`: 계산기 ₩23,514·백테 ₩2,002 배너·콘솔에러 0). 4탭 중 계산기·백테 라이브.
+- **잔여(fast-follow):** 계좌 카드별 수수료(증권사 다름) · 은퇴·배당 탭 롤아웃.
+
 ## [2026-06-13] feature | 납입 한도 초과 = 차단 → soft 경고(진행 선택) 전 탭 통일
 
 오너 결정: 연금/IRP/ISA 연납입 한도 초과 설정 시 에러로 막던 것을 **안내 + 진행 여부(예/아니오) +

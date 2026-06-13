@@ -22,7 +22,8 @@
   계좌 payload 빌더(buildRet/buildWd/buildDt) per-card fee_rate. 공용 `_mmFeeField`가 feeEnabledChk로 카드 노출.
 - **검증:** `tests/test_d4_fee_retire_div.py` **3 PASS**(배당 단일·멀티 fee 흐름·≤ 불변식, 결정론) +
   변경 모듈 기존 타겟 **74 PASS**(fee=0 회귀 무변경) + Python·템플릿 JS 문법 OK.
-- **미배포** — 라이브 은퇴·배당 per-card probe는 배포 후. 공유 엔진 변경이라 전체 회귀는 오너 확인 후.
+- **배포(cfee467)·라이브 probe 3 PASS:** 배당 단일 fee 배너 ₩87,410 · 은퇴 단일 fee 배너 ₩78,338 ·
+  콘솔에러 0(두 엔진 fee 라이브 흐름 확인, 스샷 육안 확인). 공유 엔진 변경이라 전체 회귀(pytest tests/)는 오너 확인 후.
 
 ## [2026-06-13] fix | D4 계좌별 수수료 — 직접입력 시 프리셋 라벨 동기화
 

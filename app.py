@@ -1394,6 +1394,20 @@ def myassets_data():
     })
 
 
+@app.route('/api/myassets/dividends')
+def myassets_dividends():
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    from modules.dividend_history import build_dividend_chart
+    try:
+        holdings = get_holdings(session['user_id'])
+        data = build_dividend_chart(portfolio_engine.loader, holdings)
+        return jsonify(data)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/myassets/settings', methods=['POST'])
 def myassets_save_settings():
     if not session.get('user_id'):

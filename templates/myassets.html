@@ -53,6 +53,8 @@
 .rebal-alert { background:var(--gold-pale); color:var(--gold-deep); font-weight: 600; }
 .ma-period-btn { font-size:0.75rem; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:var(--card); color:var(--text-muted); cursor:pointer; }
 .ma-period-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+.div-tgl { font-size:0.75rem; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:var(--card); color:var(--text-muted); cursor:pointer; }
+.div-tgl.active { background:var(--blue); color:#fff; border-color:var(--blue); }
 
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
 .summary-item { padding: 12px 14px; background: var(--bg); border-radius: 10px; }
@@ -171,6 +173,27 @@
       <div id="maHistoryEmpty" style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;display:none;">
         보유 종목을 추가하면 자산 추이가 표시됩니다.
       </div>
+    </div>
+
+    <!-- 배당금 (월별) -->
+    <div class="ma-card" id="divCard">
+      <div class="ma-card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span>💵 배당금 (월별)</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <button class="div-tgl active" data-div-tax="pretax">세전</button>
+          <button class="div-tgl" data-div-tax="posttax">세후</button>
+          <span style="width:1px;height:18px;background:var(--border);margin:0 4px;"></span>
+          <button class="div-tgl active" data-div-cur="KRW">원화</button>
+          <button class="div-tgl" data-div-cur="USD">외화 $</button>
+        </div>
+      </div>
+      <div style="position:relative;height:280px;">
+        <canvas id="divChart"></canvas>
+      </div>
+      <div id="divEmpty" style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;display:none;">
+        배당 이력이 있는 보유 종목이 없습니다.
+      </div>
+      <div id="divNote" style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;line-height:1.6;"></div>
     </div>
   </div>
 
@@ -781,6 +804,98 @@ function selectHoldingCode(code, name) {
 // 외부 클릭으로 닫기 비활성화
 
 loadAll().then(() => loadPortfolioHistory(30));
+loadDividends();
+
+// ── 배당금 월별 차트 ──
+let _divChart = null, _divData = null;
+let _divTax = 'pretax', _divCur = 'KRW';
+
+async function loadDividends() {
+  try {
+    const res = await fetch('/api/myassets/dividends', { cache: 'no-store' });
+    if (!res.ok) { document.getElementById('divEmpty').style.display = 'block'; return; }
+    _divData = await res.json();
+    renderDivChart();
+  } catch (e) {
+    document.getElementById('divEmpty').style.display = 'block';
+  }
+}
+
+function _fmtDivMoney(v, cur) {
+  if (cur === 'USD') return '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  return '₩' + Math.round(v).toLocaleString();
+}
+
+function renderDivChart() {
+  if (!_divData) return;
+  const years = [..._divData.past_years, _divData.proj_year];
+  const ser = _divData.series[_divCur][_divTax];
+  const anyData = years.some(y => (ser[y] || []).some(v => v > 0));
+  document.getElementById('divEmpty').style.display = anyData ? 'none' : 'block';
+  document.querySelector('#divCard canvas').style.display = anyData ? 'block' : 'none';
+
+  const labels  = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const palette = ['#BBDEFB', '#64B5F6', '#1976D2'];   // 과거 3년 점점 진하게
+  const datasets = years.map((y, idx) => {
+    const isProj = (y === _divData.proj_year);
+    return {
+      label: y + (isProj ? ' (예측)' : ''),
+      data: ser[y],
+      backgroundColor: isProj ? 'rgba(251,140,0,0.5)' : (palette[idx] || '#1976D2'),
+      borderColor: isProj ? '#FB8C00' : 'transparent',
+      borderWidth: isProj ? 1.5 : 0,
+    };
+  });
+
+  const ctx = document.getElementById('divChart').getContext('2d');
+  if (_divChart) _divChart.destroy();
+  _divChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${_fmtDivMoney(c.parsed.y, _divCur)}` } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: MM_CHART_GRID },
+             ticks: { font: { size: 10 }, callback: v =>
+               _divCur === 'USD' ? '$' + v : '₩' + (v / 10000).toFixed(0) + '만' } }
+      }
+    }
+  });
+
+  const note = [];
+  note.push('※ 과거 배당은 <b>현재 보유 수량</b>을 그대로 보유했다고 가정해 계산합니다.');
+  note.push(`※ ${_divData.proj_year}년은 종목별 최근 5년 배당성장률(CAGR) 기반 <b>예측치</b>입니다.`);
+  if (_divData.has_foreign) {
+    note.push('※ 해외 종목 배당은 ' +
+      (_divCur === 'KRW' ? '배당 당시 환율로 원화 환산' : '원화 종목을 배당 당시 환율로 달러 환산') +
+      ', 미래 예측은 현재 환율 기준입니다.');
+  }
+  note.push('더 정확한 과거 성과·미래 전망은 ' +
+    '<a href="/backtest" style="color:var(--blue);font-weight:600;">포트폴리오 백테스트</a> · ' +
+    '<a href="/calculator" style="color:var(--blue);font-weight:600;">투자계산기</a> 탭을 이용해 보세요.');
+  document.getElementById('divNote').innerHTML = note.join('<br>');
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-div-tax]');
+  if (t) {
+    _divTax = t.dataset.divTax;
+    document.querySelectorAll('[data-div-tax]').forEach(b => b.classList.toggle('active', b === t));
+    renderDivChart();
+    return;
+  }
+  const c = e.target.closest('[data-div-cur]');
+  if (c) {
+    _divCur = c.dataset.divCur;
+    document.querySelectorAll('[data-div-cur]').forEach(b => b.classList.toggle('active', b === c));
+    renderDivChart();
+  }
+});
 
 // ── 자산 추이 차트 ──
 let _maHistoryChart = null;

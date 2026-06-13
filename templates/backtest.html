@@ -1147,8 +1147,10 @@ function renderAnnualDividendChart(annualDiv, totalDiv) {
 function renderDividendGrowthChart(annualDiv) {
   const card = document.getElementById('btDivGrowthCard');
   if (btCharts.divGrowth) { btCharts.divGrowth.destroy(); btCharts.divGrowth = null; }
-  const rows = (annualDiv || []).filter(a => a.dividend > 0);
-  if (rows.length < 2) { card.style.display = 'none'; return; }   // 성장률은 2년 이상
+  // 마지막 연도는 그 해 배당을 다 못 받아 낮게 보이므로 제외
+  const full = (annualDiv || []).filter(a => a.dividend > 0);
+  const rows = full.slice(0, -1);
+  if (rows.length < 2) { card.style.display = 'none'; return; }   // 성장률 막대 1개 이상 필요
   card.style.display = 'block';
 
   // 전년 대비 증가율 (첫 해 제외)

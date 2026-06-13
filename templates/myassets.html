@@ -65,6 +65,17 @@
 .div-list-amt  { font-weight:700; flex-shrink:0; }
 .div-proj-badge { font-size:0.65rem; font-weight:700; color:#FB8C00; border:1px solid #FB8C00; border-radius:4px; padding:1px 5px; margin-left:6px; }
 
+/* 월별 배당 네모칸 */
+.div-month-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:12px; }
+.div-month-box { border:1.5px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center; cursor:pointer; background:var(--card); transition:border-color .15s, background .15s; }
+.div-month-box:hover { border-color:var(--blue); }
+.div-month-box.active { border-color:var(--blue); background:var(--blue); color:#fff; }
+.div-month-box.empty { opacity:0.45; cursor:default; }
+.div-month-box .m-label { font-size:0.78rem; font-weight:700; }
+.div-month-box .m-amt { font-size:0.72rem; margin-top:2px; opacity:0.85; }
+.div-month-table { border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:8px; }
+@media (max-width:768px) { .div-month-grid { grid-template-columns:repeat(4,1fr); } }
+
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
 .summary-item { padding: 12px 14px; background: var(--bg); border-radius: 10px; }
 .summary-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
@@ -205,10 +216,13 @@
       </div>
       <div id="divDrill" style="margin-top:12px;"></div>
       <div id="divCalWrap" style="margin-top:18px;">
-        <div class="ma-card-title" style="font-size:0.85rem;margin-bottom:8px;">📅 배당 일정</div>
-        <div id="divCal" class="div-list"></div>
+        <div class="ma-card-title" style="font-size:0.85rem;margin-bottom:8px;">📅 배당 일정 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 월 칸을 누르면 종목별 내역</span></div>
+        <div id="divMonthGrid" class="div-month-grid"></div>
+        <div id="divMonthDetail"></div>
+        <div id="divCal" class="div-list" style="margin-top:10px;"></div>
       </div>
-      <div id="divNote" style="font-size:0.72rem;color:var(--text-muted);margin-top:14px;line-height:1.6;"></div>
+      <div id="divCta" style="margin-top:16px;"></div>
+      <div id="divNote" style="font-size:0.72rem;color:var(--text-muted);margin-top:12px;line-height:1.6;"></div>
     </div>
   </div>
 
@@ -823,7 +837,7 @@ loadDividends();
 
 // ── 배당금: 연도 선택 + 월별 막대(드릴다운) + 배당 일정 캘린더 ──
 let _divChart = null, _divData = null;
-let _divTax = 'pretax', _divCur = 'KRW', _divYear = null;
+let _divTax = 'pretax', _divCur = 'KRW', _divYear = null, _divActiveMonth = null;
 
 async function loadDividends() {
   try {
@@ -902,8 +916,58 @@ function renderDivYear() {
     `<div class="div-drill-head">${_divYear}년 합계: ${_fmtDivMoney(total)}` +
     (hasProj ? ' <span style="color:#FB8C00;font-size:0.76rem;">(주황 = 예측)</span>' : '') +
     ` <span style="font-weight:400;color:var(--text-muted);font-size:0.78rem;">· 월 막대를 클릭하면 종목별 내역</span></div>`;
+  renderMonthGrid(monthly, monthProj);
   renderList(evs);
   renderDivNote();
+}
+
+// 월별 네모칸 + 펼침 표
+function renderMonthGrid(monthly, monthProj) {
+  const grid = document.getElementById('divMonthGrid');
+  grid.innerHTML = monthly.map((amt, i) => {
+    const has = amt > 0;
+    const cls = 'div-month-box' + (has ? '' : ' empty') + ((_divActiveMonth === i + 1) ? ' active' : '');
+    const amtTxt = has ? _fmtDivMoney(amt) : '—';
+    return `<div class="${cls}" ${has ? `data-month="${i + 1}"` : ''}>
+      <div class="m-label">${i + 1}월${monthProj[i] && has ? ' *' : ''}</div>
+      <div class="m-amt">${amtTxt}</div>
+    </div>`;
+  }).join('');
+  if (_divActiveMonth) renderMonthDetail(_divActiveMonth);
+  else document.getElementById('divMonthDetail').innerHTML = '';
+}
+
+function showMonth(month) {
+  _divActiveMonth = (_divActiveMonth === month) ? null : month;
+  document.querySelectorAll('#divMonthGrid .div-month-box').forEach(b =>
+    b.classList.toggle('active', b.dataset.month && parseInt(b.dataset.month) === _divActiveMonth));
+  if (_divActiveMonth) renderMonthDetail(_divActiveMonth);
+  else document.getElementById('divMonthDetail').innerHTML = '';
+}
+
+function renderMonthDetail(month) {
+  const evs = (_divData.events[_divYear] || []).filter(e => e.month === month);
+  const byCode = {};
+  evs.forEach(e => {
+    if (!byCode[e.code]) byCode[e.code] = { name: e.name, val: 0, dates: [], proj: false };
+    byCode[e.code].val += _valOf(e);
+    byCode[e.code].dates.push(e.date.slice(5));
+    if (e.projected) byCode[e.code].proj = true;
+  });
+  const rows = Object.values(byCode).sort((a, b) => b.val - a.val);
+  const total = rows.reduce((s, v) => s + v.val, 0);
+  let html = `<div class="div-month-table"><div class="div-drill-head" style="padding:8px 12px;border-bottom:1px solid var(--border);">${month}월 배당: ${_fmtDivMoney(total)}</div>`;
+  if (!rows.length) {
+    html += '<div style="color:var(--text-muted);font-size:0.82rem;padding:10px 12px;">이 달은 배당이 없습니다.</div>';
+  } else {
+    rows.forEach(v => {
+      html += `<div class="div-list-item"><span class="div-list-date" style="min-width:64px;">${v.dates.join(', ')}</span>` +
+        `<span class="div-list-name">${v.name}${v.proj ? '<span class="div-proj-badge">예측</span>' : ''}</span>` +
+        `<span class="div-list-amt">${_fmtDivMoney(v.val)}</span></div>`;
+    });
+  }
+  html += '</div>';
+  document.getElementById('divMonthDetail').innerHTML = html;
 }
 
 function renderDrill(month) {
@@ -964,10 +1028,14 @@ function renderDivNote() {
       (_divCur === 'KRW' ? '배당 당시 환율로 원화 환산' : '원화 종목을 배당 당시 환율로 달러 환산') +
       ', 미래 예측은 현재 환율 기준입니다.');
   }
-  note.push('더 정확한 과거 성과·미래 전망은 ' +
-    '<a href="/backtest" style="color:var(--blue);font-weight:600;">포트폴리오 백테스트</a> · ' +
-    '<a href="/calculator" style="color:var(--blue);font-weight:600;">투자계산기</a> 탭을 이용해 보세요.');
   document.getElementById('divNote').innerHTML = note.join('<br>');
+  document.getElementById('divCta').innerHTML =
+    '<div style="display:flex;align-items:center;gap:10px;padding:13px 16px;background:rgba(25,118,210,0.10);' +
+    'border:1px solid rgba(25,118,210,0.45);border-radius:10px;font-size:0.92rem;line-height:1.5;color:var(--text);">' +
+    '<span style="font-size:1.25rem;flex-shrink:0;">💡</span>' +
+    '<span>더 정확한 과거 성과·미래 전망이 궁금하다면? ' +
+    '<a href="/backtest" style="color:var(--blue);font-weight:700;text-decoration:underline;">포트폴리오 백테스트</a> · ' +
+    '<a href="/calculator" style="color:var(--blue);font-weight:700;text-decoration:underline;">투자계산기</a>로 정밀하게 확인해 보세요.</span></div>';
 }
 
 document.addEventListener('click', e => {
@@ -980,9 +1048,11 @@ document.addEventListener('click', e => {
     document.querySelectorAll('[data-div-cur]').forEach(b => b.classList.toggle('active', b === c));
     renderDivYear(); return; }
   const y = e.target.closest('[data-div-year]');
-  if (y) { _divYear = parseInt(y.dataset.divYear);
+  if (y) { _divYear = parseInt(y.dataset.divYear); _divActiveMonth = null;
     document.querySelectorAll('[data-div-year]').forEach(b => b.classList.toggle('active', b === y));
-    renderDivYear(); }
+    renderDivYear(); return; }
+  const mb = e.target.closest('#divMonthGrid .div-month-box[data-month]');
+  if (mb) { showMonth(parseInt(mb.dataset.month)); }
 });
 
 // ── 자산 추이 차트 ──

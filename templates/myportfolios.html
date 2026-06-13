@@ -163,10 +163,11 @@ function mpRenderList() {
     return `<div class="mp-card">
       <div class="mp-card-head">
         <div>
-          <div class="mp-name">${esc(p.name)}</div>
+          <div class="mp-name" style="cursor:pointer;" title="상세 열기" onclick="location.href='/myportfolios/${p.id}'">${esc(p.name)} <span style="font-size:0.72rem;color:var(--blue);font-weight:600;">상세 ›</span></div>
           <div class="mp-date">수정 ${esc(date)} · 종목 ${p.tickers.length}개</div>
         </div>
         <div class="mp-actions">
+          <button class="icon-btn" title="상세 열기 (수량·배당·추이)" onclick="location.href='/myportfolios/${p.id}'">📂</button>
           <button class="icon-btn" title="수정" onclick="mpOpenEdit(${p.id})">✏️</button>
           <button class="icon-btn danger" title="삭제" onclick="mpDelete(${p.id})">🗑</button>
         </div>

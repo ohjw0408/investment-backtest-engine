@@ -239,6 +239,18 @@ def get_portfolios(user_id):
     return out
 
 
+def get_portfolio(user_id, portfolio_id):
+    row = _get_conn().execute(
+        "SELECT * FROM saved_portfolios WHERE id=? AND user_id=?",
+        (portfolio_id, user_id)
+    ).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    d["tickers"] = json.loads(d.pop("tickers_json"))
+    return d
+
+
 def upsert_portfolio(user_id, name, tickers, portfolio_id=None):
     """저장/수정. 신규 생성 시 한도 초과면 ValueError."""
     now = datetime.now().isoformat()

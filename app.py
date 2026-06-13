@@ -12,7 +12,7 @@ from modules.auth_manager import (
     get_groups, upsert_group, delete_group,
     get_holdings, upsert_holding, delete_holding,
     init_holdings_db, get_settings, save_settings,
-    init_portfolios_db, get_portfolios, upsert_portfolio, delete_portfolio,
+    init_portfolios_db, get_portfolios, get_portfolio, upsert_portfolio, delete_portfolio,
 )
 
 load_dotenv()
@@ -277,6 +277,10 @@ def risk_return_page():
 @app.route('/myportfolios')
 def myportfolios():
     return render_template('myportfolios.html')
+
+@app.route('/myportfolios/<int:pid>')
+def myportfolio_detail(pid):
+    return render_template('portfolio_detail.html', pid=pid)
 
 @app.route('/myassets')
 def myassets():
@@ -755,21 +759,15 @@ def dividend_target_solve():
 # API - 포트폴리오 히스토리 (실제 역산)
 # -----------------------------------------------
 
-@app.route('/api/portfolio/history')
-def portfolio_history():
+def _compute_portfolio_history(valid):
+    """valid = [(code, qty)] (qty>0). 평가금액 추이 dict 반환 (hide_amounts 미포함)."""
     import sqlite3 as _sq
     from pathlib import Path as _P
     from datetime import datetime, timedelta
     import re
 
-    uid = session.get('user_id')
-    if not uid:
-        return jsonify({"empty": True, "labels": [], "values": [], "hide_amounts": True})
-
-    holdings = get_holdings(uid)
-    valid = [(h['code'], float(h['quantity'])) for h in holdings if h.get('quantity') and h['quantity'] > 0]
     if not valid:
-        return jsonify({"empty": True, "labels": [], "values": [], "hide_amounts": _hide_amounts_for_user(uid)})
+        return {"empty": True, "labels": [], "values": []}
 
     # USD/KRW 환율
     try:
@@ -850,7 +848,7 @@ def portfolio_history():
     pc.close()
 
     if not price_map:
-        return jsonify({"empty": True, "labels": [], "values": [], "hide_amounts": _hide_amounts_for_user(uid)})
+        return {"empty": True, "labels": [], "values": []}
 
     # 전체 날짜 합집합 정렬
     all_dates = sorted(set().union(*[set(v.keys()) for v in price_map.values()]))
@@ -874,7 +872,7 @@ def portfolio_history():
             values.append(round(total))
 
     if not values:
-        return jsonify({"empty": True, "labels": [], "values": [], "hide_amounts": _hide_amounts_for_user(uid)})
+        return {"empty": True, "labels": [], "values": []}
 
     current_prices = _get_current_asset_prices(codes)
     current_total = sum(qty * current_prices.get(code, 0) for code, qty in valid)
@@ -888,13 +886,24 @@ def portfolio_history():
 
     current = values[-1]
     change = round((values[-1] / values[0] - 1) * 100, 2) if values[0] else 0
-    return jsonify({
+    return {
         "labels": labels,
         "values": values,
         "current": current,
         "change": change,
-        "hide_amounts": _hide_amounts_for_user(uid),
-    })
+    }
+
+
+@app.route('/api/portfolio/history')
+def portfolio_history():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"empty": True, "labels": [], "values": [], "hide_amounts": True})
+    holdings = get_holdings(uid)
+    valid = [(h['code'], float(h['quantity'])) for h in holdings if h.get('quantity') and h['quantity'] > 0]
+    result = _compute_portfolio_history(valid)
+    result["hide_amounts"] = _hide_amounts_for_user(uid)
+    return jsonify(result)
 
 
 # -----------------------------------------------
@@ -1503,11 +1512,16 @@ def portfolio_save():
             weight = float(t.get('weight', 0))
         except (TypeError, ValueError):
             return jsonify({'error': '비중은 숫자여야 합니다.'}), 400
+        try:
+            quantity = float(t.get('quantity', 0) or 0)
+        except (TypeError, ValueError):
+            quantity = 0.0
         cleaned.append({
             'code':   str(t['code']),
             'name':   str(t.get('name', t['code'])),
             'badge':  str(t.get('badge', '')),
             'weight': weight,
+            'quantity': quantity,
         })
     try:
         upsert_portfolio(
@@ -1525,6 +1539,83 @@ def portfolio_delete(portfolio_id):
         return jsonify({'error': '로그인 필요'}), 401
     delete_portfolio(session['user_id'], portfolio_id)
     return jsonify({'ok': True})
+
+
+# -----------------------------------------------
+# 저장 포트폴리오 상세 (수량 입력 → 비중·추이·배당)
+# -----------------------------------------------
+
+@app.route('/api/portfolio/item/<int:portfolio_id>', methods=['GET'])
+def portfolio_item(portfolio_id):
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    p = get_portfolio(session['user_id'], portfolio_id)
+    if not p:
+        return jsonify({'error': '없는 포트폴리오'}), 404
+    return jsonify({'id': p['id'], 'name': p['name'], 'tickers': p['tickers'],
+                    'updated_at': p['updated_at']})
+
+
+def _detail_valid(tickers):
+    """요청 tickers → [(code, qty)] (qty>0)."""
+    out = []
+    for t in (tickers or []):
+        if not isinstance(t, dict):
+            continue
+        code = str(t.get('code', '')).strip()
+        try:
+            qty = float(t.get('quantity') or 0)
+        except (TypeError, ValueError):
+            qty = 0.0
+        if code and qty > 0:
+            out.append((code, qty))
+    return out
+
+
+@app.route('/api/portfolio/compute', methods=['POST'])
+def portfolio_compute():
+    """tickers:[{code, quantity}] → 현재가 + 평가금액 추이."""
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    body  = request.get_json(silent=True) or {}
+    valid = _detail_valid(body.get('tickers'))
+    codes = list({c for c, _ in valid})
+    prices  = _get_current_asset_prices(codes) if codes else {}
+    history = _compute_portfolio_history(valid)
+    return jsonify({
+        'prices': prices,
+        'history': history,
+        'hide_amounts': _hide_amounts_for_user(session['user_id']),
+    })
+
+
+@app.route('/api/portfolio/dividends-preview', methods=['POST'])
+def portfolio_dividends_preview():
+    """tickers:[{code, quantity, account_type}] → 배당 차트 데이터 (내자산과 동일 엔진)."""
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    from modules.dividend_history import build_dividend_chart
+    body = request.get_json(silent=True) or {}
+    holdings = []
+    for t in (body.get('tickers') or []):
+        if not isinstance(t, dict):
+            continue
+        try:
+            qty = float(t.get('quantity') or 0)
+        except (TypeError, ValueError):
+            qty = 0.0
+        if t.get('code') and qty > 0:
+            holdings.append({
+                'code': str(t['code']),
+                'quantity': qty,
+                'account_type': t.get('account_type', '일반'),
+            })
+    try:
+        data = build_dividend_chart(portfolio_engine.loader, holdings)
+        return jsonify(data)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/risk-return', methods=['POST'])

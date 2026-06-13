@@ -1,9 +1,11 @@
 # 리스크-리턴 도표 계획 (아이디어 기록)
 
-작성: 2026-06-03 (Claude, 오너 아이디어). 상태: ✅ **완료 (2026-06-12, `/risk-return`).**
+작성: 2026-06-03 (Claude, 오너 아이디어). 상태: ✅ **완료 (2026-06-12, `/risk-return`) → 2026-06-14 "포트폴리오 비교" 탭으로 확장 흡수.**
 구현 = `risk_return_logic.py` + `POST /api/risk-return` + `templates/risk_return.html`.
 오너 결정(2026-06-12): CAGR+일간√252(총수익) / 공통 겹침 기간(3년 미만 ⚠) / 고정 5종+사용자 추가 / 독립 페이지.
-검증 = `tests/test_risk_return.py` 7 + `tests/test_risk_return_browser.js` 8 PASS. 잔여 = 벤치마크 영속화(후속).
+검증 = `tests/test_risk_return.py` 7 + `tests/test_risk_return_browser.js` 8 PASS.
+
+> **2026-06-14 확장:** 이 산점도는 **`포트폴리오비교_plan.md`**의 "포트폴리오 비교" 탭에 통합됨(`/risk-return` URL 유지, nav 라벨 "포트폴리오 비교"). 포폴 체크박스 선택 + 11지표 수치표 + 산점도 + 레이더 + 공유 추가. 신규 엔진 = `compute_comparison`(기존 `compute_risk_return`도 보존). 벤치마크 영속화는 미적용(세션/기본셋).
 레퍼런스: FunETF 위험-수익 산점도(표절 인정 ㅇㅇ).
 **선행조건:** 포트폴리오 즐겨찾기 기능 — ✅ 해소(2026-06-12, B1).
 

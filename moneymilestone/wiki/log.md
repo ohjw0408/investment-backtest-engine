@@ -1,5 +1,9 @@
 # Log
 
+## [2026-06-14] fix | 비교탭 모바일 표→항목카드(가로스크롤 제거) + 상세 자산추이 차트 2배
+
+오너: 비교탭 패딩/폰트만 줄인 1차 모바일 수정은 11열 표라 가로스크롤 그대로 → 효과 미미(반영은 됨, 인라인 style이라 캐시無). ① **비교탭 모바일 = 항목별 카드**(포폴/벤치마다 카드, 지표 라벨/값 2열 그리드 세로 나열) → 가로스크롤 제거. 데스크탑은 표 유지, `window.resize`로 표↔카드 전환(`rrLastData` 재렌더). `#rrTable`→`#rrTableHost` 호스트 div. ② **상세 자산추이 차트** canvas 래퍼+`maintainAspectRatio:false`, 데스크탑 180px·모바일 340px(약 2배). CSS+JS, 백엔드 무변경. 검증 = risk_return·portfolio_detail JS `node --check` OK. 커밋 6a61770.
+
 ## [2026-06-14] fix | 배당성장률 마지막연도 제외 + 모바일 최적화(내포폴·비교·상세)
 
 오너 후속 2건. ① 배당 성장률 차트 **마지막 연도 제외**(그 해 배당 다 못 받아 낮게 보임) — `renderDividendGrowthChart`에서 `full.slice(0,-1)`로 마지막 빼고 성장률·CAGR 계산(막대 1개 이상 위해 3년+ 필요). ② **모바일 최적화** — `risk_return`(.rr-card 패딩↓·수치표 셀 패딩/폰트↓·[비교하기] 풀폭·검색/투명도 풀폭), `myportfolios`(헤더 wrap·+버튼 풀폭·모달 액션 flex), `portfolio_detail`(금액박스 wrap·계산버튼 풀폭). CSS만(JS 무변경, backtest만 성장률 JS 변경).

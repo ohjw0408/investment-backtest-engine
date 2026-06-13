@@ -935,14 +935,24 @@ function renderList(evs) {
     el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:10px 12px;">배당 일정이 없습니다.</div>';
     return;
   }
-  const sorted = [...evs].sort((a, b) => a.date < b.date ? -1 : 1);
-  el.innerHTML = sorted.map(e =>
-    `<div class="div-list-item">` +
-      `<span class="div-list-date">${e.date.slice(5).replace('-', '/')}</span>` +
-      `<span class="div-list-name">${e.name}${e.projected ? '<span class="div-proj-badge">예측</span>' : ''}</span>` +
-      `<span class="div-list-amt">${_fmtDivMoney(_valOf(e))}</span>` +
-    `</div>`
-  ).join('');
+  // 같은 종목끼리 1행으로 묶음 — 연 합계 + 지급월 목록
+  const byCode = {};
+  evs.forEach(e => {
+    if (!byCode[e.code]) byCode[e.code] = { name: e.name, val: 0, months: new Set(), anyProj: false };
+    const g = byCode[e.code];
+    g.val += _valOf(e);
+    g.months.add(e.month);
+    if (e.projected) g.anyProj = true;
+  });
+  const rows = Object.values(byCode).sort((a, b) => b.val - a.val);
+  el.innerHTML = rows.map(g => {
+    const months = [...g.months].sort((a, b) => a - b).map(m => m + '월').join('·');
+    return `<div class="div-list-item">` +
+      `<span class="div-list-date" style="width:auto;min-width:78px;">${months}</span>` +
+      `<span class="div-list-name">${g.name}${g.anyProj ? '<span class="div-proj-badge">예측</span>' : ''}</span>` +
+      `<span class="div-list-amt">${_fmtDivMoney(g.val)}</span>` +
+    `</div>`;
+  }).join('');
 }
 
 function renderDivNote() {

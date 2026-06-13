@@ -40,9 +40,11 @@ def test_current_year_mixed():
     reals = [e for e in cur if not e["projected"]]
     projs = [e for e in cur if e["projected"]]
     assert reals, "올해 실데이터(실적) 이벤트가 있어야 함"
-    assert projs, "올해 남은 달 예측 이벤트가 있어야 함"
-    # 실적 이벤트의 달 < 예측 이벤트의 달 (경계 = 이번 달)
-    assert max(e["month"] for e in reals) <= min(e["month"] for e in projs)
+    assert projs, "올해 빈 달 예측 이벤트가 있어야 함"
+    # 실적/예측은 같은 달이 중복되지 않음 (실데이터 있는 달은 예측 안 함)
+    real_months = {e["month"] for e in reals}
+    proj_months = {e["month"] for e in projs}
+    assert real_months.isdisjoint(proj_months)
 
 
 def test_event_fields():

@@ -1,5 +1,23 @@
 # Log
 
+## [2026-06-13] feature | D4 fast-follow ① 계좌별 거래수수료 UI
+
+탭레벨 v1(전 계좌 공통율)을 **계좌 카드별 수수료율 입력**으로 확장 — 증권사가 계좌마다 다른 점 반영.
+백엔드는 D4 v1에서 이미 계좌별 `fee_rate` 수신·집행(`multi_account_loop` L634 → `Portfolio.buy/sell`,
+`normalize_multi_accounts` 계좌별 값 우선·미지정 시 탭레벨 폴백). 이번엔 **UI만** 추가.
+
+- **공용 `static/js/multi_account_ui.js`:** `_mmFeeField(acc, i)` 추가 — 증권사 프리셋(키움/삼성/토스/직접)
+  + 율% 입력. **`feeEnabledChk` 켜진 경우에만 렌더** → 그 체크박스 없는 은퇴·배당 탭은 자동 미표시(미배선 보호).
+  상태 `acc.fee_rate_pct`(%), 미지정이면 탭레벨 `feeRateInput` 시드. `updateAccountFeePreset`(상태+입력칸 동기화),
+  `updateAccountFeeRate`(재렌더 없이 상태만 — 커서 유지 정책). 카드0·카드 i>0 둘 다 삽입.
+- **계산기·백테:** `toggleFeePanel`에 멀티계좌 재렌더 추가(필드 노출/숨김). payload 빌더 2곳
+  (`buildCalculatorAccountsPayload`·백테 inline)이 계좌마다 `fee_rate`(decimal, `_mmAccountFeePct/100`) 부착(opt-in 시).
+- **캐시버전:** `?v=20260613feecard`(multi_account_ui 4탭 + calculator.js).
+- **검증:** 신규 `tests/test_fee_card_dom.js` jsdom **14 PASS**(fee OFF→필드 미표시·ON→프리셋+율 렌더·탭 시드 기본·
+  탭값=프리셋 selected·계좌별 상태 갱신·음수 클램프·타계좌 무영향·프리셋 DOM 동기화·custom 무변경) +
+  `test_d4_fee_logic` **4 PASS**(신규 2 = normalize 계좌별 우선·disabled→0) + JS 문법 OK.
+- **미배포** — 라이브 per-card 멀티계좌 probe는 배포 후. 잔여 fast-follow ② 은퇴·배당 탭 롤아웃(백엔드 미배선).
+
 ## [2026-06-13] feature | D4 거래수수료 — 계산기·백테 (탭레벨 v1)
 
 오너 결정: 롤아웃 계산기+백테 먼저 · 수수료율 1개 통합(매수=매도) · 슬리피지 미구현 ·

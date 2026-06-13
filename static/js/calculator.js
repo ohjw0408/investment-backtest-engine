@@ -289,6 +289,7 @@ function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
   if (accs.length <= 1) return null;
 
   const renewalOn = document.getElementById('isaRenewalCheck')?.checked ?? false;
+  const feeOn = document.getElementById('feeEnabledChk')?.checked ?? false;
 
   const primary = {
     type: accs[0]?.type || '위탁',
@@ -300,6 +301,7 @@ function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
     dividend_mode: dividendMode,
     isa_renewal: renewalOn && (accs[0]?.type === 'ISA'),
     priority: Number(accs[0]?.priority ?? 1),
+    ...(feeOn ? { fee_rate: _mmAccountFeePct(accs[0]) / 100 } : {}),
   };
 
   const accounts = [primary];
@@ -324,6 +326,7 @@ function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
       dividend_mode: dividendMode,
       isa_renewal: renewalOn && (accs[i].type === 'ISA'),
       priority: Number(accs[i].priority ?? (i + 1)),
+      ...(feeOn ? { fee_rate: _mmAccountFeePct(accs[i]) / 100 } : {}),
     });
   }
   return accounts;
@@ -335,6 +338,8 @@ function toggleFeePanel() {
   const on = document.getElementById('feeEnabledChk')?.checked;
   const body = document.getElementById('feePanelBody');
   if (body) body.style.display = on ? 'block' : 'none';
+  // 멀티계좌면 카드별 수수료 입력 노출/숨김 위해 재렌더.
+  if (window.taxEnabled && (window.taxAccounts || []).length > 1) renderTaxAccounts();
 }
 function applyFeePreset(v) {
   if (v === 'custom') return;

@@ -73,3 +73,31 @@ def test_fee_zero_rate_is_noop():
         on0 = backtest_logic.run_backtest_logic(_body(fee_enabled=True, fee_rate=0.0))
     # fee_enabled지만 율 0 → 수수료 0
     assert on0["total_fees"] == 0.0
+
+
+# ── fast-follow ① 계좌별 수수료: normalize 계약(UI가 계좌별 fee_rate 전송 시 폴백 우선) ──
+from modules.multi_account_common import normalize_multi_accounts
+
+
+def test_normalize_per_account_fee_rate_overrides_body_fallback():
+    body = {
+        "fee_enabled": True,
+        "fee_rate": 0.00015,  # 탭레벨 공통(폴백)
+        "accounts": [
+            {"tickers": [{"code": ETF, "weight": 1.0}], "fee_rate": 0.0002},  # 계좌 지정
+            {"tickers": [{"code": ETF, "weight": 1.0}]},                       # 미지정 → 폴백
+        ],
+    }
+    accs = normalize_multi_accounts(body)
+    assert accs[0]["fee_rate"] == 0.0002      # 계좌 지정값 우선
+    assert accs[1]["fee_rate"] == 0.00015     # 미지정 → 탭레벨 폴백
+
+
+def test_normalize_fee_rate_zero_when_disabled():
+    body = {
+        "fee_enabled": False,
+        "fee_rate": 0.0002,
+        "accounts": [{"tickers": [{"code": ETF, "weight": 1.0}], "fee_rate": 0.0002}],
+    }
+    accs = normalize_multi_accounts(body)
+    assert accs[0]["fee_rate"] == 0.0         # opt-out → 0(기존 결과 회귀 없음)

@@ -409,7 +409,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260612fav2"></script>
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260613feecard"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
 <script>
@@ -590,6 +590,7 @@ function buildBtAccountsPayload(rebalMode, bandWidth, dividendMode) {
   const accs = window.taxAccounts || [];
   if (accs.length <= 1) return null;
   const renewalOn = document.getElementById('isaRenewalCheck')?.checked ?? false;
+  const feeOn = document.getElementById('feeEnabledChk')?.checked ?? false;
   const primary = {
     type: accs[0]?.type || '위탁',
     initial_capital: parseFloat(document.getElementById('btSeed').value) || 0,
@@ -598,6 +599,7 @@ function buildBtAccountsPayload(rebalMode, bandWidth, dividendMode) {
     rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
     isa_renewal: renewalOn && (accs[0]?.type === 'ISA'),
     priority: Number(accs[0]?.priority ?? 1),
+    ...(feeOn ? { fee_rate: _mmAccountFeePct(accs[0]) / 100 } : {}),
   };
   const accounts = [primary];
   for (let i = 1; i < accs.length; i++) {
@@ -614,6 +616,7 @@ function buildBtAccountsPayload(rebalMode, bandWidth, dividendMode) {
       rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
       isa_renewal: renewalOn && (accs[i].type === 'ISA'),
       priority: Number(accs[i].priority ?? (i + 1)),
+      ...(feeOn ? { fee_rate: _mmAccountFeePct(accs[i]) / 100 } : {}),
     });
   }
   return accounts;
@@ -687,6 +690,8 @@ function toggleFeePanel() {
   const on = document.getElementById('feeEnabledChk')?.checked;
   const body = document.getElementById('feePanelBody');
   if (body) body.style.display = on ? 'block' : 'none';
+  // 멀티계좌면 카드별 수수료 입력 노출/숨김 위해 재렌더.
+  if (window.taxEnabled && (window.taxAccounts || []).length > 1) renderTaxAccounts();
 }
 function applyFeePreset(v) {
   if (v === 'custom') return;

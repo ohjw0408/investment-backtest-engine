@@ -1,7 +1,6 @@
 /**
- * 내자산 배당금 월별 차트 실브라우저 검증 (로그인 필요 — 로컬 전용).
+ * 내자산 배당금 차트(연도선택+막대드릴다운+캘린더) 실브라우저 검증 (로그인 필요, 로컬).
  * 실행: node tests/test_dividend_chart_browser.js <sessionCookie> [baseUrl]
- *   sessionCookie = tests/mint_session.py 출력값.
  */
 const { chromium } = require('playwright');
 const COOKIE = process.argv[2];
@@ -23,7 +22,7 @@ function ok(name, cond) {
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 
-  // ── 테스트 보유종목 시드: SCHD(US 일반) + 458730(KR ISA) ──
+  // 시드: SCHD(US 일반) + 458730(KR ISA)
   await page.goto(BASE + '/myassets', { waitUntil: 'networkidle' });
   await page.evaluate(async () => {
     const items = await fetch('/api/myassets/data').then(r => r.json());
@@ -38,42 +37,69 @@ function ok(name, cond) {
   await page.goto(BASE + '/myassets', { waitUntil: 'networkidle' });
   await page.waitForFunction("typeof _divChart !== 'undefined' && _divChart !== null", { timeout: 30000 });
 
-  // 카드 + 차트
-  ok('배당금 카드 존재', !!(await page.$('#divCard')));
-  const info = await page.evaluate(() => ({
-    datasets: _divChart.data.datasets.map(d => d.label),
+  // 연도 선택기 — 과거3+예측1 = 4탭, 기본 = 직전연도(실데이터)
+  const yearTabs = await page.$$eval('#divYearTabs .div-tgl', els => els.map(e => e.textContent));
+  ok('연도 선택기 4개(과거3+예측1)', yearTabs.length === 4);
+  ok('예측 연도 라벨', yearTabs[3].includes('예측'));
+  const defActive = await page.$eval('#divYearTabs .div-tgl.active', e => e.textContent);
+  ok('기본 선택 = 직전연도(실데이터)', defActive === String(new Date().getFullYear() - 1));
+
+  // 단일 연도 12개월 막대 (단일 데이터셋)
+  const chartInfo = await page.evaluate(() => ({
     months: _divChart.data.labels.length,
-    pastYears: _divData.past_years, proj: _divData.proj_year,
-    hasForeign: _divData.has_foreign,
-    pretaxKRW: _divData.past_years.reduce((s, y) => s + _divData.series.KRW.pretax[y].reduce((a, b) => a + b, 0), 0),
+    datasets: _divChart.data.datasets.length,
+    year: _divYear,
   }));
-  ok('x축 = 12개월', info.months === 12);
-  ok('시리즈 = 과거3년+예측1년', info.datasets.length === 4);
-  ok('예측 연도 라벨 표시', info.datasets[3].includes('예측'));
-  ok('해외자산 감지', info.hasForeign === true);
-  ok('과거 배당 > 0', info.pretaxKRW > 0);
+  ok('x축 = 12개월', chartInfo.months === 12);
+  ok('단일 연도 막대(1 데이터셋)', chartInfo.datasets === 1);
 
-  // 세후 토글 → 값 감소 (US 일반 15% 과세분)
-  const before = await page.evaluate(() =>
-    _divChart.data.datasets[2].data.reduce((a, b) => a + b, 0));
+  // 배당 있는 달 찾아서 드릴다운 호출
+  const drillMonth = await page.evaluate(() => {
+    const evs = _divData.events[_divYear];
+    const m = evs.length ? evs[0].month : 1;
+    renderDrill(m);
+    return m;
+  });
+  await page.waitForTimeout(200);
+  const drillTxt = await page.textContent('#divDrill');
+  ok('막대 드릴다운 = 종목별 내역', drillTxt.includes(drillMonth + '월 배당') &&
+     (drillTxt.includes('SCHD') || drillTxt.includes('Schwab') || drillTxt.includes('TIGER') || drillTxt.includes('₩')));
+
+  // 캘린더 — 12개 미니월 + 배당일 마킹
+  const cal = await page.evaluate(() => ({
+    months: document.querySelectorAll('#divCal .div-mini-month').length,
+    marked: document.querySelectorAll('#divCal .has-div').length,
+  }));
+  ok('캘린더 = 12개월 그리드', cal.months === 12);
+  ok('캘린더 배당일 마킹 존재', cal.marked > 0);
+
+  // 연도 전환 — 예측연도 클릭
+  await page.click(`#divYearTabs .div-tgl:last-child`);
+  await page.waitForTimeout(300);
+  ok('예측연도 전환 반영', await page.evaluate(() => _divYear === _divData.proj_year));
+
+  // 세후 토글 → 합계 감소 (직전연도 복귀 후)
+  await page.click(`#divYearTabs .div-tgl:nth-child(3)`);
+  await page.waitForTimeout(200);
+  const preTotal = await page.evaluate(() =>
+    _divChart.data.datasets[0].data.reduce((a, b) => a + b, 0));
   await page.click('[data-div-tax="posttax"]');
-  await page.waitForTimeout(400);
-  const after = await page.evaluate(() =>
-    _divChart.data.datasets[2].data.reduce((a, b) => a + b, 0));
-  ok('세후 토글 → 값 감소', after < before && after > 0);
+  await page.waitForTimeout(200);
+  const postTotal = await page.evaluate(() =>
+    _divChart.data.datasets[0].data.reduce((a, b) => a + b, 0));
+  ok('세후 토글 → 합계 감소', postTotal < preTotal && postTotal > 0);
 
-  // 외화 토글 → 값 변화(달러 환산, 원화보다 작음)
+  // 외화 토글 → 달러 환산(원화보다 작음)
   await page.click('[data-div-cur="USD"]');
-  await page.waitForTimeout(400);
-  const usd = await page.evaluate(() =>
-    _divChart.data.datasets[2].data.reduce((a, b) => a + b, 0));
-  ok('외화($) 토글 → 달러 환산(원화보다 작음)', usd > 0 && usd < after);
+  await page.waitForTimeout(200);
+  const usdTotal = await page.evaluate(() =>
+    _divChart.data.datasets[0].data.reduce((a, b) => a + b, 0));
+  ok('외화 토글 → 달러 환산', usdTotal > 0 && usdTotal < postTotal);
 
   // 안내문구
   const note = await page.textContent('#divNote');
-  ok('안내: 현재 보유 수량 가정', note.includes('현재 보유 수량'));
-  ok('안내: 예측치(CAGR)', note.includes('예측'));
-  ok('안내: 백테스트·투자계산기 유도', note.includes('백테스트') && note.includes('투자계산기'));
+  ok('안내: 보유수량 가정·예측·백테 유도',
+     note.includes('현재 보유 수량') && note.includes('예측') && note.includes('백테스트') && note.includes('투자계산기'));
 
   ok('JS 에러 0', errors.length === 0);
   if (errors.length) console.log('  errors:', errors.slice(0, 3));

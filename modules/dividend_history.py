@@ -1,33 +1,35 @@
-"""내자산 배당금 월별 차트 데이터.
+"""내자산 배당금 차트 데이터 — 이벤트 기반.
 
-과거 3년 월별 실적 + 미래 1년(현재연도) 예측. 종목별 최근 5년 배당성장률(CAGR)로 투영.
+연도별 배당 이벤트(날짜·종목·금액 4변형)를 반환하면 프론트가 막대·드릴다운·캘린더를 파생한다.
+
+과거 PAST_YEARS년 실적 + 미래 1년(현재연도) 예측. 종목별 최근 5년 배당 CAGR로 투영.
 
 가정/규약:
-- 거래내역 없음 → 과거 배당도 '현재 보유 수량을 그대로 보유했다'고 가정.
-- FX: 원화 보기 = 외화 배당을 그 당시(ex-date) 환율로 원화 환산.
-       외화($) 보기 = 원화 배당을 그 당시 환율로 달러 환산.
-       미래 예측은 현재 환율 기준.
-- 세후: 일반 계좌 = 국내 15.4% / 미국 15% 원천징수. ISA·연금저축·IRP = 운용 중 비과세(세후=세전).
+- 거래내역 없음 → 과거 배당도 '현재 보유 수량을 그대로 보유'했다고 가정.
+- FX: 원화 = 외화배당 × ex-date 환율, 외화($) = 원화배당 ÷ ex-date 환율. 미래 예측은 현재 환율.
+- 세후: 일반 계좌 = 국내 15.4% / 미국 15%. ISA·연금저축·IRP = 운용 중 비과세(세후=세전).
 """
+import sqlite3
 from datetime import datetime
 
 import pandas as pd
 
-PAST_YEARS      = 3       # 과거 실적 연도 수
-CAGR_YEARS      = 5       # 성장률 산출에 쓰는 완료 연도 수
+from config import SYMBOL_DB_PATH
+
+PAST_YEARS      = 3
+CAGR_YEARS      = 5
 KR_DIV_TAX      = 0.154
 US_DIV_TAX      = 0.15
-EXEMPT_ACCOUNTS = {"ISA", "연금저축", "IRP"}   # 운용 중 비과세
+EXEMPT_ACCOUNTS = {"ISA", "연금저축", "IRP"}
 
 
-def _fx_on(fx: pd.Series, date_str: str) -> float:
+def _fx_on(fx, date_str):
     ts = pd.Timestamp(date_str[:10])
     s  = fx[fx.index <= ts]
     return float(s.iloc[-1]) if len(s) else float(fx.iloc[-1])
 
 
-def _ticker_cagr(per_year_dps: dict, base_year: int) -> float:
-    """최근 CAGR_YEARS 완료연도(base_year 이하)의 주당배당 합 CAGR. 부족/이상치는 0/클램프."""
+def _ticker_cagr(per_year_dps, base_year):
     yrs = sorted(y for y in per_year_dps if y <= base_year)[-CAGR_YEARS:]
     if len(yrs) < 2:
         return 0.0
@@ -35,16 +37,31 @@ def _ticker_cagr(per_year_dps: dict, base_year: int) -> float:
     n = yrs[-1] - yrs[0]
     if first <= 0 or n <= 0:
         return 0.0
-    cagr = (last / first) ** (1.0 / n) - 1.0
-    return max(-0.5, min(cagr, 1.0))   # 비정상 방지 클램프 (-50%~+100%)
+    return max(-0.5, min((last / first) ** (1.0 / n) - 1.0, 1.0))
 
 
-def build_dividend_chart(loader, holdings) -> dict:
+def _load_names(codes):
+    names = {}
+    try:
+        c = sqlite3.connect(SYMBOL_DB_PATH)
+        qs = ",".join("?" * len(codes))
+        for code, name in c.execute(
+            f"SELECT code, name FROM symbols WHERE code IN ({qs})", list(codes)
+        ).fetchall():
+            names[str(code).upper()] = name
+        c.close()
+    except Exception:
+        pass
+    return names
+
+
+def build_dividend_chart(loader, holdings):
     cur_year   = datetime.today().year
-    proj_year  = cur_year                              # 미래 1년 = 현재연도(예측)
-    base_year  = cur_year - 1                          # 예측 베이스 = 직전 완료연도
-    past_years = [cur_year - i for i in range(PAST_YEARS, 0, -1)]   # [Y-3, Y-2, Y-1]
-    min_year   = (cur_year - PAST_YEARS) - CAGR_YEARS  # CAGR 계산용 하한
+    proj_year  = cur_year
+    base_year  = cur_year - 1
+    past_years = [cur_year - i for i in range(PAST_YEARS, 0, -1)]
+    chart_years = past_years + [proj_year]
+    min_year   = (cur_year - PAST_YEARS) - CAGR_YEARS
 
     try:
         fx = loader._load_usdkrw()
@@ -52,27 +69,27 @@ def build_dividend_chart(loader, holdings) -> dict:
     except Exception:
         fx, cur_fx = None, 1300.0
 
-    chart_years = past_years + [proj_year]
+    codes = {str(h.get("code", "")).split(".")[0].upper() for h in holdings}
+    names = _load_names(codes) if codes else {}
 
-    def _empty():
-        return {y: [0.0] * 12 for y in chart_years}
-
-    series = {c: {t: _empty() for t in ("pretax", "posttax")} for c in ("KRW", "USD")}
+    events = {y: [] for y in chart_years}
     growth = {}
     has_foreign = False
 
-    def _accumulate(year, month, native, is_kr, fx_rate, div_tax):
+    def _event(date, month, day, code, native, is_kr, fx_rate, div_tax, projected):
         if fx_rate <= 0:
             fx_rate = cur_fx
         if is_kr:
             krw, usd = native, native / fx_rate
         else:
             usd, krw = native, native * fx_rate
-        i = month - 1
-        series["KRW"]["pretax"][year][i]  += krw
-        series["KRW"]["posttax"][year][i] += krw * (1 - div_tax)
-        series["USD"]["pretax"][year][i]  += usd
-        series["USD"]["posttax"][year][i] += usd * (1 - div_tax)
+        return {
+            "date": date, "month": month, "day": day,
+            "code": code, "name": names.get(code, code),
+            "krw_pre": round(krw, 2),  "krw_post": round(krw * (1 - div_tax), 2),
+            "usd_pre": round(usd, 4),  "usd_post": round(usd * (1 - div_tax), 4),
+            "projected": projected,
+        }
 
     conn = loader.conn
     for h in holdings:
@@ -80,10 +97,10 @@ def build_dividend_chart(loader, holdings) -> dict:
         qty  = float(h.get("quantity") or 0)
         if qty <= 0 or code in ("", "KRX_GOLD"):
             continue
-        is_kr  = loader.is_kr_etf(code)
+        is_kr   = loader.is_kr_etf(code)
         if not is_kr:
             has_foreign = True
-        acct   = h.get("account_type") or "일반"
+        acct    = h.get("account_type") or "일반"
         div_tax = 0.0 if acct in EXEMPT_ACCOUNTS else (KR_DIV_TAX if is_kr else US_DIV_TAX)
 
         rows = conn.execute(
@@ -96,24 +113,28 @@ def build_dividend_chart(loader, holdings) -> dict:
 
         per_year_dps = {}
         for d, dps in rows:
-            y = int(d[:4])
-            per_year_dps[y] = per_year_dps.get(y, 0.0) + float(dps)
-
+            per_year_dps[int(d[:4])] = per_year_dps.get(int(d[:4]), 0.0) + float(dps)
         cagr = _ticker_cagr(per_year_dps, base_year)
         growth[code] = round(cagr, 4)
 
         for d, dps in rows:
-            y, m = int(d[:4]), int(d[5:7])
-            fx_rate = _fx_on(fx, d) if fx is not None else cur_fx
-            if y in past_years:                                  # 과거 실적
-                _accumulate(y, m, float(dps) * qty, is_kr, fx_rate, div_tax)
-            if y == base_year:                                   # 미래 예측(베이스 패턴 × 성장)
-                _accumulate(proj_year, m, float(dps) * qty * (1 + cagr), is_kr, cur_fx, div_tax)
+            y, m, day = int(d[:4]), int(d[5:7]), int(d[8:10])
+            if y in past_years:
+                rate = _fx_on(fx, d) if fx is not None else cur_fx
+                events[y].append(_event(d[:10], m, day, code, float(dps) * qty, is_kr, rate, div_tax, False))
+            if y == base_year:
+                pdate = f"{proj_year}-{m:02d}-{day:02d}"
+                events[proj_year].append(
+                    _event(pdate, m, day, code, float(dps) * qty * (1 + cagr), is_kr, cur_fx, div_tax, True))
+
+    for y in events:
+        events[y].sort(key=lambda e: e["date"])
 
     return {
-        "past_years":  past_years,
+        "years":       chart_years,
         "proj_year":   proj_year,
-        "series":      series,
+        "default_year": base_year,     # 기본 = 직전 완료연도(실데이터)
         "growth":      growth,
         "has_foreign": has_foreign,
+        "events":      events,
     }

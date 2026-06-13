@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-14] feature | 비교탭 스파이더 축선택·지표설명 + 백테 연간 배당금 차트 + 계산기/백테 지표 설명
+
+오너 후속 5건. ① 비교탭 스파이더 **꼭짓점(축) 종류 선택** — 7후보 풀(수익률·안정성·방어력·배당률·Sharpe·Sortino·승률) 체크박스, 최소 3개. ② 축 선택창 옆 **설명 1-2줄**(선택 축 설명 리스트). ③ 비교탭 CAGR → **"수익률(CAGR)"** + 수치표 헤더 hover 설명(ⓘ). ④ 계산기·백테 **각 지표 설명 1-2줄**. ⑤ **백테 탭 연간 배당금 차트**(비교탭보다 정보 적으면 안 됨).
+
+- **비교탭** `risk_return.html`: `SPIDER_POOL`(7축)+`rrAxisKeys`(기본6)+`rrToggleAxis`(최소3 유지·풀순 정렬), 컨트롤에 축 체크박스+설명박스 추가. 수치표 cols에 desc → `<th title>ⓘ`. 레이더 라벨 'CAGR'→'수익률', 수치표 헤더 'CAGR'→'수익률(CAGR)'.
+- **백테 배당** `backtest_logic.py`: 두 경로(`_run_multi_account_backtest_logic`·`run_backtest_logic`) 연도 groupby에 `annual_dividends`(dividend_income 연합산) 추가 → 반환. `backtest.html`: 연간수익률 뒤 **연간 배당금 막대 차트**(`#btDivCard`·`renderAnnualDividendChart`, 데이터 없으면 숨김) + btMetrics 각 항목 desc → `title` hover ⓘ.
+- **계산기** `calculator.html`: 히스토그램 9카드(종료자산·CAGR·MDD·Sharpe·Sortino·Calmar·총배당·배당CAGR·마지막연도배당) 제목 밑 `.result-card-desc` 설명 줄.
+
+검증: run_backtest_logic(SPY 2018~23 cash) → `annual_dividends` 6행 증가·합계=total_dividend(1,441,476) 일치 PASS. risk_return·backtest JS `node --check` OK. backtest_logic syntax OK. ⚠️ 실브라우저 미검증.
+
 ## [2026-06-14] feature | 포트폴리오 비교 탭 (리스크-리턴 → 종목선택+11지표표+산점도+레이더+공유)
 
 오너: 포트폴리오끼리 비교 — 리스크리턴만으론 부족. 브레인스토밍 후 채택 = ④스파이더 + ⑤몬테카를로 부채꼴. **단 몬테카를로는 대공사라 이번엔 제외**(추후). 기존 `/risk-return`을 **"포트폴리오 비교"** 탭으로 확장.

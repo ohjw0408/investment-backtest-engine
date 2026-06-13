@@ -256,12 +256,18 @@ async function rrCompare(){
 // ── 수치표 ──
 function rrRenderTable(data){
   const cols = [
-    ['CAGR', it => pct(it.cagr)], ['변동성', it => pct(it.vol)], ['MDD', it => pct(it.mdd)],
-    ['Sharpe', it => it.sharpe?.toFixed(2) ?? '—'], ['Sortino', it => it.sortino?.toFixed(2) ?? '—'],
-    ['배당률', it => pct(it.div_yield, 2)], ['최고연', it => pct(it.best_year)], ['최저연', it => pct(it.worst_year)],
-    ['승률(월)', it => pct(it.win_rate, 0)], ['베타', it => it.beta?.toFixed(2) ?? '—'],
+    ['수익률(CAGR)', it => pct(it.cagr), '연평균 복리 성장률. 높을수록 좋음.'],
+    ['변동성', it => pct(it.vol), '수익률이 연 단위로 출렁이는 정도. 낮을수록 안정적.'],
+    ['MDD', it => pct(it.mdd), '최대 낙폭 — 고점 대비 가장 크게 떨어진 폭. 0에 가까울수록 방어적.'],
+    ['Sharpe', it => it.sharpe?.toFixed(2) ?? '—', '위험(변동성) 1단위당 수익. 높을수록 효율적.'],
+    ['Sortino', it => it.sortino?.toFixed(2) ?? '—', '하락 위험 대비 수익. 손실 변동만 위험으로 봄.'],
+    ['배당률', it => pct(it.div_yield, 2), '최근 1년 배당금 ÷ 현재가.'],
+    ['최고연', it => pct(it.best_year), '연도별 수익률 중 가장 높았던 해.'],
+    ['최저연', it => pct(it.worst_year), '연도별 수익률 중 가장 낮았던 해.'],
+    ['승률(월)', it => pct(it.win_rate, 0), '월간 수익이 플러스였던 달의 비율.'],
+    ['베타', it => it.beta?.toFixed(2) ?? '—', 'S&P500(SPY) 대비 민감도. 1보다 크면 시장보다 더 출렁임.'],
   ];
-  let html = '<thead><tr><th>대상</th>' + cols.map(c => `<th>${c[0]}</th>`).join('') + '</tr></thead><tbody>';
+  let html = '<thead><tr><th>대상</th>' + cols.map(c => `<th title="${esc(c[2])}">${c[0]} <span style="opacity:0.5;font-weight:400;">ⓘ</span></th>`).join('') + '</tr></thead><tbody>';
   rrItems.forEach((it,i) => {
     const kind = it.kind === 'portfolio' ? '내포폴' : '벤치';
     html += `<tr><td><span class="rr-dot" style="background:${colorOf(i)}"></span>${esc(it.name)}<span class="rr-kind">${kind}</span></td>` +
@@ -309,14 +315,17 @@ function rrRenderScatter(){
 }
 
 // ── 스파이더 ──
-const SPIDER_AXES = [
-  { label: 'CAGR',     get: it => it.cagr,      invert: false },
-  { label: '안정성',    get: it => it.vol,       invert: true  },
-  { label: '방어력',    get: it => Math.abs(it.mdd), invert: true },
-  { label: '배당률',    get: it => it.div_yield, invert: false },
-  { label: 'Sharpe',   get: it => it.sharpe,    invert: false },
-  { label: 'Sortino',  get: it => it.sortino,   invert: false },
+const SPIDER_POOL = [
+  { key:'cagr',    label:'수익률',  get: it => it.cagr,          invert:false, desc:'연평균 복리 성장률(CAGR). 높을수록 좋음.' },
+  { key:'stab',    label:'안정성',  get: it => it.vol,           invert:true,  desc:'가격 출렁임(연 변동성)이 낮을수록 높음.' },
+  { key:'def',     label:'방어력',  get: it => Math.abs(it.mdd), invert:true,  desc:'고점 대비 최대 하락(MDD)이 작을수록 높음.' },
+  { key:'div',     label:'배당률',  get: it => it.div_yield,     invert:false, desc:'최근 1년 배당금 ÷ 현재가.' },
+  { key:'sharpe',  label:'Sharpe',  get: it => it.sharpe,        invert:false, desc:'위험(변동성) 1단위당 수익. 위험 대비 효율.' },
+  { key:'sortino', label:'Sortino', get: it => it.sortino,       invert:false, desc:'하락 위험 대비 수익. 손실 변동만 위험으로 봄.' },
+  { key:'win',     label:'승률',    get: it => it.win_rate,      invert:false, desc:'월간 수익이 플러스였던 달의 비율.' },
 ];
+let rrAxisKeys = ['cagr','stab','def','div','sharpe','sortino'];   // 기본 6축
+function rrAxes(){ return SPIDER_POOL.filter(a => rrAxisKeys.includes(a.key)); }
 function rrNormAxis(vals, invert){
   const fin = vals.filter(v => v != null && isFinite(v));
   const mn = Math.min(...fin), mx = Math.max(...fin);
@@ -328,23 +337,47 @@ function rrNormAxis(vals, invert){
   });
 }
 function rrRenderSpiderCtrl(){
-  const el = document.getElementById('rrSpiderCtrl');
-  el.innerHTML = rrItems.map((it,i) =>
+  // 축 선택 + 설명
+  const axisBoxes = SPIDER_POOL.map(a => {
+    const on = rrAxisKeys.includes(a.key);
+    return `<label class="rr-vis" title="${esc(a.desc)}"><input type="checkbox" ${on?'checked':''} onchange="rrToggleAxis('${a.key}', this.checked)">${a.label}</label>`;
+  }).join('');
+  const descList = rrAxes().map(a => `<div><b>${a.label}</b> — ${esc(a.desc)}</div>`).join('');
+
+  // 항목 표시 토글 + 투명도
+  const itemBoxes = rrItems.map((it,i) =>
     `<label class="rr-vis"><input type="checkbox" ${rrVisible[i]?'checked':''} onchange="rrToggleVis(${i}, this.checked)">
-      <span class="rr-dot" style="background:${colorOf(i)}"></span>${esc(it.name)}</label>`).join('')
-    + `<span class="rr-opacity">투명도
-        <input type="range" min="0" max="60" value="${Math.round(rrOpacity*100)}" oninput="rrSetOpacity(this.value)">
-       </span>`;
+      <span class="rr-dot" style="background:${colorOf(i)}"></span>${esc(it.name)}</label>`).join('');
+
+  document.getElementById('rrSpiderCtrl').innerHTML =
+    `<div style="flex-basis:100%;font-size:0.76rem;color:var(--text-muted);font-weight:700;">꼭짓점(축) 선택 · 최소 3개</div>
+     <div style="flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px 14px;">${axisBoxes}</div>
+     <div style="flex-basis:100%;font-size:0.72rem;color:var(--text-muted);line-height:1.55;background:var(--bg);border-radius:8px;padding:8px 12px;">${descList}</div>
+     <div style="flex-basis:100%;height:1px;background:var(--border);margin:2px 0;"></div>
+     <div style="flex-basis:100%;font-size:0.76rem;color:var(--text-muted);font-weight:700;">표시 항목 · 투명도</div>
+     ${itemBoxes}
+     <span class="rr-opacity">투명도 <input type="range" min="0" max="60" value="${Math.round(rrOpacity*100)}" oninput="rrSetOpacity(this.value)"></span>`;
+}
+function rrToggleAxis(key, on){
+  if (on) { if (!rrAxisKeys.includes(key)) rrAxisKeys.push(key); }
+  else    { if (rrAxisKeys.length <= 3) { rrRenderSpiderCtrl(); return; }  // 최소 3개 유지
+            rrAxisKeys = rrAxisKeys.filter(k => k !== key); }
+  // 풀 순서대로 정렬
+  rrAxisKeys = SPIDER_POOL.filter(a => rrAxisKeys.includes(a.key)).map(a => a.key);
+  rrRenderSpiderCtrl();
+  rrRenderSpider();
 }
 function rrToggleVis(i, on){ rrVisible[i] = on; rrRenderSpider(); }
 function rrSetOpacity(v){ rrOpacity = (parseFloat(v)||0)/100; rrRenderSpider(); }
 function rrRenderSpider(){
   if (rrSpiderChart) rrSpiderChart.destroy();
-  const norms = SPIDER_AXES.map(ax => rrNormAxis(rrItems.map(ax.get), ax.invert));
+  const axes = rrAxes();
+  const norms = axes.map(ax => rrNormAxis(rrItems.map(ax.get), ax.invert));
   const datasets = rrItems.map((it,i) => ({
     label: it.name,
-    data: SPIDER_AXES.map((_, a) => norms[a][i]),
-    raw: SPIDER_AXES.map(ax => ax.get(it)),
+    data: axes.map((_, a) => norms[a][i]),
+    raw: axes.map(ax => ax.get(it)),
+    rkey: axes.map(ax => ax.key),
     borderColor: colorOf(i),
     backgroundColor: hexA(colorOf(i), rrOpacity),
     borderWidth: 2, pointRadius: 2,
@@ -352,18 +385,18 @@ function rrRenderSpider(){
   }));
   rrSpiderChart = new Chart(document.getElementById('rrSpider').getContext('2d'), {
     type: 'radar',
-    data: { labels: SPIDER_AXES.map(a => a.label), datasets },
+    data: { labels: axes.map(a => a.label), datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: { callbacks: { label: ctx => {
-          const ax = SPIDER_AXES[ctx.dataIndex];
+          const key = ctx.dataset.rkey[ctx.dataIndex];
           const raw = ctx.dataset.raw[ctx.dataIndex];
-          let txt;
-          if (ax.label === 'Sharpe' || ax.label === 'Sortino') txt = raw==null?'—':raw.toFixed(2);
-          else txt = raw==null?'—':(raw*100).toFixed(1)+'%';
-          return `${ctx.dataset.label} · ${ax.label}: ${txt}`;
+          const txt = (key === 'sharpe' || key === 'sortino')
+            ? (raw==null?'—':raw.toFixed(2))
+            : (raw==null?'—':(raw*100).toFixed(1)+'%');
+          return `${ctx.dataset.label} · ${axes[ctx.dataIndex].label}: ${txt}`;
         } } },
       },
       scales: { r: { min: 0, max: 1, ticks: { display: false, stepSize: 0.25 }, grid: { color: MM_CHART_GRID },

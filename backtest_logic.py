@@ -134,11 +134,15 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
     h2 = hist.copy()
     h2['year'] = _pd.to_datetime(h2['date']).dt.year
     annual_returns = []
+    annual_dividends = []
+    _has_div = 'dividend_income' in h2.columns
     for yr, grp in h2.groupby('year'):
         s = float(grp['portfolio_value'].iloc[0])
         e = float(grp['portfolio_value'].iloc[-1])
         if s > 0:
             annual_returns.append({'year': int(yr), 'return': round((e / s - 1), 4)})
+        if _has_div:
+            annual_dividends.append({'year': int(yr), 'dividend': round(float(grp['dividend_income'].sum()))})
 
     # 계좌별 분해
     accounts_out = [
@@ -193,6 +197,7 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
         },
         'history':        history_out,
         'annual_returns': annual_returns,
+        'annual_dividends': annual_dividends,
         'accounts':       accounts_out,
         'savings':        savings,
         'g2': {
@@ -357,11 +362,15 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
     h2 = history_df.copy()
     h2['year'] = _pd.to_datetime(h2['date']).dt.year
     annual_returns = []
+    annual_dividends = []
+    _has_div = 'dividend_income' in h2.columns
     for yr, grp in h2.groupby('year'):
         s = float(grp['portfolio_value'].iloc[0])
         e = float(grp['portfolio_value'].iloc[-1])
         if s > 0:
             annual_returns.append({'year': int(yr), 'return': round((e / s - 1), 4)})
+        if _has_div:
+            annual_dividends.append({'year': int(yr), 'dividend': round(float(grp['dividend_income'].sum()))})
 
     return {
         'tax_enabled':    tax_enabled,
@@ -389,4 +398,5 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         },
         'history':        history_out,
         'annual_returns': annual_returns,
+        'annual_dividends': annual_dividends,
     }

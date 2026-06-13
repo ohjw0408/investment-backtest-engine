@@ -4,6 +4,9 @@
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260611ui">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+.result-card-desc { font-size: 0.72rem; color: var(--text-muted); margin: -2px 0 10px; line-height: 1.45; }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -316,46 +319,55 @@
       <div class="hist-grid">
         <div class="result-card">
           <div class="result-card-title">종료 자산 분포</div>
+          <div class="result-card-desc">시작 시점을 바꿔가며 시뮬레이션한 최종 자산들의 분포예요.</div>
           <div class="chart-wrap-sm"><canvas id="histEndValue"></canvas></div>
           <div class="hist-stats" id="statsEndValue"></div>
         </div>
         <div class="result-card">
           <div class="result-card-title">CAGR 분포</div>
+          <div class="result-card-desc">연평균 복리 성장률 — 매년 평균 몇 % 불었는지. 높을수록 좋아요.</div>
           <div class="chart-wrap-sm"><canvas id="histCagr"></canvas></div>
           <div class="hist-stats" id="statsCagr"></div>
         </div>
         <div class="result-card">
           <div class="result-card-title">MDD 분포</div>
+          <div class="result-card-desc">최대 낙폭 — 고점 대비 가장 크게 떨어진 폭. 0에 가까울수록 방어적이에요.</div>
           <div class="chart-wrap-sm"><canvas id="histMdd"></canvas></div>
           <div class="hist-stats" id="statsMdd"></div>
         </div>
         <div class="result-card">
           <div class="result-card-title">Sharpe Ratio 분포</div>
+          <div class="result-card-desc">위험(변동성) 1단위당 수익. 높을수록 위험 대비 효율적이에요.</div>
           <div class="chart-wrap-sm"><canvas id="histSharpe"></canvas></div>
           <div class="hist-stats" id="statsSharpe"></div>
         </div>
         <div class="result-card">
           <div class="result-card-title">Sortino Ratio 분포</div>
+          <div class="result-card-desc">하락 위험만 따진 위험 대비 수익. 손실 변동만 위험으로 봐요. 높을수록 좋아요.</div>
           <div class="chart-wrap-sm"><canvas id="histSortino"></canvas></div>
           <div class="hist-stats" id="statsSortino"></div>
         </div>
         <div class="result-card">
           <div class="result-card-title">Calmar Ratio 분포</div>
+          <div class="result-card-desc">수익률(CAGR) ÷ 최대낙폭(MDD). 낙폭 대비 수익 효율. 높을수록 좋아요.</div>
           <div class="chart-wrap-sm"><canvas id="histCalmar"></canvas></div>
           <div class="hist-stats" id="statsCalmar"></div>
         </div>
         <div class="result-card">
           <div class="result-card-title">총 배당금 분포</div>
+          <div class="result-card-desc">시뮬레이션 기간 동안 받은 배당금 합계의 분포예요.</div>
           <div class="chart-wrap-sm"><canvas id="histDiv"></canvas></div>
           <div class="hist-stats" id="statsDiv"></div>
         </div>
         <div class="result-card">
           <div class="result-card-title">배당 CAGR 분포</div>
+          <div class="result-card-desc">배당금이 매년 평균 몇 % 늘었는지(배당 성장률) 분포예요.</div>
           <div class="chart-wrap-sm"><canvas id="histDivCagr"></canvas></div>
           <div class="hist-stats" id="statsDivCagr"></div>
         </div>
         <div class="result-card">
           <div class="result-card-title">마지막 연도 배당금 분포</div>
+          <div class="result-card-desc">시뮬레이션 마지막 해에 받은 배당금의 분포예요.</div>
           <div class="chart-wrap-sm"><canvas id="histLastYearDiv"></canvas></div>
           <div class="hist-stats" id="statsLastYearDiv"></div>
         </div>

@@ -373,6 +373,13 @@
         <div class="bt-chart-wrap annual"><canvas id="btAnnualChart"></canvas></div>
       </div>
 
+      <!-- 연간 배당금 -->
+      <div class="bt-card" id="btDivCard" style="display:none;">
+        <div class="bt-card-title">💵 연간 배당금 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 그 해 수령한 배당(세전, 재투자 전 기준)</span></div>
+        <div class="bt-chart-wrap annual"><canvas id="btDivChart"></canvas></div>
+        <div id="btDivNote" style="font-size:0.74rem;color:var(--text-muted);margin-top:8px;"></div>
+      </div>
+
       <!-- 낙폭 차트 -->
       <div class="bt-card">
         <div class="bt-card-title">📉 낙폭 (Drawdown)</div>
@@ -1042,17 +1049,17 @@ function renderBacktest(data) {
 
   // 핵심 지표
   document.getElementById('btMetrics').innerHTML = [
-    { label: '최종 자산',    value: fmtKRW(m.end_value),       cls: '' },
-    { label: '총 납입금',    value: fmtKRW(m.total_invested),  cls: '' },
-    { label: '총 수익률',    value: fmtPct(m.total_return),    cls: fmtPctClass(m.total_return) },
-    { label: 'CAGR',        value: fmtPct(m.cagr),            cls: fmtPctClass(m.cagr) },
-    { label: 'MDD',         value: fmtPct(m.mdd),             cls: 'down' },
-    { label: 'Sharpe',      value: m.sharpe ? m.sharpe.toFixed(2) : '—', cls: '' },
-    { label: '총 배당금',   value: fmtKRW(m.total_dividend),  cls: '' },
-    { label: '분석 기간',   value: m.years ? m.years.toFixed(1) + '년' : '—', cls: '' },
+    { label: '최종 자산',    value: fmtKRW(m.end_value),       cls: '', desc: '시뮬레이션 종료 시점의 평가금액(세금 ON이면 청산세 반영).' },
+    { label: '총 납입금',    value: fmtKRW(m.total_invested),  cls: '', desc: '초기 투자금 + 월 적립금을 모두 더한 원금.' },
+    { label: '총 수익률',    value: fmtPct(m.total_return),    cls: fmtPctClass(m.total_return), desc: '납입한 원금 대비 전체 손익률.' },
+    { label: 'CAGR',        value: fmtPct(m.cagr),            cls: fmtPctClass(m.cagr), desc: '연평균 복리 성장률 — 매년 평균 몇 % 불었는지.' },
+    { label: 'MDD',         value: fmtPct(m.mdd),             cls: 'down', desc: '최대 낙폭 — 고점 대비 가장 크게 떨어진 폭. 0에 가까울수록 방어적.' },
+    { label: 'Sharpe',      value: m.sharpe ? m.sharpe.toFixed(2) : '—', cls: '', desc: '위험(변동성) 1단위당 수익. 높을수록 위험 대비 효율적.' },
+    { label: '총 배당금',   value: fmtKRW(m.total_dividend),  cls: '', desc: '시뮬레이션 기간 동안 받은 배당금 합계.' },
+    { label: '분석 기간',   value: m.years ? m.years.toFixed(1) + '년' : '—', cls: '', desc: '시뮬레이션이 다룬 총 기간.' },
   ].map(item => `
     <div class="metric-item">
-      <div class="metric-label">${item.label}</div>
+      <div class="metric-label" title="${item.desc}">${item.label} <span style="opacity:0.45;font-weight:400;">ⓘ</span></div>
       <div class="metric-value ${item.cls}">${item.value}</div>
     </div>
   `).join('');
@@ -1096,8 +1103,37 @@ function renderBacktest(data) {
   // 연간 수익률
   renderAnnualChart(data.annual_returns);
 
+  // 연간 배당금
+  renderAnnualDividendChart(data.annual_dividends, m.total_dividend);
+
   // 낙폭 차트
   renderDrawdownChart(data.history);
+}
+
+function renderAnnualDividendChart(annualDiv, totalDiv) {
+  const card = document.getElementById('btDivCard');
+  if (btCharts.annualDiv) { btCharts.annualDiv.destroy(); btCharts.annualDiv = null; }
+  const rows = (annualDiv || []).filter(a => a.dividend > 0);
+  if (!rows.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const labels = rows.map(a => a.year + '년');
+  const values = rows.map(a => a.dividend);
+  btCharts.annualDiv = new Chart(document.getElementById('btDivChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: 'rgba(25,118,210,0.8)', borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fmtKRW(ctx.parsed.y) } } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => fmtKRW(v) }, grid: { color: MM_CHART_GRID } }
+      }
+    }
+  });
+  document.getElementById('btDivNote').innerHTML =
+    `총 배당금 ${fmtKRW(totalDiv || 0)} · 그 해 보유 수량 기준 실제 수령 배당입니다.`;
 }
 
 function renderValueChart(history) {

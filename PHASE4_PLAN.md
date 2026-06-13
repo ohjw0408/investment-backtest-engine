@@ -6,7 +6,8 @@
 > **진행 상태 (2026-06-13 갱신):**
 > - ✅ 완료: A1 A2 A3 A5 A6 (검색/암호화폐), B5 (리밸 검증), C3 C5 (지수차트/공유), D3 (세금설정 UI), F1 (대기 UX), B2-b B2-c (자산추이/캐싱), B3 (리밸 경고밴드 + 목표비중 계정연동), D5 (인플레), **B1 (포트폴리오 즐겨찾기 — 5탭 위젯+멀티계좌 카드+`/myportfolios` 관리 페이지, 2026-06-12)**, **D6 (합성 데이터 체크박스 — 계산기·백테·은퇴 전 탭)**, **E1 (모바일 반응형+다크모드 전 페이지, 2026-06-11)**, **4G (다중계좌 — `trackG_multiaccount_plan.md` G5 전체 완료 2026-06-09)**
 > - 🟡 부분완료: **D4(거래수수료) v1 — 계산기·백테 탭레벨(2026-06-13, 5abbbe4).** Fast-follow=오너 지정 1순위(①계좌별/증권사별 차등 ②은퇴·배당 롤아웃) — D4 섹션 하단 참조.
-> - ❌ 미착수: A4(종목상세/시간봉), B2-a(홈토글), B4(거래트래킹), C1(watchlist), C2(자산군비교), C4(온보딩), D1(TDF), D2(연금통합), E2~E4(최적화)
+> - ✅ 완료(추가): **A4 (종목 상세 — asset_type 분류·타입별 지표·Lightweight 캔들·1일/1주 시간봉, 2026-06-13)**
+> - ❌ 미착수: B2-a(홈토글=오너 skip), B4(거래트래킹), C1(watchlist), C2(자산군비교), C4(온보딩), D1(TDF), D2(연금통합), E2~E4(최적화)
 > - 정본 우선순위: `PROJECT_MASTER_ROADMAP.md` — 현재 1순위 = D4 fast-follow.
 
 ---
@@ -83,7 +84,13 @@
 
 ---
 
-### A4. 종목 상세 (symbol.html) — 개선
+### A4. 종목 상세 (symbol.html) — 개선  ✅ 완료 (2026-06-13)
+
+> **완료 노트(2026-06-13):** a/b/c/d 전부. asset_type 분류(symbol_master is_etf+country, 6자리=무조건 ETF
+> 오분류 해소)·타입별 지표 분기(주식 시총/PER/PBR/섹터 vs ETF 운용사/보수율/카테고리/AUM)·Lightweight Charts
+> 라인/캔들 토글·`price_hourly` 테이블+`/api/symbol/<code>/intraday` 1일/1주 시간봉. KR 주식 기초지표는
+> yfinance `.info`(KRX 종목기본정보 엔드포인트는 미구현=단순성). 검증 = test_symbol_api 8 + test_symbol_browser 23/23.
+> 변경 = `modules/price_loader.py`·`app.py`·`templates/symbol.html`.
 
 **현재 문제:**
 - 가격 차트가 너무 작음

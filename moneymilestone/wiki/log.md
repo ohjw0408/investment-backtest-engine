@@ -1,5 +1,29 @@
 # Log
 
+## [2026-06-13] feature | A4 종목 상세 개선 + 캔들차트 + 시간봉
+
+PHASE4 A4 전체(a/b/c/d). 오너 결정: full 범위 + Lightweight Charts CDN + 타겟+Playwright+라이브 검증.
+
+- **A4-a/b 분류+지표(`price_loader.get_symbol_data`):** symbol_master `is_etf`+country로
+  `asset_type`(INDEX/CRYPTO/KR_ETF/KR_STOCK/US_ETF/US_STOCK) 산출(없으면 보수율/AUM/KR ETF 휴리스틱
+  폴백). 일봉 `prices`에 OHLC 추가(yfinance 폴백 경로도 보존). 개별주식 기초지표
+  (market_cap/per/pbr/sector) yfinance `.info`에서 반환. 기존 버그(6자리=무조건 ETF 취급 →
+  KR 개별주식 "KR ETF" 오표기 + 운용사/보수율 표시) 해소.
+- **A4-c 캔들(`symbol.html`):** Lightweight Charts(MIT) CDN. 라인/캔들 토글 + 타입별 지표 그리드
+  분기(주식=시총/PER/PBR/섹터 vs ETF=운용사/보수율/카테고리/AUM). OHLC 없는 종목(KRX_GOLD 등)은
+  캔들 토글 자동 비활성+라인 강제.
+- **A4-d 시간봉:** 신규 `price_hourly` 테이블 + `get_intraday_data`(온디맨드 yfinance interval=1h
+  fetch+캐시, 같은 날 캐시 있으면 재사용) + `/api/symbol/<code>/intraday?range=1d|1w`. 기간 탭에
+  1일/1주 추가(앞), 시간봉은 candle/line 모두 지원.
+- **데이터 소스 판단:** KR 주식 기초지표는 yfinance `.info` 사용(삼성 PER/시총/섹터 정상 취득 확인).
+  KRX 종목기본정보 신규 엔드포인트는 미구현(키·디버그노이즈·리스크 → 단순성 우선). KR 주식 일부는
+  yfinance `.info` 희소 가능 = 알려진 한계.
+
+검증: `tests/test_symbol_api.py` 8 PASS(분류 5종·OHLC·기초지표 키·시간봉 캐시) +
+`tests/test_symbol_browser.js` 23/23 PASS(SPY ETF·삼성 주식·^KS11 캔들·KRX_GOLD 비활성·1일/1주 시간봉·
+라인↔캔들 토글·JS 에러 0, 실서버 라이브) + intraday 라우트 e2e(curl) 확인.
+변경 = `modules/price_loader.py`·`app.py`·`templates/symbol.html`.
+
 ## [2026-06-13] fix | BUG-KOSPI-CHART 코스피 차트 봉합 깨짐
 
 오너 라이브 발견(홈→코스피 클릭): ^KS11 차트가 중간 급등 불연속 + 52주 최저 ₩387 비정상.

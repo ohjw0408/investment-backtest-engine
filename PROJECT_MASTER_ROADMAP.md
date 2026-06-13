@@ -63,7 +63,7 @@ UI 실측/추정 필드를 확인했다.
 - ✅ ETF_BACKFILL Phase 0~2 provenance 스키마는 Stage A 백필 가격/배당 기록에 사용됨.
 - ✅ PHASE4: A1/A2/A3/A5/A6/B5/C3/C5/D3 done.
 
-Current blocker: **없음.** (2026-06-13 갱신) P0~P4 전부 마감 — G5·L7 E2E·절세액 P1~P4·간편계산기·ISA전환·B1 즐겨찾기·리스크리턴도표·납입한도 soft경고·D4 거래수수료 v1(계산기·백테). **다음 = D4 거래수수료 fast-follow(오너 지정 1순위): ①계좌별/증권사별 수수료 차등 ②은퇴·배당 탭 롤아웃.** 그 다음 = PHASE4 잔여(B2-a·A4·D1·D2·C1·C2·B4).
+Current blocker: **없음.** (2026-06-13 갱신) P0~P4 전부 마감 + D4 거래수수료 전탭(계좌별·은퇴·배당) + **A4 종목상세(캔들차트·시간봉·타입별 지표)** 완료. **다음 = PHASE4 잔여(D1 TDF·D2 연금통합·C1 watchlist·C2 자산군비교·B4 거래트래킹) — 오너 결정.** (B2-a 홈토글=오너 skip)
 
 ## Decision
 
@@ -122,8 +122,8 @@ Do not implement client-canonical storage. First implement server diagnostics, `
     ② 은퇴·배당 탭 롤아웃 (이 둘은 fee 미배선 — 엔진은 Portfolio 주입이라 배선만 추가)
     상세 = PHASE4_PLAN.md D4 섹션 fast-follow.
 
-[6] PHASE4 잔여: B2-a 홈토글 / A4 종목상세 / D1 TDF / D2 연금통합 / C1 watchlist / C2 자산군비교 / B4 거래트래킹
-    (P4 배당 절세는 2026-06-13 완료 — df7553e/a86b560)
+[6] PHASE4 잔여: D1 TDF / D2 연금통합 / C1 watchlist / C2 자산군비교 / B4 거래트래킹
+    (✅ A4 종목상세 완료 2026-06-13 / B2-a 홈토글=오너 skip / P4 배당 절세 완료 df7553e·a86b560)
 
 [7] ETF_BACKFILL V2 Phase 3+: etf_master/etf_proxy_map, confidence A~F, 전체 US 유니버스
 

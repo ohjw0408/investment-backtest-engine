@@ -244,6 +244,13 @@ class PriceLoader:
                 PRIMARY KEY (code, date)
             )
         """)
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS price_hourly (
+                code TEXT, datetime TEXT, open REAL, high REAL,
+                low REAL, close REAL, volume REAL,
+                PRIMARY KEY (code, datetime)
+            )
+        """)
         self.conn.commit()
 
     # -------------------------------------------------
@@ -601,6 +608,7 @@ class PriceLoader:
                 "low_52w":  min(prices_1y) if prices_1y else None,
                 "div_yield": None, "issuer": "KRX", "category": "금현물",
                 "expense_ratio": None, "aum": None,
+                "is_etf": False, "asset_type": "INDEX",
                 "dividends": [], "prices": prices, "is_index": True,
             }
 
@@ -664,6 +672,7 @@ class PriceLoader:
                     "low_52w":  min(prices_1y) if prices_1y else None,
                     "div_yield": None, "issuer": None, "category": "INDEX",
                     "expense_ratio": None, "aum": None,
+                    "is_etf": False, "asset_type": "INDEX",
                     "dividends": [], "prices": prices, "is_index": True,
                 }
             # index_daily에 없으면 아래 yfinance 경로로 fall-through
@@ -683,15 +692,25 @@ class PriceLoader:
                 raw.columns = raw.columns.get_level_values(0)
             raw = raw.reset_index()
             raw["Date"] = raw["Date"].dt.strftime("%Y-%m-%d")
-            raw = raw.rename(columns={"Date": "date", "Close": "close", "Dividends": "dividend"})
-            df = raw[["date", "close"]].copy()
+            raw = raw.rename(columns={"Date": "date", "Open": "open", "High": "high",
+                                      "Low": "low", "Close": "close", "Dividends": "dividend",
+                                      "Volume": "volume"})
+            keep = [c for c in ["date", "open", "high", "low", "close", "volume"] if c in raw.columns]
+            df = raw[keep].copy()
+            for col in ["open", "high", "low"]:
+                if col not in df.columns:
+                    df[col] = df["close"]
             df["dividend"] = raw.get("dividend", 0)
 
         # volume=0 행은 BackfillEngine이 생성한 프록시 추정 데이터 → 차트에서 제외
         df_display = df[df["volume"] > 0] if "volume" in df.columns and not df.empty else df
         if df_display.empty:
             df_display = df  # 실데이터 없으면 전체 사용 (fallback)
-        prices    = [{"date": row["date"], "close": round(float(row["close"]), 4)}
+        prices    = [{"date": row["date"],
+                      "open":  round(float(row["open"]),  4),
+                      "high":  round(float(row["high"]),  4),
+                      "low":   round(float(row["low"]),   4),
+                      "close": round(float(row["close"]), 4)}
                      for _, row in df_display.iterrows()]
         cur_price = prices[-1]["close"]
         prev_price = prices[-2]["close"] if len(prices) > 1 else None
@@ -720,6 +739,7 @@ class PriceLoader:
         # 메타 정보 (symbol_master.db)
         sym_db = META_DIR / "symbol_master.db"
         name = issuer = category = ""
+        is_etf_db = None
         if sym_db.exists():
             sc  = _sq.connect(str(sym_db))
             row = sc.execute("SELECT * FROM symbols WHERE code=?", (code,)).fetchone()
@@ -732,6 +752,7 @@ class PriceLoader:
                 name     = d.get("name", "")
                 issuer   = d.get("issuer", "") or ""
                 category = d.get("category", "") or ""
+                is_etf_db = d.get("is_etf")
 
         # 지수(^KS11 등)는 symbol_master에 없을 수 있음 → 표시 이름·카테고리 보완.
         if is_index:
@@ -765,8 +786,9 @@ class PriceLoader:
             except Exception:
                 pass
 
-        # yfinance 메타 (AUM, 보수율, 이름 보완)
+        # yfinance 메타 (AUM, 보수율, 이름 보완 + 개별주식 기초지표)
         aum = expense_ratio = None
+        market_cap = per = pbr = sector = None
         try:
             yf_code = self._kr_yf_ticker(code) if is_kr else code
             info    = yf.Ticker(yf_code).info
@@ -777,6 +799,11 @@ class PriceLoader:
                 category = info.get("category", "") or info.get("sector", "")
             aum           = info.get("totalAssets")
             expense_ratio = info.get("expenseRatio") or info.get("annualReportExpenseRatio")
+            # 개별주식 기초지표 (ETF에는 대부분 없음 → None 유지)
+            market_cap = info.get("marketCap")
+            per        = info.get("trailingPE") or info.get("forwardPE")
+            pbr        = info.get("priceToBook")
+            sector     = info.get("sector") or info.get("industry")
         except Exception:
             pass
 
@@ -785,6 +812,23 @@ class PriceLoader:
         if is_index and not category:
             category = 'INDEX'
 
+        # ── 자산 분류 (A4-a) ──────────────────────────────
+        # is_etf: symbol_master 우선, 없으면 ETF 신호(보수율/AUM/KR ETF 휴리스틱)로 추론
+        if is_etf_db is not None:
+            is_etf = bool(is_etf_db)
+        else:
+            is_etf = bool(expense_ratio or aum or (is_kr and self.is_kr_etf(code)))
+
+        is_crypto = (category or "").upper() == "CRYPTO" or code.endswith("-USD")
+        if is_index:
+            asset_type = "INDEX"
+        elif is_crypto:
+            asset_type = "CRYPTO"
+        elif is_kr:
+            asset_type = "KR_ETF" if is_etf else "KR_STOCK"
+        else:
+            asset_type = "US_ETF" if is_etf else "US_STOCK"
+
         return {
             "code": code, "name": name,
             "country": country, "currency": currency,
@@ -792,6 +836,77 @@ class PriceLoader:
             "last_date": last_date, "high_52w": high_52w, "low_52w": low_52w,
             "div_yield": div_yield, "issuer": issuer, "category": category,
             "expense_ratio": expense_ratio, "aum": aum,
+            "market_cap": market_cap, "per": per, "pbr": pbr, "sector": sector,
+            "is_etf": is_etf, "asset_type": asset_type,
             "dividends": dividends, "prices": prices,
             "is_index": is_index,
         }
+
+    # -------------------------------------------------
+    # 시간봉 데이터 (A4-d: 1일/1주 차트용)
+    # -------------------------------------------------
+    def get_intraday_data(self, code: str, range_key: str = "1d") -> dict:
+        """
+        종목 상세 1일/1주 탭용 시간봉(1h) 데이터.
+        온디맨드로 yfinance interval=1h fetch → price_hourly 캐시.
+        같은 날 캐시가 있으면 재사용(장중 시세 앱 아님 → 일 단위 신선도면 충분).
+        """
+        from datetime import datetime as _dt, timedelta as _td
+        code  = str(code).split(".")[0].upper()
+        is_kr = self.is_kr_etf(code)
+
+        today = _dt.today().strftime("%Y-%m-%d")
+        have_today = self.conn.execute(
+            "SELECT COUNT(*) FROM price_hourly WHERE code=? AND datetime >= ?",
+            (code, today)
+        ).fetchone()[0]
+        if not have_today:
+            self._fetch_intraday(code, is_kr)
+
+        days   = 7 if range_key == "1w" else 2  # 1d는 직전 거래일 포함 위해 2일치 조회
+        cutoff = (_dt.now() - _td(days=days)).strftime("%Y-%m-%d")
+        rows = self.conn.execute(
+            "SELECT datetime, open, high, low, close FROM price_hourly "
+            "WHERE code=? AND datetime >= ? ORDER BY datetime",
+            (code, cutoff)
+        ).fetchall()
+        prices = [{"date": r[0],
+                   "open":  round(float(r[1]), 4), "high": round(float(r[2]), 4),
+                   "low":   round(float(r[3]), 4), "close": round(float(r[4]), 4)}
+                  for r in rows]
+        return {
+            "code": code, "range": range_key,
+            "currency": "KRW" if is_kr else "USD",
+            "prices": prices,
+        }
+
+    def _fetch_intraday(self, code: str, is_kr: bool):
+        yf_code = self._kr_yf_ticker(code) if is_kr else code
+        try:
+            raw = yf.download(yf_code, period="7d", interval="1h",
+                              progress=False, auto_adjust=False, threads=False)
+        except Exception:
+            return
+        if raw is None or raw.empty:
+            return
+        if isinstance(raw.columns, pd.MultiIndex):
+            raw.columns = raw.columns.get_level_values(0)
+        raw   = raw.reset_index()
+        dtcol = raw.columns[0]  # 'Datetime' (intraday) 또는 'index'
+        rows  = []
+        for _, r in raw.iterrows():
+            ts  = r[dtcol]
+            dts = ts.strftime("%Y-%m-%d %H:%M") if hasattr(ts, "strftime") else str(ts)[:16]
+            try:
+                rows.append((code, dts, float(r["Open"]), float(r["High"]),
+                             float(r["Low"]), float(r["Close"]),
+                             float(r.get("Volume", 0) or 0)))
+            except Exception:
+                continue
+        if rows:
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO price_hourly "
+                "(code, datetime, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)",
+                rows
+            )
+            self.conn.commit()

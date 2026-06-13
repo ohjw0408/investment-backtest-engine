@@ -1570,6 +1570,19 @@ def symbol_api(code):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/symbol/<code>/intraday')
+def symbol_intraday_api(code):
+    range_key = request.args.get('range', '1d')
+    if range_key not in ('1d', '1w'):
+        range_key = '1d'
+    try:
+        data = portfolio_engine.loader.get_intraday_data(code.upper(), range_key)
+        return jsonify(data)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/assets')
 def assets():
     if not session.get('user_id'):

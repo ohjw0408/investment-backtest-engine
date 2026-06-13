@@ -57,12 +57,24 @@ function makeDom(feeOn, tabRate) {
   ok('지정값 우선(0.03)', w._mmAccountFeePct({ fee_rate_pct: 0.03 }) === 0.03);
 }
 
-// ── 4. updateAccountFeeRate: 상태만 갱신(음수 클램프) ──
+// ── 4. updateAccountFeeRate: 상태 갱신(음수 클램프) + 프리셋 select 동기화 ──
 {
   const w = makeDom(true, '0.015');
   w.taxAccounts = [{ type: '위탁' }, { type: 'ISA' }];
+  // 프리셋 select DOM(렌더된 카드 모사) — 동기화 확인용
+  const sel = w.document.createElement('select');
+  sel.id = 'accountFeePreset1';
+  ['0.015', '0.02', '0', 'custom'].forEach(v => {
+    const o = w.document.createElement('option'); o.value = v; sel.appendChild(o);
+  });
+  sel.value = '0.015';
+  w.document.body.appendChild(sel);
+
   w.updateAccountFeeRate(1, '0.025');
   ok('직접입력 → 계좌 상태 갱신', w.taxAccounts[1].fee_rate_pct === 0.025);
+  ok('비프리셋 율 → 프리셋 select=직접입력', sel.value === 'custom');
+  w.updateAccountFeeRate(1, '0.02');
+  ok('프리셋 일치 율 → 프리셋 select=해당 증권사', sel.value === '0.02');
   w.updateAccountFeeRate(1, '-5');
   ok('음수 입력 → 0 클램프', w.taxAccounts[1].fee_rate_pct === 0);
   ok('타 계좌 미영향', w.taxAccounts[0].fee_rate_pct === undefined);

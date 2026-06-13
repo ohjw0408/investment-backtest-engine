@@ -112,7 +112,7 @@ function _mmFeeField(acc, i) {
   return `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;align-items:end;">
       <label style="font-size:0.68rem;color:var(--text-muted);">증권사 수수료
-        <select onchange="updateAccountFeePreset(${i}, this.value)"
+        <select id="accountFeePreset${i}" onchange="updateAccountFeePreset(${i}, this.value)"
           style="width:100%;margin-top:2px;border:1.5px solid var(--border);border-radius:6px;padding:5px 7px;font-size:0.78rem;background:var(--input-bg);">
           ${opts}
         </select>
@@ -134,8 +134,12 @@ function updateAccountFeePreset(idx, v) {
 }
 
 // 직접입력 — 재렌더 없이 상태만(입력 커서 유지, updateTaxAccountAmount와 동일 정책).
+// 프리셋 select 라벨도 동기화(매칭 율이면 그 증권사, 아니면 '직접입력').
 function updateAccountFeeRate(idx, v) {
-  if (window.taxAccounts[idx]) window.taxAccounts[idx].fee_rate_pct = Math.max(0, Number(v) || 0);
+  const pct = Math.max(0, Number(v) || 0);
+  if (window.taxAccounts[idx]) window.taxAccounts[idx].fee_rate_pct = pct;
+  const sel = document.getElementById(`accountFeePreset${idx}`);
+  if (sel) sel.value = _MM_FEE_PRESETS.some(p => Number(p.v) === pct) ? String(pct) : 'custom';
 }
 
 function ensureAccountTickers(idx) {

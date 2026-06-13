@@ -5,8 +5,9 @@
 
 > **진행 상태 (2026-06-13 갱신):**
 > - ✅ 완료: A1 A2 A3 A5 A6 (검색/암호화폐), B5 (리밸 검증), C3 C5 (지수차트/공유), D3 (세금설정 UI), F1 (대기 UX), B2-b B2-c (자산추이/캐싱), B3 (리밸 경고밴드 + 목표비중 계정연동), D5 (인플레), **B1 (포트폴리오 즐겨찾기 — 5탭 위젯+멀티계좌 카드+`/myportfolios` 관리 페이지, 2026-06-12)**, **D6 (합성 데이터 체크박스 — 계산기·백테·은퇴 전 탭)**, **E1 (모바일 반응형+다크모드 전 페이지, 2026-06-11)**, **4G (다중계좌 — `trackG_multiaccount_plan.md` G5 전체 완료 2026-06-09)**
-> - ❌ 미착수: D4(거래수수료), A4(종목상세/시간봉), B2-a(홈토글), B4(거래트래킹), C1(watchlist), C2(자산군비교), C4(온보딩), D1(TDF), D2(연금통합), E2~E4(최적화)
-> - 정본 우선순위: `PROJECT_MASTER_ROADMAP.md`.
+> - 🟡 부분완료: **D4(거래수수료) v1 — 계산기·백테 탭레벨(2026-06-13, 5abbbe4).** Fast-follow=오너 지정 1순위(①계좌별/증권사별 차등 ②은퇴·배당 롤아웃) — D4 섹션 하단 참조.
+> - ❌ 미착수: A4(종목상세/시간봉), B2-a(홈토글), B4(거래트래킹), C1(watchlist), C2(자산군비교), C4(온보딩), D1(TDF), D2(연금통합), E2~E4(최적화)
+> - 정본 우선순위: `PROJECT_MASTER_ROADMAP.md` — 현재 1순위 = D4 fast-follow.
 
 ---
 
@@ -661,6 +662,19 @@ UI:
 - 장기 복리에서 0.015% 수수료 차이가 얼마나 나는지 보여주면 교육적 효과
 
 **난이도:** 낮음~중간 (1~2일) — fee_engine.py 이미 있어서 연동이 핵심
+
+**✅ v1 완료(2026-06-13, 5abbbe4):** `Portfolio.buy/sell` 최저 집행층 주입 → 계산기·백테 전 경로 커버.
+탭레벨 수수료(전 계좌 공통율) + 증권사 프리셋(키움/삼성/토스/직접) + 결과 "총 지불 거래수수료 ₩X".
+국내 개별주식 매도 거래세 0.18% 자동가산. 기본 OFF(opt-in). 검증 = 결정론 8 + 라이브 probe 3 PASS.
+
+**▶ Fast-follow (오너 지정 1순위, 2026-06-13) — D4 v1 후속:**
+- **① 계좌 카드별/증권사별 수수료 차등:** 멀티계좌 카드마다 수수료율(+프리셋) 입력. 백엔드는 이미
+  계좌별 `fee_rate` 수신(`normalize_multi_accounts`가 계좌별 값 없으면 body 공통율 폴백) → **UI만 추가**.
+  `multi_account_ui.js` 카드 렌더에 fee 행 + `taxAccounts[i].fee_rate` 상태 + payload 계좌별 동봉.
+- **② 은퇴·배당 탭 롤아웃:** 이 둘은 fee 미배선. 엔진은 Portfolio 주입이라 logic 배선만 추가
+  (retirement_logic·dividend_logic body→fee_rate, withdrawal/dividend_simulator portfolio 생성에 fee 전달,
+  결과 total_fees surface) + UI 패널(계산기 패턴 복제).
+- 관련 메모리: `decision-d4-fee`.
 
 ---
 

@@ -1556,60 +1556,62 @@ def portfolio_item(portfolio_id):
                     'updated_at': p['updated_at']})
 
 
-def _detail_valid(tickers):
-    """요청 tickers → [(code, qty)] (qty>0)."""
-    out = []
+def _amount_to_holdings(amount, tickers):
+    """총 투자금액(KRW) + tickers[{code, weight, account_type?}] → (holdings, prices).
+
+    수량 = 총액 × (비중/100) ÷ 현재가(KRW). 비중은 포트폴리오에 이미 저장된 값을 그대로 사용.
+    """
+    try:
+        amount = float(amount or 0)
+    except (TypeError, ValueError):
+        amount = 0.0
+    rows = []
     for t in (tickers or []):
         if not isinstance(t, dict):
             continue
         code = str(t.get('code', '')).strip()
         try:
-            qty = float(t.get('quantity') or 0)
+            w = float(t.get('weight') or 0)
         except (TypeError, ValueError):
-            qty = 0.0
-        if code and qty > 0:
-            out.append((code, qty))
-    return out
+            w = 0.0
+        if code and w > 0:
+            rows.append((code, w, t.get('account_type', '일반')))
+    codes  = list({c for c, _, _ in rows})
+    prices = _get_current_asset_prices(codes) if codes else {}
+    holdings = []
+    for code, w, acct in rows:
+        px  = prices.get(code, 0) or 0
+        qty = (amount * (w / 100.0) / px) if (amount > 0 and px > 0) else 0.0
+        holdings.append({'code': code, 'weight': w, 'quantity': qty, 'account_type': acct})
+    return holdings, prices
 
 
 @app.route('/api/portfolio/compute', methods=['POST'])
 def portfolio_compute():
-    """tickers:[{code, quantity}] → 현재가 + 평가금액 추이."""
+    """amount + tickers:[{code, weight}] → 현재가 + 종목별 수량 + 평가금액 추이."""
     if not session.get('user_id'):
         return jsonify({'error': '로그인 필요'}), 401
-    body  = request.get_json(silent=True) or {}
-    valid = _detail_valid(body.get('tickers'))
-    codes = list({c for c, _ in valid})
-    prices  = _get_current_asset_prices(codes) if codes else {}
+    body = request.get_json(silent=True) or {}
+    holdings, prices = _amount_to_holdings(body.get('amount'), body.get('tickers'))
+    valid   = [(h['code'], h['quantity']) for h in holdings if h['quantity'] > 0]
     history = _compute_portfolio_history(valid)
     return jsonify({
-        'prices': prices,
-        'history': history,
+        'prices':   prices,
+        'holdings': holdings,
+        'history':  history,
         'hide_amounts': _hide_amounts_for_user(session['user_id']),
     })
 
 
 @app.route('/api/portfolio/dividends-preview', methods=['POST'])
 def portfolio_dividends_preview():
-    """tickers:[{code, quantity, account_type}] → 배당 차트 데이터 (내자산과 동일 엔진)."""
+    """amount + tickers:[{code, weight}] → 배당 차트 데이터 (내자산과 동일 엔진)."""
     if not session.get('user_id'):
         return jsonify({'error': '로그인 필요'}), 401
     from modules.dividend_history import build_dividend_chart
     body = request.get_json(silent=True) or {}
-    holdings = []
-    for t in (body.get('tickers') or []):
-        if not isinstance(t, dict):
-            continue
-        try:
-            qty = float(t.get('quantity') or 0)
-        except (TypeError, ValueError):
-            qty = 0.0
-        if t.get('code') and qty > 0:
-            holdings.append({
-                'code': str(t['code']),
-                'quantity': qty,
-                'account_type': t.get('account_type', '일반'),
-            })
+    holdings, _ = _amount_to_holdings(body.get('amount'), body.get('tickers'))
+    holdings = [h for h in holdings if h['quantity'] > 0]
     try:
         data = build_dividend_chart(portfolio_engine.loader, holdings)
         return jsonify(data)

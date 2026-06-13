@@ -13,26 +13,35 @@
 .ma-card { background:var(--card); border-radius:14px; border:1.5px solid var(--border); padding:20px; margin-bottom:16px; }
 .ma-card-title { font-size:0.9rem; font-weight:700; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
 
-/* 수량 입력 행 */
+/* 총 투자금액 입력 */
+.pd-amount-box { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.pd-amount-input { flex:1; min-width:160px; padding:11px 14px; border:1.5px solid var(--border); border-radius:10px; background:var(--input-bg); color:var(--text); font-size:1.05rem; font-weight:700; text-align:right; }
+.pd-amount-unit { font-size:0.95rem; font-weight:700; color:var(--text-muted); }
+.pd-amount-presets { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.pd-preset { font-size:0.76rem; padding:5px 10px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text-muted); cursor:pointer; }
+.pd-preset:hover { border-color:var(--blue); color:var(--blue); }
+
+/* 종목 구성 행 */
 .pd-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); font-size:0.84rem; }
 .pd-row:last-child { border-bottom:none; }
 .pd-badge { padding:2px 8px; border-radius:6px; font-size:0.68rem; font-weight:700; color:white; flex-shrink:0; }
 .pd-code { font-weight:700; min-width:64px; }
 .pd-name { color:var(--text-muted); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.pd-qty { width:90px; padding:6px 8px; border:1.5px solid var(--border); border-radius:6px; background:var(--input-bg); color:var(--text); font-size:0.84rem; text-align:right; }
-.pd-qty-unit { color:var(--text-muted); font-size:0.78rem; flex-shrink:0; }
+.pd-weight { font-weight:700; min-width:44px; text-align:right; }
+.pd-val { min-width:96px; text-align:right; color:var(--text-muted); font-variant-numeric:tabular-nums; }
 
 .summary-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:10px; margin-bottom:16px; }
 .summary-item { padding:12px 14px; background:var(--bg); border-radius:10px; }
 .summary-label { font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; }
 .summary-value { font-size:1.05rem; font-weight:800; }
 
+.pd-hint { text-align:center; padding:24px 20px; color:var(--text-muted); font-size:0.85rem; }
+
 .ma-period-btn { font-size:0.75rem; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:var(--card); color:var(--text-muted); cursor:pointer; }
 .ma-period-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
 .div-tgl { font-size:0.75rem; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:var(--card); color:var(--text-muted); cursor:pointer; }
 .div-tgl.active { background:var(--blue); color:#fff; border-color:var(--blue); }
 .div-drill-head { font-weight:700; font-size:0.85rem; margin-bottom:6px; }
-.div-drill-item { display:flex; justify-content:space-between; gap:8px; padding:6px 10px; border-bottom:1px solid var(--border); font-size:0.83rem; }
 .div-list { border:1px solid var(--border); border-radius:8px; overflow:hidden; }
 .div-list-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--border); font-size:0.84rem; }
 .div-list-item:last-child { border-bottom:none; }
@@ -50,13 +59,6 @@
 .div-month-box .m-label { font-size:0.78rem; font-weight:700; }
 .div-month-box .m-amt { font-size:0.72rem; margin-top:2px; opacity:0.85; }
 .div-month-table { border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:8px; }
-.div-month-trow { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--border); font-size:0.84rem; cursor:pointer; }
-.div-month-trow:last-child { border-bottom:none; }
-.div-month-trow:hover { background:var(--bg); }
-.div-month-trow.active { background:var(--bg); }
-.div-month-trow .t-month { font-weight:700; min-width:48px; }
-.div-month-trow .t-amt { margin-left:auto; font-weight:700; }
-.div-month-detail { background:var(--bg); }
 
 @media (max-width:768px) {
   .pd-wrap { padding:14px 12px; }
@@ -80,30 +82,36 @@
 
   <a href="/myportfolios" class="pd-back">← 내 포트폴리오</a>
   <div class="pd-title" id="pdName">⏳ 로딩 중...</div>
-  <div class="pd-sub">종목별 보유 수량을 입력하면 비중·자산 추이·배당금을 계산합니다.</div>
+  <div class="pd-sub">총 투자금액만 입력하면 저장된 비중대로 자동 배분해 비중·자산 추이·배당금을 계산합니다.</div>
 
-  <!-- 수량 입력 -->
+  <!-- 총 투자금액 입력 (맨 위, 항상 표시) -->
   <div class="ma-card" style="margin-top:16px;">
-    <div class="ma-card-title">
-      <span>📝 보유 수량 입력</span>
-      <div style="display:flex;gap:6px;">
-        <button class="btn-secondary" style="font-size:0.8rem;padding:6px 14px;" onclick="applyQuantities()">↻ 계산</button>
-        <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="saveQuantities(this)">💾 수량 저장</button>
-      </div>
+    <div class="ma-card-title">💰 총 투자금액</div>
+    <div class="pd-amount-box">
+      <input type="number" id="pdAmount" class="pd-amount-input" min="0" step="100000" placeholder="예: 10,000,000">
+      <span class="pd-amount-unit">원</span>
+      <button class="btn-primary" style="font-size:0.85rem;padding:10px 18px;" onclick="applyAmount()">계산</button>
     </div>
-    <div id="pdRows"><div style="text-align:center;padding:20px;color:var(--text-muted);">로딩 중...</div></div>
-    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">* 수량 저장 시 이 포트폴리오에 함께 보관됩니다. 비중은 입력 수량 × 현재가 기준으로 자동 계산됩니다.</div>
+    <div class="pd-amount-presets">
+      <button class="pd-preset" onclick="setAmount(1000000)">100만</button>
+      <button class="pd-preset" onclick="setAmount(5000000)">500만</button>
+      <button class="pd-preset" onclick="setAmount(10000000)">1천만</button>
+      <button class="pd-preset" onclick="setAmount(50000000)">5천만</button>
+      <button class="pd-preset" onclick="setAmount(100000000)">1억</button>
+    </div>
+    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">* 종목별 매수금액 = 총 투자금액 × 비중. 수량은 현재가로 자동 환산됩니다. 비중 합이 100% 미만이면 나머지는 현금으로 둡니다.</div>
   </div>
 
-  <!-- 비중 -->
-  <div class="ma-card" id="pdWeightCard" style="display:none;">
+  <!-- 비중 (항상 표시) -->
+  <div class="ma-card" id="pdWeightCard">
     <div class="ma-card-title">📈 자산 구성</div>
     <div id="pdSummary" class="summary-grid"></div>
-    <div style="position:relative;height:260px;"><canvas id="pdWeightChart"></canvas></div>
+    <div id="pdCompose"></div>
+    <div style="position:relative;height:260px;margin-top:14px;"><canvas id="pdWeightChart"></canvas></div>
   </div>
 
-  <!-- 자산 추이 -->
-  <div class="ma-card" id="pdHistCard" style="display:none;">
+  <!-- 자산 추이 (항상 표시) -->
+  <div class="ma-card" id="pdHistCard">
     <div class="ma-card-title">
       <span>📊 자산 추이</span>
       <div style="display:flex;gap:6px;">
@@ -114,11 +122,11 @@
       </div>
     </div>
     <canvas id="pdHistChart" height="120"></canvas>
-    <div id="pdHistEmpty" style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;display:none;">자산 추이 데이터가 없습니다.</div>
+    <div id="pdHistHint" class="pd-hint">총 투자금액을 입력하면 자산 추이가 표시됩니다.</div>
   </div>
 
-  <!-- 배당금 -->
-  <div class="ma-card" id="pdDivCard" style="display:none;">
+  <!-- 배당금 (항상 표시) -->
+  <div class="ma-card" id="pdDivCard">
     <div class="ma-card-title">
       <span>💵 배당금</span>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -131,10 +139,10 @@
     </div>
     <div id="divYearTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
     <div style="position:relative;height:260px;"><canvas id="divChart"></canvas></div>
-    <div id="divEmpty" style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;display:none;">배당 이력이 있는 종목이 없습니다.</div>
+    <div id="divHint" class="pd-hint">총 투자금액을 입력하면 배당금이 표시됩니다.</div>
     <div id="divDrill" style="margin-top:12px;"></div>
 
-    <div id="divCalWrap" style="margin-top:18px;">
+    <div id="divCalWrap" style="margin-top:18px;display:none;">
       <div class="ma-card-title" style="font-size:0.85rem;margin-bottom:8px;">📅 월별 배당 일정 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 월 칸을 누르면 종목별 내역</span></div>
       <div id="divMonthGrid" class="div-month-grid"></div>
       <div id="divMonthDetail"></div>
@@ -151,8 +159,10 @@
 {% if user %}
 <script>
 const PID = {{ pid }};
-let pf = null;                 // {id, name, tickers:[{code,name,badge,weight,quantity}]}
+const LS_KEY = 'pf_amount_' + PID;
+let pf = null;                 // {id, name, tickers:[{code,name,badge,weight}]}
 let pdPrices = {};
+let pdAmount = 0;
 let hideAmounts = false;
 const PALETTE = ['#1976D2','#2E7D32','#F57C00','#7B1FA2','#00838F','#C62828','#5D4037','#455A64','#AD1457','#558B2F'];
 
@@ -172,113 +182,107 @@ async function loadPortfolio(){
     pf = await res.json();
   } catch(e){
     document.getElementById('pdName').textContent = '포트폴리오를 찾을 수 없습니다';
-    document.getElementById('pdRows').innerHTML = '';
     return;
   }
   document.getElementById('pdName').textContent = '⭐ ' + pf.name;
-  renderRows();
-  if (pf.tickers.some(t => Number(t.quantity) > 0)) applyQuantities();
+  renderWeight();                       // 비중 파이는 금액과 무관하게 즉시 표시
+  const saved = parseFloat(localStorage.getItem(LS_KEY) || '0') || 0;
+  if (saved > 0) {
+    document.getElementById('pdAmount').value = saved;
+    applyAmount();
+  }
 }
 
-function renderRows(){
-  document.getElementById('pdRows').innerHTML = pf.tickers.map((t,i) => `
-    <div class="pd-row">
-      <span class="pd-badge" style="background:${badgeColor(t.badge)}">${esc(t.badge || '—')}</span>
-      <span class="pd-code">${esc(t.code)}</span>
-      <span class="pd-name">${esc(t.name || '')}</span>
-      <input type="number" class="pd-qty" min="0" step="0.001" value="${Number(t.quantity)||0}" data-idx="${i}">
-      <span class="pd-qty-unit">주</span>
-    </div>`).join('');
-}
+function setAmount(v){ document.getElementById('pdAmount').value = v; applyAmount(); }
 
-function readQuantities(){
-  document.querySelectorAll('.pd-qty').forEach(inp => {
-    const i = parseInt(inp.dataset.idx);
-    pf.tickers[i].quantity = Math.max(0, Number(inp.value) || 0);
-  });
-}
-
-// ── 계산 ──
-async function applyQuantities(){
-  readQuantities();
-  const payload = { tickers: pf.tickers.map(t => ({ code: t.code, quantity: t.quantity || 0 })) };
-  if (!payload.tickers.some(t => t.quantity > 0)) {
-    alert('수량을 1개 이상 입력해주세요.');
+// ── 금액 적용 → 추이·배당 ──
+async function applyAmount(){
+  pdAmount = Math.max(0, parseFloat(document.getElementById('pdAmount').value) || 0);
+  localStorage.setItem(LS_KEY, String(pdAmount));
+  renderWeight();
+  if (pdAmount <= 0) {
+    document.getElementById('pdHistHint').style.display = 'block';
+    document.getElementById('pdHistChart').style.display = 'none';
+    document.getElementById('divHint').style.display = 'block';
+    document.getElementById('divChart').style.display = 'none';
+    document.getElementById('divYearTabs').innerHTML = '';
+    document.getElementById('divDrill').innerHTML = '';
+    document.getElementById('divCalWrap').style.display = 'none';
+    document.getElementById('divNote').innerHTML = '';
     return;
   }
-  // 비중 + 추이
+  const payload = { amount: pdAmount, tickers: pf.tickers.map(t => ({ code:t.code, weight:t.weight })) };
   try {
     const res = await fetch('/api/portfolio/compute', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload),
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload),
     });
     const data = await res.json();
     pdPrices    = data.prices || {};
     hideAmounts = !!data.hide_amounts;
+    _histData   = data.history;
     renderWeight();
-    _histData = data.history;
-    renderHistCard();
+    renderHist();
   } catch(e){}
-  // 배당
   loadDividends();
-}
-
-async function saveQuantities(btn){
-  readQuantities();
-  btn.disabled = true;
-  try {
-    const res = await fetch('/api/portfolio/save', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ id: pf.id, name: pf.name, tickers: pf.tickers }),
-    });
-    const data = await res.json();
-    if (!res.ok) { alert(data.error || '저장에 실패했어요.'); return; }
-    btn.textContent = '✓ 저장됨';
-    setTimeout(() => { btn.textContent = '💾 수량 저장'; btn.disabled = false; }, 1500);
-  } catch(e){ alert('저장에 실패했어요.'); btn.disabled = false; }
 }
 
 // ── 비중 ──
 let _weightChart = null;
 function renderWeight(){
   const items = pf.tickers
-    .map((t,i) => ({ label: t.code, val: (pdPrices[t.code]||0) * (t.quantity||0), color: PALETTE[i % PALETTE.length] }))
-    .filter(x => x.val > 0);
-  const total = items.reduce((s,i) => s + i.val, 0);
-  document.getElementById('pdWeightCard').style.display = total > 0 ? 'block' : 'none';
-  if (total <= 0) return;
+    .filter(t => Number(t.weight) > 0)
+    .map((t,i) => ({ code:t.code, name:t.name, badge:t.badge, weight:Number(t.weight), color: PALETTE[i % PALETTE.length] }));
+  const totalW = items.reduce((s,i)=>s+i.weight, 0);
 
+  // 요약
   document.getElementById('pdSummary').innerHTML = [
-    { label:'총 평가금액', value: fmtKRW(total) },
+    { label:'총 투자금액', value: pdAmount>0 ? fmtKRW(pdAmount) : '— (금액 입력)' },
     { label:'종목 수', value: items.length + '개' },
+    { label:'비중 합계', value: totalW + '%' + (totalW < 100 ? ` (현금 ${100-totalW}%)` : '') },
   ].map(i => `<div class="summary-item"><div class="summary-label">${i.label}</div><div class="summary-value">${i.value}</div></div>`).join('');
 
+  // 종목 구성 행 (비중 + 배분금액)
+  document.getElementById('pdCompose').innerHTML = items.map(t => {
+    const val = pdAmount > 0 ? pdAmount * t.weight / 100 : null;
+    return `<div class="pd-row">
+      <span class="pd-badge" style="background:${badgeColor(t.badge)}">${esc(t.badge || '—')}</span>
+      <span class="pd-code">${esc(t.code)}</span>
+      <span class="pd-name">${esc(t.name || '')}</span>
+      <span class="pd-weight">${t.weight}%</span>
+      <span class="pd-val">${val==null ? '' : fmtKRW(val)}</span>
+    </div>`;
+  }).join('');
+
+  // 파이
   if (_weightChart) _weightChart.destroy();
+  if (!items.length) return;
   _weightChart = new Chart(document.getElementById('pdWeightChart').getContext('2d'), {
     type:'pie',
-    data:{ labels: items.map(i=>i.label), datasets:[{
-      data: items.map(i => parseFloat((i.val/total*100).toFixed(1))),
+    data:{ labels: items.map(i=>i.code), datasets:[{
+      data: items.map(i => i.weight),
       backgroundColor: items.map(i => i.color+'cc'),
       borderColor: items.map(i => i.color), borderWidth:1.5,
     }]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{
       legend:{ position: window.innerWidth<=768 ? 'bottom':'right', labels:{ boxWidth:14, font:{size:11} } },
-      tooltip:{ callbacks:{ label: ctx => `${ctx.label}: ${ctx.parsed.toFixed(1)}%` } },
+      tooltip:{ callbacks:{ label: ctx => `${ctx.label}: ${ctx.parsed}%` } },
     }}
   });
 }
 
 // ── 자산 추이 ──
 let _histChart = null, _histData = null;
-function renderHistCard(){
+function renderHist(){
   const d = _histData;
-  document.getElementById('pdHistCard').style.display = 'block';
   if (!d || d.empty || !d.labels || !d.labels.length) {
-    document.getElementById('pdHistEmpty').style.display = 'block';
+    document.getElementById('pdHistHint').textContent = '이 종목 구성의 과거 가격 데이터가 없습니다.';
+    document.getElementById('pdHistHint').style.display = 'block';
+    document.getElementById('pdHistChart').style.display = 'none';
     if (_histChart) { _histChart.destroy(); _histChart = null; }
     return;
   }
-  document.getElementById('pdHistEmpty').style.display = 'none';
+  document.getElementById('pdHistHint').style.display = 'none';
+  document.getElementById('pdHistChart').style.display = 'block';
   renderHistChart(30);
 }
 function setHistPeriod(days, btn){
@@ -308,16 +312,29 @@ let _divChart = null, _divData = null;
 let _divTax = 'pretax', _divCur = 'KRW', _divYear = null, _divActiveMonth = null;
 
 async function loadDividends(){
-  const card = document.getElementById('pdDivCard');
-  card.style.display = 'block';
   try {
     const res = await fetch('/api/portfolio/dividends-preview', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ tickers: pf.tickers.map(t => ({ code:t.code, quantity:t.quantity||0 })) }),
+      body: JSON.stringify({ amount: pdAmount, tickers: pf.tickers.map(t => ({ code:t.code, weight:t.weight })) }),
     });
     if (!res.ok) throw new Error();
     _divData = await res.json();
-  } catch(e){ document.getElementById('divEmpty').style.display='block'; return; }
+  } catch(e){
+    document.getElementById('divHint').textContent = '배당 데이터를 불러오지 못했습니다.';
+    document.getElementById('divHint').style.display = 'block';
+    return;
+  }
+  const anyEvents = _divData.years && _divData.years.some(y => (_divData.events[y]||[]).length);
+  if (!anyEvents) {
+    document.getElementById('divHint').textContent = '배당 이력이 있는 종목이 없습니다.';
+    document.getElementById('divHint').style.display = 'block';
+    document.getElementById('divChart').style.display = 'none';
+    document.getElementById('divCalWrap').style.display = 'none';
+    return;
+  }
+  document.getElementById('divHint').style.display = 'none';
+  document.getElementById('divChart').style.display = 'block';
+  document.getElementById('divCalWrap').style.display = 'block';
   _divYear = _divData.default_year;
   _divActiveMonth = null;
   renderYearTabs();
@@ -339,10 +356,6 @@ function renderYearTabs(){
 function renderDivYear(){
   if (!_divData) return;
   const evs = _divData.events[_divYear] || [];
-  const anyData = evs.length > 0;
-  document.getElementById('divEmpty').style.display = anyData ? 'none' : 'block';
-  document.getElementById('divChart').style.display = anyData ? 'block' : 'none';
-
   const monthly = Array(12).fill(0);
   const monthProj = Array(12).fill(false);
   evs.forEach(e => { monthly[e.month-1] += _valOf(e); if (e.projected) monthProj[e.month-1] = true; });
@@ -374,7 +387,6 @@ function renderDivYear(){
   renderDivNote();
 }
 
-// 월별 네모칸 + 펼침 표
 function renderMonthGrid(monthly, monthProj){
   const grid = document.getElementById('divMonthGrid');
   grid.innerHTML = monthly.map((amt,i) => {
@@ -442,7 +454,7 @@ function renderList(evs){
 
 function renderDivNote(){
   const note = [];
-  note.push('※ 과거 배당은 <b>입력한 보유 수량</b>을 그대로 보유했다고 가정해 계산합니다.');
+  note.push('※ 입력한 <b>총 투자금액 × 비중</b>으로 현재 매수했다고 가정해 계산합니다.');
   note.push(`※ ${_divData.current_year}년은 실데이터가 있는 달까지는 실적, 이후 달과 ${_divData.full_proj_year}년은 종목별 최근 5년 배당성장률(CAGR) 기반 <b>예측치</b>입니다.`);
   if (_divData.has_foreign) note.push('※ 해외 종목 배당은 배당 당시 환율로 환산, 미래 예측은 현재 환율 기준입니다.');
   note.push('더 정확한 과거 성과·미래 전망은 ' +
@@ -454,14 +466,16 @@ function renderDivNote(){
 // 토글 이벤트
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-div-tax]');
-  if (t) { _divTax = t.dataset.divTax; document.querySelectorAll('[data-div-tax]').forEach(b=>b.classList.toggle('active', b===t)); renderDivYear(); return; }
+  if (t) { _divTax = t.dataset.divTax; document.querySelectorAll('[data-div-tax]').forEach(b=>b.classList.toggle('active', b===t)); if (_divData) renderDivYear(); return; }
   const c = e.target.closest('[data-div-cur]');
-  if (c) { _divCur = c.dataset.divCur; document.querySelectorAll('[data-div-cur]').forEach(b=>b.classList.toggle('active', b===c)); renderDivYear(); return; }
+  if (c) { _divCur = c.dataset.divCur; document.querySelectorAll('[data-div-cur]').forEach(b=>b.classList.toggle('active', b===c)); if (_divData) renderDivYear(); return; }
   const y = e.target.closest('[data-div-year]');
   if (y) { _divYear = parseInt(y.dataset.divYear); _divActiveMonth = null; document.querySelectorAll('[data-div-year]').forEach(b=>b.classList.toggle('active', b===y)); renderDivYear(); return; }
   const mb = e.target.closest('#divMonthGrid .div-month-box[data-month]');
   if (mb) { showMonth(parseInt(mb.dataset.month)); }
 });
+
+document.getElementById('pdAmount').addEventListener('keydown', e => { if (e.key === 'Enter') applyAmount(); });
 
 loadPortfolio();
 </script>

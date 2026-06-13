@@ -1,16 +1,18 @@
 # Log
 
-## [2026-06-14] feature | 저장 포트폴리오 상세(수량입력→비중·추이·배당) + 내자산 배당일정 월별칸·홍보문구 강조
+## [2026-06-14] feature | 저장 포트폴리오 상세(총투자금액→비중 자동배분→추이·배당) + 내자산 배당일정 월별칸·홍보문구 강조
 
-오너: ① "내 포트폴리오" 저장 카드 클릭 → 내자산 같은 상세 화면. 수량 입력창 → 그 자산의 받은/예측 배당·자산추이·비중 표시. ② 내자산 배당 CTA(백테/계산기 유도)가 너무 작음 → 크게·눈에 띄는 색(튀지 않게). ③ 배당 일정 — 막대 클릭 말고 **월별 네모칸** 누르면 표로 펼침.
+오너: ① "내 포트폴리오" 저장 카드 클릭 → 내자산 같은 상세 화면. **총 투자금액 1칸만 입력** → 저장된 비중대로 자동 배분(수량 자동 환산) → 받은/예측 배당·자산추이·비중 표시. 입력창은 **상세 페이지 맨 위, 카드는 항상 표시**(입력해야 나오는 게 아님). ② 내자산 배당 CTA(백테/계산기 유도)가 너무 작음 → 크게·눈에 띄는 색(튀지 않게). ③ 배당 일정 — 막대 클릭 말고 **월별 네모칸** 누르면 표로 펼침.
 
-- **백엔드(app.py)**: `_compute_portfolio_history(valid)` 헬퍼 추출(기존 `/api/portfolio/history`가 호출) → 재사용. 신규: 페이지 `/myportfolios/<id>`, API `GET /api/portfolio/item/<id>`, `POST /api/portfolio/compute`(현재가+추이), `POST /api/portfolio/dividends-preview`(내자산 `build_dividend_chart` 동일 엔진). 수량은 `saved_portfolios.tickers_json`에 `quantity` 필드로 영구 저장(스키마 변경 없음). `auth_manager.get_portfolio(uid,pid)` 추가, `portfolio_save`가 quantity 보존.
-- **신규 페이지 `portfolio_detail.html`**: 종목별 수량 입력 → [계산]/[수량 저장]. 비중 파이(종목별)·자산 추이(1M/3M/1Y/전체)·배당금(세전후·원외화·연도탭·막대드릴·월별 네모칸·일정 리스트). 내자산 배당 렌더 패턴 재사용.
+※ 1차 구현은 종목별 수량 입력이었으나 오너 피드백("수량 말고 총액 하나만, 비중 자동")으로 **총 투자금액 단일 입력 모델로 재설계**.
+
+- **백엔드(app.py)**: `_compute_portfolio_history(valid)` 헬퍼 추출(기존 `/api/portfolio/history`가 호출) → 재사용. 신규: 페이지 `/myportfolios/<id>`, API `GET /api/portfolio/item/<id>`, `POST /api/portfolio/compute`, `POST /api/portfolio/dividends-preview`(내자산 `build_dividend_chart` 동일 엔진). 공통 헬퍼 `_amount_to_holdings(amount, tickers[{code,weight}])` = **수량 = 총액×(비중/100)÷현재가(KRW)** 산출 후 holdings 생성. `auth_manager.get_portfolio(uid,pid)` 추가.
+- **신규 페이지 `portfolio_detail.html`**: 맨 위 총 투자금액 입력칸(프리셋 100만~1억) + [계산]. 비중 파이(금액 무관 즉시 표시)·자산 추이(1M/3M/1Y/전체)·배당금(세전후·원외화·연도탭·막대드릴·월별 네모칸·일정 리스트). 카드 항상 표시(금액 0이면 안내). 금액 = `localStorage(pf_amount_<id>)` 보관. 내자산 배당 렌더 패턴 재사용.
 - **myportfolios.html**: 카드 이름·📂 버튼 → `/myportfolios/<id>` 이동.
 - **myassets.html ②**: 배당 안내(`#divNote`)에서 백테/계산기 CTA 분리 → `#divCta` 강조 박스(0.92rem, 연한 파랑 배경+테두리, 💡).
 - **myassets.html ③**: 배당 일정에 12개월 네모칸 그리드(월별 합계 표시) + 클릭 시 그 달 종목별 펼침 표(`#divMonthDetail`). 기존 종목별 리스트·막대 드릴 유지.
 
-검증(venv test_client + 세션 주입): item/상세페이지(PID 주입)/수량 저장 라운드트립(quantity 3→5 영구) 200 PASS. compute(price>0·history keys) / dividends-preview(years·events) 200 PASS. 기존 `/api/portfolio/history` 회귀 200(hide_amounts 포함) PASS. JS `node --check` — myassets·portfolio_detail·myportfolios 3파일 전부 OK. ⚠️ 실브라우저(Playwright) 검증 미수행 — 로그인 E2E 필요.
+검증(venv test_client + 세션 주입): item/상세페이지(PID 주입) 200 PASS. compute(amount 10M·weight 60/40 → SPY 수량 5.297·price>0·history keys, amount 0 → history empty) PASS. dividends-preview(458730 100% → events 2026 12개) PASS — events 키는 JSON 직렬화로 문자열("2026"), JS는 `events[number]` 자동 문자열변환이라 정상. 기존 `/api/portfolio/history` 회귀 200 PASS. JS `node --check` 3파일 OK. ⚠️ 실브라우저(Playwright) 검증 미수행 — 로그인 E2E 필요.
 
 ## [2026-06-14] fix | 배당차트 — 빈 달 예측 채움 + 일정 종목별 묶기
 

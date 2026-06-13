@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-13] fix | BUG-KOSPI-CHART 코스피 차트 봉합 깨짐
+
+오너 라이브 발견(홈→코스피 클릭): ^KS11 차트가 중간 급등 불연속 + 52주 최저 ₩387 비정상.
+원인 = `get_symbol_data._INDEX_DB_ALIAS`가 `^KS11`(코스피)을 `KS200`(코스피200, 다른 지수·스케일)로
+별칭 → DB 과거분(KS200) + yfinance 최근분(실 ^KS11) 봉합 → 스케일 불일치 점프.
+수정 = `^KS11` 별칭 제거(KRW=X→USD/KRW만 유지) → 전 구간 yfinance 실코스피 일관 조회.
+is_index 이름/카테고리 폴백 추가(symbol_master에 없어도 "코스피 (KOSPI)" 유지).
+검증(로컬) = 40%+ 인접 점프 0개·52w저 2895(가짜 387 제거)·name 정상, ^GSPC·KRW=X 회귀 없음.
+`modules/price_loader.py` 단일 파일.
+
 ## [2026-06-13] feature | D4 fast-follow ② 은퇴·배당 거래수수료 롤아웃
 
 오너 결정: 은퇴+배당 둘 다, 은퇴 fee = **적립+인출 양 단계**. 배당 합성 경로는 거래 없는

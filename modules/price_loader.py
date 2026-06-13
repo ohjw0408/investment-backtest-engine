@@ -616,7 +616,10 @@ class PriceLoader:
             country  = "KR"  if is_kr else "US"
 
         # ── 지수: index_daily 우선 조회, stale이면 yfinance로 최근분 보충 ──
-        _INDEX_DB_ALIAS = {'KRW=X': 'USD/KRW', '^KS11': 'KS200'}
+        # ^KS11(코스피)은 index_daily에 KS200(코스피200, 다른 지수·다른 스케일)로 별칭돼 있었으나
+        # 실데이터(yfinance ^KS11)와 봉합 시 스케일 불일치로 차트가 깨졌다. 별칭 제거 →
+        # ^KS11은 아래 yfinance 경로로 일관 조회(실 코스피). KRW=X→USD/KRW는 동일 데이터라 유지.
+        _INDEX_DB_ALIAS = {'KRW=X': 'USD/KRW'}
         _INDEX_NAMES    = {
             'KRW=X': '달러/원 환율',    '^GSPC': 'S&P 500',
             '^IXIC': 'NASDAQ Composite', '^KS11': '코스피 (KOSPI)',
@@ -729,6 +732,13 @@ class PriceLoader:
                 name     = d.get("name", "")
                 issuer   = d.get("issuer", "") or ""
                 category = d.get("category", "") or ""
+
+        # 지수(^KS11 등)는 symbol_master에 없을 수 있음 → 표시 이름·카테고리 보완.
+        if is_index:
+            if not name:
+                name = _INDEX_NAMES.get(code, code)
+            if not category:
+                category = "INDEX"
 
         # KR ETF → kr_etf_list.csv 보완
         if is_kr and not issuer:

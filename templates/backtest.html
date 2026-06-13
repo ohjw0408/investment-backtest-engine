@@ -373,6 +373,12 @@
         <div class="bt-chart-wrap annual"><canvas id="btAnnualChart"></canvas></div>
       </div>
 
+      <!-- 낙폭 차트 -->
+      <div class="bt-card">
+        <div class="bt-card-title">📉 낙폭 (Drawdown)</div>
+        <div class="bt-chart-wrap drawdown"><canvas id="btDrawdownChart"></canvas></div>
+      </div>
+
       <!-- 연간 배당금 -->
       <div class="bt-card" id="btDivCard" style="display:none;">
         <div class="bt-card-title">💵 연간 배당금 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 그 해 수령한 배당(세전, 재투자 전 기준)</span></div>
@@ -380,10 +386,11 @@
         <div id="btDivNote" style="font-size:0.74rem;color:var(--text-muted);margin-top:8px;"></div>
       </div>
 
-      <!-- 낙폭 차트 -->
-      <div class="bt-card">
-        <div class="bt-card-title">📉 낙폭 (Drawdown)</div>
-        <div class="bt-chart-wrap drawdown"><canvas id="btDrawdownChart"></canvas></div>
+      <!-- 배당 성장률 -->
+      <div class="bt-card" id="btDivGrowthCard" style="display:none;">
+        <div class="bt-card-title">📈 배당 성장률 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 전년 대비 배당금 증가율</span></div>
+        <div class="bt-chart-wrap annual"><canvas id="btDivGrowthChart"></canvas></div>
+        <div id="btDivGrowthNote" style="font-size:0.74rem;color:var(--text-muted);margin-top:8px;"></div>
       </div>
 
       <!-- 종합과세 경고 + 분할매도 절세 패널 (Phase 2e) -->
@@ -1103,11 +1110,12 @@ function renderBacktest(data) {
   // 연간 수익률
   renderAnnualChart(data.annual_returns);
 
-  // 연간 배당금
-  renderAnnualDividendChart(data.annual_dividends, m.total_dividend);
-
   // 낙폭 차트
   renderDrawdownChart(data.history);
+
+  // 연간 배당금 + 배당 성장률 (낙폭 아래)
+  renderAnnualDividendChart(data.annual_dividends, m.total_dividend);
+  renderDividendGrowthChart(data.annual_dividends);
 }
 
 function renderAnnualDividendChart(annualDiv, totalDiv) {
@@ -1134,6 +1142,45 @@ function renderAnnualDividendChart(annualDiv, totalDiv) {
   });
   document.getElementById('btDivNote').innerHTML =
     `총 배당금 ${fmtKRW(totalDiv || 0)} · 그 해 보유 수량 기준 실제 수령 배당입니다.`;
+}
+
+function renderDividendGrowthChart(annualDiv) {
+  const card = document.getElementById('btDivGrowthCard');
+  if (btCharts.divGrowth) { btCharts.divGrowth.destroy(); btCharts.divGrowth = null; }
+  const rows = (annualDiv || []).filter(a => a.dividend > 0);
+  if (rows.length < 2) { card.style.display = 'none'; return; }   // 성장률은 2년 이상
+  card.style.display = 'block';
+
+  // 전년 대비 증가율 (첫 해 제외)
+  const labels = [], values = [];
+  for (let i = 1; i < rows.length; i++) {
+    const prev = rows[i-1].dividend, cur = rows[i].dividend;
+    labels.push(rows[i].year + '년');
+    values.push(prev > 0 ? +((cur / prev - 1) * 100).toFixed(1) : 0);
+  }
+  const colors = values.map(v => v >= 0 ? 'rgba(46,125,50,0.8)' : 'rgba(198,40,40,0.8)');
+
+  btCharts.divGrowth = new Chart(document.getElementById('btDivGrowthChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
+      }
+    }
+  });
+
+  // 전체 배당 CAGR
+  const first = rows[0].dividend, last = rows[rows.length-1].dividend, n = rows.length - 1;
+  let cagr = null;
+  if (first > 0 && n > 0) cagr = (Math.pow(last / first, 1 / n) - 1) * 100;
+  document.getElementById('btDivGrowthNote').innerHTML = cagr != null
+    ? `전체 배당 성장률(CAGR) ${cagr >= 0 ? '+' : ''}${cagr.toFixed(1)}% · ${rows[0].year}년 → ${rows[rows.length-1].year}년 기준`
+    : '';
 }
 
 function renderValueChart(history) {

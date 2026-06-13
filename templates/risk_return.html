@@ -151,7 +151,7 @@ let rrBench = DEFAULT_BENCH.slice();
 let rrSearchTimer = null;
 let rrItems = [];               // 결과 items
 let rrVisible = [];             // 스파이더 표시여부(items와 동일 인덱스)
-let rrOpacity = 0.25;
+let rrOpacity = 0.18;
 let rrScatterChart = null, rrSpiderChart = null;
 
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -356,7 +356,7 @@ function rrRenderSpiderCtrl(){
      <div style="flex-basis:100%;height:1px;background:var(--border);margin:2px 0;"></div>
      <div style="flex-basis:100%;font-size:0.76rem;color:var(--text-muted);font-weight:700;">표시 항목 · 투명도</div>
      ${itemBoxes}
-     <span class="rr-opacity">투명도 <input type="range" min="0" max="60" value="${Math.round(rrOpacity*100)}" oninput="rrSetOpacity(this.value)"></span>`;
+     <span class="rr-opacity">불투명도 <input type="range" min="0" max="100" value="${Math.round(rrOpacity*100)}" oninput="rrSetOpacity(this.value)"></span>`;
 }
 function rrToggleAxis(key, on){
   if (on) { if (!rrAxisKeys.includes(key)) rrAxisKeys.push(key); }

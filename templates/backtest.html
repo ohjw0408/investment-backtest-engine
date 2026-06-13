@@ -215,10 +215,36 @@
       </div>
     </div>
 
+    <!-- 거래수수료 섹션 (D4) -->
+    <div class="calc-section">
+      <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span><span class="calc-section-num">04</span> 거래수수료</span>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-size:0.8rem;color:var(--text-muted);">
+          <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()"> 적용
+        </label>
+      </div>
+      <div id="feePanelBody" style="display:none;margin-top:8px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
+          <label style="font-size:0.72rem;color:var(--text-muted);">증권사 프리셋
+            <select id="feePreset" onchange="applyFeePreset(this.value)" style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
+              <option value="0.015">키움 0.015%</option>
+              <option value="0.02">삼성 0.02%</option>
+              <option value="0">토스 0%</option>
+              <option value="custom">직접입력</option>
+            </select>
+          </label>
+          <label style="font-size:0.72rem;color:var(--text-muted);">수수료율 (%)
+            <input type="number" id="feeRateInput" value="0.015" min="0" step="0.001" style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
+          </label>
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">매수·매도에 적용. 국내 개별주식 매도는 거래세 0.18% 추가(ETF 면제).</div>
+      </div>
+    </div>
+
     <!-- 세금 적용 섹션 -->
     <div class="calc-section">
       <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-        <span><span class="calc-section-num">04</span> 세금 적용</span>
+        <span><span class="calc-section-num">05</span> 세금 적용</span>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
           <span id="btTaxLabel" style="font-size:0.8rem;color:var(--text-muted);">OFF</span>
           <div id="btTaxWrap" onclick="toggleBtTax()" style="width:44px;height:24px;background:var(--border);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
@@ -656,6 +682,30 @@ function btRenderMultiAccount(data) {
   wrap.style.display = 'block';
 }
 
+// ── 거래수수료 (D4) ──
+function toggleFeePanel() {
+  const on = document.getElementById('feeEnabledChk')?.checked;
+  const body = document.getElementById('feePanelBody');
+  if (body) body.style.display = on ? 'block' : 'none';
+}
+function applyFeePreset(v) {
+  if (v === 'custom') return;
+  const inp = document.getElementById('feeRateInput');
+  if (inp) inp.value = v;
+}
+function renderFeeSummary(containerId, totalFees) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  let slot = el.querySelector(':scope > #mmFeeSummary');
+  if (totalFees == null) { if (slot) slot.remove(); return; }
+  if (!slot) { slot = document.createElement('div'); slot.id = 'mmFeeSummary'; el.appendChild(slot); }
+  const won = Math.round(Number(totalFees) || 0).toLocaleString();
+  slot.innerHTML = `
+    <div style="margin-top:12px;padding:10px 14px;background:var(--bg,#f5f5f5);border:1px solid var(--border,#ddd);border-radius:9px;font-size:0.84rem;color:var(--text,#222);">
+      💸 총 지불 거래수수료 <b>₩${won}</b> <span style="color:var(--text-muted,#888);font-size:0.78rem;">(매수·매도 누적)</span>
+    </div>`;
+}
+
 // ── 실행 ──
 async function runBacktest(_limitOverride) {
   const total = Math.round(btTickers.reduce((s,t) => s+t.weight, 0) * 100);
@@ -716,6 +766,11 @@ async function runBacktest(_limitOverride) {
     // 납입 한도 soft 경고 — 강행 재시도 또는 "오늘 하루 묻지 않기"면 override
     if (submitBody.tax_enabled && (_limitOverride || window.MMLimit?.skipToday())) {
       submitBody.allow_limit_override = true;
+    }
+    // D4 거래수수료 — opt-in 시 탭레벨 수수료율(decimal) 동봉
+    if (document.getElementById('feeEnabledChk')?.checked) {
+      submitBody.fee_enabled = true;
+      submitBody.fee_rate = (Number(document.getElementById('feeRateInput').value) || 0) / 100;
     }
     const res = await fetch('/api/backtest/submit', {
       method: 'POST',
@@ -782,6 +837,7 @@ async function btPollTask(taskId, maxWait = 600000) {
         const btResult = data.result?.result ?? data.result;
         renderBacktest(btResult);
         window.MMLimit?.attach('btResultContent', btResult?.limit_warnings);
+        renderFeeSummary('btResultContent', btResult?.total_fees);
         try { localStorage.setItem('mm_result_backtest', JSON.stringify({result: btResult, body: window._btLastBody, ts: Date.now()})); } catch(e) {}
         return;
       }

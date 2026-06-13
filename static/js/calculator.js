@@ -330,6 +330,31 @@ function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
 }
 
 
+// ── 거래수수료 (D4) ──
+function toggleFeePanel() {
+  const on = document.getElementById('feeEnabledChk')?.checked;
+  const body = document.getElementById('feePanelBody');
+  if (body) body.style.display = on ? 'block' : 'none';
+}
+function applyFeePreset(v) {
+  if (v === 'custom') return;
+  const inp = document.getElementById('feeRateInput');
+  if (inp) inp.value = v;
+}
+// 결과 하단 "총 지불 수수료" 표시 (없으면 제거)
+function renderFeeSummary(containerId, totalFees) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  let slot = el.querySelector(':scope > #mmFeeSummary');
+  if (totalFees == null) { if (slot) slot.remove(); return; }
+  if (!slot) { slot = document.createElement('div'); slot.id = 'mmFeeSummary'; el.appendChild(slot); }
+  const won = Math.round(Number(totalFees) || 0).toLocaleString();
+  slot.innerHTML = `
+    <div style="margin-top:12px;padding:10px 14px;background:var(--bg,#f5f5f5);border:1px solid var(--border,#ddd);border-radius:9px;font-size:0.84rem;color:var(--text,#222);">
+      💸 총 지불 거래수수료 <b>₩${won}</b> <span style="color:var(--text-muted,#888);font-size:0.78rem;">(중앙값 시나리오, 매수·매도 누적)</span>
+    </div>`;
+}
+
 // ── 시뮬레이션 실행 ──
 async function runCalculator(_limitOverride) {
   if (tickers.length === 0) { alert('종목을 최소 1개 이상 추가해주세요.'); return; }
@@ -383,6 +408,11 @@ async function runCalculator(_limitOverride) {
   if (taxEnabled && (_limitOverride || window.MMLimit?.skipToday())) {
     payload.allow_limit_override = true;
   }
+  // D4 거래수수료 — opt-in 시 탭레벨 수수료율(decimal) 동봉
+  if (document.getElementById('feeEnabledChk')?.checked) {
+    payload.fee_enabled = true;
+    payload.fee_rate = (Number(document.getElementById('feeRateInput').value) || 0) / 100;
+  }
   if (accountsPayload && accountsPayload.length > 1) {
     payload.accounts = accountsPayload;
     // G2/G3/G4: 우선순위 분배정책 + 금종세 수동연도 + 세액공제 재투자
@@ -413,6 +443,7 @@ async function runCalculator(_limitOverride) {
     if (result) {
       renderResult(result, payload);
       window.MMLimit?.attach('resultContent', result.limit_warnings);
+      renderFeeSummary('resultContent', result.total_fees);
       localStorage.setItem('mm_result_calculator', JSON.stringify({result, payload, ts: Date.now()}));
     }
   } catch (err) {

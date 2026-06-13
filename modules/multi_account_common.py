@@ -44,8 +44,8 @@ def normalize_multi_accounts(body: dict) -> list[dict]:
             'dividend_mode':        raw.get('dividend_mode') or body.get('dividend_mode', 'reinvest'),
             'isa_renewal':          bool(raw.get('isa_renewal', False)),
             'unrealized_gain':      float(raw.get('unrealized_gain', 0) or 0),
-            # D4 거래수수료(계좌별, decimal 분수) — fee_enabled 꺼지면 0.
-            'fee_rate':             (float(raw.get('fee_rate', 0) or 0)
+            # D4 거래수수료(decimal 분수) — 계좌별 값 없으면 body 탭레벨 공통율(v1). off면 0.
+            'fee_rate':             (float(raw.get('fee_rate', body.get('fee_rate', 0)) or 0)
                                      if body.get('fee_enabled') else 0.0),
         })
     return accounts

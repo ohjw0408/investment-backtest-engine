@@ -385,6 +385,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260612fav2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
+<script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
 <script>
 // 오늘 날짜 기본값
 document.getElementById('btEndDate').value = new Date().toISOString().split('T')[0];
@@ -656,7 +657,7 @@ function btRenderMultiAccount(data) {
 }
 
 // ── 실행 ──
-async function runBacktest() {
+async function runBacktest(_limitOverride) {
   const total = Math.round(btTickers.reduce((s,t) => s+t.weight, 0) * 100);
   if (!btTickers.length) { alert('종목을 추가해주세요.'); return; }
   if (total !== 100)     { alert(`비중 합계가 ${total}%입니다.`); return; }
@@ -711,6 +712,10 @@ async function runBacktest() {
       submitBody.distribution_policy = buildDistributionPolicy(accountsPayload);
       submitBody.reinvest_tax_credit = document.getElementById('taxDeductionReinvest')?.checked ?? false;
       submitBody.manual_comprehensive_years = [];
+    }
+    // 납입 한도 soft 경고 — 강행 재시도 또는 "오늘 하루 묻지 않기"면 override
+    if (submitBody.tax_enabled && (_limitOverride || window.MMLimit?.skipToday())) {
+      submitBody.allow_limit_override = true;
     }
     const res = await fetch('/api/backtest/submit', {
       method: 'POST',
@@ -776,6 +781,7 @@ async function btPollTask(taskId, maxWait = 600000) {
         btHideProgressUI();
         const btResult = data.result?.result ?? data.result;
         renderBacktest(btResult);
+        window.MMLimit?.attach('btResultContent', btResult?.limit_warnings);
         try { localStorage.setItem('mm_result_backtest', JSON.stringify({result: btResult, body: window._btLastBody, ts: Date.now()})); } catch(e) {}
         return;
       }
@@ -788,6 +794,11 @@ async function btPollTask(taskId, maxWait = 600000) {
       if (data.status === 'FAILURE') {
         btHideProgressUI();
         document.getElementById('btResultEmpty').style.display = 'flex';
+        const _lc = window.MMLimit?.parseError(data.error);
+        if (_lc) {
+          if (await window.MMLimit.confirm(_lc.violations)) runBacktest(true);
+          return;
+        }
         alert('오류: ' + (data.error || '알 수 없는 오류'));
         return;
       }

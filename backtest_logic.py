@@ -27,7 +27,7 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
     from modules.simulation.multi_account_loop import MultiAccountSimulationLoop
     from modules.tax.account_tax import DistributionPolicy
     from modules.multi_account_common import (
-        normalize_multi_accounts, validate_initial_capital_limits,
+        normalize_multi_accounts, enforce_contribution_limits,
         build_loop_accounts, build_savings_summary,
     )
 
@@ -39,9 +39,9 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
     user_settings = body.get('user_settings', {})
     gain_harvesting = bool(body.get('gain_harvesting', False))
 
-    init_errors = validate_initial_capital_limits(accounts)
-    if init_errors:
-        raise ValueError({'error': 'initial_capital_limit', 'violations': init_errors})
+    # 한도 soft 경고(2026-06-13): 위반 시 진행 확인, 강행 시 limit_warnings 동봉
+    limit_warnings = enforce_contribution_limits(
+        body, accounts, routing_enabled=body.get('distribution_policy') is not None)
 
     all_tickers: list[str] = []
     for a in accounts:
@@ -174,6 +174,7 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
 
     return {
         'multi_account':  True,
+        'limit_warnings': limit_warnings or None,
         'tax_enabled':    tax_enabled,
         'metrics': {
             'end_value':      round(end_value),
@@ -262,6 +263,16 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
                 'disclaimer': _check.get('disclaimer'),
             })
 
+    # 한도 soft 경고(2026-06-13): 단일계좌 ISA/연금/IRP 초기·월납
+    limit_warnings = []
+    if tax_enabled:
+        from modules.multi_account_common import enforce_contribution_limits
+        limit_warnings = enforce_contribution_limits(body, [{
+            'type': account_type,
+            'initial_capital': initial,
+            'monthly_contribution': monthly,
+        }])
+
     # ── 가상 데이터 옵트인 ────────────────────────────────────────────────
     use_synthetic = bool(body.get('use_synthetic', False))
     _prep_meta: dict = {}
@@ -346,6 +357,7 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
 
     return {
         'tax_enabled':    tax_enabled,
+        'limit_warnings': limit_warnings or None,
         'account_type':   account_type if tax_enabled else None,
         'used_synthetic': _prep_meta.get('used_synthetic', False),
         'synthetic_info': _prep_meta.get('synthetic_info', {}),

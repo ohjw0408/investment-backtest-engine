@@ -48,6 +48,55 @@ def normalize_multi_accounts(body: dict) -> list[dict]:
     return accounts
 
 
+def collect_limit_violations(accounts: list[dict], routing_enabled: bool = False) -> list[str]:
+    """납입 한도 위반 전수 수집 (soft-경고용, 2026-06-13 오너 결정 — 차단 대신 진행 선택).
+
+    - 초기자본: ISA 계좌당 연 2,000만 / 연금저축+IRP 합산 1,800만 (라우팅 무관 — 초기 입금은 이동 불가).
+    - 월 적립(첫해 초기+월×12 기준): 라우팅 OFF일 때만 위반으로 집계.
+      라우팅 ON(멀티 분배정책)이면 초과분이 cascade로 합법 이전되므로 경고 대상 아님.
+    여러 계좌·초기/월납 복수 위반을 전부 모아 반환(한 번에 확인 — 오너 요구).
+    """
+    v: list[str] = []
+    for idx, a in enumerate(accounts):
+        atype = a.get('type')
+        init = float(a.get('initial_capital', 0) or 0)
+        monthly = float(a.get('monthly_contribution', 0) or 0)
+        if atype == 'ISA':
+            if init > 20_000_000:
+                v.append(f"계좌 {idx + 1}(ISA): 초기 투자금 {init:,.0f}원 — ISA 연 납입한도는 2,000만원입니다.")
+            elif not routing_enabled and init + monthly * 12 > 20_000_000:
+                v.append(
+                    f"계좌 {idx + 1}(ISA): 초기 {init:,.0f}원 + 월 적립 {monthly:,.0f}원×12 = "
+                    f"{init + monthly * 12:,.0f}원 — ISA 연 납입한도 2,000만원을 초과합니다.")
+    pension = [(i, a) for i, a in enumerate(accounts) if a.get('type') in ('연금저축', 'IRP')]
+    if pension:
+        p_init = sum(float(a.get('initial_capital', 0) or 0) for _, a in pension)
+        p_first_year = sum(float(a.get('initial_capital', 0) or 0)
+                           + float(a.get('monthly_contribution', 0) or 0) * 12 for _, a in pension)
+        label = '+'.join(f"계좌 {i + 1}({a['type']})" for i, a in pension)
+        if p_init > 18_000_000:
+            v.append(f"{label}: 초기 투자금 합계 {p_init:,.0f}원 — 연금저축·IRP 합산 연 납입한도는 1,800만원입니다.")
+        elif not routing_enabled and p_first_year > 18_000_000:
+            v.append(
+                f"{label}: 초기+월 적립 첫해 합계 {p_first_year:,.0f}원 — "
+                f"연금저축·IRP 합산 연 납입한도 1,800만원을 초과합니다.")
+    return v
+
+
+def enforce_contribution_limits(body: dict, accounts: list[dict],
+                                routing_enabled: bool = False) -> list[str]:
+    """한도 위반 시: override 플래그 없으면 limit_confirm 에러 raise(프런트가 진행 여부 모달),
+    있으면 경고 리스트 반환(결과 화면 하단 경고 배너용)."""
+    import json as _json
+    violations = collect_limit_violations(accounts, routing_enabled)
+    if not violations:
+        return []
+    if body.get('allow_limit_override'):
+        return violations
+    raise ValueError(_json.dumps(
+        {'error': 'limit_confirm', 'violations': violations}, ensure_ascii=False))
+
+
 def validate_initial_capital_limits(accounts: list[dict]) -> list[str]:
     """초기자본 연 납입한도 하드체크 (transfers 무관 — 초기자본은 실제 입금이라 한도 초과 불가).
 

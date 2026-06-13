@@ -56,7 +56,6 @@ def _make_strategy_factory(target_weights, rebal_mode, band_width=0.05):
 # 멀티계좌 입력 정규화·검증·결과 헬퍼는 공통 모듈에서 공유(투자계산기·백테스트와 동일, G5).
 from modules.multi_account_common import (
     normalize_multi_accounts as _normalize_multi_accounts,
-    validate_initial_capital_limits as _validate_initial_capital_limits,
     build_savings_summary as _build_savings_summary,
 )
 
@@ -142,21 +141,19 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
     import json as _json
     import statistics as _stats
     tax_engine = None
+    _limit_warnings: list = []
     if tax_enabled:
         from modules.tax.base_tax import TaxEngine
         from modules.tax.account_tax import (
             check_contribution_limits,
             validate_account_portfolio,
-            validate_isa_contribution,
         )
         tax_engine = TaxEngine(user_settings)
-        # 초기자본 연한도 하드체크(전 경우) — 초기자본은 라우팅 대상 아님(실제 입금).
-        _init_errors = _validate_initial_capital_limits(accounts)
-        if _init_errors:
-            raise ValueError(_json.dumps({
-                'error': 'initial_capital_limit',
-                'violations': _init_errors,
-            }, ensure_ascii=False))
+        # 한도 soft 경고(2026-06-13 오너 결정) — 위반 전수 수집 후 진행 확인.
+        # transfers ON(G2)이면 월납 초과분은 라우팅이 합법 처리 → 초기자본만 경고 대상.
+        from modules.multi_account_common import enforce_contribution_limits
+        _limit_warnings = enforce_contribution_limits(
+            body, accounts, routing_enabled=transfers_enabled)
         for idx, account in enumerate(accounts):
             account_type   = account['type']
             ticker_codes   = [t['code'] for t in account['tickers']]
@@ -168,16 +165,6 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
                         'error': 'account_restrictions',
                         'violations': [f"계좌 {idx + 1}: {v}" for v in _check['violations']],
                         'disclaimer': _check.get('disclaimer'),
-                    }, ensure_ascii=False))
-            # transfers ON(G2)이면 ISA 연한도 초과분을 엔진이 분배정책대로 라우팅 → 하드거부 스킵.
-            if account_type == 'ISA' and not transfers_enabled:
-                _isa_errors = validate_isa_contribution(
-                    account['initial_capital'], account['monthly_contribution'],
-                )
-                if _isa_errors:
-                    raise ValueError(_json.dumps({
-                        'error': 'isa_contribution_limit',
-                        'violations': [f"계좌 {idx + 1}: {v}" for v in _isa_errors],
                     }, ensure_ascii=False))
     else:
         from modules.tax.account_tax import check_contribution_limits
@@ -395,6 +382,7 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
         'g2':                   g2_summary,
         'split_sale_plan':      split_sale_plan,
         'comprehensive_flag':   comprehensive_flag,
+        'limit_warnings':       _limit_warnings or None,
         'isa_cap_info':         isa_cap_info,
         'data_start':           data_start,
         'synthetic_info':       synthetic_info,
@@ -526,14 +514,6 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
                 ],
             }, ensure_ascii=False))
 
-        from modules.tax.account_tax import validate_isa_contribution
-        _isa_errors = validate_isa_contribution(initial_capital, monthly_contribution)
-        if _isa_errors:
-            raise ValueError(_json.dumps({
-                'error': 'isa_contribution_limit',
-                'violations': _isa_errors,
-            }, ensure_ascii=False))
-
         _ISA_TOTAL_LIMIT = 100_000_000
         _planned_total = initial_capital + monthly_contribution * 12 * accumulation_years
         _isa_cap_info = None
@@ -552,6 +532,16 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
             # monthly_contribution 변경 안 함 — AccumulationAnalyzer에 contribution_end_months로 전달
     else:
         _isa_cap_info = None
+
+    # 한도 soft 경고(2026-06-13 오너 결정) — ISA·연금/IRP 초기·월납 위반 수집 후 진행 확인.
+    _limit_warnings: list = []
+    if tax_enabled:
+        from modules.multi_account_common import enforce_contribution_limits
+        _limit_warnings = enforce_contribution_limits(body, [{
+            'type': account_type,
+            'initial_capital': initial_capital,
+            'monthly_contribution': monthly_contribution,
+        }])
 
     # AccumulationAnalyzer 진행률 0→50% 스케일링
     _acc_start = time.time()
@@ -657,6 +647,7 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     return {
         "split_sale_plan":       _split_sale_plan,
         "comprehensive_flag":    _comprehensive_flag,
+        "limit_warnings":        _limit_warnings or None,
         "accumulation_summary": report["accumulation_summary"],
         "sample_results": [
             {

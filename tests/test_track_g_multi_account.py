@@ -1133,7 +1133,8 @@ def test_l8_reinvest_routes_through_policy():
 
 # ── L9 logic/analyzer 관통 (B1): 엔진 G2 결과가 analyzer 결과로 정확히 도달 ──
 
-from calculator_logic import _normalize_multi_accounts, _validate_initial_capital_limits
+from calculator_logic import _normalize_multi_accounts
+from modules.multi_account_common import validate_initial_capital_limits as _validate_initial_capital_limits
 
 
 def test_l2_initial_capital_limit_validation():

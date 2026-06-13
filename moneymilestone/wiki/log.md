@@ -1,5 +1,28 @@
 # Log
 
+## [2026-06-13] feature | 납입 한도 초과 = 차단 → soft 경고(진행 선택) 전 탭 통일
+
+오너 결정: 연금/IRP/ISA 연납입 한도 초과 설정 시 에러로 막던 것을 **안내 + 진행 여부(예/아니오) +
+"오늘 하루 다시 묻지 않기" + 결과 하단 경고 배너**로 교체. 4탭(계산기·백테·은퇴·배당) 공유.
+
+- **백엔드 수집기(`modules/multi_account_common.py` 신규):** `collect_limit_violations(accounts, routing_enabled)` —
+  ISA 계좌당 2,000만 / 연금저축+IRP 합산 1,800만(초기자본은 라우팅 무관, 월납은 라우팅 OFF일 때만)
+  위반 전수 수집. `enforce_contribution_limits(body, accounts, routing_enabled)` — `allow_limit_override`
+  없으면 `limit_confirm` 에러(violations 동봉) raise, 있으면 경고 리스트 반환.
+- **백엔드 배선:** calculator/retirement/backtest/dividend_logic 단일+멀티 경로 전부 옛 하드체크
+  (`validate_isa_contribution`·`_validate_initial_capital_limits`·연금 단일 raise) → `enforce_contribution_limits`
+  교체, 결과에 `limit_warnings` 동봉. transfers/distribution_policy ON이면 `routing_enabled=True`(월납 cascade 합법).
+- **프런트 모듈(`static/js/limit_guard.js` 신규):** `window.MMLimit` — `confirm()`(예/아니오 모달 + 오늘하루
+  스킵 체크박스 localStorage), `skipToday()`, `parseError()`(task FAILURE 문자열서 limit_confirm 파싱),
+  `attach()`(결과 컨테이너 하단 빨간 경고 배너). 4탭 템플릿 script 포함(`?v=20260613lim`).
+- **프런트 배선:** 4탭 `run*()`에 `_limitOverride` 인자 + skipToday면 `allow_limit_override` 동봉.
+  catch/FAILURE에서 `limit_confirm` → `MMLimit.confirm` → 예면 override 재요청, 결과에 배너 attach.
+- **정리:** 죽은 옛 에러 핸들러 제거(calculator.js `isa_contribution_limit` 등 분기·retirement.html),
+  고아 import 제거(calculator_logic/retirement_logic), 옛 테스트 import 재지정(multi_account_common 직접).
+  `validate_initial_capital_limits` 함수·테스트는 보존(pre-existing).
+- **검증:** `tests/test_limit_soft_warning.py` **3 PASS**(수집기 룰 + override 왕복 + dividend 통합)
+  + 옛 `test_l2_initial_capital_limit_validation` PASS. import 정상성·JS 문법 OK. ⚠️ 실브라우저 모달 육안 미검증.
+
 ## [2026-06-13] feature | 배당계산기 멀티계좌 (G5-E) — 멀티계좌 전 탭 완성
 
 오너 결정: ① **자동 역산 지원** — 역산 변수(시드/월납) = 계좌 1(상단) 값, 나머지 고정.

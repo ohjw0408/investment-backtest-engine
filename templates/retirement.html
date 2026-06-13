@@ -612,6 +612,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260612fav2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
+<script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
 <script>
 let retTickers = [];
 let _retTaskId = null, _retCancelled = false;
@@ -830,7 +831,7 @@ function buildWdAccountsPayload(rebalMode, bandWidth, dividendMode) {
   return accounts;
 }
 
-async function runRetirement() {
+async function runRetirement(_limitOverride) {
   const total = Math.round(retTickers.reduce((s,t) => s+t.weight, 0) * 100);
   if (!retTickers.length) { alert('종목을 추가해주세요.'); return; }
   if (total !== 100) { alert(`비중 합계가 ${total}%입니다. 100%로 맞춰주세요.`); return; }
@@ -938,6 +939,11 @@ async function runRetirement() {
     }
   }
 
+  // 납입 한도 soft 경고 — 강행 재시도 또는 "오늘 하루 묻지 않기"면 override
+  if (body.tax_enabled && (_limitOverride || window.MMLimit?.skipToday())) {
+    body.allow_limit_override = true;
+  }
+
   try {
     const submitRes = await fetch('/api/retirement/submit', {
       method: 'POST',
@@ -953,6 +959,7 @@ async function runRetirement() {
     const data = await retPollTask(task_id);
     if (data) {
       renderRetirement(data, body);
+      window.MMLimit?.attach('retResultContent', data.limit_warnings);
       try { localStorage.setItem('mm_result_retirement', JSON.stringify({result: data, body, ts: Date.now()})); } catch(e) {}
     }
   } catch(e) {
@@ -962,20 +969,18 @@ async function runRetirement() {
       let _handled = false;
       if (_errData && _errData.error) {
         const _errType = _errData.error;
-        if (_errType === 'account_restrictions' || _errType === 'isa_windmill_disabled') {
+        if (_errType === 'limit_confirm') {
+          _handled = true;
+          document.getElementById('retResultEmpty').style.display = 'flex';
+          if (await window.MMLimit.confirm(_errData.violations || [])) {
+            return runRetirement(true);
+          }
+        } else if (_errType === 'account_restrictions' || _errType === 'isa_windmill_disabled') {
           const banner = document.getElementById('retAccountRestrictBanner');
           const detail = document.getElementById('retAccountRestrictDetail');
           if (banner && detail) {
             detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
             if (_errData.disclaimer) detail.innerHTML += `<div style="margin-top:6px;font-style:italic;">${_errData.disclaimer}</div>`;
-            banner.style.display = 'block';
-            _handled = true;
-          }
-        } else if (_errType === 'isa_contribution_limit') {
-          const banner = document.getElementById('retIsaLimitErrorBanner');
-          const detail = document.getElementById('retIsaLimitErrorDetail');
-          if (banner && detail) {
-            detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
             banner.style.display = 'block';
             _handled = true;
           }

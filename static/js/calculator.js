@@ -331,7 +331,7 @@ function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
 
 
 // ── 시뮬레이션 실행 ──
-async function runCalculator() {
+async function runCalculator(_limitOverride) {
   if (tickers.length === 0) { alert('종목을 최소 1개 이상 추가해주세요.'); return; }
   const totalWeight = tickers.reduce((s, t) => s + t.weight, 0);
   if (totalWeight > 100) { alert('비중 합계가 100%를 초과했어요. 조정해주세요.'); return; }
@@ -379,6 +379,10 @@ async function runCalculator() {
       pension_age:   Number(taxProfile.pension_age || 65),
     } : {},
   };
+  // 납입 한도 soft 경고 — 강행 재시도 또는 "오늘 하루 묻지 않기"면 override 동봉
+  if (taxEnabled && (_limitOverride || window.MMLimit?.skipToday())) {
+    payload.allow_limit_override = true;
+  }
   if (accountsPayload && accountsPayload.length > 1) {
     payload.accounts = accountsPayload;
     // G2/G3/G4: 우선순위 분배정책 + 금종세 수동연도 + 세액공제 재투자
@@ -408,6 +412,7 @@ async function runCalculator() {
     hideProgressUI();
     if (result) {
       renderResult(result, payload);
+      window.MMLimit?.attach('resultContent', result.limit_warnings);
       localStorage.setItem('mm_result_calculator', JSON.stringify({result, payload, ts: Date.now()}));
     }
   } catch (err) {
@@ -418,21 +423,18 @@ async function runCalculator() {
       let _handled = false;
       if (_errData && _errData.error) {
         const _errType = _errData.error;
-        if (_errType === 'account_restrictions' || _errType === 'isa_windmill_disabled') {
+        if (_errType === 'limit_confirm') {
+          _handled = true;
+          document.getElementById('resultEmpty').style.display = 'block';
+          if (await window.MMLimit.confirm(_errData.violations || [])) {
+            return runCalculator(true);
+          }
+        } else if (_errType === 'account_restrictions' || _errType === 'isa_windmill_disabled') {
           const banner = document.getElementById('accountRestrictBanner');
           const detail = document.getElementById('accountRestrictDetail');
           if (banner && detail) {
             detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
             if (_errData.disclaimer) detail.innerHTML += `<div style="margin-top:6px;font-style:italic;">${_errData.disclaimer}</div>`;
-            banner.style.display = 'block';
-            document.getElementById('resultEmpty').style.display = 'none';
-            _handled = true;
-          }
-        } else if (_errType === 'isa_contribution_limit' || _errType === 'isa_windmill_disabled' || _errType === 'initial_capital_limit' || _errType === 'pension_contribution_limit') {
-          const banner = document.getElementById('isaLimitErrorBanner');
-          const detail = document.getElementById('isaLimitErrorDetail');
-          if (banner && detail) {
-            detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
             banner.style.display = 'block';
             document.getElementById('resultEmpty').style.display = 'none';
             _handled = true;

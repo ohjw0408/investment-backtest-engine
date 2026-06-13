@@ -62,16 +62,17 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
                 'disclaimer': _check.get('disclaimer'),
             }, ensure_ascii=False))
 
-    if tax_enabled and account_type == 'ISA':
-        from modules.tax.account_tax import validate_isa_contribution
-        _seed_initial  = float((body.get('seed') or {}).get('center', 0))
-        _monthly_val   = float((body.get('monthly') or {}).get('center', 0))
-        _isa_errors = validate_isa_contribution(_seed_initial, _monthly_val)
-        if _isa_errors:
-            raise ValueError(_json.dumps({
-                'error': 'isa_contribution_limit',
-                'violations': _isa_errors,
-            }, ensure_ascii=False))
+    # 납입 한도 — soft 경고(2026-06-13 오너 결정): 위반 시 진행 여부 확인, 강행 시 경고 동봉
+    _limit_warnings: list = []
+    if tax_enabled:
+        from modules.multi_account_common import enforce_contribution_limits
+        _seed_initial = float((body.get('seed') or {}).get('center', 0))
+        _monthly_val  = float((body.get('monthly') or {}).get('center', 0))
+        _limit_warnings = enforce_contribution_limits(body, [{
+            'type': account_type,
+            'initial_capital': _seed_initial,
+            'monthly_contribution': _monthly_val,
+        }])
 
     _isa_limit = 100_000_000 if (tax_enabled and account_type == 'ISA') else None
 
@@ -114,6 +115,8 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
         except Exception:
             response['savings'] = None   # 절세 표시는 부가 정보 — 본 결과를 막지 않는다
 
+    if _limit_warnings and isinstance(response, dict):
+        response['limit_warnings'] = _limit_warnings
     return response
 
 
@@ -125,7 +128,7 @@ def _run_multi_dividend_logic(body: dict, progress_callback=None, cancel_check=N
     import json as _json
     from modules.dividend_multi import MultiDividendSimulator
     from modules.multi_account_common import (
-        normalize_multi_accounts, validate_initial_capital_limits,
+        normalize_multi_accounts, enforce_contribution_limits,
     )
     from modules.tax.account_tax import DistributionPolicy
 
@@ -134,11 +137,8 @@ def _run_multi_dividend_logic(body: dict, progress_callback=None, cancel_check=N
     tax_enabled = bool(body.get('tax_enabled', False))
     user_settings = body.get('user_settings') or {}
 
-    init_errors = validate_initial_capital_limits(accounts)
-    if init_errors:
-        raise ValueError(_json.dumps(
-            {'error': 'initial_capital_limit', 'violations': init_errors},
-            ensure_ascii=False))
+    limit_warnings = enforce_contribution_limits(
+        body, accounts, routing_enabled=body.get('distribution_policy') is not None)
 
     if tax_enabled:
         from modules.tax.base_tax import TaxEngine
@@ -193,4 +193,6 @@ def _run_multi_dividend_logic(body: dict, progress_callback=None, cancel_check=N
         except Exception:
             response['savings'] = None
     response['multi_account'] = {'enabled': True, 'n_accounts': len(accounts)}
+    if limit_warnings and isinstance(response, dict):
+        response['limit_warnings'] = limit_warnings
     return response

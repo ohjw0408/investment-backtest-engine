@@ -16,7 +16,9 @@
 - **검증:** 신규 `tests/test_fee_card_dom.js` jsdom **14 PASS**(fee OFF→필드 미표시·ON→프리셋+율 렌더·탭 시드 기본·
   탭값=프리셋 selected·계좌별 상태 갱신·음수 클램프·타계좌 무영향·프리셋 DOM 동기화·custom 무변경) +
   `test_d4_fee_logic` **4 PASS**(신규 2 = normalize 계좌별 우선·disabled→0) + JS 문법 OK.
-- **미배포** — 라이브 per-card 멀티계좌 probe는 배포 후. 잔여 fast-follow ② 은퇴·배당 탭 롤아웃(백엔드 미배선).
+- **배포(61e0993)·라이브 probe 6 PASS:** per-card(`probe_fee_percard_live.js` 3 — 2계좌 카드별 입력
+  렌더·차등율 실행 총수수료 ₩194,705·콘솔에러 0) + 탭레벨 회귀(`probe_fee_live.js` 3 — 계산기 ₩23,514·
+  백테 ₩2,002 무변경). 잔여 fast-follow ② 은퇴·배당 탭 롤아웃(백엔드 미배선).
 
 ## [2026-06-13] feature | D4 거래수수료 — 계산기·백테 (탭레벨 v1)
 

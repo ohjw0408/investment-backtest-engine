@@ -36,6 +36,8 @@ class AccumulationAnalyzer:
         synthetic_params:       dict        = None,
         contribution_end_months: Optional[int] = None,
         apply_final_liquidation: bool        = True,
+        fee_rate:               float        = 0.0,
+        stock_tickers                        = None,
     ):
         self.portfolio_engine      = portfolio_engine
         self.tickers               = tickers
@@ -60,6 +62,9 @@ class AccumulationAnalyzer:
         self.contribution_end_months = contribution_end_months
         # 투자계산기=True(끝에 일괄청산). 은퇴 적립=False(무청산 인계 → 인출단계서 과세).
         self.apply_final_liquidation = apply_final_liquidation
+        # D4 거래수수료 — SimulationConfig에 실어 runner로 전달(0이면 무수수료).
+        self.fee_rate              = float(fee_rate or 0.0)
+        self.stock_tickers         = stock_tickers
 
     def _estimate_total_cases(self, start=None) -> int:
         cur = start if start is not None else self.data_start
@@ -136,6 +141,7 @@ class AccumulationAnalyzer:
                 break
             strategy = self.strategy_factory()
             _krf_gain, _fin_by_yr, _comp_yrs = 0.0, {}, []   # Phase 2f 기본값
+            _total_fees = 0.0                                 # D4 거래수수료
 
             # ── ISA 풍차돌리기 (특수 경로 — 주기별 수동 청산·재가입) ────
             if self.isa_renewal and self.tax_engine:
@@ -188,6 +194,8 @@ class AccumulationAnalyzer:
                     dividend_mode           = self.dividend_mode,
                     rebalance_frequency     = rebal_freq,
                     inflation               = 0.0,
+                    fee_rate                = self.fee_rate,
+                    stock_tickers           = self.stock_tickers,
                 )
 
                 run_result  = runner.run(
@@ -203,6 +211,7 @@ class AccumulationAnalyzer:
                 )
                 history_df  = run_result.history_df
                 final_value = run_result.end_value
+                _total_fees = float(getattr(run_result, 'total_fees', 0.0))
                 raw_final   = float(history_df['portfolio_value'].iloc[-1]) if not history_df.empty else 0.0
                 # Phase 2f: 종합과세 패널/트래킹 정보 (case별)
                 _krf_gain   = getattr(run_result, 'kr_foreign_unrealized_gain', 0.0)
@@ -219,6 +228,7 @@ class AccumulationAnalyzer:
             metrics["start"]     = cur.strftime("%Y-%m-%d")
             metrics["end"]       = end.strftime("%Y-%m-%d")
             metrics["end_value"] = final_value
+            metrics["total_fees"] = _total_fees
             metrics["kr_foreign_unrealized_gain"] = _krf_gain
             metrics["financial_income_by_year"]   = _fin_by_yr
             metrics["comprehensive_years"]        = _comp_yrs
@@ -306,6 +316,8 @@ class AccumulationAnalyzer:
                     dividend_mode        = self.dividend_mode,
                     rebalance_frequency  = getattr(strategy, 'rebalance_frequency', None),
                     inflation            = 0.0,
+                    fee_rate             = self.fee_rate,
+                    stock_tickers        = self.stock_tickers,
                 )
                 run_result = runner.run(
                     config          = config,
@@ -358,6 +370,8 @@ class AccumulationAnalyzer:
                     dividend_mode        = self.dividend_mode,
                     rebalance_frequency  = getattr(strategy, 'rebalance_frequency', None),
                     inflation            = 0.0,
+                    fee_rate             = self.fee_rate,
+                    stock_tickers        = self.stock_tickers,
                 )
                 # 만기 가정: isa_years_held=3 (기본 표시값)
                 run_maturity = runner.run(
@@ -697,6 +711,7 @@ class AccumulationAnalyzer:
             "end_value", "cagr", "mdd", "sharpe", "sortino",
             "calmar", "mwr", "dividend_cagr", "dividend_mdd",
             "total_dividend", "last_year_dividend", "dividend_yield_on_cost",
+            "total_fees",   # D4 거래수수료(중앙값 표시용)
         ]
         result = {}
         for key in keys:

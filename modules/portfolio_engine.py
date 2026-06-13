@@ -69,7 +69,9 @@ class PortfolioEngine:
     def run(self, config: SimulationConfig, strategy, portfolio_class=None):
 
         pf_cls    = portfolio_class if portfolio_class is not None else Portfolio
-        portfolio = pf_cls(config.initial_capital)
+        portfolio = pf_cls(config.initial_capital,
+                           fee_rate=float(getattr(config, "fee_rate", 0.0) or 0.0),
+                           stock_tickers=getattr(config, "stock_tickers", None))
 
         # 🔥 전체 범위 캐시 key (tickers + 전체 범위)
         # preload()가 먼저 호출됐으면 캐시 히트
@@ -118,6 +120,7 @@ class PortfolioEngine:
             "final_value": float(history_df["portfolio_value"].iloc[-1]) if not history_df.empty else 0.0,
             "portfolio":   portfolio,
             "last_prices": last_prices,
+            "total_fees":  float(getattr(portfolio, "total_fees", 0.0)),  # D4
         }
 
     def _find_cached_or_load(self, config):

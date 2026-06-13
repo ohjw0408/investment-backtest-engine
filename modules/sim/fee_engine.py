@@ -37,6 +37,32 @@ class FeeEngine:
         return self.calc_buy_fee(monthly)
 
 
+def build_stock_tickers(codes) -> set:
+    """국내 개별주식(is_etf=0, country=KR) 코드 집합 — 매도 거래세 0.18% 대상(D4).
+
+    ETF·미국종목은 제외(증권거래세 비대상). symbol_master.db 조회, 실패 시 빈 set(무가산).
+    """
+    codes = [c for c in (codes or []) if c]
+    if not codes:
+        return set()
+    import sqlite3
+    try:
+        from config import SYMBOL_DB_PATH
+    except Exception:
+        return set()
+    try:
+        conn = sqlite3.connect(SYMBOL_DB_PATH)
+        qs = ",".join("?" * len(codes))
+        rows = conn.execute(
+            f"SELECT code FROM symbols WHERE is_etf=0 AND country='KR' AND code IN ({qs})",
+            list(codes),
+        ).fetchall()
+        conn.close()
+        return {r[0] for r in rows}
+    except Exception:
+        return set()
+
+
 # 증권사별 프리셋
 class FeePresets:
     ZERO     = FeeEngine(0, 0, 0)                    # 수수료 없음

@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import List, Dict, Optional
+from dataclasses import dataclass, field
+from typing import List, Dict, Optional, Set
 
 
 @dataclass
@@ -54,3 +54,10 @@ class SimulationConfig:
     inflation: float = 0.0
     # 연간 인플레이션율 (예: 0.02 = 2%)
     # WithdrawalEngine이 매달 인출액을 조정하는 데 사용
+
+    # -----------------------------
+    # 거래수수료 (D4, 2026-06-13)
+    # -----------------------------
+
+    fee_rate: float = 0.0                          # 통합 매수=매도 수수료율 (0 = opt-out)
+    stock_tickers: Optional[Set[str]] = None       # 개별주식(is_etf=0) → 매도 거래세 가산

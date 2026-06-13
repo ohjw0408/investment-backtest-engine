@@ -83,6 +83,9 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
         accounts, start_date, end_date,
         default_dividend_mode=body.get('dividend_mode', 'reinvest'),
     )
+    # D4 거래수수료 — 개별주식 매도 거래세용 종목 집합.
+    from modules.sim.fee_engine import build_stock_tickers
+    _stock_tickers = build_stock_tickers(all_tickers) if body.get('fee_enabled') else None
     result = MultiAccountSimulationLoop(transfers_enabled=transfers_enabled).run(
         accounts=loop_accounts,
         price_data=price_data,
@@ -93,6 +96,7 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
         manual_comprehensive_years=manual_comprehensive_years,
         reinvest_tax_credit=reinvest_tax_credit,
         progress_callback=progress_callback,
+        stock_tickers=_stock_tickers,
     )
 
     hist = result.combined_history_df
@@ -175,6 +179,7 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
     return {
         'multi_account':  True,
         'limit_warnings': limit_warnings or None,
+        'total_fees':     (float(getattr(result, 'total_fees', 0.0)) if body.get('fee_enabled') else None),  # D4
         'tax_enabled':    tax_enabled,
         'metrics': {
             'end_value':      round(end_value),
@@ -208,6 +213,7 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         return _run_multi_account_backtest_logic(body, progress_callback)
 
     import pandas as _pd
+    from modules.sim.fee_engine import build_stock_tickers
     from modules.simulation.taxable_runner  import TaxableSimulationRunner
     from modules.config.simulation_config   import SimulationConfig
     from modules.rebalance.periodic         import PeriodicRebalance
@@ -243,6 +249,8 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         dividend_mode        = div_mode,
         rebalance_frequency  = rebal_freq,
         inflation            = 0.0,
+        fee_rate             = (float(body.get('fee_rate', 0) or 0) if body.get('fee_enabled') else 0.0),
+        stock_tickers        = (build_stock_tickers(tickers) if body.get('fee_enabled') else None),
     )
 
     tax_enabled     = body.get('tax_enabled', False)
@@ -358,6 +366,7 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
     return {
         'tax_enabled':    tax_enabled,
         'limit_warnings': limit_warnings or None,
+        'total_fees':     (float(getattr(result, 'total_fees', 0.0)) if body.get('fee_enabled') else None),  # D4
         'account_type':   account_type if tax_enabled else None,
         'used_synthetic': _prep_meta.get('used_synthetic', False),
         'synthetic_info': _prep_meta.get('synthetic_info', {}),

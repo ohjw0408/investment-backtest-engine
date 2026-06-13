@@ -1,5 +1,8 @@
-from typing import Dict
+from typing import Dict, Optional, Set
 from modules.core.position import Position
+
+# 국내 개별주식 매도 시 증권거래세 (ETF는 면제). D4 거래수수료(2026-06-13).
+STOCK_SELL_TAX = 0.0018
 
 
 class Portfolio:
@@ -7,9 +10,17 @@ class Portfolio:
     수량 기반 포트폴리오 상태 객체
     """
 
-    def __init__(self, initial_cash: float):
+    def __init__(self, initial_cash: float, fee_rate: float = 0.0,
+                 stock_tickers: Optional[Set[str]] = None):
         self.cash = initial_cash
         self.positions: Dict[str, Position] = {}
+        # 거래수수료(D4) — 통합 매수=매도율. 0이면 기존 동작과 완전 동일(opt-in).
+        self.fee_rate = fee_rate or 0.0
+        self.stock_tickers = stock_tickers or set()  # 개별주식(is_etf=0) → 매도 거래세 가산
+        self.total_fees = 0.0
+
+    def _sell_fee_rate(self, ticker: str) -> float:
+        return self.fee_rate + (STOCK_SELL_TAX if ticker in self.stock_tickers else 0.0)
 
     # -------------------------
     # 포지션 가져오기
@@ -24,14 +35,16 @@ class Portfolio:
     # -------------------------
     def buy(self, ticker: str, quantity: float, price: float):
         cost = quantity * price
+        fee  = cost * self.fee_rate
 
-        if cost > self.cash:
+        if cost + fee > self.cash:
             raise ValueError("현금이 부족합니다.")
 
         position = self.get_position(ticker)
         position.buy(quantity, price)
 
-        self.cash -= cost
+        self.cash -= cost + fee
+        self.total_fees += fee
 
     # -------------------------
     # 매도
@@ -41,7 +54,9 @@ class Portfolio:
         position.sell(quantity, price)
 
         proceeds = quantity * price
-        self.cash += proceeds
+        fee = proceeds * self._sell_fee_rate(ticker)
+        self.cash += proceeds - fee
+        self.total_fees += fee
 
     # -------------------------
     # 총 자산 가치 (현금 포함)
@@ -117,8 +132,9 @@ class TaxTrackedPortfolio(Portfolio):
     세금 계산 시 실현 차익 계산에 사용.
     """
 
-    def __init__(self, initial_cash: float):
-        super().__init__(initial_cash)
+    def __init__(self, initial_cash: float, fee_rate: float = 0.0,
+                 stock_tickers: Optional[Set[str]] = None):
+        super().__init__(initial_cash, fee_rate=fee_rate, stock_tickers=stock_tickers)
         self._avg_costs: Dict[str, float] = {}
 
     def buy(self, ticker: str, quantity: float, price: float):

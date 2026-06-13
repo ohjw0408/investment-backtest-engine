@@ -17,6 +17,7 @@ class RunResult:
     # Phase 2f: 연도별 종합과세 트래킹
     financial_income_by_year: dict = None      # year → 그 해 위탁 금융소득(외부+배당+청산차익)
     comprehensive_years: tuple = ()            # 금융소득 종합과세 대상 연도(>2천만)
+    total_fees: float = 0.0                    # D4: 누적 거래수수료
 
 
 class TaxableSimulationRunner:
@@ -36,6 +37,8 @@ class TaxableSimulationRunner:
         isa_years_held: int = 3,
         apply_final_liquidation: bool = True,
         carried_cost_basis=None,
+        fee_rate=None,
+        stock_tickers=None,
     ) -> RunResult:
         from modules.core.portfolio                  import Portfolio
         from modules.execution.order_executor        import OrderExecutor
@@ -47,6 +50,11 @@ class TaxableSimulationRunner:
         from modules.simulation.simulation_loop      import SimulationLoop
 
         user_settings = user_settings or {}
+        # D4 거래수수료 — 명시 인자 없으면 config에서(분석기가 config에 실어 보냄). 0이면 무수수료.
+        if fee_rate is None:
+            fee_rate = float(getattr(config, "fee_rate", 0.0) or 0.0)
+        if stock_tickers is None:
+            stock_tickers = getattr(config, "stock_tickers", None)
 
         if tax_enabled:
             if tax_engine is None:
@@ -65,12 +73,14 @@ class TaxableSimulationRunner:
             exec_engine = TaxedOrderExecutor(tax_engine, account_type,
                                              gain_harvesting=gain_harvesting,
                                              session=tax_session)
-            portfolio   = TaxTrackedPortfolio(config.initial_capital)
+            portfolio   = TaxTrackedPortfolio(config.initial_capital,
+                                              fee_rate=fee_rate, stock_tickers=stock_tickers)
         else:
             tax_engine  = None
             div_engine  = DividendEngine()
             exec_engine = OrderExecutor()
-            portfolio   = Portfolio(config.initial_capital)
+            portfolio   = Portfolio(config.initial_capital,
+                                    fee_rate=fee_rate, stock_tickers=stock_tickers)
 
         loop     = SimulationLoop(div_engine, ContributionEngine(), WithdrawalEngine(),
                                   exec_engine, CashAllocator())
@@ -142,4 +152,5 @@ class TaxableSimulationRunner:
             kr_foreign_unrealized_gain=kr_foreign_unrealized_gain,
             financial_income_by_year=financial_income_by_year,
             comprehensive_years=comprehensive_years,
+            total_fees=getattr(portfolio, 'total_fees', 0.0),
         )

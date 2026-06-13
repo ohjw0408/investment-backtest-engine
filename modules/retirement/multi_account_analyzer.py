@@ -186,9 +186,11 @@ class MultiAccountAnalyzer:
         apply_final_liquidation: bool = True,
         switch_policy: dict | None = None,
         yearly_after_tax_snapshot: bool = False,
+        stock_tickers=None,
     ):
         self.portfolio_engine = portfolio_engine
         self.accounts = accounts
+        self.stock_tickers = stock_tickers   # D4: 개별주식 매도 거래세용(전 계좌 공유)
         self.data_start = pd.Timestamp(data_start)
         self.data_end = pd.Timestamp(data_end)
         self.accumulation_years = accumulation_years
@@ -359,6 +361,7 @@ class MultiAccountAnalyzer:
                     "isa_years_held": account.get("isa_years_held", 3),
                     "isa_renewal": account.get("isa_renewal", False),
                     "carried_cost_basis": account.get("carried_cost_basis"),
+                    "fee_rate": float(account.get("fee_rate", 0.0) or 0.0),   # D4
                 })
 
             run_result = MultiAccountSimulationLoop(
@@ -375,6 +378,7 @@ class MultiAccountAnalyzer:
                 manual_comprehensive_years=self.manual_comprehensive_years,
                 reinvest_tax_credit=self.reinvest_tax_credit,
                 apply_final_liquidation=self.apply_final_liquidation,
+                stock_tickers=self.stock_tickers,
             )
 
             history_df = run_result.combined_history_df
@@ -399,6 +403,7 @@ class MultiAccountAnalyzer:
             metrics["end"] = end.strftime("%Y-%m-%d")
             metrics["end_value"] = final_value
             metrics["raw_end_value"] = raw_final
+            metrics["total_fees"] = float(getattr(run_result, "total_fees", 0.0))  # D4
             # G2/G3/G4 결과 surfacing (윈도우별)
             metrics["transfer_log"] = run_result.transfer_log
             metrics["comprehensive_years"] = list(run_result.comprehensive_years)
@@ -434,6 +439,7 @@ class MultiAccountAnalyzer:
                 account_metrics["end_value"] = float(account_result["end_value"])
                 account_metrics["raw_end_value"] = float(account_result["raw_end_value"])
                 account_metrics["tax_paid"] = float(account_result["tax_paid"])
+                account_metrics["total_fees"] = float(account_result.get("total_fees", 0.0))  # D4
                 # 절세액(위탁 가정): 케이스별 계좌 위탁가정세금·절세액 surfacing.
                 account_metrics["brokerage_assumed_tax"] = float(
                     account_result.get("brokerage_assumed_tax", 0.0)
@@ -601,6 +607,7 @@ class MultiAccountAnalyzer:
             "calmar", "mwr", "dividend_cagr", "dividend_mdd",
             "total_dividend", "last_year_dividend", "dividend_yield_on_cost",
             "tax_paid", "brokerage_assumed_tax", "tax_saving", "gain_harvest_saving",
+            "total_fees",   # D4 거래수수료(중앙값 표시용)
         ]
         result = {}
         for key in keys:

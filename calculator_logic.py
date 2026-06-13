@@ -355,6 +355,11 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
         for account in accounts
     ])
 
+    # D4 거래수수료 — 개별주식 매도 거래세용 종목 집합(계좌 전체 종목 기준).
+    from modules.sim.fee_engine import build_stock_tickers
+    _fee_codes = {t['code'] for a in accounts for t in a['tickers']}
+    _stock_tickers = build_stock_tickers(_fee_codes) if body.get('fee_enabled') else None
+
     analyzer = MultiAccountAnalyzer(
         portfolio_engine      = portfolio_engine,
         accounts              = accounts,
@@ -372,6 +377,7 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
         distribution_policy       = distribution_policy,
         manual_comprehensive_years = manual_comprehensive_years,
         reinvest_tax_credit       = reinvest_tax_credit,
+        stock_tickers             = _stock_tickers,
     )
     result = analyzer.run()
     distribution = result['combined']['distribution']
@@ -467,6 +473,8 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
         'g2':                 g2_summary,
         'savings':            savings_summary,
         'limit_warnings':     _limit_warnings or None,
+        'total_fees':         (distribution.get('total_fees', {}).get('p50', 0.0)
+                               if body.get('fee_enabled') else None),   # D4 총 수수료(중앙값)
         'split_sale_plan':    split_sale_plan,
         'comprehensive_flag': comprehensive_flag,
         'price_provenance':   price_provenance,
@@ -672,6 +680,7 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
             'monthly_contribution': monthly_contrib,
         }])
 
+    from modules.sim.fee_engine import build_stock_tickers
     analyzer = AccumulationAnalyzer(
         portfolio_engine        = portfolio_engine,
         tickers                 = ticker_codes,
@@ -693,6 +702,8 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
         use_synthetic           = use_synthetic,
         synthetic_params        = _prep_meta.get("synthetic_info", {}) if use_synthetic else {},
         contribution_end_months = _isa_cap_info['stop_months'] if _isa_cap_info else None,
+        fee_rate                = (float(body.get('fee_rate', 0) or 0) if body.get('fee_enabled') else 0.0),
+        stock_tickers           = (build_stock_tickers(ticker_codes) if body.get('fee_enabled') else None),
     )
 
     result = analyzer.run()
@@ -762,6 +773,8 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
         'isa_remainder_years':      years % 3 if has_partial_isa else 0,
         'isa_cap_info':             _isa_cap_info,
         'limit_warnings':           _limit_warnings or None,
+        'total_fees':               (result['distribution'].get('total_fees', {}).get('p50', 0.0)
+                                     if body.get('fee_enabled') else None),   # D4 총 수수료(중앙값)
         'split_sale_plan':          split_sale_plan,
         'comprehensive_flag':       comprehensive_flag,
         'used_synthetic':           _prep_meta.get('used_synthetic', False),

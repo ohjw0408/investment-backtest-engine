@@ -28,6 +28,7 @@ class MultiAccountRunResult:
     after_tax_by_year: dict = field(default_factory=dict)  # 세금계산기: 연말 가상청산 세후 combined
     switch_log: list[dict[str, Any]] = field(default_factory=list)  # 세금계산기: 위탁→ISA 전환 기록
     switch_cg_tax_total: float = 0.0           # 세금계산기: 전환 양도세 누계
+    total_fees: float = 0.0                     # D4: 전 계좌 거래수수료 합계
 
 
 class MultiAccountSimulationLoop:
@@ -55,6 +56,7 @@ class MultiAccountSimulationLoop:
         manual_comprehensive_years=None,
         reinvest_tax_credit: bool = False,
         apply_final_liquidation: bool = True,
+        stock_tickers=None,
     ) -> MultiAccountRunResult:
         if not accounts:
             raise ValueError("계좌가 없습니다.")
@@ -62,6 +64,7 @@ class MultiAccountSimulationLoop:
             raise ValueError("시뮬레이션 날짜가 없습니다.")
 
         user_settings = user_settings or {}
+        self._stock_tickers = stock_tickers   # D4: 개별주식 매도 거래세용(전 계좌 공유)
         # 투자계산기·백테스트=True(끝에 일괄청산). 은퇴 적립=False(무청산 인계 → 인출단계서 과세).
         self._apply_final_liquidation = apply_final_liquidation
 
@@ -274,6 +277,7 @@ class MultiAccountSimulationLoop:
             pension_transfer_credit_total=float(
                 sum(r.get("pension_transfer_credit", 0.0) for r in account_results)
             ),
+            total_fees=float(sum(r.get("total_fees", 0.0) for r in account_results)),
         )
 
     def _compute_injections(
@@ -627,6 +631,8 @@ class MultiAccountSimulationLoop:
         config = account["config"]
         account_type = account.get("type", "위탁")
         gain_harvesting = bool(account.get("gain_harvesting", False))
+        fee_rate = float(account.get("fee_rate", 0.0) or 0.0)   # D4 계좌별 거래수수료
+        stock_tickers = getattr(self, "_stock_tickers", None)
         init_capital = float(getattr(config, "initial_capital", 0.0) or 0.0)
 
         if tax_enabled:
@@ -640,12 +646,14 @@ class MultiAccountSimulationLoop:
                 gain_harvesting=gain_harvesting,
                 session=tax_session,
             )
-            portfolio = TaxTrackedPortfolio(config.initial_capital)
+            portfolio = TaxTrackedPortfolio(config.initial_capital,
+                                            fee_rate=fee_rate, stock_tickers=stock_tickers)
         else:
             tax_engine = None
             div_engine = DividendEngine()
             executor = OrderExecutor()
-            portfolio = Portfolio(config.initial_capital)
+            portfolio = Portfolio(config.initial_capital,
+                                  fee_rate=fee_rate, stock_tickers=stock_tickers)
 
         return {
             "account_id": account_id,
@@ -1097,5 +1105,6 @@ class MultiAccountSimulationLoop:
             "gain_harvest_saving": gain_harvest_saving,
             "pension_transfer_credit": float(rt.get("pension_transfer_credit", 0.0)),
             "kr_foreign_unrealized_gain": kr_foreign_unrealized_gain,
+            "total_fees": float(getattr(rt["portfolio"], "total_fees", 0.0)),  # D4
             "portfolio": rt["portfolio"],
         }

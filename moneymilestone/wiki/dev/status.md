@@ -1,5 +1,5 @@
 ---
-updated: 2026-06-12
+updated: 2026-06-14
 tags: [dev]
 ---
 
@@ -20,6 +20,10 @@ tags: [dev]
 ---
 
 ## 한 줄 요약
+
+> ✅ **2026-06-14 업데이트 76 (내자산 월별 배당금 차트 — myassets):** 오너 요청 = 내자산 탭 자산추이 밑 배당금 차트(내포트폴리오→백테/계산기 화면은 보류). 여러 차례 피드백 반영해 최종형 도달. **연도 선택기**(과거 3년 실적 + 올해=실적+예측 혼합 + 내년=전체 예측) → 단일연도 **12개월 막대**(월별 실적 파랑/예측 주황) → **막대 클릭 시 하단 종목별 드릴다운** → **배당 일정 리스트**(종목별 1행 집계: 연 합계+지급월+예측배지) → **세전/세후 × 원화/외화 토글**. 예측 = 종목별 최근 5년 배당 CAGR(올해 빈 달·내년 = 직전연도×(1+CAGR)^k). FX = 과거 ex-date 환율·미래 현재환율. 세후 = 일반 KR15.4%/US15%·ISA·연금·IRP 비과세. 가정(현재 보유수량) + 정밀분석은 백테/투자계산기 유도 안내. **이벤트 기반 백엔드** `modules/dividend_history.py`(`build_dividend_chart`) + `/api/myassets/dividends`. 검증 = `test_dividend_history.py` **7 PASS** + `test_dividend_chart_browser.js` **16 PASS**(로컬 로그인, mint_session) + 라이브 API 401 게이팅·배포 확인. 커밋 fb50d2c→7ffa32b→305862d→439ee65. **▶ 다음 = PHASE4 잔여(D1 TDF·D2 연금통합·C1 watchlist·C2 자산군비교·B4 거래트래킹) — 오너 결정.**
+
+> ✅ **2026-06-14 업데이트 75 (A4 종목 상세 개선 — symbol.html):** PHASE4 A4 완료. **분류** = `get_symbol_data`가 symbol_master is_etf+country로 `asset_type`(INDEX/CRYPTO/KR_ETF/KR_STOCK/US_ETF/US_STOCK) 산출(6자리=무조건 ETF 오분류 해소) + 타입별 지표 분기(주식 시총/PER/PBR/섹터 vs ETF 운용사/보수율/AUM). **차트** = Lightweight Charts 라인/캔들 토글 — **라인 탭=표시기간**(1일/1주 시간봉, 1개월~전체 일봉), **캔들 탭=캔들 1개 간격**(1시간/1일/1주/1개월/1년, 기간 항상 전체). 캔들 간격별 **기본 배율**(1시간 1~2일·1일 ~75일·1주 1년·1개월 ~7년·1년 전체) + **거래량 히스토그램** + **⛶ 전체화면**(Fullscreen API). 1시간봉 = yfinance 1h 730일 fetch(`get_intraday_data range=max`, 신규 `price_hourly` 테이블) + 730일 한계 안내문구. 검증 = `test_symbol_api.py` 8 PASS + `test_symbol_browser.js` **31 PASS**(로컬·라이브 둘 다) + 라이브 23~31 PASS. 커밋 fddaa51→51c5d0c→bf4e88e. **▶ 다음 = A4 완료, PHASE4 잔여로.**
 
 > ✅ **2026-06-13 업데이트 74 (D4 fast-follow ② 은퇴·배당 거래수수료 롤아웃 — 배포완료):** 오너 결정 = 은퇴+배당 둘 다, 은퇴 fee = **적립+인출 양 단계**. fee 미배선이던 은퇴·배당 탭에 거래수수료 배선(계산기·백테는 ①까지 완료). **은퇴 적립** = AccumulationAnalyzer·MultiAccountAnalyzer(이미 fee 파라미터 보유) → retirement_logic이 fee_rate·stock_tickers 전달. **은퇴 인출** = WithdrawalAnalyzer에 fee_rate/stock_tickers 신규 배선(SimulationConfig·Portfolio 주입 + total_fees surface), RetirementPlanner가 적립+인출 합산. **멀티 가구인출** = multi_account_withdrawal `_build_account_runtime` Portfolio fee + window/rolling/samples total_fees 스레딩. **인출기 탭(standalone)** = run_withdrawal_logic 단일·멀티 fee 패스스루(은퇴와 같은 wd 엔진 공유 — UI가 retirement.html 2모드라 일관 필요). **배당** = dividend_simulator `_simulate_one` Portfolio fee + `_fees_cache`/`get_total_fees`(실데이터 윈도우 중앙값; **합성 경로는 거래 없는 순수 자산수학 → fee 미적용, 기술 강제**), MultiDividendSimulator는 MultiAccountSimulationLoop per-account fee + stock_tickers. dividend_logic 단일·멀티 total_fees surface. **UI** = retirement.html·dividend_target.html에 거래수수료 섹션(opt-in+프리셋+율%) + toggleFeePanel(멀티 재렌더)·renderFeeSummary·payload fee_enabled/fee_rate + 계좌 payload 빌더 per-card fee_rate(공용 `_mmFeeField`가 feeEnabledChk로 카드 노출). 검증 = `test_d4_fee_retire_div.py` **3 PASS**(배당 단일·멀티 fee 흐름·≤ 불변식, loader 패치 결정론) + 변경 모듈 기존 타겟 **74 PASS**(fee=0 회귀 무변경: g5 인출·적립·가구·연금·배당·인출CG세·portfolio_fee·d4_fee) + Python·템플릿 JS 문법 OK. ✅ **배포(cfee467)·라이브 probe 3 PASS**(배당 단일 fee 배너 ₩87,410·은퇴 단일 fee 배너 ₩78,338·콘솔에러 0 — 두 엔진 fee 라이브 흐름 확인, 스샷 육안 확인). **공유 엔진 변경이라 전체 회귀(pytest tests/)는 오너 확인 후 실행 대기.** **▶ 다음 = D4 전 5탭 완료 → D1 TDF/D2 연금통합(7월) OR PHASE4 잔여(B2-a·A4·C1·C2·B4) — 오너 결정.**
 

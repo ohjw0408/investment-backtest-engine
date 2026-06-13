@@ -57,13 +57,13 @@
 .div-tgl.active { background:var(--blue); color:#fff; border-color:var(--blue); }
 .div-drill-head { font-weight:700; font-size:0.85rem; margin-bottom:6px; }
 .div-drill-item { display:flex; justify-content:space-between; gap:8px; padding:6px 10px; border-bottom:1px solid var(--border); font-size:0.83rem; }
-.div-cal-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
-.div-mini-month { border:1px solid var(--border); border-radius:8px; padding:8px; }
-.div-mini-title { font-size:0.72rem; font-weight:700; margin-bottom:5px; text-align:center; color:var(--text-muted); }
-.div-mini-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
-.div-mini-grid > div { font-size:0.6rem; text-align:center; padding:2px 0; border-radius:3px; color:var(--text); }
-.div-mini-grid .dow { font-weight:700; opacity:0.55; }
-.div-mini-grid .has-div { background:var(--blue); color:#fff; font-weight:700; }
+.div-list { border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.div-list-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--border); font-size:0.84rem; }
+.div-list-item:last-child { border-bottom:none; }
+.div-list-date { color:var(--text-muted); font-variant-numeric:tabular-nums; flex-shrink:0; width:52px; }
+.div-list-name { flex:1; font-weight:600; }
+.div-list-amt  { font-weight:700; flex-shrink:0; }
+.div-proj-badge { font-size:0.65rem; font-weight:700; color:#FB8C00; border:1px solid #FB8C00; border-radius:4px; padding:1px 5px; margin-left:6px; }
 
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
 .summary-item { padding: 12px 14px; background: var(--bg); border-radius: 10px; }
@@ -206,7 +206,7 @@
       <div id="divDrill" style="margin-top:12px;"></div>
       <div id="divCalWrap" style="margin-top:18px;">
         <div class="ma-card-title" style="font-size:0.85rem;margin-bottom:8px;">📅 배당 일정</div>
-        <div id="divCal" class="div-cal-grid"></div>
+        <div id="divCal" class="div-list"></div>
       </div>
       <div id="divNote" style="font-size:0.72rem;color:var(--text-muted);margin-top:14px;line-height:1.6;"></div>
     </div>
@@ -846,11 +846,16 @@ function _fmtDivMoney(v) {
     : '₩' + Math.round(v).toLocaleString();
 }
 
+function _yearLabel(y) {
+  if (y === _divData.full_proj_year) return y + ' (예측)';
+  if (y === _divData.current_year)   return y + ' (진행)';
+  return String(y);
+}
+
 function renderYearTabs() {
-  document.getElementById('divYearTabs').innerHTML = _divData.years.map(y => {
-    const isProj = (y === _divData.proj_year);
-    return `<button class="div-tgl${y === _divYear ? ' active' : ''}" data-div-year="${y}">${y}${isProj ? ' (예측)' : ''}</button>`;
-  }).join('');
+  document.getElementById('divYearTabs').innerHTML = _divData.years.map(y =>
+    `<button class="div-tgl${y === _divYear ? ' active' : ''}" data-div-year="${y}">${_yearLabel(y)}</button>`
+  ).join('');
 }
 
 function renderDivYear() {
@@ -860,26 +865,28 @@ function renderDivYear() {
   document.getElementById('divEmpty').style.display = anyData ? 'none' : 'block';
   document.getElementById('divChart').style.display = anyData ? 'block' : 'none';
 
-  const monthly = Array(12).fill(0);
-  evs.forEach(e => { monthly[e.month - 1] += _valOf(e); });
+  // 월별 합산 + 월별 예측여부(그 달에 예측 이벤트 있으면 예측 색)
+  const monthly  = Array(12).fill(0);
+  const monthProj = Array(12).fill(false);
+  evs.forEach(e => { monthly[e.month - 1] += _valOf(e); if (e.projected) monthProj[e.month - 1] = true; });
+  const colors = monthProj.map(p => p ? 'rgba(251,140,0,0.7)' : '#1976D2');
 
   const labels = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-  const isProj = (_divYear === _divData.proj_year);
   const ctx = document.getElementById('divChart').getContext('2d');
   if (_divChart) _divChart.destroy();
   _divChart = new Chart(ctx, {
     type: 'bar',
     data: { labels, datasets: [{
-      label: _divYear + (isProj ? ' (예측)' : '') + ' 배당',
+      label: _divYear + ' 배당',
       data: monthly,
-      backgroundColor: isProj ? 'rgba(251,140,0,0.6)' : '#1976D2',
-      borderColor: isProj ? '#FB8C00' : 'transparent', borderWidth: isProj ? 1.5 : 0,
+      backgroundColor: colors,
     }]},
     options: {
       responsive: true, maintainAspectRatio: false,
       onClick: (evt, els) => { if (els.length) renderDrill(els[0].index + 1); },
       plugins: { legend: { display: false },
-                 tooltip: { callbacks: { label: c => _fmtDivMoney(c.parsed.y) } } },
+                 tooltip: { callbacks: {
+                   label: c => _fmtDivMoney(c.parsed.y) + (monthProj[c.dataIndex] ? ' (예측)' : '') } } },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
         y: { beginAtZero: true, grid: { color: MM_CHART_GRID },
@@ -890,10 +897,12 @@ function renderDivYear() {
   });
 
   const total = monthly.reduce((a, b) => a + b, 0);
+  const hasProj = monthProj.some(Boolean);
   document.getElementById('divDrill').innerHTML =
-    `<div class="div-drill-head">${_divYear}년 합계: ${_fmtDivMoney(total)} ` +
-    `<span style="font-weight:400;color:var(--text-muted);font-size:0.78rem;">(월 막대를 클릭하면 종목별 내역)</span></div>`;
-  renderCalendar(evs);
+    `<div class="div-drill-head">${_divYear}년 합계: ${_fmtDivMoney(total)}` +
+    (hasProj ? ' <span style="color:#FB8C00;font-size:0.76rem;">(주황 = 예측)</span>' : '') +
+    ` <span style="font-weight:400;color:var(--text-muted);font-size:0.78rem;">· 월 막대를 클릭하면 종목별 내역</span></div>`;
+  renderList(evs);
   renderDivNote();
 }
 
@@ -920,36 +929,26 @@ function renderDrill(month) {
   document.getElementById('divDrill').innerHTML = html;
 }
 
-function renderCalendar(evs) {
-  const byDate = {};
-  evs.forEach(e => { (byDate[e.date] = byDate[e.date] || []).push(e); });
-  const dow = ['일','월','화','수','목','금','토'];
-  let html = '';
-  for (let m = 0; m < 12; m++) {
-    const first = new Date(_divYear, m, 1).getDay();
-    const days  = new Date(_divYear, m + 1, 0).getDate();
-    let cells = dow.map(d => `<div class="dow">${d}</div>`).join('');
-    for (let i = 0; i < first; i++) cells += '<div></div>';
-    for (let d = 1; d <= days; d++) {
-      const ds = `${_divYear}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const ev = byDate[ds];
-      if (ev) {
-        const tip = ev.map(x => `${x.name}: ${_fmtDivMoney(_valOf(x))}`).join(' / ');
-        cells += `<div class="has-div" title="${ds} — ${tip}">${d}</div>`;
-      } else {
-        cells += `<div>${d}</div>`;
-      }
-    }
-    html += `<div class="div-mini-month"><div class="div-mini-title">${m + 1}월</div>` +
-            `<div class="div-mini-grid">${cells}</div></div>`;
+function renderList(evs) {
+  const el = document.getElementById('divCal');
+  if (!evs.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:10px 12px;">배당 일정이 없습니다.</div>';
+    return;
   }
-  document.getElementById('divCal').innerHTML = html;
+  const sorted = [...evs].sort((a, b) => a.date < b.date ? -1 : 1);
+  el.innerHTML = sorted.map(e =>
+    `<div class="div-list-item">` +
+      `<span class="div-list-date">${e.date.slice(5).replace('-', '/')}</span>` +
+      `<span class="div-list-name">${e.name}${e.projected ? '<span class="div-proj-badge">예측</span>' : ''}</span>` +
+      `<span class="div-list-amt">${_fmtDivMoney(_valOf(e))}</span>` +
+    `</div>`
+  ).join('');
 }
 
 function renderDivNote() {
   const note = [];
   note.push('※ 과거 배당은 <b>현재 보유 수량</b>을 그대로 보유했다고 가정해 계산합니다.');
-  note.push(`※ ${_divData.proj_year}년은 종목별 최근 5년 배당성장률(CAGR) 기반 <b>예측치</b>입니다.`);
+  note.push(`※ ${_divData.current_year}년은 실데이터가 있는 달까지는 실적, 이후 달과 ${_divData.full_proj_year}년은 종목별 최근 5년 배당성장률(CAGR) 기반 <b>예측치</b>입니다.`);
   if (_divData.has_foreign) {
     note.push('※ 해외 종목 배당은 ' +
       (_divCur === 'KRW' ? '배당 당시 환율로 원화 환산' : '원화 종목을 배당 당시 환율로 달러 환산') +

@@ -37,12 +37,19 @@ function ok(name, cond) {
   await page.goto(BASE + '/myassets', { waitUntil: 'networkidle' });
   await page.waitForFunction("typeof _divChart !== 'undefined' && _divChart !== null", { timeout: 30000 });
 
-  // 연도 선택기 — 과거3+예측1 = 4탭, 기본 = 직전연도(실데이터)
+  // 연도 선택기 — 과거3 + 올해(혼합) + 내년(예측) = 5탭, 기본 = 올해
+  const Y = new Date().getFullYear();
   const yearTabs = await page.$$eval('#divYearTabs .div-tgl', els => els.map(e => e.textContent));
-  ok('연도 선택기 4개(과거3+예측1)', yearTabs.length === 4);
-  ok('예측 연도 라벨', yearTabs[3].includes('예측'));
+  ok('연도 선택기 5개(과거3+올해+내년)', yearTabs.length === 5);
+  ok('올해 (진행) 라벨', yearTabs[3].includes(String(Y)) && yearTabs[3].includes('진행'));
+  ok('내년 (예측) 라벨', yearTabs[4].includes(String(Y + 1)) && yearTabs[4].includes('예측'));
   const defActive = await page.$eval('#divYearTabs .div-tgl.active', e => e.textContent);
-  ok('기본 선택 = 직전연도(실데이터)', defActive === String(new Date().getFullYear() - 1));
+  ok('기본 선택 = 올해', defActive.includes(String(Y)));
+  // 올해 = 실적+예측 혼합
+  ok('올해 이벤트 = 실적+예측 혼합', await page.evaluate(y => {
+    const evs = _divData.events[y]; if (!evs || !evs.length) return false;
+    return evs.some(e => !e.projected) && evs.some(e => e.projected);
+  }, Y));
 
   // 단일 연도 12개월 막대 (단일 데이터셋)
   const chartInfo = await page.evaluate(() => ({
@@ -65,20 +72,25 @@ function ok(name, cond) {
   ok('막대 드릴다운 = 종목별 내역', drillTxt.includes(drillMonth + '월 배당') &&
      (drillTxt.includes('SCHD') || drillTxt.includes('Schwab') || drillTxt.includes('TIGER') || drillTxt.includes('₩')));
 
-  // 캘린더 — 12개 미니월 + 배당일 마킹
-  const cal = await page.evaluate(() => ({
-    months: document.querySelectorAll('#divCal .div-mini-month').length,
-    marked: document.querySelectorAll('#divCal .has-div').length,
+  // 배당 일정 = 리스트(캘린더 아님), 인라인 표시
+  const list = await page.evaluate(() => ({
+    items: document.querySelectorAll('#divCal .div-list-item').length,
+    hasDate: !!document.querySelector('#divCal .div-list-date'),
+    hasAmt: !!document.querySelector('#divCal .div-list-amt'),
+    projBadge: document.querySelectorAll('#divCal .div-proj-badge').length,
   }));
-  ok('캘린더 = 12개월 그리드', cal.months === 12);
-  ok('캘린더 배당일 마킹 존재', cal.marked > 0);
+  ok('배당 일정 = 리스트 항목', list.items > 0);
+  ok('리스트 = 날짜+금액 인라인', list.hasDate && list.hasAmt);
+  ok('올해 리스트에 예측 배지 존재', list.projBadge > 0);
 
-  // 연도 전환 — 예측연도 클릭
+  // 연도 전환 — 내년(전체 예측) 클릭
   await page.click(`#divYearTabs .div-tgl:last-child`);
   await page.waitForTimeout(300);
-  ok('예측연도 전환 반영', await page.evaluate(() => _divYear === _divData.proj_year));
+  ok('내년 전환 = 전체 예측', await page.evaluate(() =>
+    _divYear === _divData.full_proj_year &&
+    _divData.events[_divYear].every(e => e.projected)));
 
-  // 세후 토글 → 합계 감소 (직전연도 복귀 후)
+  // 세후 토글 → 합계 감소 (과거 실적연도 Y-1 선택 후)
   await page.click(`#divYearTabs .div-tgl:nth-child(3)`);
   await page.waitForTimeout(200);
   const preTotal = await page.evaluate(() =>

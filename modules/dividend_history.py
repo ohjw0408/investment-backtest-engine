@@ -56,11 +56,14 @@ def _load_names(codes):
 
 
 def build_dividend_chart(loader, holdings):
-    cur_year   = datetime.today().year
-    proj_year  = cur_year
-    base_year  = cur_year - 1
-    past_years = [cur_year - i for i in range(PAST_YEARS, 0, -1)]
-    chart_years = past_years + [proj_year]
+    today      = datetime.today()
+    cur_year   = today.year
+    cur_month  = today.month
+    base_year  = cur_year - 1                 # 예측 베이스 = 직전 완료연도
+    next_year  = cur_year + 1                 # 전체 예측 연도
+    past_years = [cur_year - i for i in range(PAST_YEARS, 0, -1)]   # [Y-3, Y-2, Y-1] 실적
+    # 차트 연도: 과거 3년 실적 + 현재연도(실적+예측 혼합) + 내년(전체 예측)
+    chart_years = past_years + [cur_year, next_year]
     min_year   = (cur_year - PAST_YEARS) - CAGR_YEARS
 
     try:
@@ -117,24 +120,43 @@ def build_dividend_chart(loader, holdings):
         cagr = _ticker_cagr(per_year_dps, base_year)
         growth[code] = round(cagr, 4)
 
+        # 과거 3년 실적 + 현재연도 실적 부분
+        real_months_cur = set()
+        base_events = []   # 베이스(직전연도) 월/일/주당배당 — 예측 패턴 소스
         for d, dps in rows:
             y, m, day = int(d[:4]), int(d[5:7]), int(d[8:10])
             if y in past_years:
                 rate = _fx_on(fx, d) if fx is not None else cur_fx
                 events[y].append(_event(d[:10], m, day, code, float(dps) * qty, is_kr, rate, div_tax, False))
+            if y == cur_year:           # 현재연도 실데이터 부분
+                rate = _fx_on(fx, d) if fx is not None else cur_fx
+                events[cur_year].append(_event(d[:10], m, day, code, float(dps) * qty, is_kr, rate, div_tax, False))
+                real_months_cur.add(m)
             if y == base_year:
-                pdate = f"{proj_year}-{m:02d}-{day:02d}"
-                events[proj_year].append(
-                    _event(pdate, m, day, code, float(dps) * qty * (1 + cagr), is_kr, cur_fx, div_tax, True))
+                base_events.append((m, day, float(dps)))
+
+        # 현재연도 예측 부분 — 아직 안 들어온 달(>= 이번 달, 실데이터 없는 달)을 베이스×(1+cagr)로 채움
+        for m, day, dps in base_events:
+            if m >= cur_month and m not in real_months_cur:
+                pdate = f"{cur_year}-{m:02d}-{day:02d}"
+                events[cur_year].append(
+                    _event(pdate, m, day, code, dps * qty * (1 + cagr), is_kr, cur_fx, div_tax, True))
+
+        # 내년 전체 예측 — 베이스×(1+cagr)^2
+        for m, day, dps in base_events:
+            ndate = f"{next_year}-{m:02d}-{day:02d}"
+            events[next_year].append(
+                _event(ndate, m, day, code, dps * qty * (1 + cagr) ** 2, is_kr, cur_fx, div_tax, True))
 
     for y in events:
         events[y].sort(key=lambda e: e["date"])
 
     return {
-        "years":       chart_years,
-        "proj_year":   proj_year,
-        "default_year": base_year,     # 기본 = 직전 완료연도(실데이터)
-        "growth":      growth,
-        "has_foreign": has_foreign,
-        "events":      events,
+        "years":            chart_years,
+        "current_year":     cur_year,     # 실적+예측 혼합
+        "full_proj_year":   next_year,    # 전체 예측
+        "default_year":     cur_year,     # 기본 = 올해
+        "growth":           growth,
+        "has_foreign":      has_foreign,
+        "events":           events,
     }

@@ -84,7 +84,20 @@
   <div class="pd-title" id="pdName">⏳ 로딩 중...</div>
   <div class="pd-sub">총 투자금액만 입력하면 저장된 비중대로 자동 배분해 비중·자산 추이·배당금을 계산합니다.</div>
 
-  <!-- 총 투자금액 입력 (맨 위, 항상 표시) -->
+  <!-- 정밀 분석 유도 배너 -->
+  <div class="ma-card" style="margin-top:16px;display:flex;align-items:center;gap:16px;background:rgba(25,118,210,0.08);border:1.5px solid rgba(25,118,210,0.45);">
+    <span style="font-size:2rem;flex-shrink:0;">📊</span>
+    <div style="flex:1;">
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:4px;">더 정밀한 분석이 필요하세요?</div>
+      <div style="font-size:0.92rem;color:var(--text);line-height:1.55;">
+        <a href="/backtest" style="color:var(--blue);font-weight:700;text-decoration:underline;">포트폴리오 백테스트</a> ·
+        <a href="/calculator" style="color:var(--blue);font-weight:700;text-decoration:underline;">투자계산기</a>로
+        과거 성과와 미래 전망을 자세히 확인해 보세요.
+      </div>
+    </div>
+  </div>
+
+  <!-- 총 투자금액 입력 (항상 표시) -->
   <div class="ma-card" style="margin-top:16px;">
     <div class="ma-card-title">💰 총 투자금액</div>
     <div class="pd-amount-box">
@@ -187,10 +200,8 @@ async function loadPortfolio(){
   document.getElementById('pdName').textContent = '⭐ ' + pf.name;
   renderWeight();                       // 비중 파이는 금액과 무관하게 즉시 표시
   const saved = parseFloat(localStorage.getItem(LS_KEY) || '0') || 0;
-  if (saved > 0) {
-    document.getElementById('pdAmount').value = saved;
-    applyAmount();
-  }
+  document.getElementById('pdAmount').value = saved > 0 ? saved : 10000000;  // 기본 1천만
+  applyAmount();
 }
 
 function setAmount(v){ document.getElementById('pdAmount').value = v; applyAmount(); }
@@ -405,7 +416,7 @@ function renderMonthGrid(monthly, monthProj){
 function showMonth(month){
   _divActiveMonth = (_divActiveMonth === month) ? null : month;
   document.querySelectorAll('#divMonthGrid .div-month-box').forEach(b =>
-    b.classList.toggle('active', b.dataset.month && parseInt(b.dataset.month) === _divActiveMonth));
+    b.classList.toggle('active', !!(b.dataset.month && parseInt(b.dataset.month) === _divActiveMonth)));
   if (_divActiveMonth) renderMonthDetail(_divActiveMonth);
   else document.getElementById('divMonthDetail').innerHTML = '';
 }

@@ -1,5 +1,9 @@
 # Log
 
+## [2026-06-14] fix | 포트폴리오 상세 후속 — 월칸 토글버그·CTA 상단확대·기본금액 1천만
+
+오너 피드백 3건. ① 월별 네모칸 버그: 분기배당(3·6·9·12월만)일 때 3월 클릭하면 배당 없는 1·2·4·5월까지 파랗게 선택됨. **원인 = `classList.toggle('active', cond)`에서 빈 달은 `dataset.month` undefined → `undefined && ...` = undefined → toggle 2번째 인자 undefined면 force 무시되고 매번 토글되어 active 추가**. 수정 = `!!(...)`로 boolean 강제. (myassets·portfolio_detail 동일 버그 둘 다.) ② 백테/계산기 유도 CTA 일반 사용자가 못 찾음 → 배당 박스 **밖, 자산현황 탭 맨 위 정적 배너**로 이동·확대(아이콘 2rem·제목 1.1rem 볼드·본문 0.92rem, 연파랑 유지). myassets는 `#divCta` 동적 채우기 제거 후 tab-overview 첫 카드로, portfolio_detail은 제목 아래 배너. ③ portfolio_detail 총 투자금액 **기본값 1천만원** — 진입 즉시 자동 계산(localStorage 저장값 있으면 그것, 없으면 10000000). 변경 = `templates/myassets.html`·`templates/portfolio_detail.html`(JS·HTML만, 백엔드 무변경). 검증 = JS `node --check` 2파일 OK.
+
 ## [2026-06-14] feature | 저장 포트폴리오 상세(총투자금액→비중 자동배분→추이·배당) + 내자산 배당일정 월별칸·홍보문구 강조
 
 오너: ① "내 포트폴리오" 저장 카드 클릭 → 내자산 같은 상세 화면. **총 투자금액 1칸만 입력** → 저장된 비중대로 자동 배분(수량 자동 환산) → 받은/예측 배당·자산추이·비중 표시. 입력창은 **상세 페이지 맨 위, 카드는 항상 표시**(입력해야 나오는 게 아님). ② 내자산 배당 CTA(백테/계산기 유도)가 너무 작음 → 크게·눈에 띄는 색(튀지 않게). ③ 배당 일정 — 막대 클릭 말고 **월별 네모칸** 누르면 표로 펼침.

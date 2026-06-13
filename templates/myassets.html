@@ -150,6 +150,18 @@
 
   <!-- 자산 현황 탭 -->
   <div id="tab-overview">
+    <div class="ma-card" style="display:flex;align-items:center;gap:16px;background:rgba(25,118,210,0.08);border:1.5px solid rgba(25,118,210,0.45);">
+      <span style="font-size:2rem;flex-shrink:0;">📊</span>
+      <div style="flex:1;">
+        <div style="font-size:1.1rem;font-weight:800;margin-bottom:4px;">더 정밀한 분석이 필요하세요?</div>
+        <div style="font-size:0.92rem;color:var(--text);line-height:1.55;">
+          <a href="/backtest" style="color:var(--blue);font-weight:700;text-decoration:underline;">포트폴리오 백테스트</a> ·
+          <a href="/calculator" style="color:var(--blue);font-weight:700;text-decoration:underline;">투자계산기</a>로
+          과거 성과와 미래 전망을 자세히 확인해 보세요.
+        </div>
+      </div>
+    </div>
+
     <div class="ma-card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div>
         <div style="font-size:0.9rem;font-weight:800;">금액 가리기</div>
@@ -221,7 +233,6 @@
         <div id="divMonthDetail"></div>
         <div id="divCal" class="div-list" style="margin-top:10px;"></div>
       </div>
-      <div id="divCta" style="margin-top:16px;"></div>
       <div id="divNote" style="font-size:0.72rem;color:var(--text-muted);margin-top:12px;line-height:1.6;"></div>
     </div>
   </div>
@@ -940,7 +951,7 @@ function renderMonthGrid(monthly, monthProj) {
 function showMonth(month) {
   _divActiveMonth = (_divActiveMonth === month) ? null : month;
   document.querySelectorAll('#divMonthGrid .div-month-box').forEach(b =>
-    b.classList.toggle('active', b.dataset.month && parseInt(b.dataset.month) === _divActiveMonth));
+    b.classList.toggle('active', !!(b.dataset.month && parseInt(b.dataset.month) === _divActiveMonth)));
   if (_divActiveMonth) renderMonthDetail(_divActiveMonth);
   else document.getElementById('divMonthDetail').innerHTML = '';
 }
@@ -1029,13 +1040,6 @@ function renderDivNote() {
       ', 미래 예측은 현재 환율 기준입니다.');
   }
   document.getElementById('divNote').innerHTML = note.join('<br>');
-  document.getElementById('divCta').innerHTML =
-    '<div style="display:flex;align-items:center;gap:10px;padding:13px 16px;background:rgba(25,118,210,0.10);' +
-    'border:1px solid rgba(25,118,210,0.45);border-radius:10px;font-size:0.92rem;line-height:1.5;color:var(--text);">' +
-    '<span style="font-size:1.25rem;flex-shrink:0;">💡</span>' +
-    '<span>더 정확한 과거 성과·미래 전망이 궁금하다면? ' +
-    '<a href="/backtest" style="color:var(--blue);font-weight:700;text-decoration:underline;">포트폴리오 백테스트</a> · ' +
-    '<a href="/calculator" style="color:var(--blue);font-weight:700;text-decoration:underline;">투자계산기</a>로 정밀하게 확인해 보세요.</span></div>';
 }
 
 document.addEventListener('click', e => {

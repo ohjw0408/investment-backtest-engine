@@ -706,11 +706,13 @@ class PriceLoader:
         df_display = df[df["volume"] > 0] if "volume" in df.columns and not df.empty else df
         if df_display.empty:
             df_display = df  # 실데이터 없으면 전체 사용 (fallback)
+        _has_vol = "volume" in df_display.columns
         prices    = [{"date": row["date"],
                       "open":  round(float(row["open"]),  4),
                       "high":  round(float(row["high"]),  4),
                       "low":   round(float(row["low"]),   4),
-                      "close": round(float(row["close"]), 4)}
+                      "close": round(float(row["close"]), 4),
+                      "volume": float(row["volume"]) if _has_vol and pd.notna(row["volume"]) else 0}
                      for _, row in df_display.iterrows()]
         cur_price = prices[-1]["close"]
         prev_price = prices[-2]["close"] if len(prices) > 1 else None
@@ -878,13 +880,14 @@ class PriceLoader:
             days   = 7 if range_key == "1w" else 2  # 1d는 직전 거래일 포함 위해 2일치 조회
             cutoff = (_dt.now() - _td(days=days)).strftime("%Y-%m-%d")
         rows = self.conn.execute(
-            "SELECT datetime, open, high, low, close FROM price_hourly "
+            "SELECT datetime, open, high, low, close, volume FROM price_hourly "
             "WHERE code=? AND datetime >= ? ORDER BY datetime",
             (code, cutoff)
         ).fetchall()
         prices = [{"date": r[0],
                    "open":  round(float(r[1]), 4), "high": round(float(r[2]), 4),
-                   "low":   round(float(r[3]), 4), "close": round(float(r[4]), 4)}
+                   "low":   round(float(r[3]), 4), "close": round(float(r[4]), 4),
+                   "volume": float(r[5]) if r[5] is not None else 0}
                   for r in rows]
         return {
             "code": code, "range": range_key,

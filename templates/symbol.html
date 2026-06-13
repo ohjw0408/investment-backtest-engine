@@ -391,16 +391,20 @@ function resampleOHLC(prices, unit) {
     if (k !== key) {
       if (cur) out.push(cur);
       key = k;
-      cur = { date: p.date, open: p.open, high: p.high, low: p.low, close: p.close };
+      cur = { date: p.date, open: p.open, high: p.high, low: p.low, close: p.close, volume: p.volume || 0 };
     } else {
       cur.high = Math.max(cur.high, p.high);
       cur.low  = Math.min(cur.low,  p.low);
       cur.close = p.close;
+      cur.volume += (p.volume || 0);
     }
   }
   if (cur) out.push(cur);
   return out;
 }
+
+// 간격별 기본 보이는 창(일 단위). 데이터는 전체 로드 — 초기 줌만. 0 = 전체(fitContent).
+const CANDLE_DEFAULT_DAYS = { '1H': 2, '1D': 75, '1W': 365, '1M': 2555, '1Y': 0 };
 
 // 라인: 표시 기간만큼 잘라 반환
 async function getLineData(range) {
@@ -448,10 +452,13 @@ async function renderActive() {
   if (curType === 'candle') {
     const { prices, intraday } = await getCandleData(candleInterval);
     const labelMap = { '1H':'1시간', '1D':'1일', '1W':'1주', '1M':'1개월', '1Y':'1년' };
-    setHint(`전체 기간 · 캔들 1개 = ${labelMap[candleInterval]}` +
-            (candleInterval === '1H' ? ' (시간봉은 최대 약 2년)' : ''));
+    if (candleInterval === '1H') {
+      setHint(`⚠ 캔들 1개 = 1시간 · 시간봉은 데이터 제공 한계로 최근 약 730일(2년)까지만 표시됩니다. (스크롤·줌으로 범위 조정)`);
+    } else {
+      setHint(`캔들 1개 = ${labelMap[candleInterval]} · 전체 기간 데이터 (기본 화면 외 구간은 스크롤·줌으로 확인)`);
+    }
     canvas.style.display = 'none'; cdiv.style.display = 'block';
-    renderCandle(prices, intraday);
+    renderCandle(prices, intraday, candleInterval);
   } else {
     const { prices, intraday } = await getLineData(lineRange);
     setHint(intraday ? (lineRange === '1D' ? '최근 1일(시간봉)' : '최근 1주(시간봉)') : '');
@@ -492,7 +499,7 @@ function renderLine(prices, intraday) {
   });
 }
 
-function renderCandle(prices, intraday) {
+function renderCandle(prices, intraday, interval) {
   const el = document.getElementById('candleChart');
   if (candleChart) { candleChart.remove(); candleChart = null; candleSeries = null; }
   if (!prices || !prices.length) return;
@@ -501,19 +508,45 @@ function renderCandle(prices, intraday) {
     layout: { background: { color: 'transparent' }, textColor: MM_AXIS },
     grid: { vertLines: { color: MM_CHART_GRID }, horzLines: { color: MM_CHART_GRID } },
     timeScale: { timeVisible: intraday, secondsVisible: false, borderColor: MM_CHART_GRID },
-    rightPriceScale: { borderColor: MM_CHART_GRID },
+    rightPriceScale: { borderColor: MM_CHART_GRID, scaleMargins: { top: 0.08, bottom: 0.26 } },
     crosshair: { mode: 0 },
   });
   candleSeries = candleChart.addCandlestickSeries({
     upColor: '#2E7D32', downColor: '#C62828', borderVisible: false,
     wickUpColor: '#2E7D32', wickDownColor: '#C62828',
   });
-  const cdata = prices.map(p => ({
-    time: intraday ? Math.floor(new Date(p.date.replace(' ', 'T')).getTime() / 1000) : p.date,
-    open: p.open, high: p.high, low: p.low, close: p.close,
-  }));
-  candleSeries.setData(cdata);
-  candleChart.timeScale().fitContent();
+  const toTime = p => intraday
+    ? Math.floor(new Date(p.date.replace(' ', 'T')).getTime() / 1000)
+    : p.date;
+  candleSeries.setData(prices.map(p => ({
+    time: toTime(p), open: p.open, high: p.high, low: p.low, close: p.close,
+  })));
+
+  // 거래량 히스토그램 — 하단 26% 영역, 봉 색과 동일(상승=초록/하락=빨강)
+  const volSeries = candleChart.addHistogramSeries({
+    priceScaleId: 'vol', priceFormat: { type: 'volume' },
+  });
+  candleChart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
+  volSeries.setData(prices.map(p => ({
+    time: toTime(p), value: p.volume || 0,
+    color: (p.close >= p.open) ? 'rgba(46,125,50,0.45)' : 'rgba(198,40,40,0.45)',
+  })));
+
+  // 간격별 기본 배율 — 전체 데이터 유지, 초기 보이는 창만 제한
+  const days = CANDLE_DEFAULT_DAYS[interval] || 0;
+  const ts = candleChart.timeScale();
+  if (days > 0 && prices.length > 1) {
+    const last  = prices[prices.length - 1];
+    const lastT = toTime(last);
+    const fromT = intraday
+      ? lastT - days * 86400
+      : (() => { const d = new Date(last.date); d.setDate(d.getDate() - days);
+                 return d.toISOString().slice(0, 10); })();
+    try { ts.setVisibleRange({ from: fromT, to: lastT }); }
+    catch (e) { ts.fitContent(); }
+  } else {
+    ts.fitContent();
+  }
 }
 
 function resizeCharts() {

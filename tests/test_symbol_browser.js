@@ -56,7 +56,17 @@ async function loadSymbol(ctx, code) {
     ok('캔들 탭 세트 = 캔들 간격', JSON.stringify(candleTabs) === JSON.stringify(['1시간','1일','1주','1개월','1년']));
     ok('캔들 차트(Lightweight) 렌더', await page.evaluate(() =>
       candleChart !== null && !!document.querySelector('#candleChart canvas')));
-    ok('캔들 힌트 = 전체 기간', (await page.textContent('#chartHint')).includes('전체 기간'));
+    ok('캔들 1일 힌트 = 전체 기간', (await page.textContent('#chartHint')).includes('전체 기간'));
+
+    // 거래량: API에 volume 포함
+    ok('일봉 데이터에 volume 포함', await page.evaluate(() =>
+      allData.prices.length > 0 && typeof allData.prices[0].volume === 'number'));
+    // 기본 배율: 1일봉 기본 보이는 창(~75일) < 전체 봉수
+    const zoom1D = await page.evaluate(() => {
+      const lr = candleChart.timeScale().getVisibleLogicalRange();
+      return { visible: lr.to - lr.from, total: candleSeries.data().length };
+    });
+    ok('1일봉 기본 배율 = 일부만(전체 아님)', zoom1D.visible < zoom1D.total && zoom1D.visible < 200);
 
     // 캔들 1주 — 일봉 리샘플(전체기간, 캔들 하나=1주). 점수 < 1일 캔들 점수.
     const nDay = await page.evaluate(() => candleSeries.data().length);
@@ -65,11 +75,12 @@ async function loadSymbol(ctx, code) {
     const nWeek = await page.evaluate(() => candleSeries.data().length);
     ok('캔들 1주 = 1일보다 적은 봉수(리샘플)', nWeek > 0 && nWeek < nDay);
 
-    // 캔들 1시간 — 730일 시간봉 fetch
+    // 캔들 1시간 — 730일 시간봉 fetch + 안내문구
     await page.click('.period-tab[data-period="1H"]');
-    await page.waitForTimeout(8000);
+    await page.waitForTimeout(9000);
     ok('캔들 1시간 렌더(730일 시간봉)', await page.evaluate(() =>
       candleChart !== null && candleSeries.data().length > 100));
+    ok('1시간봉 730일 한계 안내문구', (await page.textContent('#chartHint')).includes('730일'));
 
     // 전체화면 버튼 존재
     ok('전체화면 버튼 존재', !!(await page.$('#fsBtn')));

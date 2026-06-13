@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-14] feature | A4 후속2 — 간격별 기본 배율 + 거래량 + 1시간봉 안내
+
+오너 피드백:
+- **간격별 기본 보이는 창**(데이터는 전체 로드, 초기 줌만 — 스크롤/줌으로 전체 확인): 1시간=1~2일, 1일=~75일(2~3개월), 1주=1년, 1개월=~7년, 1년=전체. `CANDLE_DEFAULT_DAYS` + `timeScale().setVisibleRange`(일봉=날짜문자열·시간봉=unix초), 실패시 fitContent 폴백.
+- **거래량 히스토그램**: 캔들차트 하단 26% 영역(별도 priceScale 'vol'), 봉 색과 동일(상승 초록/하락 빨강). 백엔드가 일봉(`get_symbol_data`)·시간봉(`get_intraday_data`) prices에 `volume` 추가, 리샘플은 합산. (라인=Chart.js는 거래량 미추가 — 빠른 가격조회용, 깔끔 유지.)
+- **1시간봉 안내문구**: 캔들 1시간 선택 시 `#chartHint`에 "⚠ …시간봉은 데이터 제공 한계로 최근 약 730일(2년)까지만 표시됩니다."
+
+검증: `test_symbol_browser.js` **31/31 PASS**(로컬) — +volume API 포함·1일봉 기본배율 일부만(75<전체)·1시간 730일 안내문구. `test_symbol_api.py` 8 PASS. 변경 = `modules/price_loader.py`·`templates/symbol.html`.
+
 ## [2026-06-14] feature | A4 후속 — 캔들/라인 탭 의미 분리 + 전체화면
 
 오너 피드백: 라인과 캔들의 탭 의미가 달라야 함.

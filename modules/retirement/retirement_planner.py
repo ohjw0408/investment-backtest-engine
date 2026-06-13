@@ -91,11 +91,17 @@ class RetirementPlanner:
         combined       = self._combine(sample_results, target_percentile)
         message        = self._build_message(acc_summary, combined, target_percentile)
 
+        # D4 거래수수료 — 적립(분포 중앙값) + 인출(샘플별 중앙값의 중앙값) 합산.
+        _acc_fees = float(self.acc_result["distribution"].get("total_fees", {}).get("p50", 0.0))
+        _wd_fee_list = [float(s["wd_result"].get("total_fees", 0.0)) for s in sample_results]
+        _wd_fees = float(np.median(_wd_fee_list)) if _wd_fee_list else 0.0
+
         return {
             "accumulation_summary": acc_summary,
             "sample_results":       sample_results,
             "combined_summary":     combined,
             "message":              message,
+            "total_fees":           _acc_fees + _wd_fees,   # D4 적립+인출 합산
         }
 
     # ════════════════════════════════════════════════════════

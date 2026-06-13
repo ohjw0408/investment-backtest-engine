@@ -453,6 +453,32 @@
       </div>
     </div>
 
+    <!-- 05. 거래수수료 (D4) -->
+    <div class="calc-section">
+      <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span><span class="calc-section-num">05</span> 거래수수료</span>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-size:0.8rem;color:var(--text-muted);">
+          <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()"> 적용
+        </label>
+      </div>
+      <div id="feePanelBody" style="display:none;margin-top:8px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
+          <label style="font-size:0.72rem;color:var(--text-muted);">증권사 프리셋
+            <select id="feePreset" onchange="applyFeePreset(this.value)" style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
+              <option value="0.015">키움 0.015%</option>
+              <option value="0.02">삼성 0.02%</option>
+              <option value="0">토스 0%</option>
+              <option value="custom">직접입력</option>
+            </select>
+          </label>
+          <label style="font-size:0.72rem;color:var(--text-muted);">수수료율 (%)
+            <input type="number" id="feeRateInput" value="0.015" min="0" step="0.001" style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
+          </label>
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">적립·인출 매수·매도에 적용. 국내 개별주식 매도는 거래세 0.18% 추가(ETF 면제). 멀티계좌는 계좌 카드별 수수료율 입력.</div>
+      </div>
+    </div>
+
     <div class="calc-warning">
       ⚠ 과거 데이터 기반 통계적 추정입니다. 미래 결과를 보장하지 않습니다.
     </div>
@@ -771,6 +797,7 @@ function buildRetAccountsPayload(rebalMode, bandWidth, dividendMode) {
   const accs = window.taxAccounts || [];
   if (accs.length <= 1) return null;
   const renewalOn = document.getElementById('isaRenewalCheck')?.checked ?? false;
+  const feeOn = document.getElementById('feeEnabledChk')?.checked ?? false;
   const primary = {
     type: accs[0]?.type || '위탁',
     initial_capital: parseFloat(document.getElementById('simSeed').value) || 0,
@@ -779,6 +806,7 @@ function buildRetAccountsPayload(rebalMode, bandWidth, dividendMode) {
     rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
     isa_renewal: renewalOn && (accs[0]?.type === 'ISA'),
     priority: Number(accs[0]?.priority ?? 1),
+    ...(feeOn ? { fee_rate: _mmAccountFeePct(accs[0]) / 100 } : {}),
   };
   const accounts = [primary];
   for (let i = 1; i < accs.length; i++) {
@@ -795,6 +823,7 @@ function buildRetAccountsPayload(rebalMode, bandWidth, dividendMode) {
       rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
       isa_renewal: renewalOn && (accs[i].type === 'ISA'),
       priority: Number(accs[i].priority ?? (i + 1)),
+      ...(feeOn ? { fee_rate: _mmAccountFeePct(accs[i]) / 100 } : {}),
     });
   }
   return accounts;
@@ -804,6 +833,7 @@ function buildRetAccountsPayload(rebalMode, bandWidth, dividendMode) {
 function buildWdAccountsPayload(rebalMode, bandWidth, dividendMode) {
   const accs = window.taxAccounts || [];
   if (accs.length <= 1) return null;
+  const feeOn = document.getElementById('feeEnabledChk')?.checked ?? false;
   const primary = {
     type: accs[0]?.type || '위탁',
     initial_capital: parseFloat(document.getElementById('wdSeed').value) || 0,
@@ -811,6 +841,7 @@ function buildWdAccountsPayload(rebalMode, bandWidth, dividendMode) {
     tickers: retTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: t.weight })),
     rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
     priority: Number(accs[0]?.priority ?? 1),
+    ...(feeOn ? { fee_rate: _mmAccountFeePct(accs[0]) / 100 } : {}),
   };
   const accounts = [primary];
   for (let i = 1; i < accs.length; i++) {
@@ -826,9 +857,36 @@ function buildWdAccountsPayload(rebalMode, bandWidth, dividendMode) {
       tickers: accTickers.map(t => ({ code: t.code, name: t.name, badge: t.badge, weight: (Number(t.weight) || 0) / 100 })),
       rebal_mode: rebalMode, band_width: bandWidth, dividend_mode: dividendMode,
       priority: Number(accs[i].priority ?? (i + 1)),
+      ...(feeOn ? { fee_rate: _mmAccountFeePct(accs[i]) / 100 } : {}),
     });
   }
   return accounts;
+}
+
+// ── 거래수수료 (D4) ──
+function toggleFeePanel() {
+  const on = document.getElementById('feeEnabledChk')?.checked;
+  const body = document.getElementById('feePanelBody');
+  if (body) body.style.display = on ? 'block' : 'none';
+  // 멀티계좌면 카드별 수수료 입력 노출/숨김 위해 재렌더.
+  if (window.retTaxEnabled && (window.taxAccounts || []).length > 1) renderTaxAccounts();
+}
+function applyFeePreset(v) {
+  if (v === 'custom') return;
+  const inp = document.getElementById('feeRateInput');
+  if (inp) inp.value = v;
+}
+function renderFeeSummary(containerId, totalFees) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  let slot = el.querySelector(':scope > #mmFeeSummary');
+  if (totalFees == null) { if (slot) slot.remove(); return; }
+  if (!slot) { slot = document.createElement('div'); slot.id = 'mmFeeSummary'; el.appendChild(slot); }
+  const won = Math.round(Number(totalFees) || 0).toLocaleString();
+  slot.innerHTML = `
+    <div style="margin-top:12px;padding:10px 14px;background:var(--bg,#f5f5f5);border:1px solid var(--border,#ddd);border-radius:9px;font-size:0.84rem;color:var(--text,#222);">
+      💸 총 지불 거래수수료 <b>₩${won}</b> <span style="color:var(--text-muted,#888);font-size:0.78rem;">(중앙값 시나리오, 적립·인출 누적)</span>
+    </div>`;
 }
 
 async function runRetirement(_limitOverride) {
@@ -939,6 +997,12 @@ async function runRetirement(_limitOverride) {
     }
   }
 
+  // D4 거래수수료 — opt-in 시 탭레벨 수수료율(decimal) 동봉(계좌별 율은 accounts에).
+  if (document.getElementById('feeEnabledChk')?.checked) {
+    body.fee_enabled = true;
+    body.fee_rate = (Number(document.getElementById('feeRateInput').value) || 0) / 100;
+  }
+
   // 납입 한도 soft 경고 — 강행 재시도 또는 "오늘 하루 묻지 않기"면 override
   if (body.tax_enabled && (_limitOverride || window.MMLimit?.skipToday())) {
     body.allow_limit_override = true;
@@ -960,6 +1024,7 @@ async function runRetirement(_limitOverride) {
     if (data) {
       renderRetirement(data, body);
       window.MMLimit?.attach('retResultContent', data.limit_warnings);
+      renderFeeSummary('retResultContent', data.total_fees);
       try { localStorage.setItem('mm_result_retirement', JSON.stringify({result: data, body, ts: Date.now()})); } catch(e) {}
     }
   } catch(e) {

@@ -71,6 +71,8 @@ def _run_wd_case(args: tuple):
             dividend_mode        = config_dict["dividend_mode"],
             rebalance_frequency  = strategy_dict.get("rebalance_frequency"),
             inflation            = config_dict.get("inflation", 0.0),
+            fee_rate             = config_dict.get("fee_rate", 0.0),          # D4 거래수수료
+            stock_tickers        = config_dict.get("stock_tickers"),         # D4 개별주식 매도세
         )
 
         # ── 세금 경로 분기 ───────────────────────────────────────
@@ -96,8 +98,13 @@ def _run_wd_case(args: tuple):
             )
             history_df    = run_result.history_df
             tax_end_value = run_result.end_value
+            _total_fees   = float(getattr(run_result, "total_fees", 0.0))   # D4
         else:
-            portfolio = Portfolio(config_dict["initial_capital"])
+            portfolio = Portfolio(
+                config_dict["initial_capital"],
+                fee_rate      = config_dict.get("fee_rate", 0.0),            # D4
+                stock_tickers = config_dict.get("stock_tickers"),
+            )
             loop      = SimulationLoop(
                 DividendEngine(), ContributionEngine(), WithdrawalEngine(),
                 OrderExecutor(), CashAllocator()
@@ -106,6 +113,7 @@ def _run_wd_case(args: tuple):
             loop.run(portfolio, strategy, config, sliced_data, sliced_dates, recorder)
             history_df    = recorder.to_dataframe()
             tax_end_value = float(history_df["portfolio_value"].iloc[-1]) if not history_df.empty else 0.0
+            _total_fees   = float(getattr(portfolio, "total_fees", 0.0))    # D4
 
         return {
             "history":       history_df,
@@ -113,6 +121,7 @@ def _run_wd_case(args: tuple):
             "start":         start_str,
             "end":           end_str,
             "tax_end_value": tax_end_value,
+            "total_fees":    _total_fees,                                    # D4 인출 거래수수료
         }
     except Exception as e:
         return None
@@ -143,8 +152,12 @@ class WithdrawalAnalyzer:
         gain_harvesting:    bool      = False,
         progress_callback             = None,
         cost_basis:         float     = None,
+        fee_rate:           float     = 0.0,     # D4 거래수수료(인출 단계 매수·매도)
+        stock_tickers                 = None,    # D4 개별주식 매도세 가산 대상
     ):
         self.portfolio_engine   = portfolio_engine
+        self.fee_rate           = float(fee_rate or 0.0)
+        self.stock_tickers      = stock_tickers
         self.tickers            = tickers
         self.strategy_factory   = strategy_factory
         self.data_start         = pd.Timestamp(data_start)
@@ -194,6 +207,8 @@ class WithdrawalAnalyzer:
             "success_rate": success_rate,
             "n_real":       n_real,
             "n_synthetic":  n_synthetic,
+            # D4 인출 거래수수료(중앙값 — 적립 total_fees와 합산해 표시).
+            "total_fees":   float(np.median([c.get("total_fees", 0.0) for c in cases])) if cases else 0.0,
         }
         # 연금 세금 정보 (연금저축/IRP)
         if self.tax_engine and self.account_type in ("연금저축", "IRP"):
@@ -250,6 +265,9 @@ class WithdrawalAnalyzer:
             "user_settings":     self.user_settings,
             "gain_harvesting":   self.gain_harvesting,
             "cost_basis":        self.cost_basis,
+            # D4 거래수수료 — 워커에서 SimulationConfig/Portfolio에 주입.
+            "fee_rate":          self.fee_rate,
+            "stock_tickers":     self.stock_tickers,
         }
         task_args = [
             (s, e, config_dict, strategy_dict, rid)
@@ -296,6 +314,7 @@ class WithdrawalAnalyzer:
             metrics["start"]        = res["start"]
             metrics["end"]          = res["end"]
             metrics["is_synthetic"] = False
+            metrics["total_fees"]   = float(res.get("total_fees", 0.0))     # D4
             # 세금 적용된 최종값으로 override (TaxableSimulationRunner 청산세 포함)
             if "tax_end_value" in res:
                 tv = res["tax_end_value"]
@@ -406,6 +425,7 @@ class WithdrawalAnalyzer:
             "mdd": mdd, "total_dividend": 0.0,
             "withdrawal_coverage": 0.0, "sequence_risk": sequence_risk,
             "dividend_mdd": 0.0, "is_synthetic": True,
+            "total_fees": 0.0,   # D4: 합성 경로는 거래 없음 → 수수료 0
         }
 
     def _run_synthetic_cases(self, n_needed, mu, sigma, start_id=9000):

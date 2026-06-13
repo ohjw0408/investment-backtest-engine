@@ -84,6 +84,11 @@ class MultiDividendSimulator(DividendSimulator):
             self._children.append(child)
         self._child_stats: list[dict | None] = [None] * len(accounts)
 
+        # D4 거래수수료 — 계좌별 율은 accounts(normalize)에. 개별주식 매도세용 종목집합(전 계좌 공유).
+        _fee_on = any(float(a.get("fee_rate", 0) or 0) > 0 for a in accounts)
+        from modules.sim.fee_engine import build_stock_tickers as _bst
+        self._loop_stock_tickers = _bst(list(union_weights)) if _fee_on else None
+
     # ── 윈도우 1회: 멀티 루프(월별 주입, 무청산) ─────────────────
     def _simulate_one(self, seed, monthly, years, start_date) -> float:
         from modules.multi_account_common import build_loop_accounts
@@ -91,6 +96,7 @@ class MultiDividendSimulator(DividendSimulator):
         from modules.simulation.monthly_mode import to_monthly_price_data, last_year_dividend
 
         self._last_savings = None
+        self._last_fees = 0.0
         start = pd.Timestamp(start_date)
         end = start + pd.DateOffset(years=years)
 
@@ -134,7 +140,9 @@ class MultiDividendSimulator(DividendSimulator):
             distribution_policy=self._distribution_policy,
             reinvest_tax_credit=self._reinvest_tax_credit,
             apply_final_liquidation=False,   # 무청산 — 결과 = 배당 흐름(단일 배당탭 규약 동일)
+            stock_tickers=self._loop_stock_tickers,   # D4 개별주식 매도세
         )
+        self._last_fees = float(getattr(result, "total_fees", 0.0))   # D4 멀티 거래수수료
 
         # 절세액(P4 멀티): 계좌별 _finalize_account 필드 surface (무청산 규약은 루프가 일관 처리)
         if self._tax_enabled and result.account_results:

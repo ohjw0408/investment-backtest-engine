@@ -76,6 +76,12 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
 
     _isa_limit = 100_000_000 if (tax_enabled and account_type == 'ISA') else None
 
+    # D4 거래수수료 — 배당 시뮬 리밸·재투자 매매에 적용(실데이터 경로만, 합성 제외).
+    from modules.sim.fee_engine import build_stock_tickers as _build_stock_tickers
+    _fee_enabled   = bool(body.get('fee_enabled'))
+    _fee_rate      = float(body.get('fee_rate', 0) or 0) if _fee_enabled else 0.0
+    _stock_tickers = _build_stock_tickers(ticker_codes) if _fee_enabled else None
+
     sim = DividendSimulator(
         loader           = portfolio_engine.loader,
         tickers          = ticker_codes,
@@ -87,6 +93,8 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
         tax_engine       = tax_engine,
         account_type     = account_type,
         isa_total_limit  = _isa_limit,
+        fee_rate         = _fee_rate,
+        stock_tickers    = _stock_tickers,
     )
 
     seed_cfg    = body.get('seed',    {"center": 0,      "step": 0, "n": 0, "mode": "fixed"})
@@ -114,6 +122,17 @@ def run_dividend_scenario_logic(body: dict, progress_callback=None, cancel_check
             response['savings_account_type'] = account_type
         except Exception:
             response['savings'] = None   # 절세 표시는 부가 정보 — 본 결과를 막지 않는다
+
+    # D4 거래수수료 — opt-in 시 대표 콤보 기준 총 지불 수수료(실데이터 윈도우 중앙값).
+    if _fee_enabled and isinstance(response, dict) and not response.get('error'):
+        try:
+            _res = response.get('result') or {}
+            _seed    = float(_res.get('solved_seed',    seed_cfg.get('center', 0)) or 0)
+            _monthly = float(_res.get('solved_monthly', monthly_cfg.get('center', 0)) or 0)
+            _years   = int(_res.get('solved_years',     years_cfg.get('center', 20)) or 20)
+            response['total_fees'] = sim.get_total_fees(_seed, _monthly, _years)
+        except Exception:
+            response['total_fees'] = None
 
     if _limit_warnings and isinstance(response, dict):
         response['limit_warnings'] = _limit_warnings
@@ -192,6 +211,18 @@ def _run_multi_dividend_logic(body: dict, progress_callback=None, cancel_check=N
             response['savings_account_type'] = '멀티계좌'
         except Exception:
             response['savings'] = None
+
+    # D4 거래수수료 — opt-in 시 대표 콤보 기준 총 지불 수수료(실데이터 윈도우 중앙값).
+    if bool(body.get('fee_enabled')) and isinstance(response, dict) and not response.get('error'):
+        try:
+            _res = response.get('result') or {}
+            _seed    = float(_res.get('solved_seed',    seed_cfg.get('center', 0)) or 0)
+            _monthly = float(_res.get('solved_monthly', monthly_cfg.get('center', 0)) or 0)
+            _years   = int(_res.get('solved_years',     years_cfg.get('center', 20)) or 20)
+            response['total_fees'] = sim.get_total_fees(_seed, _monthly, _years)
+        except Exception:
+            response['total_fees'] = None
+
     response['multi_account'] = {'enabled': True, 'n_accounts': len(accounts)}
     if limit_warnings and isinstance(response, dict):
         response['limit_warnings'] = limit_warnings

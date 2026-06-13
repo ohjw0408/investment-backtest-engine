@@ -29,12 +29,16 @@ def _build_account_runtime(spec, first_price_dict, tax_engine, session):
     weights = spec["target_weights"]
     value   = float(spec["value"])
 
+    # D4 거래수수료 — 계좌별 율(spec.fee_rate) + 개별주식 매도세(stock_tickers).
+    _fee_rate      = float(spec.get("fee_rate", 0.0) or 0.0)
+    _stock_tickers = spec.get("stock_tickers")
+
     if tax_engine is not None:
-        pf = TaxTrackedPortfolio(value)
+        pf = TaxTrackedPortfolio(value, fee_rate=_fee_rate, stock_tickers=_stock_tickers)
         executor = TaxedOrderExecutor(tax_engine, atype, session=session)
         div_engine = _make_taxed_dividend_engine(tax_engine, atype, session)
     else:
-        pf = Portfolio(value)
+        pf = Portfolio(value, fee_rate=_fee_rate, stock_tickers=_stock_tickers)
         executor = OrderExecutor()
         div_engine = DividendEngine()
 
@@ -231,7 +235,9 @@ def simulate_household_window(
 
     per_account = []
     combined = 0.0
+    _total_fees = 0.0   # D4 가구 인출 거래수수료(전 계좌 합)
     for rt in runtimes:
+        _total_fees += float(getattr(rt["portfolio"], "total_fees", 0.0))
         ev = rt["portfolio"].total_value(last_price)
         entry = {
             "account_id": rt["account_id"], "type": rt["type"],
@@ -268,6 +274,7 @@ def simulate_household_window(
         "combined_end_value": round(combined, 2),
         "per_account":        per_account,
         "total_pension_tax":  round(total_pension_tax, 2),
+        "total_fees":         round(_total_fees, 2),   # D4
     }
 
 
@@ -461,6 +468,7 @@ def analyze_household_withdrawal(
         "per_account":        per_account_dist,
         "median_pension_tax": round(float(np.median(pension_taxes)), 2),
         "savings":            savings,
+        "total_fees":         round(float(np.median([r.get("total_fees", 0.0) for r in case_results])), 2),  # D4
     }
 
 
@@ -510,6 +518,8 @@ def analyze_household_samples(
                 "target_weights": spec["target_weights"],
                 "rebal_mode":     spec.get("rebal_mode", "none"),
                 "band_width":     spec.get("band_width", 0.05),
+                "fee_rate":       spec.get("fee_rate", 0.0),       # D4
+                "stock_tickers":  spec.get("stock_tickers"),       # D4
             })
         wd = analyze_household_withdrawal(
             accounts, price_data, all_dates, data_start, data_end,
@@ -523,6 +533,7 @@ def analyze_household_samples(
             "success_rate":    wd["survival_rate"],
             "end_value_p50":   wd["combined_end_value"]["p50"],
             "n_windows":       wd["n_windows"],
+            "total_fees":      wd.get("total_fees", 0.0),   # D4
         })
         wd_n_real, wd_n_synthetic = wd["n_real"], wd["n_synthetic"]
 
@@ -548,6 +559,8 @@ def analyze_household_samples(
         "sample_success_rates":    success_rates.tolist(),
         "sample_initial_capitals": [r["initial_capital"] for r in sample_results],
         "n_samples":               len(sample_results),
+        "total_fees":              round(float(np.median([r.get("total_fees", 0.0) for r in sample_results])), 2),  # D4
+
         # 인출 투영 윈도우 구성(실측/가상) — 화면에서 가상 보충 표시용(GAP-RET-KRDATA).
         "n_windows_real":          wd_n_real,
         "n_windows_synthetic":     wd_n_synthetic,

@@ -102,6 +102,11 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
             if ticker['code'] not in all_tickers:
                 all_tickers.append(ticker['code'])
 
+    # D4 거래수수료 — opt-in 시 적립·가구인출 양 단계 적용. 계좌별 율은 normalize가 이미 설정.
+    from modules.sim.fee_engine import build_stock_tickers as _build_stock_tickers
+    _fee_enabled   = bool(body.get('fee_enabled'))
+    _stock_tickers = _build_stock_tickers(all_tickers) if _fee_enabled else None
+
     usdkrw_start = portfolio_engine.loader.USD_KRW_START
     data_end     = datetime.date.today().strftime('%Y-%m-%d')
     for ticker in all_tickers:
@@ -219,6 +224,7 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
         manual_comprehensive_years = manual_comprehensive_years,
         reinvest_tax_credit        = reinvest_tax_credit,
         apply_final_liquidation    = False,  # 은퇴: 절대 일괄청산 금지 → 무청산 인계(인출단계서 과세).
+        stock_tickers              = _stock_tickers,   # D4 적립 개별주식 매도세(계좌별 율은 accounts에)
     )
     result = analyzer.run()
     distribution = result['combined']['distribution']
@@ -334,6 +340,8 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
                                   if tax_enabled else None,
                 'rebal_mode':     account.get('rebal_mode', 'none'),
                 'band_width':     float(account.get('band_width', 0.05)),
+                'fee_rate':       float(account.get('fee_rate', 0.0) or 0.0),   # D4 계좌별
+                'stock_tickers':  _stock_tickers,                               # D4 개별주식 매도세
             })
         # 인출 투영용 범위 — 적립 prep과 별도로 인출기간 기준 준비(GAP-RET-KRDATA).
         wd_prep = prepare_scenario_data(
@@ -397,6 +405,11 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
             'survival_rate': None,
             'is_safe': None,
         },
+        # D4 거래수수료 — 적립(분포 중앙값) + 가구인출(샘플 중앙값) 합산.
+        'total_fees': (
+            float(distribution.get('total_fees', {}).get('p50', 0.0))
+            + float((wd_report['combined_summary'].get('total_fees', 0.0)) if wd_report and wd_report.get('combined_summary') else 0.0)
+        ) if _fee_enabled else None,
     }
 
 
@@ -490,6 +503,12 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
         from modules.tax.base_tax import TaxEngine
         ret_tax_engine = TaxEngine(user_settings)
 
+    # D4 거래수수료 — opt-in 시 적립·인출 양 단계 매수/매도에 적용(오너 결정 2026-06-13).
+    from modules.sim.fee_engine import build_stock_tickers as _build_stock_tickers
+    _fee_enabled  = bool(body.get('fee_enabled'))
+    _fee_rate     = float(body.get('fee_rate', 0) or 0) if _fee_enabled else 0.0
+    _stock_tickers = _build_stock_tickers(ticker_codes) if _fee_enabled else None
+
     # ── 계좌 유형 규제 검증 ─────────────────────────────────────────
     import json as _json
     if tax_enabled and account_type != '위탁':
@@ -576,6 +595,8 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
         synthetic_params        = synthetic_info if use_synthetic else {},
         contribution_end_months = _isa_cap_info['stop_months'] if _isa_cap_info else None,
         apply_final_liquidation = False,  # 은퇴: 절대 일괄청산 금지 → 무청산 인계(인출단계서 과세).
+        fee_rate                = _fee_rate,           # D4 적립 단계 거래수수료
+        stock_tickers           = _stock_tickers,
     )
     acc_result = acc_analyzer.run()
 
@@ -605,6 +626,8 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
             "current_age":        int(user_settings.get("age", 40)) if tax_enabled else 40,
             "accumulation_years": accumulation_years,
             "gain_harvesting":    gain_harvesting if tax_enabled else False,
+            "fee_rate":           _fee_rate,           # D4 인출 단계 거래수수료
+            "stock_tickers":      _stock_tickers,
         },
         monthly_withdrawal  = monthly_withdrawal,
         withdrawal_years    = withdrawal_years,
@@ -678,6 +701,7 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
         "backfilled":     backfilled,
         "tax_enabled":    tax_enabled,
         "account_type":   account_type if tax_enabled else None,
+        "total_fees":     (report.get("total_fees") if _fee_enabled else None),   # D4 적립+인출
     }
 
 
@@ -716,6 +740,11 @@ def _run_multi_account_withdrawal_logic(body: dict, progress_callback=None) -> d
         except Exception as e:
             print(f"[withdrawal] {ticker} 데이터 로드 오류: {e}")
 
+    # D4 거래수수료 — 인출 매수/매도(리밸·인출). 계좌별 율은 normalize가 설정.
+    from modules.sim.fee_engine import build_stock_tickers as _build_stock_tickers
+    _fee_enabled   = bool(body.get('fee_enabled'))
+    _stock_tickers = _build_stock_tickers(all_tickers) if _fee_enabled else None
+
     prep = prepare_scenario_data(
         tickers          = all_tickers,
         required_years   = withdrawal_years,
@@ -750,6 +779,8 @@ def _run_multi_account_withdrawal_logic(body: dict, progress_callback=None) -> d
             'target_weights': {t['code']: t['weight'] for t in account['tickers']},
             'rebal_mode':     account.get('rebal_mode', 'none'),
             'band_width':     float(account.get('band_width', 0.05)),
+            'fee_rate':       float(account.get('fee_rate', 0.0) or 0.0),   # D4 계좌별
+            'stock_tickers':  _stock_tickers,                               # D4 개별주식 매도세
         })
 
     wd_price_data, wd_dates = portfolio_engine.price_loader.load(
@@ -787,6 +818,7 @@ def _run_multi_account_withdrawal_logic(body: dict, progress_callback=None) -> d
         'n_synthetic':        report['n_synthetic'],
         'data_start':         data_start,
         'tax_enabled':        tax_enabled,
+        'total_fees':         (report.get('total_fees') if _fee_enabled else None),   # D4
     }
 
 
@@ -840,6 +872,12 @@ def run_withdrawal_logic(body: dict, progress_callback=None) -> dict:
         from modules.tax.base_tax import TaxEngine
         ret_tax_engine = TaxEngine(user_settings)
 
+    # D4 거래수수료 — 인출 매수/매도(리밸·인출).
+    from modules.sim.fee_engine import build_stock_tickers as _build_stock_tickers
+    _fee_enabled   = bool(body.get('fee_enabled'))
+    _fee_rate      = float(body.get('fee_rate', 0) or 0) if _fee_enabled else 0.0
+    _stock_tickers = _build_stock_tickers(ticker_codes) if _fee_enabled else None
+
     wd_analyzer = WithdrawalAnalyzer(
         portfolio_engine   = portfolio_engine,
         tickers            = ticker_codes,
@@ -860,6 +898,8 @@ def run_withdrawal_logic(body: dict, progress_callback=None) -> dict:
         user_settings      = user_settings if tax_enabled else {},
         gain_harvesting    = body.get("gain_harvesting", False) if tax_enabled else False,
         progress_callback  = progress_callback,
+        fee_rate           = _fee_rate,           # D4
+        stock_tickers      = _stock_tickers,
     )
     result = wd_analyzer.run()
 
@@ -885,4 +925,5 @@ def run_withdrawal_logic(body: dict, progress_callback=None) -> dict:
         "pension_tax_info": result.get("pension_tax_info"),
         "tax_enabled":      tax_enabled,
         "account_type":     account_type if tax_enabled else None,
+        "total_fees":       (result.get("total_fees") if _fee_enabled else None),   # D4
     }

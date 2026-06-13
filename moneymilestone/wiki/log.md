@@ -1,5 +1,29 @@
 # Log
 
+## [2026-06-13] feature | D4 fast-follow ② 은퇴·배당 거래수수료 롤아웃
+
+오너 결정: 은퇴+배당 둘 다, 은퇴 fee = **적립+인출 양 단계**. 배당 합성 경로는 거래 없는
+순수 자산수학 → fee 미적용(기술 강제, 실데이터 경로만).
+
+- **은퇴 적립:** AccumulationAnalyzer·MultiAccountAnalyzer는 이미 fee 파라미터 보유(D4 v1) →
+  `retirement_logic`이 body fee_enabled→fee_rate·stock_tickers 전달(단일·멀티).
+- **은퇴 인출:** `withdrawal_analyzer`에 fee_rate/stock_tickers 신규 — `_run_one_withdrawal`이
+  SimulationConfig(세금경로)·Portfolio(비세금경로)에 주입, 케이스별 total_fees → run() 중앙값.
+  `retirement_planner`가 적립 분포 중앙값 + 인출 샘플 중앙값 합산해 report['total_fees'].
+- **멀티 가구인출:** `multi_account_withdrawal._build_account_runtime` Portfolio에 spec.fee_rate 주입,
+  window→rolling→samples로 total_fees 스레딩(합성 윈도우 포함, 동일 엔진 경유).
+- **인출기(standalone):** `run_withdrawal_logic` 단일(WithdrawalAnalyzer)·멀티(가구인출) fee 패스스루.
+  retirement.html이 은퇴설계+인출기 2모드 1템플릿이라 fee UI 공유 → 양쪽 다 동작해야 일관.
+- **배당:** `dividend_simulator._simulate_one` Portfolio/TaxTrackedPortfolio fee 주입 +
+  `_fees_cache`/`get_total_fees`(실측·백필 윈도우 중앙값). `dividend_multi`는 MultiAccountSimulationLoop
+  per-account fee + stock_tickers, result.total_fees 캡처. `dividend_logic` 단일·멀티 total_fees surface.
+- **UI:** retirement.html·dividend_target.html에 거래수수료 섹션(opt-in+프리셋 키움/삼성/토스/직접+율%) +
+  toggleFeePanel(멀티 재렌더)·applyFeePreset·renderFeeSummary·payload fee_enabled/fee_rate +
+  계좌 payload 빌더(buildRet/buildWd/buildDt) per-card fee_rate. 공용 `_mmFeeField`가 feeEnabledChk로 카드 노출.
+- **검증:** `tests/test_d4_fee_retire_div.py` **3 PASS**(배당 단일·멀티 fee 흐름·≤ 불변식, 결정론) +
+  변경 모듈 기존 타겟 **74 PASS**(fee=0 회귀 무변경) + Python·템플릿 JS 문법 OK.
+- **미배포** — 라이브 은퇴·배당 per-card probe는 배포 후. 공유 엔진 변경이라 전체 회귀는 오너 확인 후.
+
 ## [2026-06-13] fix | D4 계좌별 수수료 — 직접입력 시 프리셋 라벨 동기화
 
 per-card 육안 검증 중 발견: 율을 직접 타이핑하면 프리셋 select가 last 값에 멈춰 라벨 불일치

@@ -1573,7 +1573,7 @@ def symbol_api(code):
 @app.route('/api/symbol/<code>/intraday')
 def symbol_intraday_api(code):
     range_key = request.args.get('range', '1d')
-    if range_key not in ('1d', '1w'):
+    if range_key not in ('1d', '1w', 'max'):
         range_key = '1d'
     try:
         data = portfolio_engine.loader.get_intraday_data(code.upper(), range_key)

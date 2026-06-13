@@ -38,31 +38,48 @@ async function loadSymbol(ctx, code) {
     ok('ETF 지표: PER 미표시', !labels.includes('PER'));
     ok('배당 내역 카드 존재(ETF)', !!(await page.$('.div-table, .symbol-card')));
 
-    // 라인 차트 기본
+    // 라인 차트 기본 — 라인 탭 = 표시기간(1일/1주/1개월/3개월/1년/전체)
     ok('라인 차트(Chart.js) 렌더', await page.evaluate(() => chartInst !== null));
-    // 캔들 토글
+    const lineTabs = await page.$$eval('#periodTabs .period-tab', els => els.map(e => e.textContent));
+    ok('라인 탭 세트 = 표시기간', JSON.stringify(lineTabs) === JSON.stringify(['1일','1주','1개월','3개월','1년','전체']));
+
+    // 라인 1일 — 시간봉(하루 변동)
+    await page.click('.period-tab[data-period="1D"]');
+    await page.waitForTimeout(3500);
+    ok('라인 1일 = 시간봉 표시', await page.evaluate(() => chartInst !== null) &&
+       (await page.textContent('#chartHint')).includes('시간봉'));
+
+    // 캔들 토글 → 탭 세트가 "캔들 간격"으로 교체
     await page.click('.ctype-btn[data-ctype="candle"]');
     await page.waitForTimeout(800);
-    const candleOK = await page.evaluate(() =>
-      candleChart !== null && !!document.querySelector('#candleChart canvas'));
-    ok('캔들 차트(Lightweight) 렌더', candleOK);
+    const candleTabs = await page.$$eval('#periodTabs .period-tab', els => els.map(e => e.textContent));
+    ok('캔들 탭 세트 = 캔들 간격', JSON.stringify(candleTabs) === JSON.stringify(['1시간','1일','1주','1개월','1년']));
+    ok('캔들 차트(Lightweight) 렌더', await page.evaluate(() =>
+      candleChart !== null && !!document.querySelector('#candleChart canvas')));
+    ok('캔들 힌트 = 전체 기간', (await page.textContent('#chartHint')).includes('전체 기간'));
 
-    // 기간 탭 — 3개월 (일봉 유지)
-    await page.click('.period-tab[data-period="3M"]');
-    await page.waitForTimeout(600);
-    ok('3개월 탭 후 캔들 유지', await page.evaluate(() => candleChart !== null));
+    // 캔들 1주 — 일봉 리샘플(전체기간, 캔들 하나=1주). 점수 < 1일 캔들 점수.
+    const nDay = await page.evaluate(() => candleSeries.data().length);
+    await page.click('.period-tab[data-period="1W"]');
+    await page.waitForTimeout(800);
+    const nWeek = await page.evaluate(() => candleSeries.data().length);
+    ok('캔들 1주 = 1일보다 적은 봉수(리샘플)', nWeek > 0 && nWeek < nDay);
 
-    // 1일 탭 — 시간봉 fetch
-    await page.click('.period-tab[data-period="1D"]');
-    await page.waitForTimeout(4000);
-    const intradayOK = await page.evaluate(() =>
-      candleChart !== null && !!document.querySelector('#candleChart canvas'));
-    ok('1일(시간봉) 탭 캔들 렌더', intradayOK);
+    // 캔들 1시간 — 730일 시간봉 fetch
+    await page.click('.period-tab[data-period="1H"]');
+    await page.waitForTimeout(8000);
+    ok('캔들 1시간 렌더(730일 시간봉)', await page.evaluate(() =>
+      candleChart !== null && candleSeries.data().length > 100));
 
-    // 라인 복귀
+    // 전체화면 버튼 존재
+    ok('전체화면 버튼 존재', !!(await page.$('#fsBtn')));
+
+    // 라인 복귀 — 탭 세트도 복귀
     await page.click('.ctype-btn[data-ctype="line"]');
     await page.waitForTimeout(600);
-    ok('라인 복귀', await page.evaluate(() => chartInst !== null));
+    const back = await page.$$eval('#periodTabs .period-tab', els => els.map(e => e.textContent));
+    ok('라인 복귀 + 탭 세트 복귀', await page.evaluate(() => chartInst !== null) &&
+       back[0] === '1일' && back.length === 6);
 
     ok('SPY JS 에러 0', errors.length === 0);
     if (errors.length) console.log('  errors:', errors.slice(0, 3));

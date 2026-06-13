@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-14] feature | A4 후속 — 캔들/라인 탭 의미 분리 + 전체화면
+
+오너 피드백: 라인과 캔들의 탭 의미가 달라야 함.
+- **라인 탭 = 표시 기간** (1일/1주=시간봉, 1개월/3개월/1년/전체=일봉). 1일 클릭 = 하루 가격변동.
+- **캔들 탭 = 캔들 1개의 간격, 기간은 항상 전체** (1시간/1일/1주/1개월/1년).
+  - 1일 = `price_daily` 일봉 raw, 1주/1개월/1년 = 일봉 클라 JS 리샘플(O=첫 open·H=max·L=min·C=끝 close).
+  - **1시간 = yfinance 1h 730일치 fetch**(오너 결정 — 전체 8400일은 1h 상한으로 불가, 최대 2년). `get_intraday_data(range='max')` + `_fetch_intraday(period='730d')`, price_hourly 캐시(30일 이전 row 있으면 재fetch 생략).
+- **⛶ 전체화면 버튼**: Fullscreen API(`chartCard.requestFullscreen`), fullscreenchange→차트 리사이즈. 라인·캔들 공통.
+- 탭 세트는 모드별 동적 렌더(`renderTabs`). KRX_GOLD 등 close-only는 캔들 토글 자동 비활성.
+
+검증: `test_symbol_browser.js` **28/28 PASS**(로컬) — 라인/캔들 탭 세트 교체·라인 1일 시간봉·캔들 전체기간·1주 리샘플 봉수<1일·1시간 730일 봉>100·전체화면 버튼·토글 복귀·JS 에러 0. `test_symbol_api.py` 8 PASS(+max 730일 스모크 3466봉/728일). 변경 = `modules/price_loader.py`·`app.py`·`templates/symbol.html`.
+
 ## [2026-06-13] feature | A4 종목 상세 개선 + 캔들차트 + 시간봉
 
 PHASE4 A4 전체(a/b/c/d). 오너 결정: full 범위 + Lightweight Charts CDN + 타겟+Playwright+라이브 검증.

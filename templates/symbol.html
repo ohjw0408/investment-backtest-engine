@@ -89,6 +89,17 @@
 }
 .ctype-btn.active { background: var(--blue); color: white; border-color: var(--blue); }
 .ctype-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+.fs-btn {
+  padding: 4px 10px; border-radius: 7px;
+  border: 1.5px solid var(--border); background: var(--card);
+  color: var(--text-muted); cursor: pointer; font-size: 0.95rem; line-height: 1;
+}
+.fs-btn:hover { color: var(--blue); border-color: var(--blue); }
+.chart-hint { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 8px; min-height: 1em; }
+
+/* 전체화면 — 차트 카드만 화면 채움 */
+.chart-card:fullscreen { background: var(--card); padding: 24px; }
+.chart-card:fullscreen .chart-canvas-wrap { height: calc(100vh - 150px); }
 
 /* 기간 탭 */
 .period-tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -179,9 +190,10 @@ function fmtMcap(v, currency) {
 let chartInst    = null;   // Chart.js (라인)
 let candleChart  = null;   // Lightweight Charts (캔들)
 let candleSeries = null;
-let allData      = null;
-let curPeriod    = '1M';
-let curType      = 'line';
+let allData        = null;
+let curType        = 'line';   // 'line' | 'candle'
+let lineRange      = '1M';     // 라인 탭 = 표시 기간
+let candleInterval = '1D';     // 캔들 탭 = 캔들 1개의 간격 (기간은 항상 전체)
 
 async function loadSymbol() {
   const res  = await fetch(`/api/symbol/${CODE}`);
@@ -260,22 +272,19 @@ function renderPage(data) {
     <!-- 2열 본문 -->
     <div class="symbol-body">
       <!-- 왼쪽: 차트 -->
-      <div class="symbol-card chart-card">
+      <div class="symbol-card chart-card" id="chartCard">
         <div class="chart-card-head">
           <div class="symbol-card-title">📈 가격 차트</div>
-          <div class="chart-type-toggle" id="chartTypeToggle">
-            <button class="ctype-btn active" data-ctype="line">라인</button>
-            <button class="ctype-btn" data-ctype="candle">캔들</button>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <div class="chart-type-toggle" id="chartTypeToggle">
+              <button class="ctype-btn active" data-ctype="line">라인</button>
+              <button class="ctype-btn" data-ctype="candle">캔들</button>
+            </div>
+            <button class="fs-btn" id="fsBtn" title="전체화면">⛶</button>
           </div>
         </div>
-        <div class="period-tabs">
-          <button class="period-tab" data-period="1D">1일</button>
-          <button class="period-tab" data-period="1W">1주</button>
-          <button class="period-tab active" data-period="1M">1개월</button>
-          <button class="period-tab" data-period="3M">3개월</button>
-          <button class="period-tab" data-period="1Y">1년</button>
-          <button class="period-tab" data-period="ALL">전체</button>
-        </div>
+        <div class="period-tabs" id="periodTabs"></div>
+        <div class="chart-hint" id="chartHint"></div>
         <div class="chart-canvas-wrap">
           <canvas id="priceChart"></canvas>
           <div id="candleChart" style="position:absolute; inset:0; display:none;"></div>
@@ -309,19 +318,31 @@ function renderPage(data) {
     </div>
   `;
 
-  curPeriod = '1M';
-  curType   = 'line';
+  renderTabs();
   renderActive();
 }
 
-// ── 차트 엔진 (라인/캔들 × 일봉/시간봉) ──────────────────
+// ── 차트 엔진 ────────────────────────────────────────────
+// 라인 = 표시 기간(시간봉/일봉). 캔들 = 캔들 1개의 간격, 기간은 항상 전체.
 const MM_AXIS = (typeof MM_DARK !== 'undefined' && MM_DARK) ? '#8FA3B8' : '#90A4AE';
-const intradayCache = {};   // {'1d':resp, '1w':resp}
+const intradayCache = {};   // {'1d':resp,'1w':resp,'max':resp}
+
+const LINE_TABS   = [['1D','1일'],['1W','1주'],['1M','1개월'],['3M','3개월'],['1Y','1년'],['ALL','전체']];
+const CANDLE_TABS = [['1H','1시간'],['1D','1일'],['1W','1주'],['1M','1개월'],['1Y','1년']];
+
+function renderTabs() {
+  const tabs   = curType === 'candle' ? CANDLE_TABS : LINE_TABS;
+  const active = curType === 'candle' ? candleInterval : lineRange;
+  document.getElementById('periodTabs').innerHTML = tabs.map(([v, l]) =>
+    `<button class="period-tab${v === active ? ' active' : ''}" data-period="${v}">${l}</button>`
+  ).join('');
+}
 
 document.addEventListener('click', e => {
   const ptab = e.target.closest('.period-tab');
   if (ptab) {
-    curPeriod = ptab.dataset.period;
+    if (curType === 'candle') candleInterval = ptab.dataset.period;
+    else                      lineRange      = ptab.dataset.period;
     document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
     ptab.classList.add('active');
     renderActive();
@@ -332,47 +353,108 @@ document.addEventListener('click', e => {
     curType = ctype.dataset.ctype;
     document.querySelectorAll('.ctype-btn').forEach(b => b.classList.remove('active'));
     ctype.classList.add('active');
+    renderTabs();      // 모드별 탭 세트 교체
     renderActive();
+    return;
+  }
+  if (e.target.closest('#fsBtn')) {
+    const card = document.getElementById('chartCard');
+    if (!document.fullscreenElement) card.requestFullscreen && card.requestFullscreen();
+    else document.exitFullscreen && document.exitFullscreen();
   }
 });
 
-async function getPeriodData(period) {
-  // 1일/1주 → 시간봉 API (온디맨드 fetch + 캐시), 그 외 → 일봉(allData.prices)
-  if (period === '1D' || period === '1W') {
-    const rng = period === '1D' ? '1d' : '1w';
-    if (!intradayCache[rng]) {
-      const r = await fetch(`/api/symbol/${CODE}/intraday?range=${rng}`);
-      intradayCache[rng] = await r.json();
+// 시간봉 API fetch + 캐시
+async function fetchIntraday(rng) {
+  if (!intradayCache[rng]) {
+    const r = await fetch(`/api/symbol/${CODE}/intraday?range=${rng}`);
+    intradayCache[rng] = await r.json();
+  }
+  return (intradayCache[rng] || {}).prices || [];
+}
+
+// 일봉 → 주/월/년 OHLC 리샘플 (open=첫 open, high=max, low=min, close=끝 close)
+function bucketKey(dateStr, unit) {
+  if (unit === 'M') return dateStr.slice(0, 7);   // YYYY-MM
+  if (unit === 'Y') return dateStr.slice(0, 4);   // YYYY
+  // W: 연도 + 주차
+  const d = new Date(dateStr);
+  const onejan = new Date(d.getFullYear(), 0, 1);
+  const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+  return d.getFullYear() + '-W' + week;
+}
+function resampleOHLC(prices, unit) {
+  const out = []; let key = null, cur = null;
+  for (const p of prices) {
+    if (p.open == null) continue;
+    const k = bucketKey(p.date, unit);
+    if (k !== key) {
+      if (cur) out.push(cur);
+      key = k;
+      cur = { date: p.date, open: p.open, high: p.high, low: p.low, close: p.close };
+    } else {
+      cur.high = Math.max(cur.high, p.high);
+      cur.low  = Math.min(cur.low,  p.low);
+      cur.close = p.close;
     }
-    return { prices: (intradayCache[rng] || {}).prices || [], intraday: true };
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+// 라인: 표시 기간만큼 잘라 반환
+async function getLineData(range) {
+  if (range === '1D' || range === '1W') {
+    return { prices: await fetchIntraday(range === '1D' ? '1d' : '1w'), intraday: true };
   }
   const all = allData.prices || [];
   if (!all.length) return { prices: [], intraday: false };
-  const now    = new Date(all[all.length - 1].date);
-  const cutoff = new Date(now);
-  if      (period === '1M') cutoff.setMonth(cutoff.getMonth() - 1);
-  else if (period === '3M') cutoff.setMonth(cutoff.getMonth() - 3);
-  else if (period === '1Y') cutoff.setFullYear(cutoff.getFullYear() - 1);
-  else                       cutoff.setFullYear(1900);
+  const cutoff = new Date(all[all.length - 1].date);
+  if      (range === '1M') cutoff.setMonth(cutoff.getMonth() - 1);
+  else if (range === '3M') cutoff.setMonth(cutoff.getMonth() - 3);
+  else if (range === '1Y') cutoff.setFullYear(cutoff.getFullYear() - 1);
+  else                      cutoff.setFullYear(1900);
   return { prices: all.filter(p => new Date(p.date) >= cutoff), intraday: false };
 }
 
-async function renderActive() {
-  const { prices, intraday } = await getPeriodData(curPeriod);
-  const hasOHLC = prices.length > 0 && prices[0].open != null;
+// 캔들: 항상 전체 기간, 간격만 다름
+async function getCandleData(interval) {
+  if (interval === '1H') {
+    return { prices: await fetchIntraday('max'), intraday: true };
+  }
+  const all = allData.prices || [];
+  if (interval === '1D') return { prices: all, intraday: false };
+  const unit = interval === '1W' ? 'W' : interval === '1M' ? 'M' : 'Y';
+  return { prices: resampleOHLC(all, unit), intraday: false };
+}
 
-  // 캔들 토글 가용성 — OHLC 없으면 비활성 + 라인 강제
+function setHint(text) { document.getElementById('chartHint').textContent = text || ''; }
+
+async function renderActive() {
+  // 캔들 가용성 = 일봉에 OHLC 있는지(KRX_GOLD 등 close-only는 캔들 불가)
+  const dailyHasOHLC = (allData.prices || []).length > 0 && allData.prices[0].open != null;
   const candleBtn = document.querySelector('.ctype-btn[data-ctype="candle"]');
-  if (candleBtn) candleBtn.classList.toggle('disabled', !hasOHLC);
-  let type = curType;
-  if (type === 'candle' && !hasOHLC) type = 'line';
+  if (candleBtn) candleBtn.classList.toggle('disabled', !dailyHasOHLC);
+  if (curType === 'candle' && !dailyHasOHLC) {   // 강제 라인 복귀
+    curType = 'line';
+    document.querySelectorAll('.ctype-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.ctype === 'line'));
+    renderTabs();
+  }
 
   const canvas = document.getElementById('priceChart');
   const cdiv   = document.getElementById('candleChart');
-  if (type === 'candle') {
+
+  if (curType === 'candle') {
+    const { prices, intraday } = await getCandleData(candleInterval);
+    const labelMap = { '1H':'1시간', '1D':'1일', '1W':'1주', '1M':'1개월', '1Y':'1년' };
+    setHint(`전체 기간 · 캔들 1개 = ${labelMap[candleInterval]}` +
+            (candleInterval === '1H' ? ' (시간봉은 최대 약 2년)' : ''));
     canvas.style.display = 'none'; cdiv.style.display = 'block';
     renderCandle(prices, intraday);
   } else {
+    const { prices, intraday } = await getLineData(lineRange);
+    setHint(intraday ? (lineRange === '1D' ? '최근 1일(시간봉)' : '최근 1주(시간봉)') : '');
     cdiv.style.display = 'none'; canvas.style.display = 'block';
     if (candleChart) { candleChart.remove(); candleChart = null; candleSeries = null; }
     renderLine(prices, intraday);
@@ -434,12 +516,16 @@ function renderCandle(prices, intraday) {
   candleChart.timeScale().fitContent();
 }
 
-window.addEventListener('resize', () => {
+function resizeCharts() {
   if (candleChart) {
     const el = document.getElementById('candleChart');
     candleChart.applyOptions({ width: el.clientWidth, height: el.clientHeight });
+    candleChart.timeScale().fitContent();
   }
-});
+  if (chartInst) chartInst.resize();
+}
+window.addEventListener('resize', resizeCharts);
+document.addEventListener('fullscreenchange', () => setTimeout(resizeCharts, 120));
 
 loadSymbol();
 </script>

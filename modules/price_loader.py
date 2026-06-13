@@ -847,8 +847,10 @@ class PriceLoader:
     # -------------------------------------------------
     def get_intraday_data(self, code: str, range_key: str = "1d") -> dict:
         """
-        종목 상세 1일/1주 탭용 시간봉(1h) 데이터.
+        종목 상세 시간봉(1h) 데이터.
         온디맨드로 yfinance interval=1h fetch → price_hourly 캐시.
+        - range '1d'/'1w': 라인차트 1일/1주(최근 7일 fetch면 충분).
+        - range 'max': 캔들차트 1시간봉(yfinance 1h 상한 730일치 fetch).
         같은 날 캐시가 있으면 재사용(장중 시세 앱 아님 → 일 단위 신선도면 충분).
         """
         from datetime import datetime as _dt, timedelta as _td
@@ -856,15 +858,25 @@ class PriceLoader:
         is_kr = self.is_kr_etf(code)
 
         today = _dt.today().strftime("%Y-%m-%d")
-        have_today = self.conn.execute(
-            "SELECT COUNT(*) FROM price_hourly WHERE code=? AND datetime >= ?",
-            (code, today)
-        ).fetchone()[0]
-        if not have_today:
-            self._fetch_intraday(code, is_kr)
-
-        days   = 7 if range_key == "1w" else 2  # 1d는 직전 거래일 포함 위해 2일치 조회
-        cutoff = (_dt.now() - _td(days=days)).strftime("%Y-%m-%d")
+        if range_key == "max":
+            # 730일치 보유 여부 = 30일 이전 row 존재로 판정. 없으면 730일 fetch.
+            old_cutoff = (_dt.now() - _td(days=30)).strftime("%Y-%m-%d")
+            has_deep = self.conn.execute(
+                "SELECT COUNT(*) FROM price_hourly WHERE code=? AND datetime < ?",
+                (code, old_cutoff)
+            ).fetchone()[0]
+            if not has_deep:
+                self._fetch_intraday(code, is_kr, period="730d")
+            cutoff = (_dt.now() - _td(days=730)).strftime("%Y-%m-%d")
+        else:
+            have_today = self.conn.execute(
+                "SELECT COUNT(*) FROM price_hourly WHERE code=? AND datetime >= ?",
+                (code, today)
+            ).fetchone()[0]
+            if not have_today:
+                self._fetch_intraday(code, is_kr, period="7d")
+            days   = 7 if range_key == "1w" else 2  # 1d는 직전 거래일 포함 위해 2일치 조회
+            cutoff = (_dt.now() - _td(days=days)).strftime("%Y-%m-%d")
         rows = self.conn.execute(
             "SELECT datetime, open, high, low, close FROM price_hourly "
             "WHERE code=? AND datetime >= ? ORDER BY datetime",
@@ -880,10 +892,10 @@ class PriceLoader:
             "prices": prices,
         }
 
-    def _fetch_intraday(self, code: str, is_kr: bool):
+    def _fetch_intraday(self, code: str, is_kr: bool, period: str = "7d"):
         yf_code = self._kr_yf_ticker(code) if is_kr else code
         try:
-            raw = yf.download(yf_code, period="7d", interval="1h",
+            raw = yf.download(yf_code, period=period, interval="1h",
                               progress=False, auto_adjust=False, threads=False)
         except Exception:
             return

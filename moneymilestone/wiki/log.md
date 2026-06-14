@@ -1,5 +1,19 @@
 # Log
 
+## [2026-06-15] fix+feature | C1 버그픽스 4종 + 지수 캔들 회귀 복구 + 새로고침/수동가격
+
+오너 라이브 피드백 후속(C1 배포 후 발견 버그 + 신규 요청).
+
+**C1 버그 4종(커밋 7394171):** ① **지수 캔들 회귀** — 홈 지수 클릭→상세 캔들 비활성. 원인 = `index_daily`가 종가만(OHLC 컬럼 없음). 캔들 렌더러(거래량 히스토그램 포함)는 51c5d0c 이후 멀쩡, 데이터만 없던 것. 51c5d0c가 가용성 체크를 `allData.prices[0].open`(일봉 고정)으로 바꿔 지수 무조건 disabled가 된 게 회귀. **신규 `index_ohlc` 테이블(code,date,OHLCV)** + `scripts/backfill_index_ohlc.py`(^GSPC·^IXIC·^KS11·^NDX·^DJI·^N225·GC=F·SI=F·CL=F·NG=F·HG=F·KRW=X yfinance period=max) → `price_loader.get_symbol_data` 지수 분기가 index_ohlc 우선 반환(라인=index_daily 유지, 1H=intraday 온디맨드 그대로). ② PC 홈 위젯 좁은 `<table>` → `.market-grid` 3칸(큰 값+큰 스파크), 죽은 `.wt-*` CSS 제거. ③ 설정 PC = `.main-content` 2칸그리드(`1fr 308px`)의 308칸에 끼던 settings-wrap → `grid-column:1/-1`+`width:100%` 풀폭 + `#weList` 멀티컬럼. ④ 홈 로딩 느림 = 위젯 시세가 무거운 `get_symbol_data`(2000~전체 history) → 경량 `_wl_recent_closes`(인덱스=index_master 25행 / 주식=`get_price` 45일창 / index_daily에 없는 ^KS11 등=yfinance 폴백).
+
+**핫픽스(커밋 8be53b9):** 직전 배포가 라이브에 `index_ohlc` 없어 `SELECT`가 "no such table"→"종목 못찾음" 크래시. `CREATE TABLE IF NOT EXISTS` + 데이터 없으면 yfinance **지연 백필**(첫 지수 진입이 자동 적재 → 수동 서버작업 불필요). `_wl_recent_closes`도 try 폴백. 기존 데이터 불변(신규 테이블 생성·삽입만).
+
+**새로고침+수동가격(커밋 6ccf735 + 이번):** 오너 결정 = 새로고침 floor **15분 고정**(yfinance 15분 지연과 동일 → 더 자주 호출해도 같은 값, 밴 방지. 공유 Redis 캐시라 종목당 TTL 1회만 API, 전 사용자 dedup). 범위 = 내자산(필수)·홈·검색. **내자산:** `holdings.manual_price` 컬럼(ALTER 마이그레이션) + `set_manual_price`/`POST /api/myassets/manual-price`(null=해제) + `myassets_data`가 수동가 설정 종목은 fetch 무시·그 값(KRW) 사용+`manual_codes` 반환 + 현재가 셀 ✎입력·↺자동복귀·"수동" 배지 + 🔄. `_asset_ttl` 15분 고정. **홈:** 위젯 헤더 🔄→`refreshWidgets`(loadWidgets). `_watchlist_quote` TTL 15분 고정. **검색:** 컨트롤바(문구+🔄) → `refreshSearchPrices`가 보이는 종목을 `/api/watchlist/quotes` 라이브로 카드 가격/등락 덮어씀(초기 렌더는 price_daily 종가). 전 화면 "⚠ 시세 약 15분 지연 — 새로고침해도 실시간과 다를 수 있습니다" 문구.
+
+검증 = `test_home_widgets.py` 16 PASS + 수동가격 override/해제 왕복(test_client) + Playwright(^GSPC 캔들+거래량 1D·1H 렌더 / 홈 PC 6칸 그리드 / 설정 3컬럼 / 내자산 🔄·수동배지·✎↺ / 검색 005930 ₩322500 라이브 덮어쓰기 / 전 화면 문구). index_ohlc 드롭=라이브 모사로 지수 상세 4종 무크래시 자동복구 확인.
+
+**▶ 다음 = 홈/검색 새로고침 라이브 확인 / PHASE4 잔여(D1·D2·C2·B4) — 오너 결정.**
+
 ## [2026-06-14] feature | C1 — 홈 화면 위젯 + 관심목록 + 설정 페이지
 
 PHASE4 C1(관심종목) 확장판. 오너 결정으로 단순 watchlist를 넘어 **홈 시장지수 위젯의 사용자 구성화 + 다중 관심목록 + 설정 페이지**로 확대. 계획 = `C1_watchlist_plan.md`.

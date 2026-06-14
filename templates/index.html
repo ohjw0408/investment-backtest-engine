@@ -32,6 +32,7 @@
       <span class="star">★</span>
       <span class="market-title" id="widgetTitle">시장 지수</span>
       <span id="marketRefreshTime" style="font-size:0.72rem;color:rgba(255,255,255,0.85);margin-left:auto;margin-right:8px;"></span>
+      <button id="widgetRefreshBtn" class="widget-cog" title="현재 시세로 새로고침" onclick="refreshWidgets()" style="background:none;border:none;margin-right:6px;">🔄</button>
       <a href="/settings" class="widget-cog" title="홈 화면 설정">⚙</a>
     </div>
     <div class="widget-tabs" id="widgetTabs" style="display:none;"></div>
@@ -39,6 +40,7 @@
       <div class="market-loading">데이터 불러오는 중...</div>
     </div>
     <div class="widget-dots" id="widgetDots"></div>
+    <div style="font-size:0.68rem;color:var(--text-muted);padding:7px 14px;border-top:1px solid var(--border);">⚠ 시세 약 15분 지연 — 새로고침해도 실시간과 다를 수 있습니다</div>
   </div>
 
 </div>
@@ -207,6 +209,14 @@ async function loadWidgets() {
 
 function _itemsWithQuote(w) {
   return (w.items || []).map(it => ({ ...it, q: _quoteMap[String(it.code).toUpperCase()] }));
+}
+
+// 현재 시세로 새로고침 (서버 공유 캐시 15분 floor — 더 자주 눌러도 같은 값)
+async function refreshWidgets() {
+  const btn = document.getElementById('widgetRefreshBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try { await loadWidgets(); } catch (e) {}
+  if (btn) { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '🔄'; btn.disabled = false; }, 1200); }
 }
 
 function renderWidgets() {

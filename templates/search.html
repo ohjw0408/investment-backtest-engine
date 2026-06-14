@@ -63,6 +63,11 @@
     <span class="search-icon">🔍</span>
     <input type="text" id="searchInput" placeholder="종목명, ETF, 티커 입력..." autocomplete="off" autofocus>
   </div>
+  <div id="searchControls" style="display:none;justify-content:space-between;align-items:center;gap:10px;margin:10px 2px 4px;">
+    <span style="font-size:0.7rem;color:var(--text-muted);">⚠ 시세 약 15분 지연 — 새로고침해도 실시간과 다를 수 있습니다</span>
+    <button id="searchRefreshBtn" onclick="refreshSearchPrices()" title="현재 시세로 새로고침"
+      style="background:var(--card);border:1.5px solid var(--border);border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:0.9rem;flex-shrink:0;color:var(--text);">🔄</button>
+  </div>
   <div id="searchResults">
     <div class="search-hint">종목명 또는 티커를 입력하세요</div>
   </div>
@@ -96,11 +101,34 @@ function fmtChange(pct) {
 const input      = document.getElementById('searchInput');
 const resultsDiv = document.getElementById('searchResults');
 let timer = null;
+let lastCodes = [];
+
+// 현재 시세로 새로고침 — 보이는 종목을 라이브 시세(/api/watchlist/quotes, 공유 15분 캐시)로 덮어씀
+async function refreshSearchPrices() {
+  if (!lastCodes.length) return;
+  const btn = document.getElementById('searchRefreshBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    const qs  = await (await fetch('/api/watchlist/quotes?codes=' + encodeURIComponent(lastCodes.join(',')))).json();
+    const map = Object.fromEntries(qs.map(q => [q.code, q]));
+    document.querySelectorAll('.result-card[data-code]').forEach(card => {
+      const q = map[String(card.dataset.code).toUpperCase()];
+      if (!q) return;
+      const pe = card.querySelector('.card-price');
+      if (pe) pe.textContent = q.value;
+      const ce = card.querySelector('.card-change');
+      if (ce) { ce.textContent = q.change; ce.className = 'card-change ' + (q.up ? 'up' : 'down'); }
+    });
+  } catch (e) {}
+  if (btn) { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '🔄'; btn.disabled = false; }, 1200); }
+}
 
 input.addEventListener('input', () => {
   const q = input.value.trim();
   if (!q) {
     resultsDiv.innerHTML = '<div class="search-hint">종목명 또는 티커를 입력하세요</div>';
+    document.getElementById('searchControls').style.display = 'none';
+    lastCodes = [];
     return;
   }
   clearTimeout(timer);
@@ -111,14 +139,18 @@ input.addEventListener('input', () => {
       const data = await res.json();
       if (!data.length) {
         resultsDiv.innerHTML = '<div class="search-hint">검색 결과가 없습니다</div>';
+        document.getElementById('searchControls').style.display = 'none';
+        lastCodes = [];
         return;
       }
+      lastCodes = data.map(d => d.code);
+      document.getElementById('searchControls').style.display = 'flex';
       const color = (b) => badgeColor(b);
       resultsDiv.innerHTML = '<div class="results-grid">' + data.map(item => {
         const chg = fmtChange(item.change_pct);
         const priceStr = fmtPrice(item.price, item.currency);
         return `
-          <a class="result-card" href="/symbol/${item.code}">
+          <a class="result-card" href="/symbol/${item.code}" data-code="${item.code}">
             <div class="card-top">
               <span class="result-badge" style="background:${color(item.badge)}22;color:${color(item.badge)}">${item.badge}</span>
               <span class="card-price">${priceStr}</span>

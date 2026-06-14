@@ -1097,7 +1097,7 @@ def _watchlist_quote(code):
         "currency": currency,
     }
     if getattr(svc, '_redis_ok', False):
-        svc._set(key, quote, svc._get_ttl())
+        svc._set(key, quote, 15 * 60)  # 15분 고정 = 새로고침 floor
     return quote
 
 

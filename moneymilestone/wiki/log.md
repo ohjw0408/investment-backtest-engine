@@ -1,5 +1,11 @@
 # Log
 
+## [2026-06-14] feature | 부채꼴 후속 — 세로 2배 + 슬라이더 in-place 애니 + 줌
+
+오너 피드백 3건. ① 세로 너무 좁음 → 전용 `.chart-wrap-fan` 240→480px(모바일 360, calculator.css). ② 슬라이더 굴릴 때마다 차트 재생성 → x축서 솟는 애니 거슬림. `_drawFan`(최초 생성)/`_updateFanBands`(슬라이더) 분리 — 기존 차트의 하단·상단 데이터셋 data/label만 교체 후 `chart.update()` → 중앙선(p50) 불변·밴드 경계만 부드럽게 morph. ③ 줌 = `chartjs-plugin-zoom@2.2.0` CDN(base.html, Chart.js 뒤) + fan options.plugins.zoom(`wheel.modifierKey:'ctrl'`·pinch·pan xy) + 카드에 조작 힌트("🔍 Ctrl+휠 확대·축소 · 드래그 이동 · 핀치") + `resetFanZoom()` [줌 초기화] 버튼. Ctrl 게이팅으로 일반 휠 스크롤 보존.
+
+검증: `tests/test_fan_dom.js` jsdom 15 PASS(줌 config·중앙선 불변·in-place 갱신·resetFanZoom 무오류) + `tests/test_fan_live.js` 라이브 12 PASS(줌 플러그인 resetZoom 존재·높이>400·중앙선 불변·콘솔에러 0). 커밋 eddcdc5. 캐시 v20260614fan2.
+
 ## [2026-06-14] feature | 투자계산기 미래 시나리오 부채꼴 (경험적 퍼센타일 밴드)
 
 오너 요청 = 부채꼴 차트. 핵심 결정 = **미래 예측 신규 0, 있는 데이터(과거 롤링 윈도우)를 "이렇게 굴러갈 수도 있다"는 시나리오로 시작점에 모은 경험적 부채꼴.** (GBM·모수 몬테카를로 아님 — 용어 정리: 현재 GBM 합성은 과거 백필용이고 그 자체가 이미 몬테카를로. 부채꼴은 별개로 미래 예측 안 하고 실측 궤적만 겹침.)

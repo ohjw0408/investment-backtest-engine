@@ -176,7 +176,10 @@
     <div class="ma-card">
       <div class="ma-card-title">
         💼 보유 종목
-        <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="openAddHolding()">+ 종목 추가</button>
+        <span style="display:inline-flex;gap:8px;align-items:center;">
+          <button id="refreshHoldingsBtn" class="icon-btn" title="최신 시세로 새로고침 (서버 캐시 15분)" onclick="refreshHoldings()">🔄</button>
+          <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="openAddHolding()">+ 종목 추가</button>
+        </span>
       </div>
       <div id="holdingsTableWrap">
         <div style="text-align:center;padding:30px;color:var(--text-muted);">⏳ 로딩 중...</div>
@@ -384,6 +387,7 @@
 let holdings = [];
 let groups   = [];
 let prices   = {};
+let manualCodes = [];
 let weightChart = null;
 let hideAmounts = true;
 
@@ -408,17 +412,54 @@ function showTab(name) {
 
 // ── 데이터 로드 ──
 async function loadAll() {
-  const res  = await fetch('/api/myassets/data');
+  const res  = await fetch('/api/myassets/data', { cache: 'no-store' });
   const data = await res.json();
-  holdings   = data.holdings || [];
-  groups     = data.groups   || [];
-  prices     = data.prices   || {};
+  holdings    = data.holdings || [];
+  groups      = data.groups   || [];
+  prices      = data.prices   || {};
+  manualCodes = data.manual_codes || [];
   hideAmounts = data.hide_amounts !== false;
   const toggle = document.getElementById('hideAmountToggle');
   if (toggle) toggle.checked = hideAmounts;
   renderHoldings();
   renderSummary();
   renderGroupOptions();
+}
+
+// ── 새로고침 (서버 공유 캐시 15분 floor — 더 자주 눌러도 같은 값) ──
+async function refreshHoldings() {
+  const btn = document.getElementById('refreshHoldingsBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    await loadAll();
+    if (btn) {
+      btn.textContent = '✓';
+      setTimeout(() => { btn.textContent = '🔄'; btn.disabled = false; }, 1200);
+    }
+  } catch (e) {
+    if (btn) { btn.textContent = '🔄'; btn.disabled = false; }
+  }
+}
+
+// ── 수동 가격 override ──
+async function setManual(id, curKRW) {
+  const cur = (curKRW && curKRW > 0) ? Math.round(curKRW) : '';
+  const v = window.prompt('수동 현재가 입력 (원화 ₩ 기준).\n비우고 확인하면 자동 시세로 복귀합니다.', cur);
+  if (v === null) return;  // 취소
+  const price = v.trim() === '' ? null : Number(v.replace(/[,\s₩]/g, ''));
+  if (price !== null && (isNaN(price) || price < 0)) { alert('숫자(0 이상)를 입력하세요.'); return; }
+  await fetch('/api/myassets/manual-price', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, price }),
+  });
+  await loadAll();
+}
+async function clearManual(id) {
+  await fetch('/api/myassets/manual-price', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, price: null }),
+  });
+  await loadAll();
 }
 
 async function savePrivacySetting() {
@@ -457,6 +498,7 @@ function renderHoldings() {
           const wt   = totalValue > 0 ? val / totalValue : 0;
           const ret  = h.avg_price > 0 ? (cur - h.avg_price) / h.avg_price : null;
           const gc   = h.group_color || '#90A4AE';
+          const isManual = manualCodes.includes(h.code);
           return `<tr>
             <td class="h-code"><b>${h.code}</b></td>
             <td class="h-group" data-label="그룹">
@@ -468,7 +510,12 @@ function renderHoldings() {
             </td>
             <td data-label="계좌" style="color:var(--text-muted);font-size:0.78rem;">${h.account_type}</td>
             <td data-label="수량">${h.quantity.toLocaleString()}</td>
-            <td data-label="현재가">${fmtKRW(cur)}</td>
+            <td data-label="현재가" style="white-space:nowrap;">
+              ${fmtKRW(cur)}
+              ${isManual ? '<span title="수동 입력 가격" style="font-size:0.62rem;font-weight:800;color:var(--blue);background:var(--blue-pale);border-radius:4px;padding:1px 5px;margin-left:4px;">수동</span>' : ''}
+              <button class="icon-btn" style="width:22px;height:22px;font-size:0.72rem;margin-left:2px;" title="수동 가격 입력" onclick="setManual(${h.id}, ${cur})">✎</button>
+              ${isManual ? `<button class="icon-btn" style="width:22px;height:22px;font-size:0.72rem;" title="자동 시세로 복귀" onclick="clearManual(${h.id})">↺</button>` : ''}
+            </td>
             <td data-label="평가금액"><b>${fmtKRW(val)}</b></td>
             <td data-label="비중">
               <div style="min-width:60px;">

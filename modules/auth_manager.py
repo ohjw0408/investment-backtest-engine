@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS holdings (
     code         TEXT NOT NULL,
     quantity     REAL NOT NULL DEFAULT 0,
     avg_price    REAL DEFAULT 0,
+    manual_price REAL,
     account_type TEXT DEFAULT '일반',
     group_id     INTEGER,
     created_at   TEXT NOT NULL,
@@ -159,6 +160,11 @@ def init_holdings_db():
     """보유 종목 테이블 초기화."""
     c = _get_conn()
     c.executescript(HOLDINGS_DDL)
+    # 수동 가격 override 컬럼 (기존 DB 마이그레이션)
+    try:
+        c.execute("ALTER TABLE holdings ADD COLUMN manual_price REAL")
+    except Exception:
+        pass
     c.commit()
 
 
@@ -222,6 +228,17 @@ def upsert_holding(user_id, code, quantity, avg_price, account_type='일반', gr
 def delete_holding(user_id, holding_id):
     c = _get_conn()
     c.execute("DELETE FROM holdings WHERE id=? AND user_id=?", (holding_id, user_id))
+    c.commit()
+
+
+def set_manual_price(user_id, holding_id, price):
+    """수동 가격 override 설정(KRW). price=None이면 해제 → 자동 시세 복귀."""
+    now = datetime.now().isoformat()
+    c   = _get_conn()
+    c.execute(
+        "UPDATE holdings SET manual_price=?, updated_at=? WHERE id=? AND user_id=?",
+        (price, now, holding_id, user_id)
+    )
     c.commit()
 
 

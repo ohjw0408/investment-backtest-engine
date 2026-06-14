@@ -10,7 +10,7 @@ from authlib.integrations.flask_client import OAuth
 from modules.auth_manager import (
     init_db, get_or_create_user, get_user_by_id,
     get_groups, upsert_group, delete_group,
-    get_holdings, upsert_holding, delete_holding,
+    get_holdings, upsert_holding, delete_holding, set_manual_price,
     init_holdings_db, get_settings, save_settings,
     init_portfolios_db, get_portfolios, get_portfolio, upsert_portfolio, delete_portfolio,
     get_home_widgets, save_home_widgets,
@@ -1444,13 +1444,9 @@ def myassets_data():
     codes  = list({h['code'] for h in holdings})
     prices = {}
 
-    # ── Smart TTL (장중 15분, 장외 4시간) ──────────────────────────
+    # ── TTL 15분 고정 = 새로고침 floor (yfinance 15분 지연과 동일, 더 자주 호출해도 같은 값) ──
     def _asset_ttl():
-        now = _dt.utcnow()
-        if now.weekday() >= 5:
-            return 4 * 3600
-        nm = now.hour * 60 + now.minute
-        return 15 * 60 if (13 * 60 + 30 <= nm <= 20 * 60) else 4 * 3600
+        return 15 * 60
 
     # ── Redis 캐시 helpers (market_quote_service의 Redis 재사용) ──
     _r = getattr(market_quote_service, '_redis', None)
@@ -1565,10 +1561,20 @@ def myassets_data():
                 except Exception:
                     prices[code] = 0
 
+    # ── 수동 가격 override: 설정된 보유종목은 fetch 무시하고 그 값 사용(KRW) ──
+    manual_codes = []
+    for h in holdings:
+        mp = h.get('manual_price')
+        if mp is not None:
+            prices[h['code']] = float(mp)
+            manual_codes.append(h['code'])
+
     return jsonify({
         'holdings': holdings,
         'groups': groups,
         'prices': prices,
+        'manual_codes': manual_codes,
+        'as_of': _dt.utcnow().isoformat(),
         'hide_amounts': _hide_amounts_for_user(uid),
     })
 
@@ -1622,6 +1628,29 @@ def myassets_delete_holding(holding_id):
     if not session.get('user_id'):
         return jsonify({'error': '로그인 필요'}), 401
     delete_holding(session['user_id'], holding_id)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/myassets/manual-price', methods=['POST'])
+def myassets_manual_price():
+    """수동 가격 override 설정/해제. price 없으면(null) 해제 → 자동 시세 복귀."""
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    body = request.get_json(silent=True) or {}
+    hid  = body.get('id')
+    if not hid:
+        return jsonify({'error': 'id 필요'}), 400
+    raw = body.get('price', None)
+    if raw in (None, ''):
+        price = None
+    else:
+        try:
+            price = float(raw)
+            if price < 0:
+                return jsonify({'error': '가격은 0 이상이어야 합니다.'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': '잘못된 가격'}), 400
+    set_manual_price(session['user_id'], int(hid), price)
     return jsonify({'ok': True})
 
 

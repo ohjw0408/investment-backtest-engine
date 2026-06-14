@@ -2,7 +2,7 @@
 {% block title %}투자 계산기 — Money Milestone{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260611ui">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260614fan2">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 .result-card-desc { font-size: 0.72rem; color: var(--text-muted); margin: -2px 0 10px; line-height: 1.45; }
@@ -325,7 +325,11 @@
       <div class="result-card" id="fanCard" style="display:none;">
         <div class="result-card-title">미래 시나리오 부채꼴</div>
         <div class="result-card-desc">과거 실제 구간들을 "이렇게 굴러갈 수도 있다"는 시나리오로 시작점에 모은 거예요. 미래 예측이 아니라 있는 데이터의 분포입니다. 슬라이더로 밴드 범위(퍼센타일)를 조절하세요.</div>
-        <div class="chart-wrap-lg">
+        <div class="fan-zoom-bar">
+          <span class="fan-zoom-hint">🔍 Ctrl+휠 확대·축소 · 드래그 이동 · 핀치(모바일)</span>
+          <button type="button" class="fan-zoom-reset" onclick="resetFanZoom()">줌 초기화</button>
+        </div>
+        <div class="chart-wrap-fan">
           <canvas id="fanChart"></canvas>
         </div>
         <div class="fan-controls">
@@ -419,5 +423,5 @@
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260613feecard2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260614fan"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260614fan2"></script>
 {% endblock %}

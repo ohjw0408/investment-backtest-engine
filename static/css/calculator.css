@@ -455,6 +455,7 @@
 .result-card-title { font-size: 0.85rem; font-weight: 800; color: var(--text-muted); margin-bottom: 14px; }
 
 .chart-wrap-lg { height: 240px; position: relative; }
+.chart-wrap-fan { height: 480px; position: relative; }
 
 /* 지표 그리드 */
 .metrics-grid {
@@ -542,4 +543,5 @@
   .hist-grid { grid-template-columns: 1fr; }
   .result-card { padding: 14px; }
   .chart-wrap-lg { height: 200px; }
+  .chart-wrap-fan { height: 360px; }
 }

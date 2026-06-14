@@ -48,12 +48,22 @@ const ok = (n, c) => { if (c) { pass++; console.log('PASS  ' + n); } else { fail
     JSON.stringify(d[1]) === JSON.stringify([100, 174, 348]) &&
     JSON.stringify(d[2]) === JSON.stringify([100, 149, 298]));
 
-  // 슬라이더 조정(실 oninput) — 하단 10
+  // 슬라이더 조정(실 oninput) — 하단 10. in-place 갱신(차트 재생성 X)
   await page.fill('#fanLo', '10');
   await page.dispatchEvent('#fanLo', 'input');
   d = await ds();
   ok('하단 p10 → bands[9]', JSON.stringify(d[0]) === JSON.stringify([100, 109, 218]));
+  ok('중앙선 불변(p50 그대로)', JSON.stringify(d[2]) === JSON.stringify([100, 149, 298]));
   ok('하단 라벨 갱신', (await page.textContent('#fanLoVal')) === '10');
+
+  // 줌 — 플러그인 로드 + resetZoom 동작
+  ok('줌 플러그인 로드(resetZoom 존재)',
+    await page.evaluate(() => typeof chartInstances['fanChart'].resetZoom === 'function'));
+  ok('resetFanZoom 정의', await page.evaluate(() => typeof resetFanZoom === 'function'));
+  ok('줌 초기화 버튼 존재', (await page.locator('.fan-zoom-reset').count()) === 1);
+  await page.evaluate(() => resetFanZoom());
+  ok('차트 높이 ~480(2배)',
+    await page.evaluate(() => document.querySelector('.chart-wrap-fan').offsetHeight > 400));
 
   ok('콘솔/페이지 에러 0', errs.length === 0);
   if (errs.length) console.log('  ERRORS:', errs.slice(0, 5));

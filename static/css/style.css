@@ -695,6 +695,10 @@ a { text-decoration: none; color: inherit; }
 .fan-sw-band { background: rgba(25,118,210,0.25); border: 1px solid rgba(25,118,210,0.5); }
 .fan-sw-mid { background: #1976D2; height: 3px; }
 .fan-n { margin-left: auto; }
+.fan-zoom-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.fan-zoom-hint { font-size: 0.72rem; color: var(--text-muted); }
+.fan-zoom-reset { font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-muted); cursor: pointer; font-family: inherit; }
+.fan-zoom-reset:hover { background: var(--blue-pale); color: var(--blue-mid); }
 .share-url-box {
   display: none; margin-top: 8px; background: var(--bg);
   border: 1.5px solid var(--border); border-radius: 10px;

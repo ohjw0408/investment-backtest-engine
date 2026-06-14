@@ -1124,7 +1124,24 @@ function onFanSlider(which) {
   }
   document.getElementById('fanLoVal').textContent = loV;
   document.getElementById('fanHiVal').textContent = hiV;
-  _drawFan();
+  // 슬라이더는 차트 재생성 대신 밴드 데이터만 갱신 → 중앙선 고정, 밴드 경계만 부드럽게 이동
+  _updateFanBands(loV, hiV);
+}
+
+// 슬라이더 조정 시: 기존 차트의 하단·상단 데이터셋만 교체 + update() → x축서 솟는 애니 제거
+function _updateFanBands(loV, hiV) {
+  const ch = chartInstances['fanChart'];
+  if (!ch) { _drawFan(); return; }
+  ch.data.datasets[0].data  = _fanData.bands[loV - 1];
+  ch.data.datasets[0].label = `하단 p${loV}`;
+  ch.data.datasets[1].data  = _fanData.bands[hiV - 1];
+  ch.data.datasets[1].label = `상단 p${hiV}`;
+  ch.update();   // 변경된 두 라인만 현재 위치→새 위치로 morph (중앙선 불변)
+}
+
+function resetFanZoom() {
+  const ch = chartInstances['fanChart'];
+  if (ch && ch.resetZoom) ch.resetZoom();
 }
 
 function _drawFan() {
@@ -1162,7 +1179,16 @@ function _drawFan() {
         tooltip: { callbacks: {
           title: items => items[0].label,
           label: c => `${c.dataset.label}: ${fmtKRW(c.raw)}`,
-        } }
+        } },
+        // 줌: Ctrl+휠 확대·축소(일반 스크롤 보존), 핀치(모바일), 드래그 이동
+        zoom: {
+          zoom: {
+            wheel: { enabled: true, modifierKey: 'ctrl' },
+            pinch: { enabled: true },
+            mode: 'xy',
+          },
+          pan: { enabled: true, mode: 'xy' },
+        },
       },
       scales: {
         x: { ticks: { maxTicksLimit: 12, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },

@@ -17,7 +17,7 @@
     })();
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260614fan">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260614fan2">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -119,6 +119,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}?v=20260611ui"></script>
 {% block scripts %}{% endblock %}
 

@@ -1048,7 +1048,9 @@ function _renderRolling() {
     ? _rollingCases.slice()
     : _rollingCases.slice().sort((a, b) => a.cagr - b.cagr);
 
-  const labels = cases.map(c => c.start.slice(0, 7));
+  const sorted = mode !== 'year';
+  // 정렬 보기(asset/cagr): x축은 수익률 분포 순서일 뿐 → 연도 라벨 숨김. 연도별만 시작월 표시
+  const labels = sorted ? cases.map(() => '') : cases.map(c => c.start.slice(0, 7));
   const isCagr = mode === 'cagr';
   const values = cases.map(c => isCagr ? c.cagr * 100 : c.end_value);
   const valFmt = isCagr ? (v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%') : fmtKRW;
@@ -1082,7 +1084,11 @@ function _renderRolling() {
         } }
       },
       scales: {
-        x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        x: {
+          ticks: { display: !sorted, maxTicksLimit: 10, font: { size: 10 }, color: '#90A4AE' },
+          grid: { display: false },
+          title: sorted ? { display: true, text: '수익률 낮음  ←———→  높음', color: '#90A4AE', font: { size: 11 } } : { display: false },
+        },
         y: { ticks: { font: { family: 'DM Mono', size: 10 }, color: '#90A4AE', callback: valFmt }, grid: { color: MM_CHART_GRID } }
       }
     }

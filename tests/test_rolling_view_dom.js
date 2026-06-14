@@ -51,8 +51,12 @@ w.renderRollingChart(CASES);
   const d = lastCfg.data;
   ok('asset: 막대=최종자산, cagr 오름차순',
     JSON.stringify(d.datasets[0].data) === JSON.stringify([800, 1100, 1500, 3000]));
-  ok('asset: labels도 cagr순(start 정렬)',
-    JSON.stringify(d.labels) === JSON.stringify(['2011-01', '2013-01', '2010-01', '2012-01']));
+  ok('asset: x축 연도 라벨 숨김(빈값)',
+    d.labels.every(l => l === ''));
+  ok('asset: x축 제목 = 낮음→높음',
+    lastCfg.options.scales.x.title.display === true && lastCfg.options.scales.x.title.text.includes('낮음'));
+  ok('asset: x축 눈금 숨김',
+    lastCfg.options.scales.x.ticks.display === false);
   ok('asset: 전부 초록(최종자산은 음수 없음)',
     d.datasets[0].backgroundColor.every(c => c === GREEN));
 }
@@ -77,8 +81,10 @@ w.setRollingView('year');
   const d = lastCfg.data;
   ok('year: 막대=최종자산, 입력(start) 순서 유지',
     JSON.stringify(d.datasets[0].data) === JSON.stringify([1500, 800, 3000, 1100]));
-  ok('year: labels 입력순',
+  ok('year: labels 연도 표시(입력순)',
     JSON.stringify(d.labels) === JSON.stringify(['2010-01', '2011-01', '2012-01', '2013-01']));
+  ok('year: x축 눈금 표시 + 제목 없음',
+    lastCfg.options.scales.x.ticks.display === true && lastCfg.options.scales.x.title.display === false);
 }
 
 console.log(`\n${pass} PASS / ${fail} FAIL`);

@@ -1010,8 +1010,46 @@ DEFAULT_HOME_WIDGETS = [
 ]
 
 
+def _wl_recent_closes(code):
+    """위젯용 경량 종가 시계열(오래된→최신) + 통화. 전체 history 미로드.
+
+    - 지수/선물/FX/금현물: index_master(index_ohlc 우선, 없으면 index_daily) 최근 25행 — 로컬 즉시.
+    - 주식/ETF/크립토: get_price 최근 45일창 — price_daily 로컬 우선, 갭만 API.
+    """
+    from datetime import datetime as _dt2, timedelta as _td2
+    code   = str(code).upper()
+    loader = portfolio_engine.loader
+    _FUT   = {'GC=F', 'SI=F', 'CL=F', 'NG=F', 'HG=F', 'KRW=X'}
+    is_index = code.startswith('^') or code in _FUT or code == 'KRX_GOLD'
+
+    if is_index:
+        conn = loader.index_conn
+        if conn is None:
+            return [], "USD"
+        rows = conn.execute(
+            "SELECT close FROM index_ohlc WHERE code=? ORDER BY date DESC LIMIT 25", (code,)
+        ).fetchall()
+        if not rows:
+            db_code = 'USD/KRW' if code == 'KRW=X' else code
+            rows = conn.execute(
+                "SELECT close FROM index_daily WHERE code=? ORDER BY date DESC LIMIT 25", (db_code,)
+            ).fetchall()
+        closes   = [float(r[0]) for r in rows][::-1]
+        currency = "KRW" if code in ('^KS11', 'KRW=X', 'KRX_GOLD') else "USD"
+        return closes, currency
+
+    today = _dt2.today().strftime("%Y-%m-%d")
+    start = (_dt2.today() - _td2(days=45)).strftime("%Y-%m-%d")
+    df = loader.get_price(code, start, today, apply_fx=False)
+    if df is None or df.empty:
+        return [], "USD"
+    closes   = [float(x) for x in df["close"].tolist()]
+    currency = "KRW" if loader.is_kr_etf(code) else "USD"
+    return closes, currency
+
+
 def _watchlist_quote(code):
-    """단일 종목 경량 시세 — get_symbol_data 기반 + Redis 캐시. 실패 시 None."""
+    """단일 종목 경량 시세 — 최근창 종가 기반 + Redis 캐시. 실패 시 None."""
     code = str(code).upper()
     svc = market_quote_service
     key = f"mq:wl:{code}"
@@ -1020,31 +1058,25 @@ def _watchlist_quote(code):
         if cached:
             return cached
     try:
-        d = portfolio_engine.loader.get_symbol_data(code)
+        closes, currency = _wl_recent_closes(code)
     except Exception:
         return None
-    prices = d.get("prices") or []
-    cur  = d.get("current_price")
-    prev = d.get("prev_price")
-    if cur is None and prices:
-        cur = prices[-1].get("close")
-    if cur is None:
+    if not closes:
         return None
-    if prev is None and len(prices) >= 2:
-        prev = prices[-2].get("close")
+    cur  = closes[-1]
+    prev = closes[-2] if len(closes) >= 2 else None
     change = round((cur - prev) / prev * 100, 2) if prev else 0.0
-    is_krw = d.get("currency") == "KRW"
+    is_krw = currency == "KRW"
     prefix = "₩" if is_krw else "$"
     val    = f"{prefix}{cur:,.0f}" if (is_krw or cur >= 1000) else f"{prefix}{cur:,.2f}"
-    spark  = [round(float(p["close"]), 2) for p in prices[-20:]] if prices else []
     quote = {
         "code":   code,
-        "name":   d.get("name") or code,
+        "name":   code,
         "value":  val,
         "change": f"{'+' if change >= 0 else ''}{change}%",
         "up":     change >= 0,
-        "spark":  spark,
-        "currency": d.get("currency"),
+        "spark":  [round(c, 2) for c in closes[-20:]],
+        "currency": currency,
     }
     if getattr(svc, '_redis_ok', False):
         svc._set(key, quote, svc._get_ttl())

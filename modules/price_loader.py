@@ -634,6 +634,66 @@ class PriceLoader:
             'GC=F':  '금 선물 (COMEX)', '^NDX':  'NASDAQ-100',
             '^DJI':  '다우존스',         '^N225': '닛케이 225',
         }
+        # ── 캔들용 OHLCV: index_ohlc 보유 지수는 OHLCV로 반환(라인+캔들 공용) ──
+        # index_daily는 종가만 → 캔들 불가. 시장지수는 index_ohlc(backfill_index_ohlc.py)에
+        # OHLCV가 적재돼 있으므로 우선 사용. stale이면 yfinance로 보충 후 테이블에 영속.
+        if is_index and self.index_conn is not None:
+            ohlc_rows = self.index_conn.execute(
+                "SELECT date, open, high, low, close, volume FROM index_ohlc "
+                "WHERE code=? ORDER BY date", (code,)
+            ).fetchall()
+            if ohlc_rows:
+                prices = [{"date": r[0], "open": round(float(r[1]), 4),
+                           "high": round(float(r[2]), 4), "low": round(float(r[3]), 4),
+                           "close": round(float(r[4]), 4),
+                           "volume": float(r[5]) if r[5] is not None else 0.0}
+                          for r in ohlc_rows]
+                last_date = prices[-1]["date"]
+                five_ago  = (_dt.today() - _td(days=5)).strftime("%Y-%m-%d")
+                if last_date < five_ago:
+                    try:
+                        gap_start = (_dt.strptime(last_date, "%Y-%m-%d") + _td(days=1)).strftime("%Y-%m-%d")
+                        yf_raw = yf.download(code, start=gap_start, end=today,
+                                             progress=False, auto_adjust=False, threads=False)
+                        if not yf_raw.empty:
+                            if isinstance(yf_raw.columns, pd.MultiIndex):
+                                yf_raw.columns = yf_raw.columns.get_level_values(0)
+                            yf_raw = yf_raw.reset_index()
+                            new_rows = []
+                            for _, r in yf_raw.iterrows():
+                                d = r["Date"].strftime("%Y-%m-%d") if hasattr(r["Date"], "strftime") else str(r["Date"])[:10]
+                                rec = (code, d, float(r["Open"]), float(r["High"]),
+                                       float(r["Low"]), float(r["Close"]),
+                                       float(r["Volume"]) if pd.notna(r["Volume"]) else 0.0)
+                                new_rows.append(rec)
+                                prices.append({"date": d, "open": round(rec[2], 4),
+                                               "high": round(rec[3], 4), "low": round(rec[4], 4),
+                                               "close": round(rec[5], 4), "volume": rec[6]})
+                            if new_rows:
+                                self.index_conn.executemany(
+                                    "INSERT OR REPLACE INTO index_ohlc "
+                                    "(code, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)",
+                                    new_rows)
+                                self.index_conn.commit()
+                    except Exception:
+                        pass
+                cur_price  = prices[-1]["close"]
+                prev_price = prices[-2]["close"] if len(prices) > 1 else None
+                last_date  = prices[-1]["date"]
+                cutoff_1y  = (_dt.today() - _td(days=365)).strftime("%Y-%m-%d")
+                prices_1y  = [p["close"] for p in prices if p["date"] >= cutoff_1y]
+                return {
+                    "code": code, "name": _INDEX_NAMES.get(code, code),
+                    "country": country, "currency": currency,
+                    "current_price": cur_price, "prev_price": prev_price,
+                    "last_date": last_date,
+                    "high_52w": max(prices_1y) if prices_1y else None,
+                    "low_52w":  min(prices_1y) if prices_1y else None,
+                    "div_yield": None, "issuer": None, "category": "INDEX",
+                    "expense_ratio": None, "aum": None,
+                    "is_etf": False, "asset_type": "INDEX",
+                    "dividends": [], "prices": prices, "is_index": True,
+                }
         if is_index and self.index_conn is not None:
             db_code  = _INDEX_DB_ALIAS.get(code, code)
             idx_rows = self.index_conn.execute(

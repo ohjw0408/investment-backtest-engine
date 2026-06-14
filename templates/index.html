@@ -233,23 +233,21 @@ function renderWidgets() {
       tabs.style.display = 'none';
     }
     if (title) title.textContent = _widgets[_activeWidget].name;
-    _renderTable(_itemsWithQuote(_widgets[_activeWidget]), body);
+    _renderGrid(_itemsWithQuote(_widgets[_activeWidget]), body);
   }
 }
 
-function _renderTable(items, body) {
-  body.innerHTML = `<table class="widget-table"><tbody>${items.map((it, i) => {
-    const q = it.q;
-    const chg = q ? `<span class="${q.up ? 'up' : 'down'}">${q.up ? '▲' : '▼'} ${_esc(q.change)}</span>` : '—';
-    return `<tr class="widget-row" data-code="${_esc(it.code)}">
-      <td class="wt-name">${_esc(it.name)}</td>
-      <td class="wt-val">${q ? _esc(q.value) : '—'}</td>
-      <td class="wt-change">${chg}</td>
-      <td class="wt-spark"><canvas id="wtspark-${i}" class="sparkline" width="90" height="30"></canvas></td>
-    </tr>`;
-  }).join('')}</tbody></table>`;
-  body.querySelectorAll('.widget-row').forEach(r =>
-    r.addEventListener('click', () => { location.href = '/symbol/' + encodeURIComponent(r.dataset.code); }));
+// PC: 칸 그리드(.market-grid 3열) — 종목별 큰 값 + 큰 스파크라인
+function _renderGrid(items, body) {
+  body.innerHTML = `<div class="market-grid">${items.map((it, i) => `
+    <div class="market-item" data-code="${_esc(it.code)}">
+      <div class="market-name">${_esc(it.name)}</div>
+      <div class="market-value">${it.q ? _esc(it.q.value) : '—'}</div>
+      <div class="market-change ${it.q && it.q.up ? 'up' : 'down'}">${it.q ? (it.q.up ? '▲' : '▼') + ' ' + _esc(it.q.change) : '—'}</div>
+      <canvas id="wtspark-${i}" class="sparkline" width="160" height="46"></canvas>
+    </div>`).join('')}</div>`;
+  body.querySelectorAll('.market-item[data-code]').forEach(el =>
+    el.addEventListener('click', () => { location.href = '/symbol/' + encodeURIComponent(el.dataset.code); }));
   items.forEach((it, i) => {
     if (it.q && it.q.spark && it.q.spark.length >= 2)
       requestAnimationFrame(() => drawSparkline(`wtspark-${i}`, it.q.spark, it.q.up));

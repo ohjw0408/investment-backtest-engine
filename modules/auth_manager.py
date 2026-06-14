@@ -40,6 +40,10 @@ def init_db():
     _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     _conn.row_factory = sqlite3.Row
     _conn.executescript(DDL)
+    # 마이그레이션: 홈 화면 위젯 설정(JSON) 컬럼
+    cols = [r[1] for r in _conn.execute("PRAGMA table_info(user_settings)").fetchall()]
+    if "home_widgets" not in cols:
+        _conn.execute("ALTER TABLE user_settings ADD COLUMN home_widgets TEXT")
     _conn.commit()
 
 
@@ -97,6 +101,29 @@ def save_settings(user_id, tax):
         "INSERT INTO user_settings (user_id, tax, updated_at) VALUES (?,?,?) "
         "ON CONFLICT(user_id) DO UPDATE SET tax=excluded.tax, updated_at=excluded.updated_at",
         (user_id, json.dumps(tax, ensure_ascii=False), now)
+    )
+    c.commit()
+
+
+# ── 홈 화면 위젯(관심목록) 설정 ───────────────────────────
+def get_home_widgets(user_id):
+    """저장된 홈 위젯 config(list) 반환. 없으면 None(→ 호출측이 기본값 사용)."""
+    row = _get_conn().execute(
+        "SELECT home_widgets FROM user_settings WHERE user_id=?", (user_id,)
+    ).fetchone()
+    if row and row["home_widgets"]:
+        return json.loads(row["home_widgets"])
+    return None
+
+
+def save_home_widgets(user_id, widgets):
+    now = datetime.now().isoformat()
+    c   = _get_conn()
+    c.execute(
+        "INSERT INTO user_settings (user_id, home_widgets, updated_at) VALUES (?,?,?) "
+        "ON CONFLICT(user_id) DO UPDATE SET home_widgets=excluded.home_widgets, "
+        "updated_at=excluded.updated_at",
+        (user_id, json.dumps(widgets, ensure_ascii=False), now)
     )
     c.commit()
 

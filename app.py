@@ -13,6 +13,7 @@ from modules.auth_manager import (
     get_holdings, upsert_holding, delete_holding,
     init_holdings_db, get_settings, save_settings,
     init_portfolios_db, get_portfolios, get_portfolio, upsert_portfolio, delete_portfolio,
+    get_home_widgets, save_home_widgets,
 )
 
 load_dotenv()
@@ -987,6 +988,122 @@ def _get_krx_gold():
 @app.route('/api/market')
 def market():
     return jsonify(market_quote_service.get_all())
+
+
+# -----------------------------------------------
+# API - 홈 화면 위젯(관심목록) 설정 + 시세
+# -----------------------------------------------
+
+# 비로그인/미설정 기본값 — 현재 시장지수 6종
+DEFAULT_HOME_WIDGETS = [
+    {"key": "w_market", "name": "시장 지수", "items": [
+        {"code": "^GSPC",    "name": "S&P 500"},
+        {"code": "^IXIC",    "name": "NASDAQ"},
+        {"code": "^KS11",    "name": "코스피"},
+        {"code": "GC=F",     "name": "금 (국제)"},
+        {"code": "KRX_GOLD", "name": "금 (KRX)"},
+        {"code": "KRW=X",    "name": "환율 (USD/KRW)"},
+    ]},
+]
+
+
+def _watchlist_quote(code):
+    """단일 종목 경량 시세 — get_symbol_data 기반 + Redis 캐시. 실패 시 None."""
+    code = str(code).upper()
+    svc = market_quote_service
+    key = f"mq:wl:{code}"
+    if getattr(svc, '_redis_ok', False):
+        cached = svc._get(key)
+        if cached:
+            return cached
+    try:
+        d = portfolio_engine.loader.get_symbol_data(code)
+    except Exception:
+        return None
+    prices = d.get("prices") or []
+    cur  = d.get("current_price")
+    prev = d.get("prev_price")
+    if cur is None and prices:
+        cur = prices[-1].get("close")
+    if cur is None:
+        return None
+    if prev is None and len(prices) >= 2:
+        prev = prices[-2].get("close")
+    change = round((cur - prev) / prev * 100, 2) if prev else 0.0
+    is_krw = d.get("currency") == "KRW"
+    prefix = "₩" if is_krw else "$"
+    val    = f"{prefix}{cur:,.0f}" if (is_krw or cur >= 1000) else f"{prefix}{cur:,.2f}"
+    spark  = [round(float(p["close"]), 2) for p in prices[-20:]] if prices else []
+    quote = {
+        "code":   code,
+        "name":   d.get("name") or code,
+        "value":  val,
+        "change": f"{'+' if change >= 0 else ''}{change}%",
+        "up":     change >= 0,
+        "spark":  spark,
+        "currency": d.get("currency"),
+    }
+    if getattr(svc, '_redis_ok', False):
+        svc._set(key, quote, svc._get_ttl())
+    return quote
+
+
+def _clean_home_widgets(widgets):
+    """저장용 위젯 검증·정제. (cleaned, error) 반환."""
+    if not isinstance(widgets, list) or not (1 <= len(widgets) <= 10):
+        return None, '위젯은 1~10개여야 합니다.'
+    cleaned = []
+    for w in widgets:
+        if not isinstance(w, dict):
+            return None, '잘못된 위젯 형식입니다.'
+        name = str(w.get('name', '')).strip()
+        if not name or len(name) > 20:
+            return None, '위젯 이름은 1~20자로 입력해주세요.'
+        items = w.get('items')
+        if not isinstance(items, list) or not (1 <= len(items) <= 30):
+            return None, f'"{name}"의 종목은 1~30개여야 합니다.'
+        clean_items = []
+        for it in items:
+            if not isinstance(it, dict) or not it.get('code'):
+                return None, '잘못된 종목 형식입니다.'
+            clean_items.append({
+                'code': str(it['code']).upper(),
+                'name': str(it.get('name', it['code']))[:40],
+            })
+        cleaned.append({
+            'key':   str(w.get('key', ''))[:40] or f'w_{len(cleaned)}',
+            'name':  name,
+            'items': clean_items,
+        })
+    return cleaned, None
+
+
+@app.route('/api/home-config')
+def home_config_get():
+    if session.get('user_id'):
+        w = get_home_widgets(session['user_id'])
+        if w:
+            return jsonify({"widgets": w, "logged_in": True})
+    return jsonify({"widgets": DEFAULT_HOME_WIDGETS,
+                    "logged_in": bool(session.get('user_id'))})
+
+
+@app.route('/api/home-config', methods=['POST'])
+def home_config_save():
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    body = request.get_json(silent=True) or {}
+    cleaned, err = _clean_home_widgets(body.get('widgets'))
+    if err:
+        return jsonify({'error': err}), 400
+    save_home_widgets(session['user_id'], cleaned)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/watchlist/quotes')
+def watchlist_quotes():
+    codes = [c.strip() for c in request.args.get('codes', '').split(',') if c.strip()][:60]
+    return jsonify([q for c in codes if (q := _watchlist_quote(c))])
 
 
 # -----------------------------------------------

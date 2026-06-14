@@ -1,11 +1,227 @@
 {% extends "base.html" %}
 {% block title %}설정 — Money Milestone{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">설정</h1>
-  <p class="page-sub">앱 설정을 관리하세요.</p>
+<style>
+.settings-wrap { max-width: 760px; }
+.settings-section { background: var(--card); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 18px; overflow: hidden; }
+.settings-section-head { padding: 14px 18px; border-bottom: 1px solid var(--border); font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+.settings-section-body { padding: 16px 18px; }
+.settings-hint { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5; }
+.we-widget { border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; background: var(--bg); }
+.we-widget-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.we-name-input { flex: 1; min-width: 0; font-size: 0.92rem; font-weight: 700; padding: 6px 10px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text); font-family: inherit; }
+.we-iconbtn { background: var(--card); border: 1.5px solid var(--border); border-radius: 7px; width: 30px; height: 30px; cursor: pointer; font-size: 0.85rem; color: var(--text-muted); flex-shrink: 0; }
+.we-iconbtn:hover:not(:disabled) { background: var(--blue-pale); color: var(--blue); }
+.we-iconbtn:disabled { opacity: 0.3; cursor: default; }
+.we-del { color: var(--red-light); }
+.we-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.we-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 1.5px solid var(--border); border-radius: 16px; padding: 4px 6px 4px 11px; font-size: 0.8rem; }
+.we-chip-code { color: var(--text-muted); font-size: 0.72rem; }
+.we-chip-x { cursor: pointer; border: none; background: var(--border); color: var(--text); border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; line-height: 1; }
+.we-chip-x:hover { background: var(--red-light); color: #fff; }
+.we-add-item { margin-top: 10px; font-size: 0.8rem; font-weight: 700; color: var(--blue); background: var(--blue-pale); border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.we-add-widget { width: 100%; padding: 11px; border: 1.5px dashed var(--border); border-radius: 10px; background: transparent; color: var(--text-muted); font-weight: 700; cursor: pointer; font-family: inherit; }
+.we-add-widget:hover { border-color: var(--blue); color: var(--blue); }
+.we-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.we-save { background: var(--blue); color: #fff; border: none; border-radius: 10px; padding: 10px 22px; font-weight: 800; font-size: 0.9rem; cursor: pointer; font-family: inherit; }
+.we-save:disabled { opacity: 0.5; cursor: default; }
+.we-status { font-size: 0.82rem; }
+.we-status.ok { color: var(--green-light); }
+.we-status.err { color: var(--red-light); }
+.login-gate { text-align: center; padding: 30px 16px; color: var(--text-muted); line-height: 1.7; }
+.login-gate a { color: var(--blue); font-weight: 700; }
+.we-modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 2000; align-items: flex-start; justify-content: center; }
+.we-modal-bg.open { display: flex; }
+.we-modal { background: var(--card); border-radius: 14px; width: min(440px, 92vw); margin-top: 70px; max-height: 76vh; display: flex; flex-direction: column; overflow: hidden; }
+.we-modal-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+.we-modal-head input { flex: 1; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.9rem; background: var(--bg); color: var(--text); font-family: inherit; }
+.we-modal-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted); }
+.we-presets { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px; }
+.we-preset { font-size: 0.76rem; border: 1.5px solid var(--border); border-radius: 14px; padding: 4px 10px; background: var(--bg); cursor: pointer; font-family: inherit; color: var(--text); }
+.we-preset:hover { background: var(--blue-pale); color: var(--blue); }
+.we-results { overflow-y: auto; flex: 1; }
+.we-result { padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; gap: 10px; }
+.we-result:hover { background: var(--blue-pale); }
+.we-result-name { font-weight: 700; font-size: 0.88rem; }
+.we-result-code { font-size: 0.74rem; color: var(--text-muted); }
+.we-result-badge { font-size: 0.68rem; background: var(--border); border-radius: 4px; padding: 1px 6px; margin-left: auto; }
+</style>
+
+<h1 class="page-title">설정</h1>
+
+<div class="settings-wrap">
+  <div class="settings-section">
+    <div class="settings-section-head"><span>🏠</span> 홈 화면 설정</div>
+    <div class="settings-section-body">
+      <div class="settings-hint">홈 화면에 표시할 위젯(시장 지수·관심목록)을 구성하세요. 위젯 이름·종목·순서를 바꿀 수 있어요. 모바일은 스와이프, PC는 탭으로 전환됩니다.</div>
+      <div id="loginGate" class="login-gate" style="display:none;">
+        편집하려면 <a href="/auth/google" onclick="return handleGoogleLogin(event)">로그인</a>이 필요해요.<br>지금은 기본 구성으로 표시됩니다.
+      </div>
+      <div id="widgetEditor" style="display:none;">
+        <div id="weList"></div>
+        <button class="we-add-widget" onclick="weAddWidget()">+ 관심목록 추가</button>
+        <div class="we-actions">
+          <button class="we-save" id="weSaveBtn" onclick="weSave()">저장</button>
+          <span class="we-status" id="weStatus"></span>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
-<div class="card" style="padding: 40px; text-align:center; color: var(--text-muted);">
-  🚧 설정 페이지 준비 중
+
+<div class="we-modal-bg" id="weModal">
+  <div class="we-modal">
+    <div class="we-modal-head">
+      <input type="text" id="weSearch" placeholder="종목·ETF 검색 (예: SPY, 삼성전자, 069500)" autocomplete="off">
+      <button class="we-modal-close" onclick="weCloseModal()">✕</button>
+    </div>
+    <div class="we-presets" id="wePresets"></div>
+    <div class="we-results" id="weResults"></div>
+  </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _weWidgets = [];
+let _weTarget = -1;
+let _weSearchTimer = null;
+
+const WE_PRESETS = [
+  { code: '^GSPC', name: 'S&P 500' },
+  { code: '^IXIC', name: 'NASDAQ' },
+  { code: '^KS11', name: '코스피' },
+  { code: 'GC=F', name: '금 (국제)' },
+  { code: 'KRX_GOLD', name: '금 (KRX)' },
+  { code: 'KRW=X', name: '환율 (USD/KRW)' },
+];
+
+function weEsc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  let cfg;
+  try { cfg = await (await fetch('/api/home-config', { cache: 'no-store' })).json(); }
+  catch (e) { cfg = { widgets: [], logged_in: false }; }
+  _weWidgets = JSON.parse(JSON.stringify(cfg.widgets || []));
+  if (!cfg.logged_in) {
+    document.getElementById('loginGate').style.display = 'block';
+    return;
+  }
+  document.getElementById('widgetEditor').style.display = 'block';
+  weRender();
+
+  const si = document.getElementById('weSearch');
+  si.addEventListener('input', () => {
+    clearTimeout(_weSearchTimer);
+    _weSearchTimer = setTimeout(() => weDoSearch(si.value.trim()), 250);
+  });
+});
+
+function weRender() {
+  const list = document.getElementById('weList');
+  list.innerHTML = _weWidgets.map((w, i) => `
+    <div class="we-widget">
+      <div class="we-widget-head">
+        <input class="we-name-input" value="${weEsc(w.name)}" maxlength="20"
+               oninput="weRename(${i}, this.value)">
+        <button class="we-iconbtn" onclick="weMove(${i},-1)" ${i === 0 ? 'disabled' : ''} title="위로">▲</button>
+        <button class="we-iconbtn" onclick="weMove(${i},1)" ${i === _weWidgets.length - 1 ? 'disabled' : ''} title="아래로">▼</button>
+        <button class="we-iconbtn we-del" onclick="weRemoveWidget(${i})" ${_weWidgets.length <= 1 ? 'disabled' : ''} title="삭제">✕</button>
+      </div>
+      <div class="we-chips">
+        ${(w.items || []).map((it, j) => `
+          <span class="we-chip">${weEsc(it.name)} <span class="we-chip-code">${weEsc(it.code)}</span>
+            <button class="we-chip-x" onclick="weRemoveItem(${i},${j})">✕</button></span>`).join('')}
+      </div>
+      <button class="we-add-item" onclick="weOpenModal(${i})">+ 종목 추가</button>
+    </div>`).join('');
+}
+
+function weRename(i, v) { _weWidgets[i].name = v; }
+function weMove(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= _weWidgets.length) return;
+  [_weWidgets[i], _weWidgets[j]] = [_weWidgets[j], _weWidgets[i]];
+  weRender();
+}
+function weRemoveWidget(i) {
+  if (_weWidgets.length <= 1) return;
+  _weWidgets.splice(i, 1);
+  weRender();
+}
+function weRemoveItem(wi, ii) {
+  _weWidgets[wi].items.splice(ii, 1);
+  weRender();
+}
+function weAddWidget() {
+  if (_weWidgets.length >= 10) { weSetStatus('위젯은 최대 10개예요.', false); return; }
+  _weWidgets.push({ key: 'w_' + Date.now(), name: '관심목록' + _weWidgets.length, items: [] });
+  weRender();
+}
+
+function weOpenModal(wi) {
+  _weTarget = wi;
+  document.getElementById('weModal').classList.add('open');
+  const si = document.getElementById('weSearch');
+  si.value = '';
+  document.getElementById('weResults').innerHTML = '';
+  document.getElementById('wePresets').innerHTML =
+    WE_PRESETS.map(p => `<button class="we-preset" onclick="weAddItem('${weEsc(p.code)}','${weEsc(p.name)}')">${weEsc(p.name)}</button>`).join('');
+  setTimeout(() => si.focus(), 50);
+}
+function weCloseModal() { document.getElementById('weModal').classList.remove('open'); _weTarget = -1; }
+
+async function weDoSearch(q) {
+  const box = document.getElementById('weResults');
+  if (!q) { box.innerHTML = ''; return; }
+  let results = [];
+  try { results = await (await fetch('/api/search?q=' + encodeURIComponent(q))).json(); }
+  catch (e) { results = []; }
+  box.innerHTML = results.map(r => `
+    <div class="we-result" onclick="weAddItem('${weEsc(r.code)}','${weEsc(String(r.name).replace(/'/g, ''))}')">
+      <div>
+        <div class="we-result-name">${weEsc(r.name)}</div>
+        <div class="we-result-code">${weEsc(r.code)}</div>
+      </div>
+      ${r.badge ? `<span class="we-result-badge">${weEsc(r.badge)}</span>` : ''}
+    </div>`).join('') || '<div class="we-result" style="cursor:default;color:var(--text-muted)">결과 없음</div>';
+}
+
+function weAddItem(code, name) {
+  if (_weTarget < 0) return;
+  const items = _weWidgets[_weTarget].items;
+  if (items.length >= 30) { weSetStatus('위젯당 종목은 최대 30개예요.', false); return; }
+  if (items.some(it => String(it.code).toUpperCase() === String(code).toUpperCase())) return;
+  items.push({ code: code, name: name || code });
+  weRender();
+}
+
+function weSetStatus(msg, ok) {
+  const el = document.getElementById('weStatus');
+  el.textContent = msg;
+  el.className = 'we-status ' + (ok ? 'ok' : 'err');
+}
+
+async function weSave() {
+  const btn = document.getElementById('weSaveBtn');
+  btn.disabled = true;
+  weSetStatus('저장 중...', true);
+  try {
+    const res = await fetch('/api/home-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ widgets: _weWidgets }),
+    });
+    const j = await res.json();
+    if (res.ok) weSetStatus('저장됐어요. 홈 화면에 반영됩니다.', true);
+    else weSetStatus(j.error || '저장 실패', false);
+  } catch (e) {
+    weSetStatus('네트워크 오류', false);
+  }
+  btn.disabled = false;
+}
+</script>
 {% endblock %}

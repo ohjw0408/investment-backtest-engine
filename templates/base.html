@@ -42,6 +42,7 @@
     <a class="nav-link {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">내 자산</a>
     <a class="nav-link {% if request.path.startswith('/tax-settings') %}active{% endif %}" href="/tax-settings">세금 설정</a>
     <a class="nav-link {% if request.path.startswith('/search') %}active{% endif %}" href="/search">검색</a>
+    <a class="nav-link {% if request.path.startswith('/settings') %}active{% endif %}" href="/settings">설정</a>
   </div>
   <div class="nav-search-wrap">
     <div class="nav-search-box">
@@ -108,6 +109,9 @@
     </a>
     <a class="sidebar-item {% if request.path.startswith('/search') %}active{% endif %}" href="/search">
       <span>🔍</span> 종목 검색
+    </a>
+    <a class="sidebar-item {% if request.path.startswith('/settings') %}active{% endif %}" href="/settings">
+      <span>⚙️</span> 설정
     </a>
   </aside>
 

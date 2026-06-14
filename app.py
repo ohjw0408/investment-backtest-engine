@@ -292,6 +292,10 @@ def myassets():
 def settings():
     return render_template('tax_settings.html')
 
+@app.route('/settings')
+def settings_page():
+    return render_template('settings.html')
+
 # -----------------------------------------------
 # API - 검색
 # -----------------------------------------------

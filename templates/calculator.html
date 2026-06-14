@@ -306,9 +306,16 @@
 
       <div id="multiAccountSummary" style="display:none;margin-bottom:16px;"></div>
 
-      <!-- 시작 시점별 종료 자산 -->
+      <!-- 시작 시점별 결과 (보기 전환) -->
       <div class="result-card">
-        <div class="result-card-title">시작 시점별 종료 자산</div>
+        <div class="rchart-head">
+          <div class="result-card-title" id="rollingTitle">최종 자산 (수익률 낮은순 →)</div>
+          <div class="rchart-seg">
+            <button class="rchart-seg-btn active" data-mode="asset" onclick="setRollingView('asset')">최종자산</button>
+            <button class="rchart-seg-btn" data-mode="cagr" onclick="setRollingView('cagr')">수익률</button>
+            <button class="rchart-seg-btn" data-mode="year" onclick="setRollingView('year')">연도별</button>
+          </div>
+        </div>
         <div class="chart-wrap-lg">
           <canvas id="rollingChart"></canvas>
         </div>
@@ -388,5 +395,5 @@
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260613feecard2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260613feecard"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260614rollview"></script>
 {% endblock %}

@@ -677,6 +677,10 @@ a { text-decoration: none; color: inherit; }
   font-family: inherit;
 }
 .share-pill:hover { background: var(--blue-soft); }
+.rchart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.rchart-seg { display: inline-flex; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+.rchart-seg-btn { background: transparent; border: none; padding: 5px 12px; font-size: 0.76rem; font-weight: 700; color: var(--text-muted); cursor: pointer; font-family: inherit; }
+.rchart-seg-btn.active { background: var(--blue); color: #fff; }
 .share-url-box {
   display: none; margin-top: 8px; background: var(--bg);
   border: 1.5px solid var(--border); border-radius: 10px;

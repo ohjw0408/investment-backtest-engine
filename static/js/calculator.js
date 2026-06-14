@@ -1015,21 +1015,55 @@ function renderHistStats(elId, distData, fmtFn) {
 }
 
 // ── 롤링 케이스 차트 ──
+// 롤링 차트 보기 모드: 'asset'(최종자산·수익률순) | 'cagr'(수익률·수익률순) | 'year'(시작 시점별)
+let _rollingCases = [];
+let _rollingMode  = 'asset';
+
+const _ROLLING_TITLES = {
+  asset: '최종 자산 (수익률 낮은순 →)',
+  cagr:  '연복리 수익률 CAGR (낮은순 →)',
+  year:  '시작 시점별 종료 자산',
+};
+
 function renderRollingChart(cases) {
+  _rollingCases = cases || [];
+  _renderRolling();
+}
+
+function setRollingView(mode) {
+  _rollingMode = mode;
+  document.querySelectorAll('.rchart-seg-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === mode));
+  const title = document.getElementById('rollingTitle');
+  if (title) title.textContent = _ROLLING_TITLES[mode] || '';
+  _renderRolling();
+}
+
+function _renderRolling() {
   if (chartInstances['rollingChart']) chartInstances['rollingChart'].destroy();
+  const mode = _rollingMode;
 
-  const ctx    = document.getElementById('rollingChart').getContext('2d');
+  // 'year'는 시작 시점 순서 유지, 그 외는 수익률(CAGR) 오름차순 정렬
+  const cases = (mode === 'year')
+    ? _rollingCases.slice()
+    : _rollingCases.slice().sort((a, b) => a.cagr - b.cagr);
+
   const labels = cases.map(c => c.start.slice(0, 7));
-  const values = cases.map(c => c.end_value);
+  const isCagr = mode === 'cagr';
+  const values = cases.map(c => isCagr ? c.cagr * 100 : c.end_value);
+  const valFmt = isCagr ? (v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%') : fmtKRW;
+  // CAGR 보기: 음수면 빨강 / 그 외(최종자산)는 항상 초록
+  const pos = isCagr ? values.map(v => v >= 0) : values.map(() => true);
 
+  const ctx = document.getElementById('rollingChart').getContext('2d');
   chartInstances['rollingChart'] = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
       datasets: [{
         data: values,
-        backgroundColor: values.map(v => v >= 0 ? 'rgba(67,160,71,0.6)' : 'rgba(239,83,80,0.6)'),
-        borderColor:     values.map(v => v >= 0 ? '#43A047' : '#EF5350'),
+        backgroundColor: pos.map(p => p ? 'rgba(67,160,71,0.6)' : 'rgba(239,83,80,0.6)'),
+        borderColor:     pos.map(p => p ? '#43A047' : '#EF5350'),
         borderWidth: 1, borderRadius: 3,
       }]
     },
@@ -1037,11 +1071,19 @@ function renderRollingChart(cases) {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: c => fmtKRW(c.raw) } }
+        tooltip: { callbacks: {
+          title: items => '시작 ' + (cases[items[0].dataIndex]?.start.slice(0, 7) || ''),
+          label: c => {
+            const k = cases[c.dataIndex];
+            return isCagr
+              ? 'CAGR ' + valFmt(c.raw) + ' · ' + fmtKRW(k.end_value)
+              : fmtKRW(c.raw) + ' · CAGR ' + (k.cagr >= 0 ? '+' : '') + (k.cagr * 100).toFixed(2) + '%';
+          }
+        } }
       },
       scales: {
         x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { ticks: { font: { family: 'DM Mono', size: 10 }, color: '#90A4AE', callback: v => fmtKRW(v) }, grid: { color: MM_CHART_GRID } }
+        y: { ticks: { font: { family: 'DM Mono', size: 10 }, color: '#90A4AE', callback: valFmt }, grid: { color: MM_CHART_GRID } }
       }
     }
   });

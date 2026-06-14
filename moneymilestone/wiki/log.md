@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-14] feature | 투자계산기 롤링 차트 보기 전환 (최종자산/CAGR/연도별)
+
+오너 요청 = 롤링 차트("시작 시점별 종료 자산") 위에 버튼 3개로 보기 전환. **기본 = 최종자산**(수익률 낮은순 정렬) / **CAGR**(수익률순, 음수면 빨강) / **연도별**(기존 시작 시점별, 입력 순서 유지).
+
+설계 경위: 처음 "이중 Y축(왼쪽 CAGR·오른쪽 최종자산, 막대 1세트)" 논의 → 거치식은 CAGR↔최종자산 1:1이라 양축 정확하나 **월적립 있으면 같은 CAGR라도 최종자산 갈림 → 한쪽 축 근사** 발견. 오너 결정 = 이중축 폐기, **단일 Y축 3모드 분리**.
+
+구현(프론트 전용, 백엔드·데이터 무변경): case별 `cagr`는 이미 응답에 존재(`calculator_logic.py:400`). `static/js/calculator.js` `renderRollingChart`를 상태화(`_rollingCases`/`_rollingMode`, 기본 `asset`) + 신규 `setRollingView(mode)`(정렬·라벨·색상·툴팁·제목·버튼 active 전환) + `_renderRolling` 내부 렌더. `asset`/`cagr`는 cagr 오름차순 정렬, `year`는 입력순 유지. `templates/calculator.html` 차트 카드에 `.rchart-head`+`.rchart-seg` 버튼 3개, `static/css/style.css`에 segmented 버튼 CSS. 캐시 `?v=20260614rollview`(calculator.js + style.css/base.html).
+
+검증: 신규 `tests/test_rolling_view_dom.js` **jsdom 9 PASS**(Chart 모킹 — asset 최종자산·cagr순 정렬·전부 초록 / cagr CAGR%·음수만 빨강·제목·버튼 active / year 입력순 유지) + `node --check` OK. ⚠️ 실브라우저 미검증·미배포(라이브 브라우저 테스트는 배포 선행). HTML onclick 배선은 육안 확인.
+
 ## [2026-06-14] fix | 비교탭 모바일 표→항목카드(가로스크롤 제거) + 상세 자산추이 차트 2배
 
 오너: 비교탭 패딩/폰트만 줄인 1차 모바일 수정은 11열 표라 가로스크롤 그대로 → 효과 미미(반영은 됨, 인라인 style이라 캐시無). ① **비교탭 모바일 = 항목별 카드**(포폴/벤치마다 카드, 지표 라벨/값 2열 그리드 세로 나열) → 가로스크롤 제거. 데스크탑은 표 유지, `window.resize`로 표↔카드 전환(`rrLastData` 재렌더). `#rrTable`→`#rrTableHost` 호스트 div. ② **상세 자산추이 차트** canvas 래퍼+`maintainAspectRatio:false`, 데스크탑 180px·모바일 340px(약 2배). CSS+JS, 백엔드 무변경. 검증 = risk_return·portfolio_detail JS `node --check` OK. 커밋 6a61770.

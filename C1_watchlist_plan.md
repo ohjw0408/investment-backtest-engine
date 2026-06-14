@@ -1,6 +1,25 @@
-# C1 — 홈 화면 위젯 + 관심목록 + 설정 페이지 (계획)
+# C1 — 홈 화면 위젯 + 관심목록 + 설정 페이지 (✅ 완료·배포)
 
 2026-06-14 수립. 오너 결정 반영. PHASE4 C1 확장판.
+
+> ✅ **완료·배포·검증 (2026-06-14, 커밋 adc2ae0→2a65515→180c0b2→040a19c).**
+> 백엔드(`user_settings.home_widgets` JSON + `/api/home-config` + `/api/watchlist/quotes`), 홈 동적 위젯 렌더
+> (모바일 스와이프 캐러셀 / PC 탭+그리드), 설정 페이지 `/settings`(위젯 CRUD·이름·순서·검색모달/프리셋). 검증 = `test_home_widgets.py`
+> 16 PASS + 라이브 검증.
+>
+> **후속 (2026-06-15, 커밋 7394171→8be53b9→6ccf735→ed2ac9d):**
+> - **지수 캔들 회귀 복구:** `index_daily`가 종가만이라 지수 캔들 비활성됐던 것. 신규 `index_ohlc`(code,date,OHLCV) 테이블 +
+>   `scripts/backfill_index_ohlc.py`(시장지수 12종 yfinance) + `get_symbol_data` 지연 백필(첫 진입 자동적재, 테이블 없으면
+>   `CREATE TABLE IF NOT EXISTS`+yfinance, **수동 서버작업 불필요**). 라인=index_daily 유지, 1H=intraday 온디맨드, KRX_GOLD만 close-only.
+> - **PC 홈 위젯:** 좁은 `<table>` → `.market-grid` 3칸(큰 값+스파크).
+> - **설정 PC:** `.main-content` 2칸그리드 308칸에 끼던 wrap → `grid-column:1/-1` 풀폭 + `#weList` 멀티컬럼.
+> - **홈 시세 경량화:** 무거운 `get_symbol_data` → `_wl_recent_closes`(인덱스=index_master 25행/주식=get_price 45일창).
+> - **새로고침 버튼(내자산·홈·검색):** 공유 Redis 캐시 + **TTL 15분 고정 = floor**(yfinance 15분 지연과 동일 → 헛호출/밴 방지,
+>   종목당 TTL 1회만 API). 검색 🔄 = 보이는 종목을 `/api/watchlist/quotes` 라이브로 덮어씀.
+> - **내자산 수동 가격 override:** `holdings.manual_price` 컬럼 + `POST /api/myassets/manual-price`(null=해제) + 현재가 ✎/↺/"수동" 배지.
+> - 전 화면 "⚠ 시세 약 15분 지연" 문구.
+>
+> **이 기능군은 완료 상태. 재구현·재제안 금지. 다음 작업은 PHASE4 잔여(D1·D2·C2·B4).**
 
 ## 목표
 홈 화면의 고정 "시장 지수" 6종을 **사용자 구성 가능한 위젯 캐러셀**로 교체.

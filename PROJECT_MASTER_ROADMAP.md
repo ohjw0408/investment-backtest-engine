@@ -1,6 +1,6 @@
 # Project Master Roadmap
 
-Last updated: 2026-06-14 (✅ **전체 동기화** — 2026-06-14 완료분 반영: **A4 종목상세**·**내자산 월별 배당금 차트**·**저장 포트폴리오 상세 `/myportfolios/<id>`**(총투자금액 1칸→비중 자동배분→비중·추이·배당, 수량입력 모델에서 오너 피드백으로 재설계)·**포트폴리오 비교 탭**(`/risk-return` 확장 = 11지표 수치표+리스크리턴 산점도+레이더(축선택·설명·불투명도)+🔗📷공유, `포트폴리오비교_plan.md`)·**백테 연간 배당금/배당성장률 차트**·**계산기/백테 지표 설명**·**비교탭·상세 모바일 최적화**(표→항목카드·추이차트 2배). 계획 파일 동기화: 세금계산기_plan = `/tax-switch` 완료 정정·리스크리턴도표_plan = 비교탭 흡수 표기·포트폴리오비교_plan 완료·PHASE4 헤더 갱신. **잔여(추후) = 포트폴리오 비교 몬테카를로 부채꼴(대공사). 다음 후보 = PHASE4 잔여(D1 TDF·D2 연금통합·C1 watchlist·C2 자산군비교·B4 거래트래킹) — 오너 결정.** 이전: 2026-06-13 ✅ **전체 동기화** — 2026-06-12~13 완료분 반영: B1 즐겨찾기(5탭 위젯+멀티계좌 카드+`/myportfolios`)·리스크리턴도표(`/risk-return`)·ISA 전환 계산기(`/tax-switch`)·절세액 P1~P3 마감·GAP-DECUM-COMP/BUG-PENSION-1 stale 정리·자산구성 파이차트. 계획 파일 전수 점검: trackG/isafix/E2E plan 종결, 세금리팩토링 phase1-api·2e·2f 완료 정정, PHASE4 헤더 갱신. **다음 후보 = P4 배당 절세(`divrefactoring.md` 선행) OR PHASE4 잔여(D4·B2-a·A4·D1·D2·C1·C2) — 오너 결정.** 이전: 2026-06-11 ✅ **모바일 반응형+다크모드+UX 전 페이지 개편** — 햄버거 드로어·`data-theme=dark` 팔레트·인라인 색상 ~200곳 변수화·BUG-NAV-1 해소·백테/내자산 모바일 후속 수정. Playwright 168체크+라이브 검증+오너 실기기 확인 완료. 상세 = status update 57~58. 이전: 2026-06-10 ✅ **간편 계산기 4종 신규 `/simple`** — 오너 결정으로 P1 착수: 복리(세후·인플레)·배당재투자(잼투리식)·인플레 생활비·실질 구매력, 전부 클라이언트 JS. 손계산 25 + jsdom 35 PASS. GAP-DECUM-COMP = 오너 결정 **계속 보류**. 이전: 2026-06-09 **Track G5 멀티계좌 탭 복제 전체 완료**: G5-A 백테 ✅ → G5-B 은퇴적립 ✅ → G5-C 은퇴인출 엔진 ✅ → G5-D 인출기 standalone 멀티+세금 ✅ → **UI 4탭(계산기·백테·은퇴적립·은퇴인출) 전부 배선·배포** → **세금 커버리지 전탭 감사 = 신규 배선버그 0**. BUG-WD-TAX·GAP-WD-MULTI 해소. 발견 갭 1개 **GAP-DECUM-COMP**(인출 중 금융소득 종합과세 미모델링)=오너 보류. → **다음 = L7 실데이터 통합검증(브라우저) OR 신규 간편도구(간편계산기·세금계산기) OR GAP-DECUM-COMP**)
+Last updated: 2026-06-15 (✅ **전체 동기화** — C1(홈위젯·관심목록·설정페이지)=완료 확정(adc2ae0~040a19c, 배포·검증), 시작 시 "C1 미구현"이던 stale 정정. **2026-06-15 후속:** ① 지수 캔들 회귀 복구 — `index_daily`가 종가만이라 지수 캔들 비활성됐던 것, 신규 `index_ohlc` OHLCV 테이블+`scripts/backfill_index_ohlc.py`+지연백필(KRX_GOLD만 close-only) ② PC 홈 위젯 칸 그리드 ③ 설정 PC 멀티컬럼 ④ 홈 시세 경량화(`_wl_recent_closes`) ⑤ 새로고침 버튼(내자산·홈·검색, 공유 Redis 캐시 15분 floor=밴 방지) ⑥ 내자산 수동 가격 override(✎/↺/배지, `holdings.manual_price`) ⑦ 전 화면 시세 15분 지연 문구. 커밋 7394171→8be53b9→6ccf735→ed2ac9d. **다음 = PHASE4 잔여(D1·D2·C2·B4).** 이전: 2026-06-14 완료분 반영: **A4 종목상세**·**내자산 월별 배당금 차트**·**저장 포트폴리오 상세 `/myportfolios/<id>`**(총투자금액 1칸→비중 자동배분→비중·추이·배당, 수량입력 모델에서 오너 피드백으로 재설계)·**포트폴리오 비교 탭**(`/risk-return` 확장 = 11지표 수치표+리스크리턴 산점도+레이더(축선택·설명·불투명도)+🔗📷공유, `포트폴리오비교_plan.md`)·**백테 연간 배당금/배당성장률 차트**·**계산기/백테 지표 설명**·**비교탭·상세 모바일 최적화**(표→항목카드·추이차트 2배). 계획 파일 동기화: 세금계산기_plan = `/tax-switch` 완료 정정·리스크리턴도표_plan = 비교탭 흡수 표기·포트폴리오비교_plan 완료·PHASE4 헤더 갱신. **잔여(추후) = 포트폴리오 비교 몬테카를로 부채꼴(대공사). 다음 후보 = PHASE4 잔여(D1 TDF·D2 연금통합·C1 watchlist·C2 자산군비교·B4 거래트래킹) — 오너 결정.** 이전: 2026-06-13 ✅ **전체 동기화** — 2026-06-12~13 완료분 반영: B1 즐겨찾기(5탭 위젯+멀티계좌 카드+`/myportfolios`)·리스크리턴도표(`/risk-return`)·ISA 전환 계산기(`/tax-switch`)·절세액 P1~P3 마감·GAP-DECUM-COMP/BUG-PENSION-1 stale 정리·자산구성 파이차트. 계획 파일 전수 점검: trackG/isafix/E2E plan 종결, 세금리팩토링 phase1-api·2e·2f 완료 정정, PHASE4 헤더 갱신. **다음 후보 = P4 배당 절세(`divrefactoring.md` 선행) OR PHASE4 잔여(D4·B2-a·A4·D1·D2·C1·C2) — 오너 결정.** 이전: 2026-06-11 ✅ **모바일 반응형+다크모드+UX 전 페이지 개편** — 햄버거 드로어·`data-theme=dark` 팔레트·인라인 색상 ~200곳 변수화·BUG-NAV-1 해소·백테/내자산 모바일 후속 수정. Playwright 168체크+라이브 검증+오너 실기기 확인 완료. 상세 = status update 57~58. 이전: 2026-06-10 ✅ **간편 계산기 4종 신규 `/simple`** — 오너 결정으로 P1 착수: 복리(세후·인플레)·배당재투자(잼투리식)·인플레 생활비·실질 구매력, 전부 클라이언트 JS. 손계산 25 + jsdom 35 PASS. GAP-DECUM-COMP = 오너 결정 **계속 보류**. 이전: 2026-06-09 **Track G5 멀티계좌 탭 복제 전체 완료**: G5-A 백테 ✅ → G5-B 은퇴적립 ✅ → G5-C 은퇴인출 엔진 ✅ → G5-D 인출기 standalone 멀티+세금 ✅ → **UI 4탭(계산기·백테·은퇴적립·은퇴인출) 전부 배선·배포** → **세금 커버리지 전탭 감사 = 신규 배선버그 0**. BUG-WD-TAX·GAP-WD-MULTI 해소. 발견 갭 1개 **GAP-DECUM-COMP**(인출 중 금융소득 종합과세 미모델링)=오너 보류. → **다음 = L7 실데이터 통합검증(브라우저) OR 신규 간편도구(간편계산기·세금계산기) OR GAP-DECUM-COMP**)
 
 > 이력: 2026-06-03 = 절세액 P1·단일계좌·KRX 금현물 Phase 1+2·BUG-TAX-1/2·BUG-G1-2·deploy.yml 복구 (당시 진행 중 = G5-C 토대).
 
@@ -16,7 +16,7 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 
 | File | Role | Status |
 |---|---|---|
-| `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed (A1~A3/A5/A6/B1/B2-b/B2-c/B3/B5/C3/C5/D3/D5/D6/E1/F1/4G done — 2026-06-13 갱신). 잔여 = D4·B2-a·A4·B4·C1·C2·C4·D1·D2·E2~E4 |
+| `PHASE4_PLAN.md` | Product feature roadmap: search, symbol pages, my assets, home, sharing, UX, advanced calculators, synthetic-data checkbox idea, server price-cache retention policy | Partially completed (A1~A6/B1/B2-b/B2-c/B3/B5/C1/C3/C5/D3/D4/D5/D6/E1/F1/4G done — 2026-06-15 갱신. C1=홈위젯·관심목록·설정페이지, 후속으로 지수캔들 회귀복구·새로고침·내자산 수동가격). 잔여 = B4·C2·C4·D1·D2·E2~E4 (B2-a=오너 skip) |
 | `세금에서시작된완전리팩토링계획.plan.md` | Tax and simulation-core correctness roadmap: TaxProfile, TaxSessionState, TaxableSimulationRunner, gates by screen | Phase 1~3 + 2c/2d 완료. ✅ **Phase 2f(금융소득 종합과세) 완료(2026-05-31, 4100ecd)** — 중간실현 합산·`other_financial_income` 자동산출·`_ytd_income` 주입·분할매도 슬라이더 전탭(배당탭은 별도엔진 제외). 검증 = test_phase2f 7/7 + tax_truth 64/64 + Gate 2a/2b/2c. 잔여 = Phase 3 정리·문서(낮음). |
 | `ETF_BACKFILL_ARCHITECTURE_PLAN.md` | Long-term ETF backfill, data provenance architecture, and canonical server price-retention policy | ✅ **Phase 6.0 Stage A + Stage B 완료**(주식 배당 + 채권/MMF·환헤지비용·US 채권 키워드 자동분류·통화가드, 서버검증). Phase 3+ (etf_master, etf_proxy_map, confidence grading)는 이후. |
 | `SYNTHETIC_DATA_INTEGRATION_PLAN.md` | Opt-in synthetic data support and common data preparation facade for calculator/backtest/portfolio tabs | ✅ Complete (Phase 1~10, all screens). |
@@ -61,9 +61,9 @@ UI 실측/추정 필드를 확인했다.
 - ⚠️ Track B: Phase 2c Gate "passed" — 가격 기준. 배당 정상화 후 재검증 대상.
 - ✅ Track C: Synthetic data integration complete across all screens (Phases 1~10).
 - ✅ ETF_BACKFILL Phase 0~2 provenance 스키마는 Stage A 백필 가격/배당 기록에 사용됨.
-- ✅ PHASE4: A1/A2/A3/A5/A6/B5/C3/C5/D3 done.
+- ✅ PHASE4: A1/A2/A3/A4/A5/A6/B1/B2-b/B2-c/B3/B5/C1/C3/C5/D3/D4/D5/D6/E1/F1/4G done.
 
-Current blocker: **없음.** (2026-06-14 갱신) P0~P4 전부 마감 + D4 거래수수료 전탭 + **A4 종목상세(asset_type 분류·라인/캔들 토글·간격별 캔들·거래량·전체화면·시간봉)** + **내자산 월별 배당금 차트(연도선택·막대 드릴다운·배당 일정 리스트·세전세후/원화외화·CAGR 예측)** 완료. **다음 = PHASE4 잔여(D1 TDF·D2 연금통합·C1 watchlist·C2 자산군비교·B4 거래트래킹) — 오너 결정.** (B2-a 홈토글=오너 skip / 내포트폴리오→백테 화면=오너 보류)
+Current blocker: **없음.** (2026-06-15 갱신) P0~P4 전부 마감 + D4 거래수수료 전탭 + A4 종목상세 + 내자산 월별 배당금 차트 + **C1 홈 위젯/관심목록/설정 페이지(배포·검증 완료 — adc2ae0~040a19c)** 완료. **2026-06-15 후속:** ① 지수 캔들 회귀 복구(신규 `index_ohlc` OHLCV 테이블 + `scripts/backfill_index_ohlc.py` + 지연 백필, KRX_GOLD만 close-only) ② PC 홈 위젯 칸 그리드 ③ 설정 PC 멀티컬럼 ④ 홈 시세 경량화 ⑤ **새로고침 버튼(내자산·홈·검색, 공유 캐시 15분 floor)** ⑥ **내자산 수동 가격 override(✎/↺/"수동" 배지)** ⑦ 전 화면 시세 15분 지연 문구. 커밋 7394171→8be53b9→6ccf735→ed2ac9d. **다음 = PHASE4 잔여(D1 TDF·D2 연금통합·C2 자산군비교·B4 거래트래킹) — 오너 결정.** (B2-a 홈토글=오너 skip / C1 완료 / 내포트폴리오→백테 화면=오너 보류)
 
 ## Decision
 
@@ -122,8 +122,10 @@ Do not implement client-canonical storage. First implement server diagnostics, `
     ② 은퇴·배당 탭 롤아웃 (이 둘은 fee 미배선 — 엔진은 Portfolio 주입이라 배선만 추가)
     상세 = PHASE4_PLAN.md D4 섹션 fast-follow.
 
-[6] PHASE4 잔여: D1 TDF / D2 연금통합 / C1 watchlist / C2 자산군비교 / B4 거래트래킹
-    (✅ A4 종목상세 완료 2026-06-13 / B2-a 홈토글=오너 skip / P4 배당 절세 완료 df7553e·a86b560)
+[6] PHASE4 잔여: D1 TDF / D2 연금통합 / C2 자산군비교 / B4 거래트래킹
+    (✅ A4 종목상세 완료 2026-06-13 / ✅ C1 홈위젯·관심목록·설정 완료 2026-06-14 (adc2ae0~040a19c) /
+     ✅ 2026-06-15 후속: 지수캔들 회귀복구(index_ohlc)·새로고침버튼(내자산/홈/검색)·내자산 수동가격 /
+     B2-a 홈토글=오너 skip / P4 배당 절세 완료 df7553e·a86b560)
 
 [7] ETF_BACKFILL V2 Phase 3+: etf_master/etf_proxy_map, confidence A~F, 전체 US 유니버스
 
@@ -204,19 +206,18 @@ Exit criteria (original — partially met):
 
 Owner plan: `PHASE4_PLAN.md`
 
-**완료:** A1/A2/A3/A5/A6/B5/C3/C5/D3 + F1/B2-b/B2-c/B3/D5 + **B1(즐겨찾기)·D6(합성 체크박스 전탭)·E1(모바일+다크) — 2026-06-13 갱신**
+**완료:** A1/A2/A3/A4/A5/A6/B5/C1/C3/C5/D3/D4 + F1/B2-b/B2-c/B3/D5 + **B1(즐겨찾기)·D6(합성 체크박스 전탭)·E1(모바일+다크)·A4(종목상세 캔들/시간봉)·C1(홈위젯·관심목록·설정페이지) — 2026-06-15 갱신.** C1 후속(2026-06-15): 지수 캔들 회귀복구(`index_ohlc` OHLCV 테이블+지연백필), 새로고침 버튼(내자산·홈·검색, 공유캐시 15분 floor), 내자산 수동 가격 override(✎/↺/배지), 전 화면 시세 15분 지연 문구.
 
 **남은 항목 (의존성 없음):**
 
 | 항목 | 난이도 | 선행 조건 |
 |------|--------|-----------|
-| D4 거래수수료 설정 | 1~2일 | 없음 |
-| B2-a 홈 화면 자산 토글 | 0.5일 | 없음 |
-| A4 종목 상세 개선 + 캔들차트 | 3~4일 | 없음 |
 | D1 TDF 기능 | 3~4일 | Tax 2d ✅ |
 | D2 연금 통합 계산기 | 4~5일 | Tax 2d ✅ |
-| C1 홈 화면 watchlist | 2~3일 | 없음 |
 | C2 자산군별 수익률 비교 | 2~3일 | 없음 |
+| B4 거래 트래킹 탭 + 추가매수 매도최소화 | 4~5일 | 없음 |
+
+*(완료/제외: D4·A4·C1 완료 / B2-a 홈토글=오너 skip / C4 온보딩=전 기능 완료 후)*
 
 **나중에 (선행 의존성 있는 것들):**
 
@@ -323,7 +324,9 @@ Completion note - YYYY-MM-DD
 **[P3 — PHASE4 제품 기능]**
 - ✅ **포트폴리오 즐겨찾기(B1) 완료(2026-06-12).** 종목+비중 1세트·로그인 전용·5탭 전부(+멀티계좌 카드)·한도 20(`get_portfolio_limit()` 단일 변경점) + 관리 페이지 `/myportfolios`. 상세 = log/status update 64~66.
 - ✅ **리스크리턴도표 완료(2026-06-12).** `/risk-return` — CAGR×연변동성(총수익)·공통 겹침 기간·벤치마크 고정 5종+추가. 손계산 7 + E2E 8 PASS. 잔여 = 벤치마크 영속화(후속). 상세 = update 67.
-- 잔여: D1 TDF·D2 연금통합·A4 종목상세·C1/C2.
+- ✅ **A4 종목상세 완료(2026-06-13).** asset_type 분류·라인/캔들 토글·간격별 캔들·거래량·전체화면·시간봉. 상세 = update 79~80.
+- ✅ **C1 홈위젯·관심목록·설정 완료(2026-06-14, adc2ae0~040a19c).** 사용자 구성 위젯 캐러셀·다중 관심목록·`/settings`. 상세 = update 83. **후속(2026-06-15):** 지수 캔들 회귀복구(`index_ohlc`)·새로고침 버튼(내자산/홈/검색)·내자산 수동 가격 override. 상세 = update 84.
+- 잔여: D1 TDF·D2 연금통합·C2 자산군비교·B4 거래트래킹.
 
 **[잔여 곁가지(낮음)]**
 - KQ150 fdr 티커 수정(수집 실패). 데이터 파이프 갭채움+gold 외 일일 스케줄러.

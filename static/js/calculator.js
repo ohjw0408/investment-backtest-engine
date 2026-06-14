@@ -1156,6 +1156,11 @@ function _drawFan() {
   const rowMid = _fanData.bands[49];   // p50
   const labels = _fanData.axis.map(k => k === 0 ? '시작' : `${k}년차`);
 
+  // y축을 전체 분포(p1~p99) 범위로 고정 → 슬라이더로 밴드 바꿔도 프레임 불변(변화 잘 보임)
+  const yMin = Math.min(..._fanData.bands[0]);    // p1 (최저)
+  const yMax = Math.max(..._fanData.bands[98]);   // p99 (최고)
+  const yPad = (yMax - yMin) * 0.05 || 1;
+
   const ctx = document.getElementById('fanChart').getContext('2d');
   chartInstances['fanChart'] = new Chart(ctx, {
     type: 'line',
@@ -1192,7 +1197,8 @@ function _drawFan() {
       },
       scales: {
         x: { ticks: { maxTicksLimit: 12, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { ticks: { font: { family: 'DM Mono', size: 10 }, color: '#90A4AE', callback: fmtKRW }, grid: { color: MM_CHART_GRID } }
+        y: { min: yMin - yPad, max: yMax + yPad,
+             ticks: { font: { family: 'DM Mono', size: 10 }, color: '#90A4AE', callback: fmtKRW }, grid: { color: MM_CHART_GRID } }
       }
     }
   });

@@ -48,6 +48,10 @@ ok('시나리오 개수 표시', w.document.getElementById('fanN').textContent.i
   ok('x 라벨 = 시작/1년차/2년차',
     JSON.stringify(lastCfg.data.labels) === JSON.stringify(['시작', '1년차', '2년차']));
   ok('줌 config 존재(Ctrl+휠)', lastCfg.options.plugins.zoom.zoom.wheel.modifierKey === 'ctrl');
+  // y축 고정: bands[0]=[100,100,200] min=100, bands[98]=[100,198,396] max=396, pad=14.8
+  ok('y축 min/max = 전체 p1~p99 범위 고정',
+    Math.abs(lastCfg.options.scales.y.min - (100 - 14.8)) < 0.01 &&
+    Math.abs(lastCfg.options.scales.y.max - (396 + 14.8)) < 0.01);
 }
 
 // ── 2. 슬라이더 조정 → 밴드 갱신 ──
@@ -55,6 +59,8 @@ w.document.getElementById('fanLo').value = '10';
 w.onFanSlider('lo');
 ok('하단 p10 → bands[9] (in-place 갱신)', JSON.stringify(lastCfg.data.datasets[0].data) === JSON.stringify(bands[9]));
 ok('중앙선 불변(p50 그대로)', JSON.stringify(lastCfg.data.datasets[2].data) === JSON.stringify(bands[49]));
+ok('y축 슬라이더 후에도 고정(프레임 불변)',
+  Math.abs(lastCfg.options.scales.y.min - (100 - 14.8)) < 0.01);
 ok('라벨값 갱신', w.document.getElementById('fanLoVal').textContent === '10');
 ok('resetFanZoom 호출 무오류', (() => { try { w.resetFanZoom(); return true; } catch (e) { return false; } })());
 

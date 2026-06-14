@@ -22,8 +22,8 @@ const dom = new JSDOM(`<body>
   <canvas id="fanChart"></canvas>
   <input type="range" id="fanLo" min="1" max="99" value="25">
   <input type="range" id="fanHi" min="1" max="99" value="75">
-  <input type="range" id="fanPanX" min="0" max="100" value="50" disabled>
-  <input type="range" id="fanPanY" min="0" max="100" value="50" disabled>
+  <div id="fanScrollX" class="fan-scroll disabled"><div id="fanThumbX"></div></div>
+  <div id="fanScrollY" class="fan-scroll disabled"><div id="fanThumbY"></div></div>
   <b id="fanLoVal"></b><b id="fanHiVal"></b><span id="fanN"></span>
 </body>`, { runScripts: 'outside-only', virtualConsole: vc });
 
@@ -89,28 +89,27 @@ w.resetFanZoom();
   ok('리셋: y.max ≈ 현재밴드 최고+pad', Math.abs(y.max - (278 + 14.24)) < 0.1);
 }
 
-// ── 3c. 팬 슬라이더 = 확대된 창 이동 (lastChart 훅으로 scales 조작) ──
+// ── 3c. 스크롤바 창 이동 = _fanPanTo (lastChart 훅으로 scales 조작) ──
 {
-  // 확대 시뮬: x창 [0,1] (전체 [0,2] 중 절반). lastCfg.options === 인스턴스 options
+  // 확대 시뮬: x창 [0,1] (전체 [0,2] 중 절반)
   w.__lastChart.scales.x.min = 0; w.__lastChart.scales.x.max = 1;
-  w.document.getElementById('fanPanX').value = '100';
-  w.onFanPan('x');
-  ok('팬 x=100 → 창 우측끝(min=1,max=2)',
+  w._fanPanTo('x', 1);   // 우측끝
+  ok('팬 frac=1 → 창 우측끝(min=1,max=2)',
     lastCfg.options.scales.x.min === 1 && lastCfg.options.scales.x.max === 2);
-  w.__lastChart.scales.x.min = 0; w.__lastChart.scales.x.max = 1;   // 창 크기 유지
-  w.document.getElementById('fanPanX').value = '0';
-  w.onFanPan('x');
-  ok('팬 x=0 → 창 좌측끝(min=0)', lastCfg.options.scales.x.min === 0);
+  w.__lastChart.scales.x.min = 1; w.__lastChart.scales.x.max = 2;   // 갱신 반영
+  w._fanPanTo('x', 0);   // 좌측끝
+  ok('팬 frac=0 → 창 좌측끝(min=0)', lastCfg.options.scales.x.min === 0);
 }
 
-// ── 3d. _syncFanPan: 확대 시 슬라이더 활성, 축소 시 비활성 ──
+// ── 3d. _syncFanScroll: thumb 크기·활성/비활성 ──
 {
-  w.__lastChart.scales.x.min = 0; w.__lastChart.scales.x.max = 1;   // 확대됨
-  w._syncFanPan();
-  ok('확대 시 가로 팬 슬라이더 활성', w.document.getElementById('fanPanX').disabled === false);
-  w.__lastChart.scales.x.min = 0; w.__lastChart.scales.x.max = 2;   // 전체(축소 안됨)
-  w._syncFanPan();
-  ok('전체 보기 시 팬 슬라이더 비활성', w.document.getElementById('fanPanX').disabled === true);
+  w.__lastChart.scales.x.min = 0; w.__lastChart.scales.x.max = 1;   // 확대됨(50%)
+  w._syncFanScroll();
+  ok('확대 시 스크롤바 활성', !w.document.getElementById('fanScrollX').classList.contains('disabled'));
+  ok('thumb 크기 = 창 비율(50%)', w.document.getElementById('fanThumbX').style.width === '50%');
+  w.__lastChart.scales.x.min = 0; w.__lastChart.scales.x.max = 2;   // 전체
+  w._syncFanScroll();
+  ok('전체 보기 시 스크롤바 비활성', w.document.getElementById('fanScrollX').classList.contains('disabled'));
 }
 
 // ── 4. null/빈 fan → 카드 숨김 ──

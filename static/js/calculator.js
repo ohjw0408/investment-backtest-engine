@@ -1139,39 +1139,80 @@ function _updateFanBands(loV, hiV) {
   ch.update();   // 변경된 두 라인만 현재 위치→새 위치로 morph (중앙선 불변)
 }
 
-// 확대 후 가로/세로 슬라이더로 보이는 창(window) 이동. _fanFull = 전체 데이터 범위.
+// 확대 후 가로/세로 스크롤바로 보이는 창(window) 이동. _fanFull = 전체 데이터 범위.
 let _fanFull = null;
+let _fanDrag = null;
 
-function onFanPan(axis) {
+// 창 위치를 frac(0~1, 스크롤 가능 구간 내)으로 설정
+function _fanPanTo(axis, frac) {
   const ch = chartInstances['fanChart'];
   if (!ch || !_fanFull) return;
-  const full = _fanFull[axis];
-  const sc = ch.scales[axis];
-  const fullSize = full.max - full.min;
-  const win = sc.max - sc.min;
-  if (win >= fullSize - 1e-9) return;   // 확대 안 된 상태면 이동 무의미
-  const el = document.getElementById(axis === 'x' ? 'fanPanX' : 'fanPanY');
-  const v = parseInt(el.value);
-  const newMin = full.min + (v / 100) * (fullSize - win);
+  const full = _fanFull[axis], sc = ch.scales[axis];
+  const fullSize = full.max - full.min, win = sc.max - sc.min;
+  if (win >= fullSize - 1e-9) return;
+  frac = Math.max(0, Math.min(1, frac));
+  const newMin = full.min + frac * (fullSize - win);
   ch.options.scales[axis].min = newMin;
   ch.options.scales[axis].max = newMin + win;
   ch.update('none');
+  _syncFanScroll();
 }
 
-// 확대/이동(휠·핀치·드래그) 후 슬라이더 위치·활성 동기화
-function _syncFanPan() {
+// 스크롤바 thumb 잡기 → document에서 드래그 추적
+function _fanThumbDown(axis, e) {
+  const ch = chartInstances['fanChart'];
+  if (!ch || !_fanFull) return;
+  const full = _fanFull[axis], sc = ch.scales[axis];
+  const fullSize = full.max - full.min, win = sc.max - sc.min;
+  if (win >= fullSize - 1e-9) return;
+  const track = document.getElementById(axis === 'x' ? 'fanScrollX' : 'fanScrollY');
+  const rect = track.getBoundingClientRect();
+  _fanDrag = {
+    axis,
+    scrollPx: (axis === 'x' ? rect.width : rect.height) * (1 - win / fullSize), // thumb 제외 이동거리
+    startPx: axis === 'x' ? e.clientX : e.clientY,
+    startFrac: (sc.min - full.min) / (fullSize - win),
+  };
+  e.preventDefault();
+  document.addEventListener('pointermove', _fanThumbMove);
+  document.addEventListener('pointerup', _fanThumbUp);
+}
+
+function _fanThumbMove(e) {
+  if (!_fanDrag) return;
+  const { axis, scrollPx, startPx, startFrac } = _fanDrag;
+  if (scrollPx <= 0) return;
+  let d = ((axis === 'x' ? e.clientX : e.clientY) - startPx) / scrollPx;
+  if (axis === 'y') d = -d;   // y: 위로 드래그 = 값 증가
+  _fanPanTo(axis, startFrac + d);
+}
+
+function _fanThumbUp() {
+  _fanDrag = null;
+  document.removeEventListener('pointermove', _fanThumbMove);
+  document.removeEventListener('pointerup', _fanThumbUp);
+}
+
+// 확대/이동 후 스크롤바 thumb 크기·위치·활성 동기화
+function _syncFanScroll() {
   const ch = chartInstances['fanChart'];
   if (!ch || !_fanFull) return;
   ['x', 'y'].forEach(axis => {
-    const el = document.getElementById(axis === 'x' ? 'fanPanX' : 'fanPanY');
-    if (!el) return;
+    const track = document.getElementById(axis === 'x' ? 'fanScrollX' : 'fanScrollY');
+    const thumb = document.getElementById(axis === 'x' ? 'fanThumbX' : 'fanThumbY');
+    if (!track || !thumb) return;
     const full = _fanFull[axis], sc = ch.scales[axis];
     const fullSize = full.max - full.min, win = sc.max - sc.min;
+    const ratio = Math.max(0.05, Math.min(1, win / fullSize));   // thumb 크기 비율
     const zoomed = win < fullSize - 1e-6;
-    el.disabled = !zoomed;
-    el.value = zoomed
-      ? Math.round(Math.max(0, Math.min(1, (sc.min - full.min) / (fullSize - win))) * 100)
-      : 50;
+    track.classList.toggle('disabled', !zoomed);
+    if (axis === 'x') {
+      thumb.style.width = (ratio * 100) + '%';
+      thumb.style.left = (Math.max(0, Math.min(1, (sc.min - full.min) / fullSize)) * 100) + '%';
+    } else {
+      thumb.style.height = (ratio * 100) + '%';
+      thumb.style.top = (Math.max(0, Math.min(1, (full.max - sc.max) / fullSize)) * 100) + '%';  // top=고액
+    }
   });
 }
 
@@ -1191,7 +1232,7 @@ function resetFanZoom() {
   ch.options.scales.x.max = _fanFull.x.max;
   _fanFull.y = { min: yMin - pad, max: yMax + pad };  // 이후 팬 기준 프레임 갱신
   ch.update();
-  _syncFanPan();
+  _syncFanScroll();
 }
 
 function _drawFan() {
@@ -1243,9 +1284,9 @@ function _drawFan() {
             wheel: { enabled: true, modifierKey: 'ctrl' },
             pinch: { enabled: true },
             mode: 'xy',
-            onZoomComplete: _syncFanPan,
+            onZoomComplete: _syncFanScroll,
           },
-          pan: { enabled: true, mode: 'xy', onPanComplete: _syncFanPan },
+          pan: { enabled: true, mode: 'xy', onPanComplete: _syncFanScroll },
         },
       },
       scales: {
@@ -1255,6 +1296,7 @@ function _drawFan() {
       }
     }
   });
+  _syncFanScroll();   // 스크롤바 초기화(미확대 → 숨김)
 }
 
 // ── 포맷 헬퍼 ──

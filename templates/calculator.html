@@ -333,9 +333,13 @@
           <div class="chart-wrap-fan">
             <canvas id="fanChart"></canvas>
           </div>
-          <input type="range" id="fanPanY" class="fan-pan fan-pan-y" min="0" max="100" value="50" oninput="onFanPan('y')" title="세로 이동" disabled>
+          <div class="fan-scroll fan-scroll-y disabled" id="fanScrollY">
+            <div class="fan-scroll-thumb" id="fanThumbY" onpointerdown="_fanThumbDown('y', event)"></div>
+          </div>
         </div>
-        <input type="range" id="fanPanX" class="fan-pan fan-pan-x" min="0" max="100" value="50" oninput="onFanPan('x')" title="가로 이동" disabled>
+        <div class="fan-scroll fan-scroll-x disabled" id="fanScrollX">
+          <div class="fan-scroll-thumb" id="fanThumbX" onpointerdown="_fanThumbDown('x', event)"></div>
+        </div>
         <div class="fan-controls">
           <div class="fan-range">
             <span class="fan-range-label">하단 <b id="fanLoVal">25</b>%</span>
@@ -427,5 +431,5 @@
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260613feecard2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260614fan4"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260614fan5"></script>
 {% endblock %}

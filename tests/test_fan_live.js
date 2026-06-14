@@ -70,11 +70,11 @@ const ok = (n, c) => { if (c) { pass++; console.log('PASS  ' + n); } else { fail
   ok('resetFanZoom 정의', await page.evaluate(() => typeof resetFanZoom === 'function'));
   ok('줌 초기화 버튼 존재', (await page.locator('.fan-zoom-reset').count()) === 1);
 
-  // 팬 슬라이더 존재 + 초기(미확대) 비활성
-  ok('가로/세로 팬 슬라이더 존재',
-    (await page.locator('#fanPanX').count()) === 1 && (await page.locator('#fanPanY').count()) === 1);
-  ok('미확대 시 팬 슬라이더 비활성',
-    await page.evaluate(() => document.getElementById('fanPanX').disabled === true));
+  // 스크롤바 존재 + 초기(미확대) 비활성(disabled 클래스)
+  ok('가로/세로 스크롤바 존재',
+    (await page.locator('#fanScrollX').count()) === 1 && (await page.locator('#fanScrollY').count()) === 1);
+  ok('미확대 시 스크롤바 숨김(disabled)',
+    await page.evaluate(() => document.getElementById('fanScrollX').classList.contains('disabled')));
 
   // 리셋 = 현재 밴드(하단 10 ~ 상단 75)에 맞춰 y 재규격화 → y범위 변경
   await page.evaluate(() => resetFanZoom());

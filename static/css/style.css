@@ -699,12 +699,17 @@ a { text-decoration: none; color: inherit; }
 .fan-zoom-hint { font-size: 0.72rem; color: var(--text-muted); }
 .fan-zoom-reset { font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-muted); cursor: pointer; font-family: inherit; }
 .fan-zoom-reset:hover { background: var(--blue-pale); color: var(--blue-mid); }
-.fan-plot { display: flex; align-items: stretch; gap: 4px; }
+.fan-plot { display: flex; align-items: stretch; gap: 6px; }
 .fan-plot .chart-wrap-fan { flex: 1; min-width: 0; }
-.fan-pan { accent-color: var(--blue); cursor: pointer; }
-.fan-pan:disabled { opacity: 0.3; cursor: default; }
-.fan-pan-y { writing-mode: vertical-lr; direction: rtl; width: 20px; -webkit-appearance: slider-vertical; appearance: slider-vertical; }
-.fan-pan-x { width: 100%; margin-top: 6px; }
+.fan-scroll { position: relative; background: var(--border); border-radius: 7px; touch-action: none; }
+.fan-scroll-x { height: 13px; width: 100%; margin-top: 8px; }
+.fan-scroll-y { width: 13px; }
+.fan-scroll-thumb { position: absolute; background: var(--text-muted); border-radius: 7px; opacity: 0.5; cursor: grab; }
+.fan-scroll-thumb:hover { opacity: 0.75; }
+.fan-scroll-thumb:active { cursor: grabbing; opacity: 0.85; }
+.fan-scroll-x .fan-scroll-thumb { top: 0; bottom: 0; left: 0; width: 100%; }
+.fan-scroll-y .fan-scroll-thumb { left: 0; right: 0; top: 0; height: 100%; }
+.fan-scroll.disabled { opacity: 0; pointer-events: none; }
 .share-url-box {
   display: none; margin-top: 8px; background: var(--bg);
   border: 1.5px solid var(--border); border-radius: 10px;

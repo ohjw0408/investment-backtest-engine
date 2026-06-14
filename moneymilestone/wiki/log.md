@@ -8,7 +8,7 @@
 
 구현(프론트 전용, 백엔드·데이터 무변경): case별 `cagr`는 이미 응답에 존재(`calculator_logic.py:400`). `static/js/calculator.js` `renderRollingChart`를 상태화(`_rollingCases`/`_rollingMode`, 기본 `asset`) + 신규 `setRollingView(mode)`(정렬·라벨·색상·툴팁·제목·버튼 active 전환) + `_renderRolling` 내부 렌더. `asset`/`cagr`는 cagr 오름차순 정렬, `year`는 입력순 유지. `templates/calculator.html` 차트 카드에 `.rchart-head`+`.rchart-seg` 버튼 3개, `static/css/style.css`에 segmented 버튼 CSS. 캐시 `?v=20260614rollview`(calculator.js + style.css/base.html).
 
-검증: 신규 `tests/test_rolling_view_dom.js` **jsdom 9 PASS**(Chart 모킹 — asset 최종자산·cagr순 정렬·전부 초록 / cagr CAGR%·음수만 빨강·제목·버튼 active / year 입력순 유지) + `node --check` OK. ⚠️ 실브라우저 미검증·미배포(라이브 브라우저 테스트는 배포 선행). HTML onclick 배선은 육안 확인.
+검증: 신규 `tests/test_rolling_view_dom.js` **jsdom 9 PASS**(Chart 모킹 — asset 최종자산·cagr순 정렬·전부 초록 / cagr CAGR%·음수만 빨강·제목·버튼 active / year 입력순 유지) + `node --check` OK. ✅ **커밋(62a3a04)·push·배포 후 `tests/test_rolling_view_live.js` 라이브 11 PASS** — 프로덕션에서 실 Chart.js 렌더 + 실 버튼 onclick 클릭 + 정렬/색상/제목/active/콘솔에러 0 확인(결과 카드는 계산 전 hidden이라 fake cases 주입+조상 노출 방식).
 
 ## [2026-06-14] fix | 비교탭 모바일 표→항목카드(가로스크롤 제거) + 상세 자산추이 차트 2배
 

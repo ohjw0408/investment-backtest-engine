@@ -1026,17 +1026,35 @@ def _wl_recent_closes(code):
         conn = loader.index_conn
         if conn is None:
             return [], "USD"
-        rows = conn.execute(
-            "SELECT close FROM index_ohlc WHERE code=? ORDER BY date DESC LIMIT 25", (code,)
-        ).fetchall()
+        try:  # index_ohlc 미존재(배포 직후 등) → index_daily 폴백
+            rows = conn.execute(
+                "SELECT close FROM index_ohlc WHERE code=? ORDER BY date DESC LIMIT 25", (code,)
+            ).fetchall()
+        except Exception:
+            rows = []
         if not rows:
             db_code = 'USD/KRW' if code == 'KRW=X' else code
             rows = conn.execute(
                 "SELECT close FROM index_daily WHERE code=? ORDER BY date DESC LIMIT 25", (db_code,)
             ).fetchall()
-        closes   = [float(r[0]) for r in rows][::-1]
         currency = "KRW" if code in ('^KS11', 'KRW=X', 'KRX_GOLD') else "USD"
-        return closes, currency
+        if rows:
+            return [float(r[0]) for r in rows][::-1], currency
+        # 로컬 미보유 지수(예: ^KS11은 index_daily에 KS200만 있어 없음) → yfinance 경량 fetch
+        if code != 'KRX_GOLD':
+            try:
+                import yfinance as _yf
+                from datetime import datetime as _d3, timedelta as _t3
+                _s = (_d3.today() - _t3(days=45)).strftime("%Y-%m-%d")
+                df = _yf.download(code, start=_s, progress=False, auto_adjust=False, threads=False)
+                if not df.empty:
+                    cl = df["Close"]
+                    if hasattr(cl, "columns"):
+                        cl = cl.iloc[:, 0]
+                    return [float(x) for x in cl.dropna().tolist()], currency
+            except Exception:
+                pass
+        return [], currency
 
     today = _dt2.today().strftime("%Y-%m-%d")
     start = (_dt2.today() - _td2(days=45)).strftime("%Y-%m-%d")

@@ -635,13 +635,53 @@ class PriceLoader:
             '^DJI':  '다우존스',         '^N225': '닛케이 225',
         }
         # ── 캔들용 OHLCV: index_ohlc 보유 지수는 OHLCV로 반환(라인+캔들 공용) ──
-        # index_daily는 종가만 → 캔들 불가. 시장지수는 index_ohlc(backfill_index_ohlc.py)에
-        # OHLCV가 적재돼 있으므로 우선 사용. stale이면 yfinance로 보충 후 테이블에 영속.
+        # index_daily는 종가만 → 캔들 불가. 시장지수 OHLCV를 index_ohlc에 둔다.
+        # 배포 안전: 테이블 없으면 생성(no such table 예외로 지수 페이지 깨짐 방지).
+        # 데이터 없으면 yfinance에서 지연 백필 → 첫 진입이 자동 적재(수동 작업 불필요).
+        _CANDLE_INDEX = frozenset({'^GSPC', '^IXIC', '^KS11', '^NDX', '^DJI', '^N225',
+                                   'GC=F', 'SI=F', 'CL=F', 'NG=F', 'HG=F', 'KRW=X'})
         if is_index and self.index_conn is not None:
+            try:
+                self.index_conn.execute(
+                    "CREATE TABLE IF NOT EXISTS index_ohlc ("
+                    "code TEXT, date TEXT, open REAL, high REAL, low REAL, "
+                    "close REAL, volume REAL, PRIMARY KEY(code, date))")
+            except Exception:
+                pass
             ohlc_rows = self.index_conn.execute(
                 "SELECT date, open, high, low, close, volume FROM index_ohlc "
                 "WHERE code=? ORDER BY date", (code,)
             ).fetchall()
+            if not ohlc_rows and code in _CANDLE_INDEX:
+                # 지연 백필: 최초 1회 전체 OHLCV 적재(이후 위 gap-fill이 최신 유지)
+                try:
+                    raw = yf.download(code, period="max", progress=False,
+                                      auto_adjust=False, threads=False)
+                    if not raw.empty:
+                        if isinstance(raw.columns, pd.MultiIndex):
+                            raw.columns = raw.columns.get_level_values(0)
+                        raw  = raw.reset_index()
+                        seed = []
+                        for _, r in raw.iterrows():
+                            dd = r["Date"].strftime("%Y-%m-%d") if hasattr(r["Date"], "strftime") else str(r["Date"])[:10]
+                            try:
+                                seed.append((code, dd, float(r["Open"]), float(r["High"]),
+                                             float(r["Low"]), float(r["Close"]),
+                                             float(r["Volume"]) if pd.notna(r["Volume"]) else 0.0))
+                            except (ValueError, TypeError):
+                                continue
+                        if seed:
+                            self.index_conn.executemany(
+                                "INSERT OR REPLACE INTO index_ohlc "
+                                "(code, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)",
+                                seed)
+                            self.index_conn.commit()
+                            ohlc_rows = self.index_conn.execute(
+                                "SELECT date, open, high, low, close, volume FROM index_ohlc "
+                                "WHERE code=? ORDER BY date", (code,)
+                            ).fetchall()
+                except Exception:
+                    pass
             if ohlc_rows:
                 prices = [{"date": r[0], "open": round(float(r[1]), 4),
                            "high": round(float(r[2]), 4), "low": round(float(r[3]), 4),

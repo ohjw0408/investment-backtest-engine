@@ -26,17 +26,19 @@
     </div>
   </div>
 
-  <!-- ===== 시장 지수 카드 ===== -->
-  <div class="card market-card">
+  <!-- ===== 홈 위젯 (시장지수 / 관심목록) ===== -->
+  <div class="card market-card" id="widgetCard">
     <div class="market-header">
       <span class="star">★</span>
-      <span class="market-title">시장 지수</span>
-      <span id="marketRefreshTime" style="font-size:0.72rem;color:var(--text-muted);margin-left:auto;margin-right:4px;"></span>
-      <span class="market-news">📰</span>
+      <span class="market-title" id="widgetTitle">시장 지수</span>
+      <span id="marketRefreshTime" style="font-size:0.72rem;color:rgba(255,255,255,0.85);margin-left:auto;margin-right:8px;"></span>
+      <a href="/settings" class="widget-cog" title="홈 화면 설정">⚙</a>
     </div>
-    <div class="market-grid" id="marketGrid">
+    <div class="widget-tabs" id="widgetTabs" style="display:none;"></div>
+    <div class="widget-body" id="widgetBody">
       <div class="market-loading">데이터 불러오는 중...</div>
     </div>
+    <div class="widget-dots" id="widgetDots"></div>
   </div>
 
 </div>
@@ -61,9 +63,11 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   loadPortfolio();
-  loadMarket();
+  loadWidgets();
   loadAssets();
-  setInterval(loadMarket, 5 * 60 * 1000);
+  setInterval(loadWidgets, 5 * 60 * 1000);
+  let _wrt;
+  window.addEventListener('resize', () => { clearTimeout(_wrt); _wrt = setTimeout(renderWidgets, 200); });
   setInterval(() => {
     loadPortfolio(_homePortfolioPeriod);
     loadAssets();
@@ -178,59 +182,116 @@ async function loadPortfolio(period = '1m') {
   });
 }
 
-// ── 시장 지수 ──
-async function loadMarket() {
-  const res   = await fetch('/api/market');
-  const items = await res.json();
-  const grid  = document.getElementById('marketGrid');
-  grid.innerHTML = '';
+// ── 홈 위젯 (시장지수 / 관심목록) ──
+let _widgets = [];
+let _quoteMap = {};
+let _activeWidget = 0;
 
-  // 갱신 시각 표시
-  if (items.length > 0 && items[0].fetched_at) {
-    const fetchedAt = new Date(items[0].fetched_at + 'Z');
-    const mins = Math.round((Date.now() - fetchedAt.getTime()) / 60000);
-    const el = document.getElementById('marketRefreshTime');
-    if (el) el.textContent = mins <= 1 ? '방금 업데이트' : `${mins}분 전 업데이트`;
-  }
+function _esc(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
 
-  // ID → yfinance ticker 매핑 (클릭 링크용)
-  const MARKET_LINKS = {
-    'sp500':   '^GSPC',
-    'nasdaq':  '^IXIC',
-    'kospi':   '^KS11',
-    'gold':    'GC=F',
-    'krx_gold':'KRX_GOLD',
-    'usdkrw':  'KRW=X',
-  };
-
-  items.forEach((item, i) => {
-    const colIdx = i % 3;
-    const rowIdx = Math.floor(i / 3);
-    const lastRow = Math.floor((items.length - 1) / 3);
-    const linkTicker = item.ticker || MARKET_LINKS[item.id];
-
-    const div = document.createElement('div');
-    div.className = 'market-item';
-    div.style.borderRight  = (colIdx === 2) ? 'none' : '1px solid var(--border)';
-    div.style.borderBottom = (rowIdx >= lastRow) ? 'none' : '1px solid var(--border)';
-    if (linkTicker) {
-      div.style.cursor = 'pointer';
-      div.addEventListener('click', () => {
-        window.location.href = '/symbol/' + encodeURIComponent(linkTicker);
-      });
+async function loadWidgets() {
+  try {
+    const cfg = await (await fetch('/api/home-config', { cache: 'no-store' })).json();
+    _widgets = cfg.widgets || [];
+    const codes = [...new Set(_widgets.flatMap(w => (w.items || []).map(i => String(i.code).toUpperCase())))];
+    if (codes.length) {
+      const qs = await (await fetch('/api/watchlist/quotes?codes=' + encodeURIComponent(codes.join(',')))).json();
+      _quoteMap = Object.fromEntries(qs.map(q => [q.code, q]));
     }
-    div.innerHTML = `
-      <span class="market-tag">${item.tag}</span>
-      <div class="market-name">${item.name}</div>
-      <div class="market-value">${item.value}</div>
-      <div class="market-change ${item.up ? 'up' : 'down'}">
-        ${item.up ? '▲' : '▼'} ${item.change}
-      </div>
-      <canvas id="spark-${item.id}" class="sparkline" width="100" height="36"></canvas>
-    `;
-    grid.appendChild(div);
-    requestAnimationFrame(() => drawSparkline(`spark-${item.id}`, item.spark, item.up));
+    renderWidgets();
+  } catch (e) { /* 네트워크 실패 시 무시 */ }
+}
+
+function _itemsWithQuote(w) {
+  return (w.items || []).map(it => ({ ...it, q: _quoteMap[String(it.code).toUpperCase()] }));
+}
+
+function renderWidgets() {
+  if (!_widgets.length) return;
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  const tabs = document.getElementById('widgetTabs');
+  const body = document.getElementById('widgetBody');
+  const dots = document.getElementById('widgetDots');
+  const title = document.getElementById('widgetTitle');
+  if (_activeWidget >= _widgets.length) _activeWidget = 0;
+
+  if (isMobile) {
+    tabs.style.display = 'none';
+    _renderMobile(body, dots, title);
+  } else {
+    dots.innerHTML = '';
+    if (_widgets.length > 1) {
+      tabs.style.display = '';
+      tabs.innerHTML = _widgets.map((w, i) =>
+        `<button class="widget-tab ${i === _activeWidget ? 'active' : ''}" data-i="${i}">${_esc(w.name)}</button>`).join('');
+      tabs.querySelectorAll('.widget-tab').forEach(b =>
+        b.addEventListener('click', () => { _activeWidget = +b.dataset.i; renderWidgets(); }));
+    } else {
+      tabs.style.display = 'none';
+    }
+    if (title) title.textContent = _widgets[_activeWidget].name;
+    _renderTable(_itemsWithQuote(_widgets[_activeWidget]), body);
+  }
+}
+
+function _renderTable(items, body) {
+  body.innerHTML = `<table class="widget-table"><tbody>${items.map((it, i) => {
+    const q = it.q;
+    const chg = q ? `<span class="${q.up ? 'up' : 'down'}">${q.up ? '▲' : '▼'} ${_esc(q.change)}</span>` : '—';
+    return `<tr class="widget-row" data-code="${_esc(it.code)}">
+      <td class="wt-name">${_esc(it.name)}</td>
+      <td class="wt-val">${q ? _esc(q.value) : '—'}</td>
+      <td class="wt-change">${chg}</td>
+      <td class="wt-spark"><canvas id="wtspark-${i}" class="sparkline" width="90" height="30"></canvas></td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
+  body.querySelectorAll('.widget-row').forEach(r =>
+    r.addEventListener('click', () => { location.href = '/symbol/' + encodeURIComponent(r.dataset.code); }));
+  items.forEach((it, i) => {
+    if (it.q && it.q.spark && it.q.spark.length >= 2)
+      requestAnimationFrame(() => drawSparkline(`wtspark-${i}`, it.q.spark, it.q.up));
   });
+}
+
+function _renderMobile(body, dots, title) {
+  // 모든 위젯을 6개씩 페이지로 평탄화 → 스와이프 시퀀스
+  const pages = [];
+  _widgets.forEach(w => {
+    const items = _itemsWithQuote(w);
+    for (let i = 0; i < items.length; i += 6) pages.push({ name: w.name, items: items.slice(i, i + 6) });
+  });
+  if (!pages.length) { body.innerHTML = ''; dots.innerHTML = ''; return; }
+
+  body.innerHTML = `<div class="widget-carousel" id="widgetCarousel">${pages.map((pg, pi) => `
+    <div class="widget-slide"><div class="market-grid">${pg.items.map((it, ii) => `
+      <div class="market-item" data-code="${_esc(it.code)}"
+           style="border-right:${ii % 2 === 0 ? '1px solid var(--border)' : 'none'};border-bottom:${ii < pg.items.length - 2 ? '1px solid var(--border)' : 'none'};">
+        <div class="market-name">${_esc(it.name)}</div>
+        <div class="market-value">${it.q ? _esc(it.q.value) : '—'}</div>
+        <div class="market-change ${it.q && it.q.up ? 'up' : 'down'}">${it.q ? (it.q.up ? '▲' : '▼') + ' ' + _esc(it.q.change) : '—'}</div>
+        <canvas id="msp-${pi}-${ii}" class="sparkline" width="100" height="36"></canvas>
+      </div>`).join('')}</div></div>`).join('')}</div>`;
+
+  dots.innerHTML = pages.map((_, i) => `<span class="wdot ${i === 0 ? 'active' : ''}"></span>`).join('');
+  if (title) title.textContent = pages[0].name;
+
+  pages.forEach((pg, pi) => pg.items.forEach((it, ii) => {
+    if (it.q && it.q.spark && it.q.spark.length >= 2)
+      requestAnimationFrame(() => drawSparkline(`msp-${pi}-${ii}`, it.q.spark, it.q.up));
+  }));
+
+  const car = document.getElementById('widgetCarousel');
+  car.addEventListener('scroll', () => {
+    const idx = Math.round(car.scrollLeft / car.clientWidth);
+    dots.querySelectorAll('.wdot').forEach((d, i) => d.classList.toggle('active', i === idx));
+    if (title && pages[idx]) title.textContent = pages[idx].name;
+  }, { passive: true });
+
+  body.querySelectorAll('.market-item[data-code]').forEach(el =>
+    el.addEventListener('click', () => { location.href = '/symbol/' + encodeURIComponent(el.dataset.code); }));
 }
 
 // ── 자산군별 ──

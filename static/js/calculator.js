@@ -1139,9 +1139,59 @@ function _updateFanBands(loV, hiV) {
   ch.update();   // 변경된 두 라인만 현재 위치→새 위치로 morph (중앙선 불변)
 }
 
+// 확대 후 가로/세로 슬라이더로 보이는 창(window) 이동. _fanFull = 전체 데이터 범위.
+let _fanFull = null;
+
+function onFanPan(axis) {
+  const ch = chartInstances['fanChart'];
+  if (!ch || !_fanFull) return;
+  const full = _fanFull[axis];
+  const sc = ch.scales[axis];
+  const fullSize = full.max - full.min;
+  const win = sc.max - sc.min;
+  if (win >= fullSize - 1e-9) return;   // 확대 안 된 상태면 이동 무의미
+  const el = document.getElementById(axis === 'x' ? 'fanPanX' : 'fanPanY');
+  const v = parseInt(el.value);
+  const newMin = full.min + (v / 100) * (fullSize - win);
+  ch.options.scales[axis].min = newMin;
+  ch.options.scales[axis].max = newMin + win;
+  ch.update('none');
+}
+
+// 확대/이동(휠·핀치·드래그) 후 슬라이더 위치·활성 동기화
+function _syncFanPan() {
+  const ch = chartInstances['fanChart'];
+  if (!ch || !_fanFull) return;
+  ['x', 'y'].forEach(axis => {
+    const el = document.getElementById(axis === 'x' ? 'fanPanX' : 'fanPanY');
+    if (!el) return;
+    const full = _fanFull[axis], sc = ch.scales[axis];
+    const fullSize = full.max - full.min, win = sc.max - sc.min;
+    const zoomed = win < fullSize - 1e-6;
+    el.disabled = !zoomed;
+    el.value = zoomed
+      ? Math.round(Math.max(0, Math.min(1, (sc.min - full.min) / (fullSize - win))) * 100)
+      : 50;
+  });
+}
+
+// 줌 초기화 = 현재 선택 밴드(하단~상단)에 맞춰 y축 규격화 + 수동 줌/팬 클리어
 function resetFanZoom() {
   const ch = chartInstances['fanChart'];
-  if (ch && ch.resetZoom) ch.resetZoom();
+  if (!ch || !_fanData) return;
+  const loV = parseInt(document.getElementById('fanLo').value);
+  const hiV = parseInt(document.getElementById('fanHi').value);
+  const yMin = Math.min(..._fanData.bands[loV - 1]);
+  const yMax = Math.max(..._fanData.bands[hiV - 1]);
+  const pad = (yMax - yMin) * 0.08 || 1;
+  if (ch.resetZoom) ch.resetZoom();                 // 플러그인 줌상태 클리어
+  ch.options.scales.y.min = yMin - pad;
+  ch.options.scales.y.max = yMax + pad;
+  ch.options.scales.x.min = _fanFull.x.min;
+  ch.options.scales.x.max = _fanFull.x.max;
+  _fanFull.y = { min: yMin - pad, max: yMax + pad };  // 이후 팬 기준 프레임 갱신
+  ch.update();
+  _syncFanPan();
 }
 
 function _drawFan() {
@@ -1160,6 +1210,8 @@ function _drawFan() {
   const yMin = Math.min(..._fanData.bands[0]);    // p1 (최저)
   const yMax = Math.max(..._fanData.bands[98]);   // p99 (최고)
   const yPad = (yMax - yMin) * 0.05 || 1;
+  // 전체 데이터 범위 — 팬 슬라이더 기준
+  _fanFull = { x: { min: 0, max: labels.length - 1 }, y: { min: yMin - yPad, max: yMax + yPad } };
 
   const ctx = document.getElementById('fanChart').getContext('2d');
   chartInstances['fanChart'] = new Chart(ctx, {
@@ -1185,14 +1237,15 @@ function _drawFan() {
           title: items => items[0].label,
           label: c => `${c.dataset.label}: ${fmtKRW(c.raw)}`,
         } },
-        // 줌: Ctrl+휠 확대·축소(일반 스크롤 보존), 핀치(모바일), 드래그 이동
+        // 줌: Ctrl+휠 확대·축소(일반 스크롤 보존), 핀치(모바일). 이동은 가로/세로 슬라이더로.
         zoom: {
           zoom: {
             wheel: { enabled: true, modifierKey: 'ctrl' },
             pinch: { enabled: true },
             mode: 'xy',
+            onZoomComplete: _syncFanPan,
           },
-          pan: { enabled: true, mode: 'xy' },
+          pan: { enabled: true, mode: 'xy', onPanComplete: _syncFanPan },
         },
       },
       scales: {

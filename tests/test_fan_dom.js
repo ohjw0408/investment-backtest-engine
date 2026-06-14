@@ -22,6 +22,8 @@ const dom = new JSDOM(`<body>
   <canvas id="fanChart"></canvas>
   <input type="range" id="fanLo" min="1" max="99" value="25">
   <input type="range" id="fanHi" min="1" max="99" value="75">
+  <input type="range" id="fanPanX" min="0" max="100" value="50" disabled>
+  <input type="range" id="fanPanY" min="0" max="100" value="50" disabled>
   <b id="fanLoVal"></b><b id="fanHiVal"></b><span id="fanN"></span>
 </body>`, { runScripts: 'outside-only', virtualConsole: vc });
 
@@ -31,7 +33,12 @@ w.document.getElementById('fanChart').getContext = () => ({});
 let lastCfg = null;
 w.Chart = function (ctx, cfg) {
   lastCfg = cfg; this.data = cfg.data; this.options = cfg.options;
+  this.scales = {
+    x: { min: 0, max: cfg.data.labels.length - 1 },
+    y: { min: cfg.options.scales.y.min, max: cfg.options.scales.y.max },
+  };
   this.update = () => {}; this.resetZoom = () => {}; this.destroy = () => {};
+  w.__lastChart = this;   // 테스트 훅: 인스턴스(scales) 접근용
 };
 w.eval(src);
 
@@ -68,6 +75,43 @@ ok('resetFanZoom 호출 무오류', (() => { try { w.resetFanZoom(); return true
 w.document.getElementById('fanLo').value = '90';   // 상단 75 넘김
 w.onFanSlider('lo');
 ok('하단>상단 시 상단 밀어올림', parseInt(w.document.getElementById('fanHi').value) === 91);
+
+// ── 3b. 줌 초기화 = 현재 밴드(20~40)에 맞춰 y 규격화 ──
+w.renderFan(FAN);   // 프레시 차트
+w.document.getElementById('fanLo').value = '20';
+w.document.getElementById('fanHi').value = '40';
+w.onFanSlider('lo');
+w.resetFanZoom();
+{
+  // bands[19]=[100,119,238] min=100, bands[39]=[100,139,278] max=278, pad=(278-100)*0.08=14.24
+  const y = lastCfg.options.scales.y;
+  ok('리셋: y.min ≈ 현재밴드 최저-pad', Math.abs(y.min - (100 - 14.24)) < 0.1);
+  ok('리셋: y.max ≈ 현재밴드 최고+pad', Math.abs(y.max - (278 + 14.24)) < 0.1);
+}
+
+// ── 3c. 팬 슬라이더 = 확대된 창 이동 (lastChart 훅으로 scales 조작) ──
+{
+  // 확대 시뮬: x창 [0,1] (전체 [0,2] 중 절반). lastCfg.options === 인스턴스 options
+  w.__lastChart.scales.x.min = 0; w.__lastChart.scales.x.max = 1;
+  w.document.getElementById('fanPanX').value = '100';
+  w.onFanPan('x');
+  ok('팬 x=100 → 창 우측끝(min=1,max=2)',
+    lastCfg.options.scales.x.min === 1 && lastCfg.options.scales.x.max === 2);
+  w.__lastChart.scales.x.min = 0; w.__lastChart.scales.x.max = 1;   // 창 크기 유지
+  w.document.getElementById('fanPanX').value = '0';
+  w.onFanPan('x');
+  ok('팬 x=0 → 창 좌측끝(min=0)', lastCfg.options.scales.x.min === 0);
+}
+
+// ── 3d. _syncFanPan: 확대 시 슬라이더 활성, 축소 시 비활성 ──
+{
+  w.__lastChart.scales.x.min = 0; w.__lastChart.scales.x.max = 1;   // 확대됨
+  w._syncFanPan();
+  ok('확대 시 가로 팬 슬라이더 활성', w.document.getElementById('fanPanX').disabled === false);
+  w.__lastChart.scales.x.min = 0; w.__lastChart.scales.x.max = 2;   // 전체(축소 안됨)
+  w._syncFanPan();
+  ok('전체 보기 시 팬 슬라이더 비활성', w.document.getElementById('fanPanX').disabled === true);
+}
 
 // ── 4. null/빈 fan → 카드 숨김 ──
 w.renderFan(null);

@@ -326,12 +326,16 @@
         <div class="result-card-title">미래 시나리오 부채꼴</div>
         <div class="result-card-desc">과거 실제 구간들을 "이렇게 굴러갈 수도 있다"는 시나리오로 시작점에 모은 거예요. 미래 예측이 아니라 있는 데이터의 분포입니다. 슬라이더로 밴드 범위(퍼센타일)를 조절하세요.</div>
         <div class="fan-zoom-bar">
-          <span class="fan-zoom-hint">🔍 Ctrl+휠 확대·축소 · 드래그 이동 · 핀치(모바일)</span>
-          <button type="button" class="fan-zoom-reset" onclick="resetFanZoom()">줌 초기화</button>
+          <span class="fan-zoom-hint">🔍 Ctrl+휠 확대·축소 · 확대 후 아래·옆 슬라이더로 이동 · 핀치(모바일)</span>
+          <button type="button" class="fan-zoom-reset" onclick="resetFanZoom()">현재 밴드에 맞춤</button>
         </div>
-        <div class="chart-wrap-fan">
-          <canvas id="fanChart"></canvas>
+        <div class="fan-plot">
+          <div class="chart-wrap-fan">
+            <canvas id="fanChart"></canvas>
+          </div>
+          <input type="range" id="fanPanY" class="fan-pan fan-pan-y" min="0" max="100" value="50" oninput="onFanPan('y')" title="세로 이동" disabled>
         </div>
+        <input type="range" id="fanPanX" class="fan-pan fan-pan-x" min="0" max="100" value="50" oninput="onFanPan('x')" title="가로 이동" disabled>
         <div class="fan-controls">
           <div class="fan-range">
             <span class="fan-range-label">하단 <b id="fanLoVal">25</b>%</span>
@@ -423,5 +427,5 @@
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260613feecard2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260614fan3"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260614fan4"></script>
 {% endblock %}

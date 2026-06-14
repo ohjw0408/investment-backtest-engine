@@ -34,7 +34,10 @@ const CASES = [
   const inject = (cs) => page.evaluate(c => window.renderRollingChart(c), cs);
   const chartData = () => page.evaluate(() => {
     const ch = chartInstances['rollingChart'];
-    return { data: ch.data.datasets[0].data, bg: ch.data.datasets[0].backgroundColor, labels: ch.data.labels };
+    return {
+      data: ch.data.datasets[0].data, bg: ch.data.datasets[0].backgroundColor, labels: ch.data.labels,
+      xTicks: ch.options.scales.x.ticks.display, xTitle: ch.options.scales.x.title.display,
+    };
   });
   const GREEN = 'rgba(67,160,71,0.6)', RED = 'rgba(239,83,80,0.6)';
 
@@ -48,6 +51,7 @@ const CASES = [
   let d = await chartData();
   ok('asset: 최종자산 cagr오름차순', JSON.stringify(d.data) === JSON.stringify([800, 1100, 1500, 3000]));
   ok('asset: 전부 초록', d.bg.every(c => c === GREEN));
+  ok('asset: x축 연도라벨 숨김 + 제목 표시', d.labels.every(l => l === '') && d.xTicks === false && d.xTitle === true);
 
   // CAGR 버튼 클릭 (실 onclick)
   await page.click('[data-mode="cagr"]');
@@ -62,6 +66,8 @@ const CASES = [
   await page.click('[data-mode="year"]');
   d = await chartData();
   ok('year: 입력순 유지', JSON.stringify(d.data) === JSON.stringify([1500, 800, 3000, 1100]));
+  ok('year: 연도라벨 표시 + 제목 없음',
+    JSON.stringify(d.labels) === JSON.stringify(['2010-01', '2011-01', '2012-01', '2013-01']) && d.xTitle === false);
 
   // 최종자산 복귀
   await page.click('[data-mode="asset"]');

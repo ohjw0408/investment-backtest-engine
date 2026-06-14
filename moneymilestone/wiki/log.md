@@ -1,5 +1,19 @@
 # Log
 
+## [2026-06-14] feature | C1 — 홈 화면 위젯 + 관심목록 + 설정 페이지
+
+PHASE4 C1(관심종목) 확장판. 오너 결정으로 단순 watchlist를 넘어 **홈 시장지수 위젯의 사용자 구성화 + 다중 관심목록 + 설정 페이지**로 확대. 계획 = `C1_watchlist_plan.md`.
+
+오너 결정: 비로그인=기본값만(편집 로그인유도) / PC=상단 탭 / 종목추가=기존 /api/search + 지수·환율 프리셋 / 설정탭=`/settings` 신규(확장형, 그 안 "홈화면 설정" 섹션) / 모바일=스와이프(위젯당 6개/페이지, 넘으면 다음 페이지) / 기본값=현재 홈 6종.
+
+**Phase 1 백엔드(adc2ae0):** `user_settings.home_widgets`(JSON) 컬럼 마이그레이션 + auth_manager `get_home_widgets`/`save_home_widgets`. `app.py` DEFAULT_HOME_WIDGETS(6종) + `_watchlist_quote`(get_symbol_data 기반 경량 시세 — value/change/up/spark, Redis mq:wl:<code> 캐시) + `_clean_home_widgets`(검증: 위젯1~10·이름1~20·종목1~30) + `GET/POST /api/home-config` + `GET /api/watchlist/quotes`. 검증 `test_home_widgets.py` 16 PASS.
+
+**Phase 2 홈 렌더(2a65515):** 정적 market 카드 → 동적 위젯. `loadWidgets`(config+quotes fetch) + `renderWidgets`(matchMedia 분기). PC=`_renderTable`(위젯 탭바 + 표: 종목·현재가·등락%·스파크, 행클릭→symbol). 모바일=`_renderMobile`(전 위젯을 6개씩 페이지로 평탄화한 scroll-snap 캐러셀 + 도트, 스크롤 시 제목·도트 동기화). 헤더 ⚙→/settings. 검증 `test_home_widgets_live.js` 라이브 10 PASS(PC표 6행+^GSPC / 모바일 캐러셀·도트).
+
+**Phase 3 설정 페이지(180c0b2, 040a19c):** `/settings`(settings.html, 확장형 섹션) + base.html 사이드바·nav "설정". "홈 화면 설정" 섹션 = 위젯 매니저(이름 인라인 편집·▲▼ 순서·추가/삭제, 위젯별 종목 칩 ✕·종목추가 검색모달[/api/search]+지수/환율 프리셋칩·저장 POST). 비로그인→로그인 게이트. ⚠️ 기존 `/settings`=tax_settings 별칭 충돌 제거(tax=/tax-settings 유지). 검증 `test_settings_browser.js` 로컬 로그인 12 PASS(게이트·위젯 CRUD·검색/프리셋·저장 왕복·삭제·콘솔에러0) + 라이브 설정 게이트 PASS.
+
+전부 가법 — 기존 /api/market·tax-settings 무영향. 잔여(소) = 다크/반응형 육안.
+
 ## [2026-06-14] feature | 부채꼴 후속 — 세로 2배 + 슬라이더 in-place 애니 + 줌
 
 오너 피드백 3건. ① 세로 너무 좁음 → 전용 `.chart-wrap-fan` 240→480px(모바일 360, calculator.css). ② 슬라이더 굴릴 때마다 차트 재생성 → x축서 솟는 애니 거슬림. `_drawFan`(최초 생성)/`_updateFanBands`(슬라이더) 분리 — 기존 차트의 하단·상단 데이터셋 data/label만 교체 후 `chart.update()` → 중앙선(p50) 불변·밴드 경계만 부드럽게 morph. ③ 줌 = `chartjs-plugin-zoom@2.2.0` CDN(base.html, Chart.js 뒤) + fan options.plugins.zoom(`wheel.modifierKey:'ctrl'`·pinch·pan xy) + 카드에 조작 힌트("🔍 Ctrl+휠 확대·축소 · 드래그 이동 · 핀치") + `resetFanZoom()` [줌 초기화] 버튼. Ctrl 게이팅으로 일반 휠 스크롤 보존.

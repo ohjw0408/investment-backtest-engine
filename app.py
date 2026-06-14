@@ -287,7 +287,6 @@ def myportfolio_detail(pid):
 def myassets():
     return render_template('myassets.html')
 
-@app.route('/settings')
 @app.route('/tax-settings')
 def settings():
     return render_template('tax_settings.html')

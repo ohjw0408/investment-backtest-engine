@@ -321,6 +321,30 @@
         </div>
       </div>
 
+      <!-- 미래 시나리오 부채꼴 (경험적) -->
+      <div class="result-card" id="fanCard" style="display:none;">
+        <div class="result-card-title">미래 시나리오 부채꼴</div>
+        <div class="result-card-desc">과거 실제 구간들을 "이렇게 굴러갈 수도 있다"는 시나리오로 시작점에 모은 거예요. 미래 예측이 아니라 있는 데이터의 분포입니다. 슬라이더로 밴드 범위(퍼센타일)를 조절하세요.</div>
+        <div class="chart-wrap-lg">
+          <canvas id="fanChart"></canvas>
+        </div>
+        <div class="fan-controls">
+          <div class="fan-range">
+            <span class="fan-range-label">하단 <b id="fanLoVal">25</b>%</span>
+            <div class="fan-slider-wrap">
+              <input type="range" id="fanLo" min="1" max="99" value="25" class="fan-slider" oninput="onFanSlider('lo')">
+              <input type="range" id="fanHi" min="1" max="99" value="75" class="fan-slider" oninput="onFanSlider('hi')">
+            </div>
+            <span class="fan-range-label">상단 <b id="fanHiVal">75</b>%</span>
+          </div>
+          <div class="fan-legend">
+            <span><i class="fan-sw fan-sw-band"></i> 선택 밴드</span>
+            <span><i class="fan-sw fan-sw-mid"></i> 중앙값(p50)</span>
+            <span id="fanN" class="fan-n"></span>
+          </div>
+        </div>
+      </div>
+
       <!-- 지표 히스토그램 그리드 -->
       <div class="hist-section-title">지표 분포</div>
       <div class="hist-grid">
@@ -395,5 +419,5 @@
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260613feecard2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260614rollview2"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260614fan"></script>
 {% endblock %}

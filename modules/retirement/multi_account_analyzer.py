@@ -424,6 +424,11 @@ class MultiAccountAnalyzer:
                 if positive_cf > 0 and final_value > 0 and self.accumulation_years > 0:
                     metrics["cagr"] = (final_value / positive_cf) ** (1.0 / self.accumulation_years) - 1
 
+            # 경험적 부채꼴용 연차 궤적(합산 자산값)
+            from modules.multi_account_common import yearly_trajectory
+            metrics["_yearly"] = yearly_trajectory(
+                history_df, self.accumulation_years, final_value)
+
             account_cases = []
             for account_result, source_account in zip(run_result.account_results, self.accounts):
                 account_history = account_result["history_df"]

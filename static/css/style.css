@@ -681,6 +681,20 @@ a { text-decoration: none; color: inherit; }
 .rchart-seg { display: inline-flex; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
 .rchart-seg-btn { background: transparent; border: none; padding: 5px 12px; font-size: 0.76rem; font-weight: 700; color: var(--text-muted); cursor: pointer; font-family: inherit; }
 .rchart-seg-btn.active { background: var(--blue); color: #fff; }
+.fan-controls { margin-top: 12px; }
+.fan-range { display: flex; align-items: center; gap: 12px; }
+.fan-range-label { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+.fan-range-label b { color: var(--blue); font-family: 'DM Mono', monospace; }
+.fan-slider-wrap { position: relative; flex: 1; height: 24px; }
+.fan-slider-wrap::before { content: ''; position: absolute; top: 11px; left: 0; width: 100%; height: 3px; background: var(--border); border-radius: 2px; }
+.fan-slider { position: absolute; top: 0; left: 0; width: 100%; margin: 0; height: 24px; background: transparent; pointer-events: none; -webkit-appearance: none; appearance: none; }
+.fan-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; pointer-events: auto; cursor: pointer; width: 16px; height: 16px; border-radius: 50%; background: var(--blue); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+.fan-slider::-moz-range-thumb { pointer-events: auto; cursor: pointer; width: 16px; height: 16px; border-radius: 50%; background: var(--blue); border: 2px solid #fff; }
+.fan-legend { display: flex; gap: 16px; margin-top: 10px; font-size: 0.76rem; color: var(--text-muted); align-items: center; flex-wrap: wrap; }
+.fan-sw { display: inline-block; width: 14px; height: 10px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+.fan-sw-band { background: rgba(25,118,210,0.25); border: 1px solid rgba(25,118,210,0.5); }
+.fan-sw-mid { background: #1976D2; height: 3px; }
+.fan-n { margin-left: auto; }
 .share-url-box {
   display: none; margin-top: 8px; background: var(--bg);
   border: 1.5px solid var(--border); border-radius: 10px;

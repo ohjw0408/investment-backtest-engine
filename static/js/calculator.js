@@ -849,6 +849,9 @@ function renderResult(data, payload) {
   // 롤링 케이스 차트
   renderRollingChart(data.cases);
 
+  // 미래 시나리오 부채꼴 (경험적)
+  renderFan(data.fan);
+
   // 히스토그램들
   const histConfigs = [
     { id: 'histEndValue', key: 'end_value', fmt: fmtKRW,            color: '#1976D2', div: false },
@@ -1090,6 +1093,80 @@ function _renderRolling() {
           title: sorted ? { display: true, text: '수익률 낮음  ←———→  높음', color: '#90A4AE', font: { size: 11 } } : { display: false },
         },
         y: { ticks: { font: { family: 'DM Mono', size: 10 }, color: '#90A4AE', callback: valFmt }, grid: { color: MM_CHART_GRID } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 미래 시나리오 부채꼴 (경험적) — 과거 롤링 윈도우 시점별 퍼센타일 밴드
+// ═══════════════════════════════════════════════════════════
+let _fanData = null;
+
+function renderFan(fan) {
+  const card = document.getElementById('fanCard');
+  _fanData = (fan && fan.bands && fan.bands.length === 99) ? fan : null;
+  if (!_fanData) { if (card) card.style.display = 'none'; return; }
+  card.style.display = '';
+  const nEl = document.getElementById('fanN');
+  if (nEl) nEl.textContent = `시나리오 ${_fanData.n}개`;
+  _drawFan();
+}
+
+// 슬라이더 두 개로 밴드 하단/상단 퍼센타일 조정 (하단 < 상단 강제)
+function onFanSlider(which) {
+  const lo = document.getElementById('fanLo');
+  const hi = document.getElementById('fanHi');
+  let loV = parseInt(lo.value), hiV = parseInt(hi.value);
+  if (loV >= hiV) {
+    if (which === 'lo') { hiV = Math.min(99, loV + 1); hi.value = hiV; }
+    else               { loV = Math.max(1, hiV - 1);  lo.value = loV; }
+  }
+  document.getElementById('fanLoVal').textContent = loV;
+  document.getElementById('fanHiVal').textContent = hiV;
+  _drawFan();
+}
+
+function _drawFan() {
+  if (!_fanData) return;
+  if (chartInstances['fanChart']) chartInstances['fanChart'].destroy();
+
+  const loV = parseInt(document.getElementById('fanLo').value);
+  const hiV = parseInt(document.getElementById('fanHi').value);
+  // percentiles = [1..99] → 인덱스 = p-1
+  const rowLo  = _fanData.bands[loV - 1];
+  const rowHi  = _fanData.bands[hiV - 1];
+  const rowMid = _fanData.bands[49];   // p50
+  const labels = _fanData.axis.map(k => k === 0 ? '시작' : `${k}년차`);
+
+  const ctx = document.getElementById('fanChart').getContext('2d');
+  chartInstances['fanChart'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: `하단 p${loV}`, data: rowLo, borderColor: 'rgba(25,118,210,0.45)',
+          borderWidth: 1, pointRadius: 0, fill: false, tension: 0.2 },
+        { label: `상단 p${hiV}`, data: rowHi, borderColor: 'rgba(25,118,210,0.45)',
+          borderWidth: 1, pointRadius: 0, fill: '-1',
+          backgroundColor: 'rgba(25,118,210,0.18)', tension: 0.2 },
+        { label: '중앙값 p50', data: rowMid, borderColor: '#1976D2',
+          borderWidth: 2, pointRadius: 0, fill: false, tension: 0.2 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          title: items => items[0].label,
+          label: c => `${c.dataset.label}: ${fmtKRW(c.raw)}`,
+        } }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 12, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        y: { ticks: { font: { family: 'DM Mono', size: 10 }, color: '#90A4AE', callback: fmtKRW }, grid: { color: MM_CHART_GRID } }
       }
     }
   });

@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-14] feature | 투자계산기 미래 시나리오 부채꼴 (경험적 퍼센타일 밴드)
+
+오너 요청 = 부채꼴 차트. 핵심 결정 = **미래 예측 신규 0, 있는 데이터(과거 롤링 윈도우)를 "이렇게 굴러갈 수도 있다"는 시나리오로 시작점에 모은 경험적 부채꼴.** (GBM·모수 몬테카를로 아님 — 용어 정리: 현재 GBM 합성은 과거 백필용이고 그 자체가 이미 몬테카를로. 부채꼴은 별개로 미래 예측 안 하고 실측 궤적만 겹침.)
+
+오너 결정(AskUserQuestion 2라운드): 단일 Y축 절대금액₩ / x=경과 연차(1년차~N) / 별도 새 카드 / 듀얼핸들 슬라이더로 밴드 하단·상단 퍼센타일 **각각 1% 자유 조정**(기본 p25~p75) + p50 중앙선 / 합성 윈도우는 사용자 allow_synthetic 체크 따름(별도 필터 X) / 단일+멀티계좌 합산 둘 다.
+
+구현(전부 가법 — 기존 로직·값 무변경):
+- **백엔드** 공유 헬퍼 `modules/multi_account_common.py:yearly_trajectory(history, years, final_value)` — 윈도우 history(date·portfolio_value)에서 연차 offset별 자산값, 최종점=세후 end_value(헤드라인 일치). 단일 `accumulation_analyzer._run_rolling`·멀티 `multi_account_analyzer._run_rolling`이 case에 `metrics["_yearly"]` 부착(합산은 combined_history_df). `calculator_logic._build_fan(cases, years)` = 윈도우들 `_yearly` 모아 `np.percentile` p1~p99×(연차+1) 그리드 산출(서버 사전계산 → 슬라이더가 서버 재호출 0으로 임의 밴드 즉시 그림, 표본<5면 None). 양쪽 응답에 `fan` 키 추가. `_yearly` 원본은 cases_summary에서 제외(페이로드 보호).
+- **프론트** `calculator.html` 부채꼴 카드(`#fanCard`: canvas + 듀얼 range 슬라이더 + 범례), `style.css` 듀얼레인지 오버레이 CSS(`.fan-slider` pointer-events 트릭), `calculator.js` `renderFan`(카드 표시/숨김·그리드 저장)·`onFanSlider`(하단<상단 강제·라벨 갱신)·`_drawFan`(Chart.js line 3데이터셋, 상단 fill:'-1'로 밴드 채움, x='시작/N년차'). renderResult에서 `renderFan(data.fan)` 호출. 캐시 `?v=20260614fan`.
+
+검증: `tests/test_fan_logic.py` **15 PASS**(yearly_trajectory 궤적·final_value 오버라이드·빈값 / _build_fan 그리드 shape·year0 동일·p50 median·퍼센타일 단조·표본<5 None·길이불일치 제외) + `tests/test_fan_dom.js` **jsdom 12 PASS**(기본 25/75 밴드 선택·슬라이더 조정·하단≥상단 보정·null 숨김) + 실데이터 통합(SPY 단일 229윈도우, 2계좌 멀티 202윈도우 — fan 생성·year0 밴드폭0·p25<p50<p75 단조·`_yearly` 누설 0). ⚠️ 실브라우저 미검증·미배포(배포는 라이브 브라우저 테스트 선행).
+
 ## [2026-06-14] feature | 투자계산기 롤링 차트 보기 전환 (최종자산/CAGR/연도별)
 
 오너 요청 = 롤링 차트("시작 시점별 종료 자산") 위에 버튼 3개로 보기 전환. **기본 = 최종자산**(수익률 낮은순 정렬) / **CAGR**(수익률순, 음수면 빨강) / **연도별**(기존 시작 시점별, 입력 순서 유지).

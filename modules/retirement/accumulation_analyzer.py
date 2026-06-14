@@ -235,6 +235,11 @@ class AccumulationAnalyzer:
             if self.isa_renewal and self.tax_engine and _early is not None:
                 metrics["end_value_early_cancel"] = _early
 
+            # 경험적 부채꼴용 연차 궤적(시점별 자산값)
+            from modules.multi_account_common import yearly_trajectory
+            metrics["_yearly"] = yearly_trajectory(
+                history_df, self.accumulation_years, final_value)
+
             # 청산세 적용으로 end_value가 세전 history와 달라진 경우 → CAGR 재계산
             if final_value != raw_final:
                 total_contrib = (

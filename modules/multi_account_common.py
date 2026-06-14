@@ -8,6 +8,33 @@ Track G 멀티계좌 입력 정규화·검증·결과 헬퍼.
 """
 
 
+def yearly_trajectory(history, years: int, final_value=None) -> list:
+    """윈도우 history(date·portfolio_value)에서 연차별(0~years) 자산값을 뽑는다.
+
+    경험적 부채꼴용 — 각 롤링 윈도우의 시점별 궤적을 시작 정렬(offset 0=시작금)로 반환.
+    offset k = 시작일 + k년 시점 이하 마지막 자산값. 최종점(year N)은 final_value
+    (세후 end_value, 헤드라인 수치)와 일치시킨다.
+    """
+    import pandas as pd
+    if history is None or getattr(history, 'empty', True):
+        return []
+    df = history[['date', 'portfolio_value']].copy()
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.sort_values('date')
+    if df.empty:
+        return []
+    start = df['date'].iloc[0]
+    out = [float(df['portfolio_value'].iloc[0])]
+    for k in range(1, years + 1):
+        target = start + pd.DateOffset(years=k)
+        mask = df['date'] <= target
+        out.append(float(df.loc[mask, 'portfolio_value'].iloc[-1]) if mask.any()
+                   else float(df['portfolio_value'].iloc[-1]))
+    if final_value is not None and len(out) > 1:
+        out[-1] = float(final_value)
+    return out
+
+
 def normalize_multi_accounts(body: dict) -> list[dict]:
     """body의 accounts 배열을 시뮬용 표준 dict 리스트로 정규화.
 

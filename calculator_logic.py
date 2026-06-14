@@ -197,6 +197,28 @@ from modules.multi_account_common import (
 )
 
 
+def _build_fan(cases: list, years: int) -> dict | None:
+    """경험적 부채꼴 — 각 롤링 윈도우의 연차 궤적(_yearly)에서 시점별 퍼센틸 그리드 산출.
+
+    p1~p99 × (years+1) 그리드를 클라에 보내면 슬라이더가 서버 재호출 없이 임의 밴드를
+    즉시 그린다. 미래 예측 신규 없음 — 있는 데이터를 시작점 정렬로 겹친 것.
+    """
+    import numpy as np
+    trajs = [c.get('_yearly') for c in cases
+             if c.get('_yearly') and len(c['_yearly']) == years + 1]
+    if len(trajs) < 5:        # 표본 부족이면 부채꼴 생략
+        return None
+    arr = np.asarray(trajs, dtype=float)          # [N, years+1]
+    pct = list(range(1, 100))                     # p1..p99
+    grid = np.percentile(arr, pct, axis=0)        # [99, years+1]
+    return {
+        'axis':        list(range(0, years + 1)),         # 0~N 연차
+        'percentiles': pct,
+        'bands':       np.round(grid).tolist(),           # bands[i] = pct[i] 시점별 값
+        'n':           len(trajs),
+    }
+
+
 def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> dict:
     from modules.retirement.multi_account_analyzer import MultiAccountAnalyzer
 
@@ -491,6 +513,7 @@ def _run_multi_account_calculator_logic(body: dict, progress_callback=None) -> d
             'contribution_warnings': contribution_warnings,
         },
         'isa_cap_info':       isa_cap_info,
+        'fan':                _build_fan(result['cases'], years),
         'used_synthetic':     _prep_meta.get('used_synthetic', False),
         'synthetic_info':     _prep_meta.get('synthetic_info', {}),
         'backfilled':         _prep_meta.get('backfilled', []),
@@ -777,6 +800,7 @@ def run_calculator_logic(body: dict, progress_callback=None) -> dict:
                                      if body.get('fee_enabled') else None),   # D4 총 수수료(중앙값)
         'split_sale_plan':          split_sale_plan,
         'comprehensive_flag':       comprehensive_flag,
+        'fan':                      _build_fan(result['cases'], years),
         'used_synthetic':           _prep_meta.get('used_synthetic', False),
         'synthetic_info':           _prep_meta.get('synthetic_info', {}),
         'backfilled':               _prep_meta.get('backfilled', []),

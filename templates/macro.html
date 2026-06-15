@@ -25,6 +25,13 @@
 .mc-nores { color: var(--text-muted); font-size: 0.82rem; padding: 20px 4px; }
 
 /* 커스텀 겹쳐보기 */
+.mc-cust-hero { background: linear-gradient(135deg, rgba(25,118,210,0.08), rgba(230,81,0,0.06)); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px 18px; margin-top: 14px; }
+.mc-cust-hero h3 { font-size: 0.98rem; font-weight: 800; margin: 0 0 4px; }
+.mc-cust-hero p { font-size: 0.8rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
+.mc-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.mc-preset { border: 1.5px solid var(--border); background: var(--card); color: var(--text); border-radius: 10px; padding: 8px 13px; font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: border-color .15s; }
+.mc-preset:hover { border-color: var(--blue); }
+.mc-preset.on { border-color: var(--blue); background: rgba(25,118,210,0.1); }
 .mc-cust-intro { font-size: 0.82rem; color: var(--text-muted); margin: 10px 0 12px; line-height: 1.5; }
 .mc-cust-search { position: relative; max-width: 480px; }
 .mc-cust-search input { width: 100%; padding: 9px 13px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--input-bg, var(--bg)); color: var(--text); font-size: 0.85rem; font-family: inherit; box-sizing: border-box; }
@@ -128,5 +135,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/macro.js') }}?v=20260615macro3"></script>
+<script src="{{ url_for('static', filename='js/macro.js') }}?v=20260615macro4"></script>
 {% endblock %}

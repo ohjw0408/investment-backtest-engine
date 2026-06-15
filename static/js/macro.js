@@ -7,6 +7,14 @@
   let custom = [];          // [{key,label,color}]
   let custStart = null, custEnd = null, custViewMode = 'norm';  // 구간·표시모드
   let custRaw = {};         // 최근 fetch 원본 {key:series}
+  let activePreset = 0;
+  // 큐레이션 예시: 종목·지수·거시지표를 섞어 "겹쳐보기"가 뭔지 한눈에
+  const PRESETS = [
+    { title: '🇰🇷 코스피 · 환율 · 기준금리', items: [['SYM:^KS11', '코스피(KOSPI)'], ['KR_USDKRW', '원/달러 환율'], ['KR_BASE_RATE', '한국 기준금리']] },
+    { title: '🇺🇸 S&P500 · 기준금리 · VIX', items: [['SYM:^GSPC', 'S&P 500'], ['US_FEDFUNDS', '미 기준금리'], ['US_VIXCLS', 'VIX']] },
+    { title: '💻 애플 · 나스닥100 · 미10년물', items: [['SYM:AAPL', '애플'], ['SYM:^NDX', '나스닥100'], ['US_DGS10', '미 국채 10년']] },
+    { title: '🥇 금 · 달러지수 · 기대인플레', items: [['SYM:GC=F', '금 선물'], ['US_DTWEXBGS', '달러지수'], ['US_T10YIE', '기대인플레 10Y']] },
+  ];
 
   const $ = (id) => document.getElementById(id);
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -86,9 +94,13 @@
   // ── 커스텀 겹쳐보기 ──
   function renderCustom() {
     $('mcBody').innerHTML = `
-      <div class="mc-cust-intro">단위가 달라도 여러 지표·종목을 겹쳐 <b>추세(경향성)</b>를 비교합니다. 기본은 공통 시작점=100 정규화. 최대 6개.</div>
-      <div class="mc-cust-search">
-        <input type="text" id="mcCustInput" placeholder="🔍 지표·종목 추가 (예: M2, 환율, 국고채, AAPL)…" autocomplete="off">
+      <div class="mc-cust-hero">
+        <h3>🔬 무엇이든 겹쳐 비교</h3>
+        <p>주식·ETF·지수·거시경제지표를 한 차트에 겹쳐 <b>추세(경향성)</b>를 비교합니다. 단위가 달라도 시작점=100 정규화 또는 개별 축으로 함께 봅니다. 아래 예시를 눌러보거나 직접 추가하세요.</p>
+        <div class="mc-presets" id="mcPresets">${PRESETS.map((p, i) => `<button class="mc-preset ${i === activePreset ? 'on' : ''}" data-i="${i}">${p.title}</button>`).join('')}</div>
+      </div>
+      <div class="mc-cust-search" style="margin-top:14px">
+        <input type="text" id="mcCustInput" placeholder="🔍 직접 추가 (예: 삼성전자, 코스피, 국고채, AAPL, CPI)…" autocomplete="off">
         <div class="mc-dd" id="mcCustDD"></div>
       </div>
       <div class="mc-chips" id="mcChips"></div>
@@ -99,10 +111,18 @@
     inp.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => custSearch(inp.value), 220); });
     inp.addEventListener('focus', () => { if (inp.value.trim()) custSearch(inp.value); });
     document.addEventListener('click', (e) => { if (!dd.contains(e.target) && e.target !== inp) dd.classList.remove('open'); });
-    renderChips();
-    if (!custom.length) {  // 기본 예시 2종
-      addCustom('KR_M2', '한국 M2(평잔, 계절조정)'); addCustom('KR_USDKRW', '원/달러 매매기준율');
-    } else { loadCustomChart(); }
+    $('mcPresets').querySelectorAll('button').forEach(b => b.addEventListener('click', () => loadPreset(+b.dataset.i)));
+    if (!custom.length) loadPreset(activePreset);   // 기본 = 첫 예시
+    else { renderChips(); loadCustomChart(); }
+  }
+
+  function loadPreset(i) {
+    activePreset = i;
+    custom = PRESETS[i].items.map(([key, label], idx) => ({ key, label, color: PALETTE[idx % PALETTE.length] }));
+    custStart = custEnd = null; custViewMode = 'norm';
+    const ps = $('mcPresets');
+    if (ps) ps.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.i === i));
+    renderChips(); loadCustomChart();
   }
 
   async function custSearch(q) {
@@ -130,12 +150,13 @@
     }));
   }
 
+  function clearPresetHL() { activePreset = -1; const ps = $('mcPresets'); if (ps) ps.querySelectorAll('button').forEach(b => b.classList.remove('on')); }
   function addCustom(key, label) {
     if (custom.find(c => c.key === key) || custom.length >= 6) return;
     custom.push({ key, label, color: PALETTE[custom.length % PALETTE.length] });
-    renderChips(); loadCustomChart();
+    clearPresetHL(); renderChips(); loadCustomChart();
   }
-  function removeCustom(key) { custom = custom.filter(c => c.key !== key); custom.forEach((c, i) => c.color = PALETTE[i % PALETTE.length]); renderChips(); loadCustomChart(); }
+  function removeCustom(key) { custom = custom.filter(c => c.key !== key); custom.forEach((c, i) => c.color = PALETTE[i % PALETTE.length]); clearPresetHL(); renderChips(); loadCustomChart(); }
 
   function renderChips() {
     $('mcChips').innerHTML = custom.map(c => `<span class="mc-chip2" style="background:${c.color}">${c.label}<button data-k="${c.key}">×</button></span>`).join('')

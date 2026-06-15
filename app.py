@@ -279,6 +279,10 @@ def risk_return_page():
 def macro_page():
     return render_template('macro.html')
 
+@app.route('/calendar')
+def calendar_page():
+    return render_template('calendar.html')
+
 @app.route('/myportfolios')
 def myportfolios():
     return render_template('myportfolios.html')
@@ -1865,6 +1869,34 @@ def api_macro_intraday(code):
         return jsonify({'error': 'no intraday'}), 404
     rng = request.args.get('range', 'max')
     return jsonify({'rows': macro_loader.get_intraday_cached(spec['yf'], rng)})
+
+def _calendar_user_codes(uid):
+    """저장 포트폴리오 + 홈 위젯(관심목록)에서 종목 코드 수집."""
+    codes = set()
+    try:
+        for pf in get_portfolios(uid):
+            for t in pf.get('tickers', []):
+                if isinstance(t, dict) and t.get('code'):
+                    codes.add(str(t['code']))
+    except Exception:
+        pass
+    try:
+        for w in (get_home_widgets(uid) or []):
+            for it in (w.get('items') or []):
+                if isinstance(it, dict) and it.get('code'):
+                    codes.add(str(it['code']))
+    except Exception:
+        pass
+    return list(codes)[:40]
+
+@app.route('/api/calendar')
+def api_calendar():
+    """증시 캘린더 이벤트: 경제지표 발표일(공개) + 내 종목 실적·배당(로그인)."""
+    from modules import market_calendar
+    uid = session.get('user_id')
+    codes = _calendar_user_codes(uid) if uid else []
+    return jsonify({'events': market_calendar.events_for(codes),
+                    'logged_in': bool(uid), 'symbol_count': len(codes)})
 
 @app.route('/api/macro/curves')
 def api_macro_curves():

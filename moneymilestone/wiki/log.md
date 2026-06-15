@@ -1,5 +1,9 @@
 # Log
 
+## [2026-06-15] feature | 증시 캘린더 `/calendar` (Step 6, PART B 완료)
+
+플랜 `거시지표_캘린더_plan.md` PART B. **읽기 전용 캘린더**(알림 X — 추후 리밸런싱 알림 때). 이벤트 3종: **경제지표 발표일**(FRED `/fred/release/dates`, 향후 포함, 주요 9개 release_id 큐레이션 — CPI10·PPI46·고용50·GDP53·PCE54·소매9·산업생산13·JOLTS192·FOMC101) + **내 종목 실적 발표일·배당락일**(yfinance `Ticker.calendar`, 로그인 시 저장 포트폴리오+홈위젯 종목). 신규 `modules/market_calendar.py`(econ_events·symbol_events·events_for, 일 단위 메모리 캐시; KR 6자리→.KS, 지수/금/크립토 제외) + `/calendar` 페이지·`/api/calendar`(공개=지표, 로그인=내 종목 추가) + `templates/calendar.html`·`static/js/calendar.js`(월 그리드 PC·리스트 모바일·필터 전체/지표/실적/배당·prev/next/오늘·색상 범례) + nav/사이드바 "📅 증시 캘린더". 검증 = econ 553이벤트·symbol_events(AAPL 실적7/31·배당락5/11, 005930 동일, 지수/금 제외) + Playwright(30셀·이벤트·월이동·econ필터·콘솔에러 0). ⚠️ 실적·배당 예정일 yfinance 추정(변동·누락 가능) 면책. **거시지표 캘린더 플랜 PART A+B 완료, C3(포폴비교 통합)만 잔여.**
+
 ## [2026-06-15] feature | 거시지표 커브 뷰 7종 (📐 만기축 단면)
 
 오너 요청 — 무료 가능 커브 전부. **신규 📐 커브 토글.** 7종: 미 국채 수익률·미 국채 실질(TIPS)·한 국고채·미 BEI 기대인플레·미 IG OAS 만기버킷·미 회사채 등급별 OAS·VIX 기간구조. (선물/CDS/FX포워드/스왑=데이터벽 제외 — 커브 점=별도 만기시리즈 필요, 원자재는 연속물 1개뿐이라 불가.) **커브 노드 25종 신규 백필**(DFII7/20/30·T7/20/30YIEM·IG 만기버킷 6·등급 OAS 7[CCC=BAMLH0A3HYC]·KTB2/20/30·VIX9D/3M/6M), `curve_only=True`로 카드 그리드 미표시(카드 151 유지, DB 시리즈 176). **백엔드:** `CURVES` 정의 + `get_curve(id)`(노드별 월말 매트릭스 + 최신 스냅샷) + `/api/macro/curves`·`/api/macro/curve/<id>`. **UI:** 커브 선택 버튼 + 최신 곡선 + 과거 비교(1·3·5년 전 점선 오버레이) + 월 슬라이더(시점 스크럽) + UST는 implied forward(근사) 토글. x=만기(년)/등급·기간(범주). 검증 Playwright(7커브·스냅샷/슬라이더/forward 데이터셋·rating 7점·카드 151·콘솔에러 0) + 값 sanity(UST 우상향·rating AAA0.34→CCC9.56·VIX 콘탱고).

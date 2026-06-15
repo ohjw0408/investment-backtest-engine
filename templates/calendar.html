@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}증시 캘린더 — Money Milestone{% endblock %}
+
+{% block head %}
+<style>
+.cal-wrap { grid-column: 1 / -1; max-width: 1100px; margin: 0 auto; width: 100%; box-sizing: border-box; padding: 24px; }
+.cal-title { font-size: 1.15rem; font-weight: 800; }
+.cal-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+.cal-bar { display: flex; align-items: center; gap: 12px; margin: 16px 0 10px; flex-wrap: wrap; }
+.cal-nav { display: inline-flex; align-items: center; gap: 8px; }
+.cal-nav button { border: 1.5px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; font-family: inherit; }
+.cal-nav .mlabel { font-size: 1.02rem; font-weight: 800; min-width: 120px; text-align: center; }
+.cal-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.cal-filters button { border: 1.5px solid var(--border); background: var(--bg); color: var(--text-muted); border-radius: 16px; padding: 5px 11px; font-size: 0.76rem; cursor: pointer; font-family: inherit; }
+.cal-filters button.on { border-color: var(--blue); color: var(--blue); font-weight: 700; }
+
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.cal-dow { text-align: center; font-size: 0.72rem; color: var(--text-muted); font-weight: 700; padding: 4px 0; }
+.cal-cell { min-height: 92px; border: 1.5px solid var(--border); border-radius: 9px; padding: 5px 6px; background: var(--card); display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.cal-cell.empty { background: transparent; border: none; }
+.cal-cell.today { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue) inset; }
+.cal-daynum { font-size: 0.74rem; font-weight: 700; color: var(--text-muted); }
+.cal-cell.sun .cal-daynum { color: #C62828; }
+.cal-ev { font-size: 0.66rem; border-radius: 5px; padding: 2px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; color: #fff; }
+.cal-ev.econ { background: #1976D2; }
+.cal-ev.earnings { background: #6A1B9A; }
+.cal-ev.dividend { background: #2E7D32; }
+.cal-more { font-size: 0.64rem; color: var(--text-muted); }
+
+.cal-legend { display: flex; gap: 14px; font-size: 0.75rem; color: var(--text-muted); margin: 12px 0; flex-wrap: wrap; }
+.cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.cal-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.cal-note { font-size: 0.74rem; color: var(--gold-deep, #B26A00); background: var(--gold-pale, #FFF8E1); border-radius: 8px; padding: 8px 11px; margin-top: 6px; }
+.cal-loginnote { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; }
+
+/* 모바일 = 리스트 */
+@media (max-width: 720px) {
+  .cal-grid { display: none; }
+  .cal-list { display: block; }
+}
+.cal-list { display: none; margin-top: 10px; }
+.cal-list-day { border: 1.5px solid var(--border); border-radius: 9px; padding: 10px 12px; margin-bottom: 8px; background: var(--card); }
+.cal-list-day h4 { margin: 0 0 6px; font-size: 0.85rem; }
+.cal-list-ev { font-size: 0.78rem; padding: 3px 0; display: flex; gap: 7px; align-items: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cal-wrap">
+  <div class="cal-title">📅 증시 캘린더</div>
+  <div class="cal-sub">경제지표 발표일 + 내 종목 실적·배당락일을 한눈에. (읽기 전용)</div>
+
+  <div class="cal-bar">
+    <div class="cal-nav">
+      <button id="calPrev">‹</button>
+      <span class="mlabel" id="calMonth"></span>
+      <button id="calNext">›</button>
+      <button id="calToday">오늘</button>
+    </div>
+    <div class="cal-filters" id="calFilters">
+      <button data-f="all" class="on">전체</button>
+      <button data-f="econ">지표</button>
+      <button data-f="earnings">실적</button>
+      <button data-f="dividend">배당</button>
+    </div>
+  </div>
+
+  <div class="cal-legend">
+    <span><span class="cal-dot" style="background:#1976D2"></span> 경제지표 발표</span>
+    <span><span class="cal-dot" style="background:#6A1B9A"></span> 실적 발표</span>
+    <span><span class="cal-dot" style="background:#2E7D32"></span> 배당락일</span>
+  </div>
+
+  <div class="cal-dows cal-grid" id="calDows"></div>
+  <div class="cal-grid" id="calGrid"></div>
+  <div class="cal-list" id="calList"></div>
+
+  <div class="cal-loginnote" id="calLoginNote"></div>
+  <div class="cal-note">⚠️ 실적·배당 예정일은 yfinance 추정으로 변동·누락될 수 있습니다. 경제지표는 FRED 공식 일정입니다.</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/calendar.js') }}?v=20260615cal1"></script>
+{% endblock %}

@@ -1901,7 +1901,7 @@ def api_calendar():
     from modules import market_calendar
     uid = session.get('user_id')
     codes = _calendar_user_codes(uid) if uid else []
-    return jsonify({'events': market_calendar.events_for(codes),
+    return jsonify({'events': market_calendar.events_for(codes, portfolio_engine.loader),
                     'logged_in': bool(uid), 'symbol_count': len(codes)})
 
 @app.route('/api/macro/curves')

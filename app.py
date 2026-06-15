@@ -1871,8 +1871,14 @@ def api_macro_intraday(code):
     return jsonify({'rows': macro_loader.get_intraday_cached(spec['yf'], rng)})
 
 def _calendar_user_codes(uid):
-    """저장 포트폴리오 + 홈 위젯(관심목록)에서 종목 코드 수집."""
+    """내 자산(보유) + 저장 포트폴리오 + 홈 위젯(관심목록)에서 종목 코드 수집."""
     codes = set()
+    try:
+        for h in get_holdings(uid):
+            if h.get('code'):
+                codes.add(str(h['code']))
+    except Exception:
+        pass
     try:
         for pf in get_portfolios(uid):
             for t in pf.get('tickers', []):
@@ -1887,7 +1893,7 @@ def _calendar_user_codes(uid):
                     codes.add(str(it['code']))
     except Exception:
         pass
-    return list(codes)[:40]
+    return list(codes)[:50]
 
 @app.route('/api/calendar')
 def api_calendar():

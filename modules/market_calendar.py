@@ -16,6 +16,8 @@ import requests
 BASE = Path(__file__).resolve().parent.parent
 FRED_KEY_FILE = BASE / "data" / "meta" / "fred_api_key.txt"
 ECON_CACHE_FILE = BASE / "data" / "meta" / "cal_econ_cache.json"
+POLICY_FILE = BASE / "data" / "meta" / "policy_meetings.json"
+POLICY_TITLES = {"fomc": "🇺🇸 FOMC (기준금리 결정)", "bok": "🇰🇷 한은 금통위 (기준금리)"}
 
 # FRED release_id → 표시명 (주요 지표만 큐레이션)
 CAL_RELEASES = {
@@ -92,6 +94,24 @@ def _econ_events_all():
         ECON_CACHE_FILE.write_text(json.dumps({"date": tk, "events": out}), encoding="utf-8")
     except Exception:
         pass
+    return out
+
+
+def policy_events():
+    """통화정책 결정일(US FOMC + KR 금통위) — 연 1회 공식 확정, 큐레이션 JSON. 네트워크 없음."""
+    try:
+        data = json.loads(POLICY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    floor = (datetime.date.today() - datetime.timedelta(days=45)).isoformat()
+    out = []
+    for kind, dates in data.items():
+        if kind.startswith("_") or not isinstance(dates, list):
+            continue
+        title = POLICY_TITLES.get(kind, kind)
+        for d in dates:
+            if isinstance(d, str) and d >= floor:
+                out.append({"date": d, "type": "policy", "title": title, "kind": kind})
     return out
 
 
@@ -178,8 +198,9 @@ def dividend_events(loader, codes, names=None):
 
 
 def events_for(codes, loader=None, econ_ids=None, show_earnings=True, show_dividend=True, names=None):
-    """경제지표 + 실적(개별주) + 배당락(배당엔진). 종목명(names) 적용. config로 필터."""
+    """경제지표 + 통화정책 결정일 + 실적(개별주) + 배당락(배당엔진). 종목명(names) 적용. config로 필터."""
     out = list(econ_events(econ_ids))
+    out.extend(policy_events())
     codes = list(dict.fromkeys(codes or []))
     names = dict(names or {})
     if codes:

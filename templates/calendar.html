@@ -27,6 +27,7 @@
 .cal-ev.econ { background: #1976D2; }
 .cal-ev.earnings { background: #6A1B9A; }
 .cal-ev.dividend { background: #2E7D32; }
+.cal-ev.policy { background: #B8860B; }
 .cal-more { font-size: 0.64rem; color: var(--text-muted); }
 .cal-ev.clickable, .cal-list-ev.clickable { cursor: pointer; }
 .cal-ev.clickable:hover { filter: brightness(1.12); }
@@ -73,7 +74,7 @@
 {% block content %}
 <div class="cal-wrap">
   <div class="cal-title">📅 증시 캘린더</div>
-  <div class="cal-sub">경제지표 발표일 + 내 종목 실적·배당락일을 한눈에. (읽기 전용)</div>
+  <div class="cal-sub">경제지표 발표일 + 통화정책 결정일(FOMC·금통위) + 내 종목 실적·배당락일을 한눈에. (읽기 전용)</div>
 
   <div class="cal-bar">
     <div class="cal-nav">
@@ -93,6 +94,7 @@
 
   <div class="cal-legend">
     <span><span class="cal-dot" style="background:#1976D2"></span> 경제지표 발표</span>
+    <span><span class="cal-dot" style="background:#B8860B"></span> 통화정책 결정(FOMC·금통위)</span>
     <span><span class="cal-dot" style="background:#6A1B9A"></span> 실적 발표</span>
     <span><span class="cal-dot" style="background:#2E7D32"></span> 배당락일</span>
   </div>
@@ -108,5 +110,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/calendar.js') }}?v=20260615cal4"></script>
+<script src="{{ url_for('static', filename='js/calendar.js') }}?v=20260615cal5"></script>
 {% endblock %}

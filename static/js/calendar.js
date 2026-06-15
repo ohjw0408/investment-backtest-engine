@@ -6,7 +6,7 @@
   let filter = 'all';
   let loggedIn = false;
   const DOW = ['일', '월', '화', '수', '목', '금', '토'];
-  const TYPE_CLS = { econ: 'econ', earnings: 'earnings', dividend: 'dividend' };
+  const TYPE_CLS = { econ: 'econ', earnings: 'earnings', dividend: 'dividend', policy: 'policy' };
 
   function ymd(d) { return d.toISOString().slice(0, 10); }
 
@@ -71,7 +71,8 @@
   function eventsByDate() {
     const map = {};
     for (const ev of EVENTS) {
-      if (filter !== 'all' && ev.type !== filter) continue;
+      // 통화정책(policy)은 '지표' 필터에 함께 노출
+      if (filter !== 'all' && ev.type !== filter && !(filter === 'econ' && ev.type === 'policy')) continue;
       (map[ev.date] = map[ev.date] || []).push(ev);
     }
     return map;
@@ -113,7 +114,7 @@
       const evs = map[ds] || [];
       if (!evs.length) continue;
       list += `<div class="cal-list-day"><h4>${m + 1}/${day} (${DOW[new Date(y, m, day).getDay()]})</h4>`
-        + evs.map(e => `<div class="cal-list-ev${e.type === 'dividend' ? ' clickable' : ''}"${divData(e)}><span class="cal-dot" style="background:${e.type === 'econ' ? '#1976D2' : e.type === 'earnings' ? '#6A1B9A' : '#2E7D32'}"></span>${e.title}</div>`).join('')
+        + evs.map(e => `<div class="cal-list-ev${e.type === 'dividend' ? ' clickable' : ''}"${divData(e)}><span class="cal-dot" style="background:${e.type === 'econ' ? '#1976D2' : e.type === 'policy' ? '#B8860B' : e.type === 'earnings' ? '#6A1B9A' : '#2E7D32'}"></span>${e.title}</div>`).join('')
         + `</div>`;
     }
     $('calList').innerHTML = list || '<div class="cal-loginnote">이 달 이벤트 없음.</div>';

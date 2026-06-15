@@ -4,6 +4,10 @@
 >
 > 🔵 **다음 후보: PHASE4 잔여 = D1 · D2 · C2 · B4** (C1·A4·D4 완료).
 
+## [2026-06-15] plan | 연산 성능 최적화 계획(`성능최적화_plan.md`)
+
+오너 요청 = 전 연산경로(시뮬엔진·가격로더·세금·겹쳐보기) 정독 후 1 vCPU/4GB·결과불변 최적화 계획. **핵심 발견:** ① **롤링 윈도우 가격 재로드(P0)** = AccumulationAnalyzer(:170)·MultiAccountAnalyzer(_load_prices)가 윈도우마다 `price_loader.load`(DB+reindex+ffill) 재실행(수백회). **WithdrawalAnalyzer(:226)는 이미 1회 로드+슬라이스** = 모범 패턴 존재 → 미적용 분석기를 끌어올리면 결과불변·5~20×. ② **1 vCPU에서 multiprocessing.Pool 역효과** — 속도이득0 + 프로세스마다 full_price_data 복제로 4GB OOM 위험(WithdrawalAnalyzer Pool). ③ per-day 멤버십테스트·엔진캐시 무한증식·C3 겹쳐보기 보유종목별 get_symbol_data(~2s)·watchlist 순차. **전략:** CPU-bound=일 줄이기(중복제거·벡터화), I/O-bound=ThreadPool 병렬. **선행=골든마스터+벤치 하니스(결과불변 안전장치).** 미착수(계획만).
+
 ## [2026-06-15] fix+ui | 점 티커(BRK.B) 데이터·겹쳐보기 툴팁 중복·비교탭 UI 재배치
 
 오너 3건. ① **BUG-DOT-TICKER**: 버크셔 등 점 US 티커 클릭→데이터 없음. `get_symbol_data` 입구 `split(".")[0]`이 BRK.B→BRK로 절단 + yfinance는 BRK-B 필요. → 입구는 `.KS`/`.KQ`만 제거, 신규 `_yf_dl_ticker`(US 점→하이픈) 3곳 적용. BRK.B 1256pt 확인, 회귀0. ② **BUG-MACRO-OVERLAP-TIP**: 거시 겹쳐보기 hover 중복 툴팁. `baseOpts` `mode:'x'`→`'index'` + datasetIndex 중복 filter. v=macro12. ③ **비교탭 UI 재배치**(오너 디자인): 순서 = 광고(맨위)→📈추세 겹쳐보기→🔬포트폴리오 정밀 비교(선택+결과). "비교하기"→**"📊 정밀 비교하기" 큰 버튼**(전폭) + 정밀비교 카드에 설명("겹쳐보기는 추세만, 여기선 11지표 정밀비교") — 별도 비교 기능 존재를 명확히 노출. 검증 = 3파일 구문/파싱 OK.

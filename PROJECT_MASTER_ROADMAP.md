@@ -31,6 +31,7 @@ Do not merge the detailed plans into one giant document. Keep them separate and 
 | `다계좌세금_E2E검증_plan.md` | 4탭(계산기·백테·은퇴sim·인출기) 멀티계좌 세금 배선 Playwright 실브라우저 자동검증 16건. **= P0 L7의 실행판.** | ✅ **완료(2026-06-11) — 16/16 PASS.** 상시 재실행 자산 = `tests/e2e_multitax/run_all.js`. |
 | `합성상관계수_plan.md` | 합성 pre-history 종목 간 상관 복원(조건부 다변량) | ✅ 구현 완료(2026-06-06, `synthetic_mvn.py`). ⚠️ 서버 실데이터 검증 대기. |
 | `divrefactoring.md` | 배당금계산기 엔진을 공용 Runner 파이프라인으로 통합 | 💡 미착수 — P4 배당 절세의 선행 후보. |
+| `성능최적화_plan.md` | 시뮬 엔진·가격로더·세금·겹쳐보기 등 전 연산경로 성능 최적화(1 vCPU/4GB, 결과 불변). | 📋 계획 수립(2026-06-15). 최대 레버 = 롤링 윈도우 가격 재로드 제거(P0). 1vCPU라 multiprocessing.Pool 역효과 발견. 착수 전 골든마스터 하니스 선행. |
 
 ## Current Situation
 

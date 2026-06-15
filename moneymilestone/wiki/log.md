@@ -1,32 +1,30 @@
 # Log
 
-## [2026-06-15] feature(WIP) | 거시경제 지표 — 데이터 레이어(Step 1/6)
+## [2026-06-15] feature | 거시경제 지표 탭 `/macro` 신규 — 배포·라이브 (플랜 `거시지표_캘린더_plan.md`)
 
-신규 기능 플랜 `거시지표_캘린더_plan.md`(거시지표 탭 + 증시 캘린더, 알림 제외) 착수. 오너 한·미 지표 전체 승인.
+신규 기능. 거시지표 탭(완료) + 증시 캘린더(미착수). 알림 제외(추후 리밸런싱 알림 때). 커밋 0df9740→040ca98(8개). 프로덕션 라이브 = moneymilestone.duckdns.org/macro. 매 변경 Playwright 콘솔에러 0 검증.
 
-**Step 1 완료(데이터 레이어):** 신규 `modules/macro_loader.py` — SERIES 레지스트리 86종(미국 FRED 66 + 한국 ECOS 20) + `fetch_fred`(공식 API, 키 `data/meta/fred_api_key.txt`)·`fetch_ecos`(StatisticSearch, 키 `data/meta/ecos_api_key.txt`)·`backfill`·`validate`. 신규 테이블 `macro_series`(메타)·`macro_observations`(시계열) in `index_master.db`. **전 코드 라이브 실호출 검증 → 86/86 적재 = 283,536행.**
+**데이터(`modules/macro_loader.py`)** — SERIES 레지스트리 **총 129종**. 소스 3개: 미국 FRED 공식 API(키 `data/meta/fred_api_key.txt`) / 한국 ECOS StatisticSearch(키 `data/meta/ecos_api_key.txt`) / 시장지수 yfinance. 신규 테이블 `macro_series`(메타·설명)·`macro_observations`(시계열) in `index_master.db`. 전 코드 라이브 실호출 검증.
+- 카테고리: 주가지수(39)·금리·인플레이션·고용·통화유동성·신용리스크·경기성장·시장환율. country = US/KR/GL.
+- **KOSIS 불필요 확정** — 한국 고용·산업생산·선행지수·주택가격·BSI·CSI 전부 ECOS 수록(고용 901Y027/실업률 I61BC·고용률 I61E, 선행 901Y067/I16A, M2 161Y005/BBHS00, GDP 200Y107/10601, BSI 512Y008/[BA,99988] 2차원 등 라이브 확정).
+- 제외: `GOLDAMGBD228NLBM`(FRED 폐지)·`USALOLITONOSTSAM`(OECD CLI stale 2024).
+- 시장지수 yfinance 39종: US(S&P500·다우·나스닥종합/100·러셀1000/2000/3000·S&P100/400/600·윌셔5000·NYSE·SOX 필라델피아반도체·FANG+·다우운송/유틸·DXY) / KR(코스피·코스닥·코스피200) / GL(닛케이·항셍·상해·대만·센섹스·FTSE·DAX·유로스톡스50·STOXX600·CAC40·IBEX·SMI·ASX200·TSX·보베스파·멕시코·STI·니프티50·인니).
+- 전 지표 출범부터 전체 히스토리(DGS10 1962·CPI 1947). `DESCRIPTIONS` 129종 1~2줄 한글 설명.
 
-**코드 확정(실호출):** FRED 69종 중 68 존재 — 제외 2 = `GOLDAMGBD228NLBM`(폐지 HTTP400, 금은 기존 KRX_GOLD/yfinance 보유)·`USALOLITONOSTSAM`(OECD 미 CLI FRED 최신 2024-01 stale). 한국 ECOS = KOSIS 불필요 확정(고용 901Y027/실업률 I61BC·고용률 I61E·참가율 I61D, 산업생산 901Y033/[A00,1], 선행지수 901Y067/I16A, M2 161Y005/BBHS00, GDP 200Y107/10601, BSI 512Y008/[BA,99988], CSI 511Y002/FME, 주택가격 901Y062/P63A, 가계신용 151Y001 등 전부 ECOS 수록). 2차원 통계표 item 순서·GDP 가격기준 라이브 검증 완료.
+**UI(`templates/macro.html`·`static/js/macro.js`)** + 라우트 `/macro`·`/api/macro/{overview,series/<code>,compare,multi}` + nav/사이드바 "🌐 거시지표".
+- 토글: 🇺🇸미국 / 🇰🇷한국 / 🌏글로벌지수 / 🆚한·미비교 / 🔬겹쳐보기.
+- 카테고리 섹션 + 카드그리드(PC 6칸=`.mc-wrap{grid-column:1/-1}`로 308px 레일 탈출, SVG 스파크·등락·hover 툴팁). 지표 검색창(이름 실시간 필터).
+- 카드클릭→상세 모달: 전체 시계열 + 기간 토글(3개월/1년/5년/전체, **날짜 기준**) + 설명 박스. 지수는 라인/캔들 토글(Lightweight Charts, `/api/symbol/<yf>` OHLC 재사용).
+- 한·미 비교: 고정 12쌍, 단위 자동(%·%p 원값 / 그 외 시작=100 정규화).
+- **겹쳐보기(🔬)**: 거시지표+종목/ETF/지수 임의 N개(≤6) 추세 비교. 예시 프리셋 4종(코스피·환율·기준금리 등)·온보딩 히어로. 비교구간(시작/종료일+퀵)·표시모드(원값 개별축[기본]/정규화 시작=100). `/api/macro/multi`(토큰 = 거시코드|`SYM:<종목>`).
 
-**Step 4 완료(/macro UI, 로컬 검증·미배포):** 오너 결정 = 레이아웃 A(국가토글 US/KR/비교 + 카테고리 섹션 + 카드그리드), 카드클릭→전체 시계열, 한미비교는 단위별 자동(%·%p 원값 / 그 외 시작=100 정규화). 한국 국채금리 4종(817Y002 KTB1/3/10Y·CD91) 레지스트리 추가 → 90종. 신규 `templates/macro.html`+`static/js/macro.js`(SVG 스파크라인 90카드·경량, 상세/비교=Chart.js, 날짜→연단위 선형축으로 date-adapter 의존 회피) + 라우트 `/macro`·`/api/macro/{overview,series/<code>,compare}` + base.html nav/사이드바("🌐 거시지표"). 검증 = 라이브 엔드포인트 4종 + Playwright(US 67카드·KR 23·스파크 67·상세캔버스·비교캔버스·12쌍·비교모드문구·콘솔에러 0).
+**자동갱신(Step3)** — `refresh()` 증분 + `tasks.refresh_macro` + `celery_app` beat 2회/일(US 21:30·KR 07:00 UTC).
 
-**배포 완료(커밋 0df9740):** push→Actions→Hetzner. deploy.yml에 `venv/bin/python -m modules.macro_loader --ensure || true`(서버 테이블 비었을 때만 최초 백필; FRED/ECOS 키 서버보유) 추가. 서버 자동백필 작동 확인 = 프로덕션 `/api/macro/overview` 90종 반환. 읽기경로 ensure_schema로 빈테이블 크래시 방지(C1 index_ohlc 교훈). **라이브 검증:** Playwright(moneymilestone.duckdns.org/macro) US 67·KR 23카드·상세/비교 캔버스 렌더·콘솔에러 0.
+**배포 안전** — deploy.yml `--ensure`(`ensure_data`): 빈 테이블 최초 백필 + 1990캡 감지 재백필 + 신규 시리즈만 자동 백필 + 설명 시드, 전부 멱등(`|| true`). 읽기경로 `ensure_schema`로 빈테이블 크래시 방지(C1 index_ohlc 교훈). 서버 DB·키는 git 미추적(서버 로컬).
 
-**오너 라이브 피드백 후속(같은 날, Step4 보강):** ① **전체 히스토리** — fetch start 1990 하드캡 제거(FRED 1900-01-01·ECOS 1900) → 시리즈 출범부터(DGS10 1962·CPI 1947·UNRATE 1948, 총 394,593행). `ensure_data`가 1990캡(US_DGS10 min date≥1990) 감지 시 서버 자동 재백필 → 배포만으로 히스토리 업그레이드. ② **PC 풀폭** — `.main-content`가 grid `1fr 308px`라 좁은 1fr에 갇혀 2칸/줄이던 것 → `.mc-wrap{grid-column:1/-1}` + max-width 1560 + 조밀 그리드(minmax 158) = PC 6칸/줄(C1 설정페이지와 동일 패턴). ③ **검색** — US/KR 뷰 상단 검색창, 이름 부분일치 실시간 필터. ④ **임의 겹쳐보기**(🔬 토글) — 단위 무시하고 N개(≤6) 추세 비교. 거시지표 90종 + **종목/ETF/지수**(`/api/search`+`get_symbol_data`) 검색추가. 기본=공통 시작점=100 정규화, 2개일 땐 원값 좌우 2축 토글. 신규 `/api/macro/multi?keys=`(토큰 = 거시코드 또는 `SYM:<종목>`). 검증 = Playwright(PC 6칸·검색 4건·커스텀 기본2+차트·AAPL 종목추가 3칩·콘솔에러 0) + multi 엔드포인트(KR_M2 270 + USDKRW 17444 + AAPL 6651 혼합).
+**해결한 버그/피드백:** ① 기간 토글이 포인트 개수로 잘라 월별 지표 "1년"=21년 → 날짜 기준 수정 ② PC 2칸/줄 → 6칸 ③ 1990 캡 → 전체 히스토리 ④ 정규화 시 한 시리즈 스케일 독점 → 겹쳐보기 기본 원값.
 
-**겹쳐보기 고도화(피드백 후속, PART C C1·C2):** ① **비교 구간 설정** — 커스텀에 시작/종료일 date 입력 + 퀵(1·5·10년·전체), 정규화 기준점 = 사용자 구간 시작일(기존 공통 최소일 고정 → 변경). ② **N≥3 다축** — "정규화 ↔ 원값(개별 축)" 토글을 전 N에서 제공(기존 3개↑ 자동 정규화 폴백 해제, Chart.js 시리즈별 y축 좌우 교대·축틱 색상=시리즈색). `drawDual`→`drawAxes`(N축 일반화). 검증 Playwright(구간컨트롤·원값모드·3칩 다축·1년 퀵→시작일·콘솔에러 0). **C3(포폴 비교탭 통합)=큰 작업, 계획만 기록.**
-
-**겹쳐보기 기본값·온보딩 개선(피드백):** 기본값 M2+환율(기능 안 보임) → **히어로 박스 + 예시 프리셋 4종**(① 코스피·환율·기준금리 ② S&P500·기준금리·VIX ③ 애플·나스닥100·미10년물 ④ 금·달러지수·기대인플레). 진입 시 기본=프리셋①, 클릭으로 전환. 종목+지수+거시 섞어 "이게 뭐하는 툴인지" 직관 전달. 수동 추가 시 프리셋 하이라이트 해제. 검증 Playwright(프리셋 4·기본 3칩 차트·전환·콘솔에러 0).
-
-**피드백 3건 + Step3(같은 날):** ① 겹쳐보기 **기본 표시=원값(개별 축)** (정규화는 한 시리즈가 스케일 독점 → 나머지 평평). ② **Step3 Celery beat 자동갱신** — `macro_loader.refresh()`(증분, 시리즈별 마지막일 이후만 fetch·upsert) + `tasks.refresh_macro` + `celery_app` beat 2회/일(US장마감 21:30 UTC·KR장마감 07:00 UTC). ③ **시장 대표 지수 15종 추가**(신규 source 'yf'=yfinance, 카테고리 "주가지수"): US=S&P500·다우·나스닥종합·나스닥100·러셀2000 / KR=코스피·코스닥 / GL=닛케이·항셍·상해·대만·센섹스·FTSE·DAX·유로스톡스. 신규 **🌏 글로벌지수 토글**(country=GL). `ensure_data`가 신규 시리즈(행 0)만 자동 백필 → 배포 시 지수 자동 적재. **거시지표 총 105종.** 검증 = Playwright(US 주가지수 카테고리·GL 8지수·커스텀 원값 3축·콘솔에러 0) + refresh 증분 105종.
-
-**Step 5 완료(지표 설명문):** 105종 전 지표에 1~2줄 한글 설명(교육·정보용) 작성 → `macro_loader.DESCRIPTIONS` dict + `seed_descriptions()`(멱등 UPDATE). `_upsert`가 DESCRIPTIONS에서 desc 주입, `ensure_data`가 배포 시 항상 시드(데이터 재백필 없이 설명만 갱신). UI = 모달 상세에 설명 박스 + 카드 hover title 툴팁. 검증 = 105/105 desc 채움 + Playwright(카드 title·모달 desc 표시·콘솔에러 0).
-
-**지수 확장(피드백 — 대표지수만은 섭섭):** 섹터·스타일·글로벌 24종 추가 → 거시지표 **총 129종**(주가지수 39). US= 필라델피아 반도체(SOX)·FANG+·다우운송/유틸·NYSE종합·S&P100/400/600·러셀1000/3000·윌셔5000·달러인덱스(DXY). KR= 코스피200. GL= STOXX600·CAC40·IBEX·SMI·ASX200·TSX·보베스파·멕시코·STI·니프티50·인니. 전 신규 desc 포함. ensure_data가 배포 시 신규만 자동 백필. 프론트 변경 없음(loader만).
-
-**상세 기간 버그 수정 + 지수 캔들(피드백):** ① **기간 토글 버그** — `drawDetail`이 `pts.slice(-n)`로 **포인트 개수**(60/260/1300)를 잘라, 월별 지표(CPI·실업률 등)는 "1년"이 260개월=21년으로 깨졌음. → **날짜 기준**(마지막일−N개월)으로 필터, 버튼 data-m=3/12/60/0(개월). x축 틱도 연도(Math.round)→`fracToDate`(YYYY-MM). 검증: CPI "1년"=12개 점. ② **지수 캔들** — 지수(주가지수 39종, OHLC 보유)에만 라인/캔들 토글 노출(비가격 지표는 OHLC 없어 숨김). 캔들 = Lightweight Charts(macro.html 로드) + `/api/symbol/<yf>` OHLC 재사용. get_series에 `yf`·`is_index` 노출. 검증 Playwright(CPI 1년=12점·비지수 토글 숨김·코스피 캔들 렌더·콘솔에러 0).
-
-**다음:** Step 6 캘린더(`market_events`+yfinance 실적+FRED releases) / PART C3 포폴비교 통합(오너 결정).
+**미완(거시지표 탭 후속):** Step 6 증시 캘린더 / PART C3 포트폴리오 비교탭 오버레이 통합(`PF:<id>`+벤치+거시) — 둘 다 플랜에 기록, 오너 결정 대기.
 
 ## [2026-06-15] fix+feature | C1 버그픽스 4종 + 지수 캔들 회귀 복구 + 새로고침/수동가격
 

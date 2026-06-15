@@ -28,6 +28,20 @@
 .cal-ev.earnings { background: #6A1B9A; }
 .cal-ev.dividend { background: #2E7D32; }
 .cal-more { font-size: 0.64rem; color: var(--text-muted); }
+.cal-ev.clickable, .cal-list-ev.clickable { cursor: pointer; }
+.cal-ev.clickable:hover { filter: brightness(1.12); }
+
+/* 배당 1주당 금액 팝오버 */
+.cal-pop { position: fixed; display: none; z-index: 2000; min-width: 200px; max-width: 280px;
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22); padding: 12px 14px; font-size: 0.8rem; }
+.cal-pop .cp-name { font-weight: 800; font-size: 0.9rem; margin-bottom: 8px; }
+.cal-pop .cp-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.cal-pop .cp-row span { color: var(--text-muted); }
+.cal-pop .cp-usd { color: var(--text-muted); font-weight: 400; font-size: 0.74rem; }
+.cal-pop .cp-tag { margin-top: 8px; font-size: 0.7rem; font-weight: 700; border-radius: 5px; padding: 3px 8px; display: inline-block; }
+.cal-pop .cp-tag.conf { color: #2E7D32; background: rgba(46,125,50,0.12); }
+.cal-pop .cp-tag.proj { color: #FB8C00; background: rgba(251,140,0,0.12); }
 
 .cal-legend { display: flex; gap: 14px; font-size: 0.75rem; color: var(--text-muted); margin: 12px 0; flex-wrap: wrap; }
 .cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -79,10 +93,11 @@
   <div class="cal-list" id="calList"></div>
 
   <div class="cal-loginnote" id="calLoginNote"></div>
-  <div class="cal-note">⚠️ 실적·배당 예정일은 yfinance 추정으로 변동·누락될 수 있습니다. 경제지표는 FRED 공식 일정입니다.</div>
+  <div class="cal-note">⚠️ 실적·배당 예정일은 yfinance 추정으로 변동·누락될 수 있습니다. 경제지표는 FRED 공식 일정입니다. 배당락일을 누르면 1주당 배당금(예상/확정)을 볼 수 있어요.</div>
 </div>
+<div class="cal-pop" id="calPop"></div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/calendar.js') }}?v=20260615cal2"></script>
+<script src="{{ url_for('static', filename='js/calendar.js') }}?v=20260615cal3"></script>
 {% endblock %}

@@ -2,6 +2,12 @@
 
 > 🔴 **다음 최우선 과제 (오너 지정, 2026-06-15): 증시 캘린더 — ① 한국 경제지표 발표일 ② 미국 FOMC 회의일 데이터 수집 방법 의논·구현.** 현재 둘 다 미지원(FRED는 미국 지표만·회의일 미제공, ECOS는 발표캘린더 API 없음). 무료/안정 소스 조사 필요(후보: 한은·통계청 공개 일정 페이지 파싱, Fed FOMC 공표 일정 페이지, investpy/economic-calendar 라이브러리 등). 착수 전 이 항목부터.
 
+## [2026-06-15] feature+move | 캘린더 배당락 클릭=1주당 배당금 + 광고문구 비교탭 이동
+
+오너 2건. ① **광고 유도문구 이동**: 내 자산 자산현황 탭 상단 "더 정밀한 분석이 필요하세요?"(백테스트·투자계산기 유도) 카드를 제거하고 **포트폴리오 비교 탭(`/risk-return`)** 비교대상 선택카드 아래로 이동(`.rr-card`로 스타일 변환). ② **배당락 클릭 = 1주당 배당금**: 캘린더 배당 이벤트 클릭 시 팝오버로 1주당 배당금(예상/확정) 표시. `market_calendar.dividend_events`가 `build_dividend_chart`(qty=1) 결과의 `krw_pre`/`usd_pre`/`projected`를 이벤트에 `dps_krw`/`dps_usd`/`projected`로 부착. `calendar.js` = 배당 이벤트에 data-* 부착 + 위임 클릭 → `#calPop` 팝오버(종목명·배당락일·1주당 ₩(±$)·예상/확정 태그). 그리드+모바일 리스트 공통, 바깥 클릭/스크롤 시 닫힘. JS v=cal3.
+
+⚠️ **배당지급일(pay date)은 소스에 없음** — `corporate_actions`는 배당락일(ex-div)만 보유. 캘린더도 배당락 이벤트만 표시하므로 "지급일 클릭"은 구현 불가, 배당락일 클릭에만 적용. 지급일 필요 시 별도 데이터 소스 수집 선행 필요.
+
 ## [2026-06-15] fix | 내 자산·내 포트폴리오 종목명 표시(티커→이름, 근본수정)
 
 오너: 내 자산·포트폴리오에서 005930 등 티커가 종목명 자리에 나옴. **근본 수정** = `_resolve_names`(app) → `dividend_history._load_names`(symbol_master.db `symbols` **15,015종 전수**) 코드→이름. 하드코딩 아님. `myassets_data` 보유종목에 name 주입 + `myassets.html` 행=종목명(굵게)+티커(작게). `portfolio_list`·`portfolio item` ticker name 빈 경우 보강. symbol_master에 없는 일부(지수/크립토)만 코드 폴백.

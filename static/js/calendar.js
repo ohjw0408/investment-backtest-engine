@@ -10,6 +10,40 @@
 
   function ymd(d) { return d.toISOString().slice(0, 10); }
 
+  // 배당 이벤트에 1주당 금액 데이터 부착 (클릭 시 팝오버용)
+  function divData(e) {
+    if (e.type !== 'dividend') return '';
+    const name = (e.title || '').replace(/\s*배당락.*$/, '');
+    return ` data-div="1" data-name="${name}" data-date="${e.date}"`
+      + ` data-krw="${e.dps_krw == null ? '' : e.dps_krw}"`
+      + ` data-usd="${e.dps_usd == null ? '' : e.dps_usd}"`
+      + ` data-proj="${e.projected ? 1 : 0}"`;
+  }
+
+  function fmtKrw(v) { return '₩' + Math.round(v).toLocaleString('ko-KR'); }
+  function fmtUsd(v) { return '$' + Number(v).toFixed(v < 1 ? 4 : 2); }
+
+  function showDivPop(el) {
+    const pop = $('calPop');
+    const krw = parseFloat(el.dataset.krw), usd = parseFloat(el.dataset.usd);
+    const proj = el.dataset.proj === '1';
+    let amt = '—';
+    if (!isNaN(krw)) amt = fmtKrw(krw) + (!isNaN(usd) ? ` <span class="cp-usd">(${fmtUsd(usd)})</span>` : '');
+    pop.innerHTML = `<div class="cp-name">${el.dataset.name}</div>`
+      + `<div class="cp-row"><span>배당락일</span><b>${el.dataset.date}</b></div>`
+      + `<div class="cp-row"><span>1주당 배당금</span><b>${amt}</b></div>`
+      + `<div class="cp-tag ${proj ? 'proj' : 'conf'}">${proj ? '예상 (yfinance 추정)' : '확정'}</div>`;
+    pop.style.display = 'block';
+    const r = el.getBoundingClientRect();
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    let left = r.left, top = r.bottom + 6;
+    if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+    if (top + ph > window.innerHeight - 8) top = r.top - ph - 6;
+    pop.style.left = Math.max(8, left) + 'px';
+    pop.style.top = Math.max(8, top) + 'px';
+  }
+  function hideDivPop() { const p = $('calPop'); if (p) p.style.display = 'none'; }
+
   async function load() {
     try {
       const r = await (await fetch('/api/calendar')).json();
@@ -54,7 +88,7 @@
       const ds = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const evs = map[ds] || [];
       const dow = new Date(y, m, day).getDay();
-      const evHtml = evs.slice(0, 4).map(e => `<div class="cal-ev ${TYPE_CLS[e.type]}" title="${e.title}">${e.title}</div>`).join('')
+      const evHtml = evs.slice(0, 4).map(e => `<div class="cal-ev ${TYPE_CLS[e.type]}${e.type === 'dividend' ? ' clickable' : ''}" title="${e.title}"${divData(e)}>${e.title}</div>`).join('')
         + (evs.length > 4 ? `<div class="cal-more">+${evs.length - 4}</div>` : '');
       cells += `<div class="cal-cell ${ds === todayStr ? 'today' : ''} ${dow === 0 ? 'sun' : ''}">
         <div class="cal-daynum">${day}</div>${evHtml}</div>`;
@@ -67,7 +101,7 @@
       const evs = map[ds] || [];
       if (!evs.length) continue;
       list += `<div class="cal-list-day"><h4>${m + 1}/${day} (${DOW[new Date(y, m, day).getDay()]})</h4>`
-        + evs.map(e => `<div class="cal-list-ev"><span class="cal-dot" style="background:${e.type === 'econ' ? '#1976D2' : e.type === 'earnings' ? '#6A1B9A' : '#2E7D32'}"></span>${e.title}</div>`).join('')
+        + evs.map(e => `<div class="cal-list-ev${e.type === 'dividend' ? ' clickable' : ''}"${divData(e)}><span class="cal-dot" style="background:${e.type === 'econ' ? '#1976D2' : e.type === 'earnings' ? '#6A1B9A' : '#2E7D32'}"></span>${e.title}</div>`).join('')
         + `</div>`;
     }
     $('calList').innerHTML = list || '<div class="cal-loginnote">이 달 이벤트 없음.</div>';
@@ -80,6 +114,14 @@
     $('calFilters').querySelectorAll('button').forEach(x => x.classList.remove('on'));
     b.classList.add('on'); filter = b.dataset.f; render();
   }));
+
+  // 배당 이벤트 클릭 → 1주당 배당금 팝오버 (그리드 + 모바일 리스트 위임)
+  document.addEventListener('click', (ev) => {
+    const t = ev.target.closest('[data-div="1"]');
+    if (t) { ev.stopPropagation(); showDivPop(t); }
+    else if (!ev.target.closest('#calPop')) { hideDivPop(); }
+  });
+  window.addEventListener('scroll', hideDivPop, true);
 
   load();
 })();

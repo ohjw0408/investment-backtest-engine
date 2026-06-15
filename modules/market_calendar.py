@@ -145,6 +145,8 @@ def dividend_events(loader, codes, names=None):
                 pred = bool(e.get("predicted")) or (d > tk)
                 code = e.get("code")
                 out.append({"date": d, "type": "dividend", "symbol": code,
+                            "dps_krw": e.get("krw_pre"), "dps_usd": e.get("usd_pre"),
+                            "projected": pred,
                             "title": f"{names.get(code, code)} 배당락" + (" (예상)" if pred else "")})
     except Exception:
         pass

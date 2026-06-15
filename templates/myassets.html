@@ -501,7 +501,7 @@ function renderHoldings() {
           const gc   = h.group_color || '#90A4AE';
           const isManual = manualCodes.includes(h.code);
           return `<tr>
-            <td class="h-code"><b>${h.code}</b></td>
+            <td class="h-code"><b>${h.name || h.code}</b>${h.name && h.name !== h.code ? ` <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">${h.code}</span>` : ''}</td>
             <td class="h-group" data-label="그룹">
               <select onchange="quickSetGroup(${h.id}, this.value)"
                 style="border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.75rem;background:var(--card);cursor:pointer;max-width:100px;color:var(--text);">

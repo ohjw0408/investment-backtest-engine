@@ -1571,6 +1571,9 @@ def myassets_data():
                     prices[code] = 0
 
     # ── 수동 가격 override: 설정된 보유종목은 fetch 무시하고 그 값 사용(KRW) ──
+    _nm = _resolve_names([h['code'] for h in holdings])
+    for h in holdings:
+        h['name'] = _nm.get(h['code']) or h.get('name') or h['code']
     manual_codes = []
     for h in holdings:
         mp = h.get('manual_price')
@@ -1694,6 +1697,12 @@ def portfolio_list():
     if not session.get('user_id'):
         return jsonify({'error': '로그인 필요'}), 401
     items = get_portfolios(session['user_id'])
+    allc = [t['code'] for p in items for t in p['tickers'] if isinstance(t, dict) and t.get('code')]
+    nm = _resolve_names(allc)
+    for p in items:
+        for t in p['tickers']:
+            if isinstance(t, dict) and t.get('code') and not t.get('name'):
+                t['name'] = nm.get(t['code']) or t['code']
     return jsonify([
         {'id': p['id'], 'name': p['name'], 'tickers': p['tickers'],
          'updated_at': p['updated_at']}
@@ -1760,6 +1769,10 @@ def portfolio_item(portfolio_id):
     p = get_portfolio(session['user_id'], portfolio_id)
     if not p:
         return jsonify({'error': '없는 포트폴리오'}), 404
+    nm = _resolve_names([t['code'] for t in p['tickers'] if isinstance(t, dict) and t.get('code')])
+    for t in p['tickers']:
+        if isinstance(t, dict) and t.get('code') and not t.get('name'):
+            t['name'] = nm.get(t['code']) or t['code']
     return jsonify({'id': p['id'], 'name': p['name'], 'tickers': p['tickers'],
                     'updated_at': p['updated_at']})
 
@@ -1870,6 +1883,20 @@ def api_macro_intraday(code):
         return jsonify({'error': 'no intraday'}), 404
     rng = request.args.get('range', 'max')
     return jsonify({'rows': macro_loader.get_intraday_cached(spec['yf'], rng)})
+
+def _resolve_names(codes):
+    """코드→종목명 (symbol_master). 반환 키 = 원본 코드."""
+    out = {}
+    try:
+        from modules.dividend_history import _load_names
+        loaded = _load_names(list(codes))   # {CODE_UPPER: name}
+        for c in codes:
+            nm = loaded.get(str(c).upper())
+            if nm:
+                out[c] = nm
+    except Exception:
+        pass
+    return out
 
 def _calendar_grouped(uid):
     """사용자 종목을 소스별로 그룹화 + 이름맵. {holdings,portfolios,watchlist}."""

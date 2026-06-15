@@ -24,6 +24,8 @@
 
 **지수 확장(피드백 — 대표지수만은 섭섭):** 섹터·스타일·글로벌 24종 추가 → 거시지표 **총 129종**(주가지수 39). US= 필라델피아 반도체(SOX)·FANG+·다우운송/유틸·NYSE종합·S&P100/400/600·러셀1000/3000·윌셔5000·달러인덱스(DXY). KR= 코스피200. GL= STOXX600·CAC40·IBEX·SMI·ASX200·TSX·보베스파·멕시코·STI·니프티50·인니. 전 신규 desc 포함. ensure_data가 배포 시 신규만 자동 백필. 프론트 변경 없음(loader만).
 
+**상세 기간 버그 수정 + 지수 캔들(피드백):** ① **기간 토글 버그** — `drawDetail`이 `pts.slice(-n)`로 **포인트 개수**(60/260/1300)를 잘라, 월별 지표(CPI·실업률 등)는 "1년"이 260개월=21년으로 깨졌음. → **날짜 기준**(마지막일−N개월)으로 필터, 버튼 data-m=3/12/60/0(개월). x축 틱도 연도(Math.round)→`fracToDate`(YYYY-MM). 검증: CPI "1년"=12개 점. ② **지수 캔들** — 지수(주가지수 39종, OHLC 보유)에만 라인/캔들 토글 노출(비가격 지표는 OHLC 없어 숨김). 캔들 = Lightweight Charts(macro.html 로드) + `/api/symbol/<yf>` OHLC 재사용. get_series에 `yf`·`is_index` 노출. 검증 Playwright(CPI 1년=12점·비지수 토글 숨김·코스피 캔들 렌더·콘솔에러 0).
+
 **다음:** Step 6 캘린더(`market_events`+yfinance 실적+FRED releases) / PART C3 포폴비교 통합(오너 결정).
 
 ## [2026-06-15] fix+feature | C1 버그픽스 4종 + 지수 캔들 회귀 복구 + 새로고침/수동가격

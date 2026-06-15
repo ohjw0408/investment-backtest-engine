@@ -85,7 +85,8 @@
 .mc-modal-sub { font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; }
 .mc-x { border: none; background: none; font-size: 1.4rem; cursor: pointer; color: var(--text-muted); line-height: 1; }
 .mc-desc { font-size: 0.8rem; color: var(--text); background: var(--bg); border-radius: 8px; padding: 10px 12px; margin: 12px 0; line-height: 1.5; }
-.mc-period { display: inline-flex; gap: 2px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 2px; margin-bottom: 10px; }
+.mc-modal-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.mc-period { display: inline-flex; gap: 2px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 2px; }
 .mc-period button { border: none; background: none; padding: 5px 12px; border-radius: 6px; font-size: 0.76rem; cursor: pointer; color: var(--text-muted); font-family: inherit; font-weight: 600; }
 .mc-period button.on { background: var(--blue); color: #fff; }
 .mc-loading { text-align: center; padding: 40px; color: var(--text-muted); }
@@ -124,17 +125,25 @@
       <button class="mc-x" id="mcModalX">×</button>
     </div>
     <div class="mc-desc" id="mcModalDesc" style="display:none"></div>
-    <div class="mc-period" id="mcPeriod">
-      <button data-r="60">3개월</button>
-      <button data-r="260">1년</button>
-      <button data-r="1300" class="on">5년</button>
-      <button data-r="0">전체</button>
+    <div class="mc-modal-bar">
+      <div class="mc-period" id="mcPeriod">
+        <button data-m="3">3개월</button>
+        <button data-m="12">1년</button>
+        <button data-m="60" class="on">5년</button>
+        <button data-m="0">전체</button>
+      </div>
+      <div class="mc-period" id="mcChartType" style="display:none">
+        <button data-t="line" class="on">📈 라인</button>
+        <button data-t="candle">🕯 캔들</button>
+      </div>
     </div>
-    <div class="mc-chart-wrap"><canvas id="mcDetailChart"></canvas></div>
+    <div class="mc-chart-wrap" id="mcLineWrap"><canvas id="mcDetailChart"></canvas></div>
+    <div class="mc-chart-wrap" id="mcCandleWrap" style="display:none"></div>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/macro.js') }}?v=20260615macro6"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="{{ url_for('static', filename='js/macro.js') }}?v=20260615macro7"></script>
 {% endblock %}

@@ -249,7 +249,7 @@
     return {
       responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: legend, labels: { color: txt, font: { size: 11 } } }, tooltip: { callbacks: { title: (it) => fracToDate(it[0].parsed.x) } } },
-      scales: { x: { type: 'linear', ticks: { color: txt, callback: (v) => Math.round(v), maxTicksLimit: 9 }, grid: { color: grid } },
+      scales: { x: { type: 'linear', ticks: { color: txt, callback: (v) => fracToDate(v), maxTicksLimit: 9 }, grid: { color: grid } },
         y: { ticks: { color: txt }, grid: { color: grid }, title: { display: !!unitLabel, text: unitLabel, color: txt } } },
     };
   }
@@ -266,22 +266,65 @@
   }
 
   // ── 상세 모달 ──
+  let detailMonths = 60, detailType = 'line', candleChart = null, candleCache = null;
+
+  function cutoffDate(lastStr, months) {
+    if (!months || months <= 0) return null;
+    const d = new Date(lastStr); d.setMonth(d.getMonth() - months);
+    return d.toISOString().slice(0, 10);
+  }
+
   async function openDetail(code) {
     $('mcModal').classList.add('open');
     $('mcModalTitle').textContent = '불러오는 중…'; $('mcModalSub').textContent = ''; $('mcModalDesc').style.display = 'none';
     const d = await (await fetch(`/api/macro/series/${code}`)).json();
     if (d.error) { $('mcModalTitle').textContent = '데이터 없음'; return; }
-    window._mcDetail = d;
+    window._mcDetail = d; candleCache = null; detailMonths = 60; detailType = 'line';
+    const flag = d.country === 'US' ? '🇺🇸 미국' : d.country === 'KR' ? '🇰🇷 한국' : '🌏 글로벌';
     $('mcModalTitle').textContent = d.name_ko;
-    $('mcModalSub').textContent = `${d.country === 'US' ? '🇺🇸 미국' : '🇰🇷 한국'} · 단위 ${d.unit} · ${d.points.length.toLocaleString()}개 관측 · ${d.points[0][0]}~${d.points.at(-1)[0]}`;
+    $('mcModalSub').textContent = `${flag} · 단위 ${d.unit} · ${d.points.length.toLocaleString()}개 관측 · ${d.points[0][0]}~${d.points.at(-1)[0]}`;
     if (d.desc) { $('mcModalDesc').style.display = 'block'; $('mcModalDesc').textContent = d.desc; }
-    $('mcPeriod').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.r === '1300'));
-    drawDetail(1300);
+    // 지수만 캔들 토글 노출
+    $('mcChartType').style.display = d.is_index ? 'inline-flex' : 'none';
+    $('mcChartType').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === 'line'));
+    $('mcPeriod').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === '60'));
+    renderDetail();
   }
-  function drawDetail(n) {
-    const d = window._mcDetail; let pts = d.points;
-    if (n && n > 0) pts = pts.slice(-n);
-    detailChart = drawLine('mcDetailChart', detailChart, [lineDS(d.name_ko, pts, '#1976D2')], d.unit);
+
+  async function renderDetail() {
+    const d = window._mcDetail;
+    const showCandle = detailType === 'candle' && d.is_index;
+    $('mcLineWrap').style.display = showCandle ? 'none' : 'block';
+    $('mcCandleWrap').style.display = showCandle ? 'block' : 'none';
+    const cut = cutoffDate(d.points.at(-1)[0], detailMonths);
+    if (showCandle) {
+      if (!candleCache) {
+        const sym = await (await fetch(`/api/symbol/${encodeURIComponent(d.yf)}`)).json();
+        candleCache = (sym.prices || []).filter(p => p.open != null && p.close != null);
+      }
+      const rows = candleCache.filter(p => !cut || p.date >= cut)
+        .map(p => ({ time: p.date, open: p.open, high: p.high, low: p.low, close: p.close }));
+      drawCandle(rows);
+    } else {
+      const pts = cut ? d.points.filter(p => p[0] >= cut) : d.points;
+      detailChart = drawLine('mcDetailChart', detailChart, [lineDS(d.name_ko, pts, '#1976D2')], d.unit);
+    }
+  }
+
+  function drawCandle(rows) {
+    const wrap = $('mcCandleWrap');
+    wrap.innerHTML = '';
+    if (candleChart) { try { candleChart.remove(); } catch (e) {} candleChart = null; }
+    const txt = css('--text-muted') || '#888', grid = css('--border') || '#e0e0e0';
+    candleChart = LightweightCharts.createChart(wrap, {
+      width: wrap.clientWidth, height: 380,
+      layout: { background: { color: 'transparent' }, textColor: txt },
+      grid: { vertLines: { color: grid }, horzLines: { color: grid } },
+      timeScale: { timeVisible: false },
+    });
+    const s = candleChart.addCandlestickSeries({ upColor: '#2E7D32', downColor: '#C62828', borderVisible: false, wickUpColor: '#2E7D32', wickDownColor: '#C62828' });
+    s.setData(rows);
+    candleChart.timeScale().fitContent();
   }
 
   // ── 이벤트 ──
@@ -298,7 +341,12 @@
   $('mcModalX').addEventListener('click', () => $('mcModal').classList.remove('open'));
   $('mcModal').addEventListener('click', (e) => { if (e.target === $('mcModal')) $('mcModal').classList.remove('open'); });
   $('mcPeriod').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-    $('mcPeriod').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); drawDetail(+b.dataset.r);
+    $('mcPeriod').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+    detailMonths = +b.dataset.m; renderDetail();
+  }));
+  $('mcChartType').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    $('mcChartType').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+    detailType = b.dataset.t; renderDetail();
   }));
 
   fetch('/api/macro/overview').then(r => r.json()).then(d => { DATA = d; renderCountry('US'); })

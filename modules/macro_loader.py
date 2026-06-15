@@ -635,8 +635,10 @@ def get_series(code, limit=None):
     pts = [[r["date"], r["value"]] for r in rows]
     if limit:
         pts = pts[-limit:]
+    spec = SERIES_BY_CODE.get(code, {})
     return {"code": code, "name_ko": m["name_ko"], "unit": m["unit"],
             "country": m["country"], "freq": m["freq"], "desc": m["description"] or "",
+            "yf": spec.get("yf"), "is_index": spec.get("category") == "주가지수",
             "points": pts}
 
 

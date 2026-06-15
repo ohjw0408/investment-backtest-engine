@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-15] feature(WIP) | 거시경제 지표 — 데이터 레이어(Step 1/6)
+
+신규 기능 플랜 `거시지표_캘린더_plan.md`(거시지표 탭 + 증시 캘린더, 알림 제외) 착수. 오너 한·미 지표 전체 승인.
+
+**Step 1 완료(데이터 레이어):** 신규 `modules/macro_loader.py` — SERIES 레지스트리 86종(미국 FRED 66 + 한국 ECOS 20) + `fetch_fred`(공식 API, 키 `data/meta/fred_api_key.txt`)·`fetch_ecos`(StatisticSearch, 키 `data/meta/ecos_api_key.txt`)·`backfill`·`validate`. 신규 테이블 `macro_series`(메타)·`macro_observations`(시계열) in `index_master.db`. **전 코드 라이브 실호출 검증 → 86/86 적재 = 283,536행.**
+
+**코드 확정(실호출):** FRED 69종 중 68 존재 — 제외 2 = `GOLDAMGBD228NLBM`(폐지 HTTP400, 금은 기존 KRX_GOLD/yfinance 보유)·`USALOLITONOSTSAM`(OECD 미 CLI FRED 최신 2024-01 stale). 한국 ECOS = KOSIS 불필요 확정(고용 901Y027/실업률 I61BC·고용률 I61E·참가율 I61D, 산업생산 901Y033/[A00,1], 선행지수 901Y067/I16A, M2 161Y005/BBHS00, GDP 200Y107/10601, BSI 512Y008/[BA,99988], CSI 511Y002/FME, 주택가격 901Y062/P63A, 가계신용 151Y001 등 전부 ECOS 수록). 2차원 통계표 item 순서·GDP 가격기준 라이브 검증 완료.
+
+**Step 4 완료(/macro UI, 로컬 검증·미배포):** 오너 결정 = 레이아웃 A(국가토글 US/KR/비교 + 카테고리 섹션 + 카드그리드), 카드클릭→전체 시계열, 한미비교는 단위별 자동(%·%p 원값 / 그 외 시작=100 정규화). 한국 국채금리 4종(817Y002 KTB1/3/10Y·CD91) 레지스트리 추가 → 90종. 신규 `templates/macro.html`+`static/js/macro.js`(SVG 스파크라인 90카드·경량, 상세/비교=Chart.js, 날짜→연단위 선형축으로 date-adapter 의존 회피) + 라우트 `/macro`·`/api/macro/{overview,series/<code>,compare}` + base.html nav/사이드바("🌐 거시지표"). 검증 = 라이브 엔드포인트 4종 + Playwright(US 67카드·KR 23·스파크 67·상세캔버스·비교캔버스·12쌍·비교모드문구·콘솔에러 0).
+
+**다음:** Step 3 Celery beat 자동갱신 → Step 5 설명 콘텐츠(LLM, macro_series.description) → Step 6 캘린더(`market_events` + yfinance 실적 + FRED releases). **미배포(로컬 검증까지).**
+
 ## [2026-06-15] fix+feature | C1 버그픽스 4종 + 지수 캔들 회귀 복구 + 새로고침/수동가격
 
 오너 라이브 피드백 후속(C1 배포 후 발견 버그 + 신규 요청).

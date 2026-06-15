@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}거시경제 지표 — Money Milestone{% endblock %}
+
+{% block head %}
+<style>
+.mc-wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+.mc-title { font-size: 1.15rem; font-weight: 800; }
+.mc-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+.mc-disc { font-size: 0.74rem; color: var(--gold-deep, #B26A00); background: var(--gold-pale, #FFF8E1); border-radius: 8px; padding: 7px 10px; margin-top: 10px; }
+
+/* 국가 토글 */
+.mc-toggle { display: inline-flex; gap: 2px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px; padding: 3px; margin-top: 14px; }
+.mc-toggle button { border: none; background: none; padding: 7px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); cursor: pointer; font-family: inherit; }
+.mc-toggle button.on { background: var(--blue); color: #fff; }
+
+/* 카테고리 섹션 */
+.mc-cat { margin-top: 22px; }
+.mc-cat-head { font-size: 0.95rem; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.mc-cat-head .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--blue); }
+.mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+
+/* 지표 카드 */
+.mc-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 13px 14px; cursor: pointer; transition: border-color .15s, transform .1s; position: relative; }
+.mc-card:hover { border-color: var(--blue); transform: translateY(-1px); }
+.mc-card .flag { position: absolute; top: 11px; right: 12px; font-size: 0.66rem; color: var(--text-muted); font-weight: 700; }
+.mc-card .nm { font-size: 0.8rem; font-weight: 700; line-height: 1.3; padding-right: 28px; min-height: 2.1em; }
+.mc-card .val { font-size: 1.18rem; font-weight: 800; margin-top: 7px; }
+.mc-card .unit { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-left: 3px; }
+.mc-card .chg { font-size: 0.74rem; font-weight: 700; margin-top: 2px; }
+.mc-card .chg.up { color: #2E7D32; }
+.mc-card .chg.down { color: #C62828; }
+.mc-card .chg.flat { color: var(--text-muted); }
+.mc-spark { margin-top: 8px; width: 100%; height: 30px; display: block; }
+.mc-spark polyline { fill: none; stroke-width: 1.6; }
+.mc-date { font-size: 0.66rem; color: var(--text-muted); margin-top: 5px; }
+
+/* 비교 */
+.mc-cmp-pairs { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.mc-cmp-pairs button { border: 1.5px solid var(--border); background: var(--bg); color: var(--text); border-radius: 16px; padding: 6px 13px; font-size: 0.78rem; cursor: pointer; font-family: inherit; }
+.mc-cmp-pairs button.on { border-color: var(--blue); background: rgba(25,118,210,0.1); font-weight: 700; }
+.mc-cmp-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 14px; padding: 18px; margin-top: 8px; }
+.mc-cmp-mode { font-size: 0.76rem; color: var(--text-muted); margin-bottom: 10px; }
+.mc-chart-wrap { position: relative; height: 380px; }
+
+/* 상세 모달 */
+.mc-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
+.mc-modal.open { display: flex; }
+.mc-modal-box { background: var(--card); border-radius: 16px; padding: 20px; max-width: 760px; width: 100%; max-height: 90vh; overflow-y: auto; }
+.mc-modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.mc-modal-title { font-size: 1.02rem; font-weight: 800; }
+.mc-modal-sub { font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; }
+.mc-x { border: none; background: none; font-size: 1.4rem; cursor: pointer; color: var(--text-muted); line-height: 1; }
+.mc-desc { font-size: 0.8rem; color: var(--text); background: var(--bg); border-radius: 8px; padding: 10px 12px; margin: 12px 0; line-height: 1.5; }
+.mc-period { display: inline-flex; gap: 2px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 2px; margin-bottom: 10px; }
+.mc-period button { border: none; background: none; padding: 5px 12px; border-radius: 6px; font-size: 0.76rem; cursor: pointer; color: var(--text-muted); font-family: inherit; font-weight: 600; }
+.mc-period button.on { background: var(--blue); color: #fff; }
+.mc-loading { text-align: center; padding: 40px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mc-wrap">
+  <div class="mc-title">🌐 거시경제 지표</div>
+  <div class="mc-sub">미국(FRED) · 한국(한국은행 ECOS) 핵심 지표. 카드를 누르면 전체 시계열을 봅니다.</div>
+  <div class="mc-disc">⚠️ 교육·정보 제공용입니다. 투자 자문이 아니며, 발표 지표는 시차가 있을 수 있습니다.</div>
+
+  <div class="mc-toggle" id="mcToggle">
+    <button data-view="US" class="on">🇺🇸 미국</button>
+    <button data-view="KR">🇰🇷 한국</button>
+    <button data-view="CMP">🆚 한·미 비교</button>
+  </div>
+
+  <div id="mcBody"><div class="mc-loading">불러오는 중…</div></div>
+</div>
+
+<!-- 상세 모달 -->
+<div class="mc-modal" id="mcModal">
+  <div class="mc-modal-box">
+    <div class="mc-modal-head">
+      <div>
+        <div class="mc-modal-title" id="mcModalTitle"></div>
+        <div class="mc-modal-sub" id="mcModalSub"></div>
+      </div>
+      <button class="mc-x" id="mcModalX">×</button>
+    </div>
+    <div class="mc-desc" id="mcModalDesc" style="display:none"></div>
+    <div class="mc-period" id="mcPeriod">
+      <button data-r="60">3개월</button>
+      <button data-r="260">1년</button>
+      <button data-r="1300" class="on">5년</button>
+      <button data-r="0">전체</button>
+    </div>
+    <div class="mc-chart-wrap"><canvas id="mcDetailChart"></canvas></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/macro.js') }}?v=20260615macro1"></script>
+{% endblock %}

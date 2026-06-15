@@ -23,6 +23,8 @@ jobs:
             # reset 영향 없음.
             git fetch origin main
             git reset --hard origin/main
+            # 거시지표 최초 적재(테이블 비었을 때만, 멱등). 키는 서버 보유. 실패해도 배포 계속.
+            venv/bin/python -m modules.macro_loader --ensure || true
             cp deploy/domino-celery-beat.service /etc/systemd/system/
             systemctl daemon-reload
             systemctl enable domino-celery-beat

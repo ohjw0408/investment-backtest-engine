@@ -38,6 +38,7 @@
     <a class="nav-link {% if request.path.startswith('/retirement') %}active{% endif %}" href="/retirement">은퇴 설계</a>
     <a class="nav-link {% if request.path.startswith('/backtest') %}active{% endif %}" href="/backtest">포트폴리오 분석</a>
     <a class="nav-link {% if request.path.startswith('/risk-return') %}active{% endif %}" href="/risk-return">포트폴리오 비교</a>
+    <a class="nav-link {% if request.path.startswith('/macro') %}active{% endif %}" href="/macro">거시지표</a>
     <a class="nav-link {% if request.path.startswith('/myportfolios') %}active{% endif %}" href="/myportfolios">내 포트폴리오</a>
     <a class="nav-link {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">내 자산</a>
     <a class="nav-link {% if request.path.startswith('/tax-settings') %}active{% endif %}" href="/tax-settings">세금 설정</a>
@@ -97,6 +98,9 @@
     </a>
     <a class="sidebar-item {% if request.path.startswith('/risk-return') %}active{% endif %}" href="/risk-return">
       <span>📊</span> 포트폴리오 비교
+    </a>
+    <a class="sidebar-item {% if request.path.startswith('/macro') %}active{% endif %}" href="/macro">
+      <span>🌐</span> 거시지표
     </a>
     <a class="sidebar-item {% if request.path.startswith('/myportfolios') %}active{% endif %}" href="/myportfolios">
       <span>⭐</span> 내 포트폴리오

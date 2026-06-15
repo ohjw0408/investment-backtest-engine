@@ -275,6 +275,10 @@ def backtest():
 def risk_return_page():
     return render_template('risk_return.html')
 
+@app.route('/macro')
+def macro_page():
+    return render_template('macro.html')
+
 @app.route('/myportfolios')
 def myportfolios():
     return render_template('myportfolios.html')
@@ -1818,6 +1822,30 @@ def portfolio_dividends_preview():
         import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/macro/overview')
+def api_macro_overview():
+    """거시경제 지표 카테고리별 카드 데이터 (공개)."""
+    from modules import macro_loader
+    return jsonify(macro_loader.get_overview())
+
+@app.route('/api/macro/series/<code>')
+def api_macro_series(code):
+    """단일 지표 전체 시계열 (상세 차트용)."""
+    from modules import macro_loader
+    data = macro_loader.get_series(code)
+    if not data:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(data)
+
+@app.route('/api/macro/compare')
+def api_macro_compare():
+    """한·미 지표 비교 (단위 같으면 원값, 다르면 시작=100 정규화)."""
+    from modules import macro_loader
+    data = macro_loader.get_compare(request.args.get('us', ''), request.args.get('kr', ''))
+    if not data:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(data)
 
 @app.route('/api/risk-return', methods=['POST'])
 def risk_return():

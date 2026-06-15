@@ -2022,12 +2022,54 @@ def api_macro_curve(curve_id):
         return jsonify({'error': 'not found'}), 404
     return jsonify(data)
 
+def _portfolio_index_series(tickers, years=6):
+    """저장 포트폴리오 → 비중 고정 정규화 지수(시작=100) 일별 시계열. 오버레이 추세 비교용.
+       비중 합으로 정규화, 종목별 종가를 시작일=100으로 환산해 가중합 → 통화 무관."""
+    from datetime import datetime, timedelta
+    cutoff = (datetime.now() - timedelta(days=int(years * 365))).strftime('%Y-%m-%d')
+    wsum = sum(float(t.get('weight') or 0) for t in tickers) or 1.0
+    series = {}
+    for t in tickers:
+        code = str(t.get('code') or '').upper()
+        w = float(t.get('weight') or 0) / wsum
+        if w <= 0 or not code:
+            continue
+        try:
+            d = portfolio_engine.loader.get_symbol_data(code)
+            m = {p['date']: p['close'] for p in d.get('prices', [])
+                 if p.get('close') and p['date'] >= cutoff}
+            if m:
+                series[code] = (w, m)
+        except Exception:
+            continue
+    if not series:
+        return []
+    common = None
+    for _, m in series.values():
+        ks = set(m.keys())
+        common = ks if common is None else (common & ks)
+    dates = sorted(common or [])
+    if len(dates) < 2:
+        return []
+    t0 = dates[0]
+    out = []
+    for dt in dates:
+        val = 0.0
+        for _, (w, m) in series.items():
+            base = m.get(t0)
+            if base:
+                val += w * (m[dt] / base) * 100.0
+        out.append([dt, round(val, 4)])
+    return out
+
+
 @app.route('/api/macro/multi')
 def api_macro_multi():
-    """임의 시리즈 N개 겹쳐보기. 토큰 = 거시지표 코드 또는 'SYM:<종목코드>'.
-       단위가 제각각이라 프런트에서 시작=100 정규화(또는 2개일 때 2축). 원값 반환."""
+    """임의 시리즈 N개 겹쳐보기. 토큰 = 거시지표 코드 / 'SYM:<종목>' / 'PF:<저장포폴id>'.
+       단위가 제각각이라 프런트에서 시작=100 정규화(또는 개별 축). 원값 반환."""
     from modules import macro_loader
     keys = [k for k in request.args.get('keys', '').split(',') if k][:6]
+    uid = session.get('user_id')
     out = []
     for k in keys:
         if k.startswith('SYM:'):
@@ -2041,6 +2083,18 @@ def api_macro_multi():
                                 'unit': d.get('currency') or '', 'points': pts})
             except Exception:
                 pass
+        elif k.startswith('PF:'):
+            if not uid:
+                continue
+            try:
+                pf = get_portfolio(uid, int(k[3:]))
+            except Exception:
+                pf = None
+            if pf:
+                pts = _portfolio_index_series(pf.get('tickers') or [])
+                if pts:
+                    out.append({'key': k, 'label': pf['name'],
+                                'unit': '지수(시작=100)', 'points': pts})
         else:
             s = macro_loader.get_series(k)
             if s:

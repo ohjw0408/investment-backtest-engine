@@ -23,6 +23,22 @@
 
 ## 1. 코드 정독 결과 — 연산 인벤토리 & 핫스팟
 
+> **전수 확인 완료 (2026-06-15, 2차 패스).** 세금엔진 3종·시뮬 루프 2종·분석기 전종·dividend_simulator·order_executor·synthetic·data_preparer·backtest_logic·macro_loader 연산부를 본문 정독. 아래 "이미 양호/死코드" 판정 포함.
+
+### 전수 판정 요약
+- ✅ **세금엔진(`tax/base_tax.py`·`account_tax.py`·`split_sale_planner.py`) = 연산상 양호.** per-call이 캐시된 산술. `_classify_cache`(인스턴스별)인데 **분석기가 tax_engine을 요청당 1개로 재사용**(윈도우마다 전달)→ 재분류 없음. `classify_instrument_type`/`_is_safe_asset`만 sqlite 비캐시지만 **검증시점 1회**(per-day 아님). split_sale는 `_comprehensive_tax` 중복정의(코드중복, 성능 무관).
+- ✅ **backtest = 단일 시뮬(롤링 아님), 가격 1회 로드**(`backtest_logic.py:78`). 핫스팟 아님.
+- ✅ **dividend_simulator = `_preload_all` 보유**(전체 1회 로드). `_simulate_one` 윈도우별 pandas `.loc`/resample은 경미(배당 경로).
+- ✅ **`maybe_gain_harvest`(order_executor) 매일 호출되나 12월 외 즉시 return**(`:310`) — 일일 비용 무시.
+- ✅ **multi_account_loop = numpy 캐시된 per-day 루프**(일×계좌). 데이터는 분석기가 공급.
+- 🗑 **死코드(로직층 미사용): `analyzer/engine_rolling_analyzer`·`portfolio_analyzer`·`retirement_analyzer`·`rolling_scenario_analyzer`.** 프로덕션 미경유 → 최적화 대상 아님(레거시/테스트). ※초기 1차 패스서 본 EngineRollingAnalyzer는 실사용 아님.
+- ❌ **핫스팟 확정: `AccumulationAnalyzer._run_rolling`(:170)·`MultiAccountAnalyzer`(:304 루프 내 `_load_prices` :314) = 윈도우마다 가격 재로드.** (P0)
+- ⚠️ **`WithdrawalAnalyzer`/가구인출 = 전체 1회 로드(:226) + multiprocessing.Pool.** Pool이 1vCPU 부적합(P1-1).
+- 🟡 **synthetic 가격 생성(`synthetic_price_generator.py:97`) = 파이썬 역루프**(`for i in range(n_days...)`). 벡터화 가능(use_synthetic 한정). (P3-3)
+- 🟢 **macro_loader `fetch_yf` iterrows(:529 등) = 백필/refresh 전용**(per-request 아님·I/O 지배). 후순위.
+
+### 모듈 인벤토리 (연산 성격)
+
 | 모듈 | 역할 | 연산 성격 | 상태 |
 |---|---|---|---|
 | `simulation/simulation_loop.py` | per-day 메인 루프 | CPU, 최내곽(윈도우×일) | 일부 numpy 캐싱됨, 잔여 핫스팟 |
@@ -105,6 +121,10 @@
 - **문제**(`engine_rolling_analyzer.py`): `resample("ME")` 2회(`:86`,`:149`)·`to_datetime`·`set_index`·`copy` 윈도우마다. IRR Newton 200iter(`:121`)는 수렴 시 break 있음(양호)이나 npv가 파이썬 sum.
 - **수정**: resample 1회 재사용, npv/dnpv numpy 벡터화, history 후처리 numpy화.
 - **이득**: 윈도우당 상수 절감 × 수백. **위험**: 低. **검증**: 지표 동일.
+
+### 🟢 P3-3. synthetic 가격 생성 벡터화 (use_synthetic 한정)
+- **문제**(`synthetic_price_generator.py:97`): `for i in range(n_days-2,-1,-1)` 역방향 GBM 가격 빌드 = 파이썬 일별 루프. 종목×윈도우(합성 보충 시)마다.
+- **수정**: 누적곱(`np.cumprod`)으로 벡터화 — 난수 배열 1회 생성 후 역방향 누적. **결과안전**: 동일 seed·동일 분포 → 동일 경로(부동소수 동일). **위험**: 中(역방향 정렬·seed 정합 정확히). **검증**: 동일 seed 출력 배열 일치.
 
 ### 🟢 P3-2. (고급·후순위) 최내곽 루프 JIT
 - per-day 루프를 Numba/Cython화 검토. 단 루프가 파이썬 엔진객체(executor·tax)를 호출 → JIT 난도 高. **무세금·무리밸·일시납·재투자** 단순경로에 한해 벡터화 fast-path(누적수익률) 신설 = 겹쳐보기/비교 등 비과세 추세계산 대량 가속 가능. 위험 中(경로 분기 정확성). 후순위.

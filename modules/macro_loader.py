@@ -416,6 +416,33 @@ def fetch_yf(yfsym, start="1900-01-01"):
     return out
 
 
+_OHLC_CACHE = {}
+
+
+def fetch_yf_ohlc(yfsym, start="1900-01-01"):
+    """yfinance OHLC (캔들용). get_symbol_data가 일부 지수에서 실패해 직접 사용."""
+    import yfinance as yf
+    h = yf.Ticker(yfsym).history(start=start, auto_adjust=False)
+    out = []
+    for idx, row in h.iterrows():
+        o, hi, lo, c = row.get("Open"), row.get("High"), row.get("Low"), row.get("Close")
+        if c is None or c != c:
+            continue
+        out.append({"date": idx.strftime("%Y-%m-%d"),
+                    "open": float(o), "high": float(hi), "low": float(lo), "close": float(c)})
+    return out
+
+
+def get_ohlc_cached(yfsym):
+    """OHLC 메모리 캐시 (프런트 기간 변경 시 재fetch 방지)."""
+    if yfsym not in _OHLC_CACHE:
+        try:
+            _OHLC_CACHE[yfsym] = fetch_yf_ohlc(yfsym)
+        except Exception:
+            _OHLC_CACHE[yfsym] = []
+    return _OHLC_CACHE[yfsym]
+
+
 def fetch_ecos(stat, cyc, items, key=None):
     key = key or _ecos_key()
     s, e = _ecos_period_bounds(cyc)

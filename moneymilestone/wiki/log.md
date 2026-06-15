@@ -1,5 +1,9 @@
 # Log
 
+## [2026-06-15] fix | 거시지표 후속 — 지수 캔들 소스·전체화면·겹쳐보기 tooltip 정렬
+
+오너 피드백 3건. ① **지수 캔들 누락**(SOX 등 6/39: ^RUT·^STOXX50E·^SOX·^NSEI open 없음, 000001.SS·DX-Y.NYB 코드파싱 ValueError) — 원인 = 캔들이 종목용 `/api/symbol`(get_symbol_data) 사용, 지수에서 불안정. → 신규 `fetch_yf_ohlc`+`get_ohlc_cached`(yfinance 직접, 메모리캐시) + `/api/macro/ohlc/<code>` 엔드포인트로 전환 → 39종 전부 OHLC 확보. ② **전체화면** — 모달바에 ⛶ 버튼(`.mc-modal-box` Fullscreen API), `:fullscreen` 시 차트 `calc(100vh-180px)`, fullscreenchange→renderDetail 재렌더(캔들 clientHeight 동적). ③ **겹쳐보기 tooltip 시점 안 맞음**(원값 개별축에서 시리즈마다 x 다른데 mode 'index'가 배열 인덱스로 매칭 → 좌우로 튐) → `interaction/tooltip mode 'index'→'x'`(시간축 기준 정렬). 검증 Playwright(SOX 캔들·⛶ 버튼·custom mode='x'·콘솔에러 0).
+
 ## [2026-06-15] feature | 거시경제 지표 탭 `/macro` 신규 — 배포·라이브 (플랜 `거시지표_캘린더_plan.md`)
 
 신규 기능. 거시지표 탭(완료) + 증시 캘린더(미착수). 알림 제외(추후 리밸런싱 알림 때). 커밋 0df9740→040ca98(8개). 프로덕션 라이브 = moneymilestone.duckdns.org/macro. 매 변경 Playwright 콘솔에러 0 검증.

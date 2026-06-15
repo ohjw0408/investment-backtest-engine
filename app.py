@@ -1847,6 +1847,15 @@ def api_macro_compare():
         return jsonify({'error': 'not found'}), 404
     return jsonify(data)
 
+@app.route('/api/macro/ohlc/<code>')
+def api_macro_ohlc(code):
+    """지수 OHLC (캔들용). yfinance 직접 — 일부 지수에서 /api/symbol 실패 회피."""
+    from modules import macro_loader
+    spec = macro_loader.SERIES_BY_CODE.get(code)
+    if not spec or spec.get('src') != 'yf':
+        return jsonify({'error': 'no ohlc'}), 404
+    return jsonify({'rows': macro_loader.get_ohlc_cached(spec['yf'])})
+
 @app.route('/api/macro/multi')
 def api_macro_multi():
     """임의 시리즈 N개 겹쳐보기. 토큰 = 거시지표 코드 또는 'SYM:<종목코드>'.

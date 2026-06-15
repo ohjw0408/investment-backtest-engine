@@ -247,8 +247,8 @@
   function baseOpts(unitLabel, legend) {
     const grid = css('--border') || '#e0e0e0', txt = css('--text-muted') || '#888';
     return {
-      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: legend, labels: { color: txt, font: { size: 11 } } }, tooltip: { callbacks: { title: (it) => fracToDate(it[0].parsed.x) } } },
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'x', intersect: false },
+      plugins: { legend: { display: legend, labels: { color: txt, font: { size: 11 } } }, tooltip: { mode: 'x', intersect: false, callbacks: { title: (it) => fracToDate(it[0].parsed.x) } } },
       scales: { x: { type: 'linear', ticks: { color: txt, callback: (v) => fracToDate(v), maxTicksLimit: 9 }, grid: { color: grid } },
         y: { ticks: { color: txt }, grid: { color: grid }, title: { display: !!unitLabel, text: unitLabel, color: txt } } },
     };
@@ -299,8 +299,8 @@
     const cut = cutoffDate(d.points.at(-1)[0], detailMonths);
     if (showCandle) {
       if (!candleCache) {
-        const sym = await (await fetch(`/api/symbol/${encodeURIComponent(d.yf)}`)).json();
-        candleCache = (sym.prices || []).filter(p => p.open != null && p.close != null);
+        const r = await (await fetch(`/api/macro/ohlc/${d.code}`)).json();
+        candleCache = (r.rows || []).filter(p => p.open != null && p.close != null);
       }
       const rows = candleCache.filter(p => !cut || p.date >= cut)
         .map(p => ({ time: p.date, open: p.open, high: p.high, low: p.low, close: p.close }));
@@ -317,7 +317,7 @@
     if (candleChart) { try { candleChart.remove(); } catch (e) {} candleChart = null; }
     const txt = css('--text-muted') || '#888', grid = css('--border') || '#e0e0e0';
     candleChart = LightweightCharts.createChart(wrap, {
-      width: wrap.clientWidth, height: 380,
+      width: wrap.clientWidth, height: wrap.clientHeight || 380,
       layout: { background: { color: 'transparent' }, textColor: txt },
       grid: { vertLines: { color: grid }, horzLines: { color: grid } },
       timeScale: { timeVisible: false },
@@ -338,7 +338,15 @@
     else renderCountry(VIEW, $('mcSearch').value);
   }));
   $('mcSearch').addEventListener('input', () => { if (VIEW === 'US' || VIEW === 'KR' || VIEW === 'GL') renderCountry(VIEW, $('mcSearch').value); });
-  $('mcModalX').addEventListener('click', () => $('mcModal').classList.remove('open'));
+  $('mcFsBtn').addEventListener('click', () => {
+    const box = document.querySelector('.mc-modal-box');
+    if (!document.fullscreenElement) { box.requestFullscreen && box.requestFullscreen(); }
+    else { document.exitFullscreen && document.exitFullscreen(); }
+  });
+  document.addEventListener('fullscreenchange', () => {
+    if ($('mcModal').classList.contains('open')) setTimeout(renderDetail, 150);
+  });
+  $('mcModalX').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); $('mcModal').classList.remove('open'); });
   $('mcModal').addEventListener('click', (e) => { if (e.target === $('mcModal')) $('mcModal').classList.remove('open'); });
   $('mcPeriod').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
     $('mcPeriod').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on');

@@ -76,6 +76,27 @@
       </div>
     </div>
   </div>
+
+  <div class="settings-section">
+    <div class="settings-section-head"><span>📅</span> 캘린더 설정</div>
+    <div class="settings-section-body">
+      <div class="settings-hint">증시 캘린더에 표시할 경제지표와 이벤트 종류를 고르세요.</div>
+      <div id="calLoginGate" class="login-gate" style="display:none;">
+        설정하려면 <a href="/auth/google" onclick="return handleGoogleLogin(event)">로그인</a>이 필요해요.<br>비로그인 시 경제지표 전체가 표시되며, 실적·배당은 로그인 후 이용할 수 있어요.
+      </div>
+      <div id="calEditor" style="display:none;">
+        <div style="font-weight:700;font-size:0.85rem;margin:4px 0 8px;">경제지표</div>
+        <div id="calEconList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px 14px;"></div>
+        <div style="font-weight:700;font-size:0.85rem;margin:16px 0 8px;">내 종목 이벤트</div>
+        <label style="display:flex;gap:7px;align-items:center;font-size:0.85rem;margin-bottom:6px;"><input type="checkbox" id="calShowEarn"> 기업 실적 발표일</label>
+        <label style="display:flex;gap:7px;align-items:center;font-size:0.85rem;"><input type="checkbox" id="calShowDiv"> 배당락일</label>
+        <div class="we-actions" style="margin-top:14px;">
+          <button class="we-save" id="calSaveBtn" onclick="calSave()">저장</button>
+          <span class="we-status" id="calStatus"></span>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="we-modal-bg" id="weModal">
@@ -230,6 +251,35 @@ async function weSave() {
     weSetStatus('네트워크 오류', false);
   }
   btn.disabled = false;
+}
+</script>
+<script>
+// 캘린더 설정
+(async () => {
+  let r;
+  try { r = await (await fetch('/api/calendar/config', { cache: 'no-store' })).json(); }
+  catch (e) { return; }
+  if (!r.logged_in) { document.getElementById('calLoginGate').style.display = 'block'; return; }
+  document.getElementById('calEditor').style.display = 'block';
+  const cfg = r.config || {};
+  const enabled = new Set(cfg.econ || []);
+  document.getElementById('calEconList').innerHTML = (r.available_econ || []).map(e =>
+    `<label style="display:flex;gap:7px;align-items:center;font-size:0.82rem;">
+      <input type="checkbox" class="cal-econ" value="${e.id}" ${enabled.has(e.id) ? 'checked' : ''}> ${e.label}</label>`).join('');
+  document.getElementById('calShowEarn').checked = cfg.show_earnings !== false;
+  document.getElementById('calShowDiv').checked = cfg.show_dividend !== false;
+})();
+
+async function calSave() {
+  const econ = [...document.querySelectorAll('.cal-econ:checked')].map(c => +c.value);
+  const body = { econ, show_earnings: document.getElementById('calShowEarn').checked, show_dividend: document.getElementById('calShowDiv').checked };
+  const st = document.getElementById('calStatus');
+  st.textContent = '저장 중…';
+  try {
+    const res = await fetch('/api/calendar/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    st.textContent = res.ok ? '저장됐어요. 캘린더에 반영됩니다.' : '저장 실패';
+    st.style.color = res.ok ? 'var(--green, #2E7D32)' : 'var(--red, #C62828)';
+  } catch (e) { st.textContent = '저장 실패'; }
 }
 </script>
 {% endblock %}

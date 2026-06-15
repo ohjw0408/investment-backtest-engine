@@ -44,6 +44,8 @@ def init_db():
     cols = [r[1] for r in _conn.execute("PRAGMA table_info(user_settings)").fetchall()]
     if "home_widgets" not in cols:
         _conn.execute("ALTER TABLE user_settings ADD COLUMN home_widgets TEXT")
+    if "calendar_config" not in cols:
+        _conn.execute("ALTER TABLE user_settings ADD COLUMN calendar_config TEXT")
     _conn.commit()
 
 
@@ -114,6 +116,27 @@ def get_home_widgets(user_id):
     if row and row["home_widgets"]:
         return json.loads(row["home_widgets"])
     return None
+
+
+def get_calendar_config(user_id):
+    """캘린더 설정(JSON) 반환. 없으면 None(→ 기본값)."""
+    row = _get_conn().execute(
+        "SELECT calendar_config FROM user_settings WHERE user_id=?", (user_id,)
+    ).fetchone()
+    if row and row["calendar_config"]:
+        return json.loads(row["calendar_config"])
+    return None
+
+
+def save_calendar_config(user_id, cfg):
+    import datetime as _dt
+    _get_conn().execute(
+        "INSERT INTO user_settings (user_id, calendar_config, updated_at) VALUES (?,?,?) "
+        "ON CONFLICT(user_id) DO UPDATE SET calendar_config=excluded.calendar_config, "
+        "updated_at=excluded.updated_at",
+        (user_id, json.dumps(cfg), _dt.datetime.now().isoformat()),
+    )
+    _get_conn().commit()
 
 
 def save_home_widgets(user_id, widgets):

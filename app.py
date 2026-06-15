@@ -14,6 +14,7 @@ from modules.auth_manager import (
     init_holdings_db, get_settings, save_settings,
     init_portfolios_db, get_portfolios, get_portfolio, upsert_portfolio, delete_portfolio,
     get_home_widgets, save_home_widgets,
+    get_calendar_config, save_calendar_config,
 )
 
 load_dotenv()
@@ -1895,14 +1896,51 @@ def _calendar_user_codes(uid):
         pass
     return list(codes)[:50]
 
+def _default_calendar_config():
+    from modules import market_calendar
+    return {'econ': list(market_calendar.CAL_RELEASES.keys()),
+            'show_earnings': True, 'show_dividend': True}
+
 @app.route('/api/calendar')
 def api_calendar():
-    """증시 캘린더 이벤트: 경제지표 발표일(공개) + 내 종목 실적·배당(로그인)."""
+    """증시 캘린더: 경제지표(공개) + 내 종목 실적·배당(로그인). 로그인 시 사용자 설정 적용."""
     from modules import market_calendar
     uid = session.get('user_id')
-    codes = _calendar_user_codes(uid) if uid else []
-    return jsonify({'events': market_calendar.events_for(codes, portfolio_engine.loader),
-                    'logged_in': bool(uid), 'symbol_count': len(codes)})
+    if not uid:
+        # 비로그인 = 지표 전체만, 실적·배당 없음
+        return jsonify({'events': market_calendar.events_for([], portfolio_engine.loader,
+                                                             econ_ids=None, show_earnings=False, show_dividend=False),
+                        'logged_in': False, 'symbol_count': 0})
+    cfg = get_calendar_config(uid) or _default_calendar_config()
+    codes = _calendar_user_codes(uid)
+    ev = market_calendar.events_for(codes, portfolio_engine.loader,
+                                    econ_ids=set(cfg.get('econ', [])),
+                                    show_earnings=cfg.get('show_earnings', True),
+                                    show_dividend=cfg.get('show_dividend', True))
+    return jsonify({'events': ev, 'logged_in': True, 'symbol_count': len(codes)})
+
+@app.route('/api/calendar/config')
+def api_calendar_config_get():
+    from modules import market_calendar
+    uid = session.get('user_id')
+    cfg = (get_calendar_config(uid) if uid else None) or _default_calendar_config()
+    return jsonify({'config': cfg, 'logged_in': bool(uid),
+                    'available_econ': [{'id': rid, 'label': lbl} for rid, lbl in market_calendar.CAL_RELEASES.items()]})
+
+@app.route('/api/calendar/config', methods=['POST'])
+def api_calendar_config_save():
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    from modules import market_calendar
+    body = request.get_json(silent=True) or {}
+    valid_ids = set(market_calendar.CAL_RELEASES.keys())
+    cfg = {
+        'econ': [i for i in (body.get('econ') or []) if i in valid_ids],
+        'show_earnings': bool(body.get('show_earnings', True)),
+        'show_dividend': bool(body.get('show_dividend', True)),
+    }
+    save_calendar_config(session['user_id'], cfg)
+    return jsonify({'ok': True, 'config': cfg})
 
 @app.route('/api/macro/curves')
 def api_macro_curves():

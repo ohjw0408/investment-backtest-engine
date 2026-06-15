@@ -37,8 +37,16 @@ def _fred_key():
     return os.environ.get("FRED_API_KEY") or (FRED_KEY_FILE.read_text().strip() if FRED_KEY_FILE.exists() else "")
 
 
-def econ_events():
-    """주요 지표 발표일 (과거 ~45일 + 향후 ~150일, 실제 발표일만). 캐시(일 단위)."""
+def econ_events(ids=None):
+    """주요 지표 발표일 (과거 ~45일 + 향후 ~150일). ids=허용 release_id set(None=전체)."""
+    all_ev = _econ_events_all()
+    if ids is None:
+        return all_ev
+    ids = set(ids)
+    return [e for e in all_ev if e.get("rid") in ids]
+
+
+def _econ_events_all():
     today = datetime.date.today()
     tk = today.isoformat()
     if tk in _econ_cache:
@@ -56,7 +64,7 @@ def econ_events():
                                      "limit": 200},
                              timeout=20).json()
             for d in r.get("release_dates", []):
-                out.append({"date": d["date"], "type": "econ", "title": label})
+                out.append({"date": d["date"], "type": "econ", "title": label, "rid": rid})
         except Exception:
             continue
     _econ_cache.clear()
@@ -83,17 +91,24 @@ def earnings_events(code):
     sym = _yf_stock(code)
     out = []
     if sym:
+        floor = (datetime.date.today() - datetime.timedelta(days=400)).isoformat()
         try:
             import yfinance as yf
-            cal = yf.Ticker(sym).calendar or {}
-            ed = cal.get("Earnings Date")
-            if isinstance(ed, list) and ed:
-                ed = ed[0]
-            if ed:
-                out.append({"date": ed.isoformat() if hasattr(ed, "isoformat") else str(ed),
-                            "type": "earnings", "title": f"{code} 실적발표", "symbol": code})
+            ed = yf.Ticker(sym).get_earnings_dates(limit=16)   # 과거+미래 분기 실적일
+            if ed is not None:
+                for idx in ed.index:
+                    d = idx.date().isoformat() if hasattr(idx, "date") else str(idx)[:10]
+                    if d >= floor:
+                        out.append({"date": d, "type": "earnings", "title": f"{code} 실적발표", "symbol": code})
         except Exception:
             pass
+        # 중복 날짜 제거
+        seen, uq = set(), []
+        for e in out:
+            if e["date"] in seen:
+                continue
+            seen.add(e["date"]); uq.append(e)
+        out = uq
     _earn_cache[ck] = out
     return out
 
@@ -123,13 +138,14 @@ def dividend_events(loader, codes):
     return out
 
 
-def events_for(codes, loader=None):
-    """경제지표(공개) + 실적(개별주, yfinance) + 배당락(배당엔진) 합본."""
-    out = list(econ_events())
+def events_for(codes, loader=None, econ_ids=None, show_earnings=True, show_dividend=True):
+    """경제지표 + 실적(개별주) + 배당락(배당엔진). config로 필터."""
+    out = list(econ_events(econ_ids))
     codes = list(dict.fromkeys(codes or []))
-    for c in codes:
-        out.extend(earnings_events(c))
-    if loader is not None and codes:
+    if show_earnings:
+        for c in codes:
+            out.extend(earnings_events(c))
+    if show_dividend and loader is not None and codes:
         out.extend(dividend_events(loader, codes))
     seen, uniq = set(), []
     for e in out:

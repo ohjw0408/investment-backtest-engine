@@ -1,5 +1,9 @@
 # Log
 
+## [2026-06-15] feature | 캘린더 — 과거 실적·사용자 지표설정·로그인 게이팅
+
+오너 피드백 3건. ① **과거 실적 누락**: yfinance `Ticker.calendar`는 다음 1건만 → `get_earnings_dates(limit=16)`로 **과거+미래 분기 실적일** 전부(NVDA 5/20 등). 과거 400일~미래 윈도우. ② **사용자 지표 선택**: `/settings`에 "📅 캘린더 설정" 섹션 — 경제지표 8종 체크 + 실적/배당 토글. 저장 = `user_settings.calendar_config`(JSON, 신규 컬럼) + `get/save_calendar_config` + `/api/calendar/config` GET·POST. `/api/calendar`가 로그인 시 설정 적용(econ_ids·show_earnings·show_dividend 필터). ③ **로그인 게이팅**: 비로그인 = 경제지표 전체만(실적·배당 없음), 캘린더 실적/배당 필터 클릭 시 로그인 유도 + 설정 링크. 검증 E2E(NVDA 과거실적 6건·config 저장→CPI만+배당off 반영·비로그인 지표만).
+
 ## [2026-06-15] fix | 캘린더 배당=배당엔진(ETF)·내자산 수집·지표 미래월·FOMC제외
 
 오너 피드백(배당 안 뜸·7월 텅·FOMC 매일). **검증 결함 자인**: 최초 AAPL(주식)로만 확인해 ETF 케이스 누락. 오너 실제 ETF(SCHD·QQQM·458730·133690)로 재검증·수정.

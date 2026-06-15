@@ -73,12 +73,12 @@ def _econ_events_all():
 
 
 def _yf_stock(code):
-    """앱 코드 → yfinance 심볼(주식만). ETF/지수/금/크립토/KR ETF → None(실적 없음)."""
+    """앱 코드 → yfinance 심볼(실적용). 지수/금/크립토 → None. KR 6자리 → .KS(폴백 .KQ)."""
     c = code.upper()
     if c.startswith("^") or c == "KRX_GOLD" or c.endswith("=F") or c.endswith("=X") or "-" in c:
         return None
-    if c.isdigit():           # 국내(주식/ETF 구분 불가) — 실적은 스킵(배당은 엔진이 처리)
-        return None
+    if c.isdigit() and len(c) == 6:
+        return c + ".KS"
     return c
 
 
@@ -92,16 +92,20 @@ def earnings_events(code):
     out = []
     if sym:
         floor = (datetime.date.today() - datetime.timedelta(days=400)).isoformat()
-        try:
-            import yfinance as yf
-            ed = yf.Ticker(sym).get_earnings_dates(limit=16)   # 과거+미래 분기 실적일
-            if ed is not None:
+        import yfinance as yf
+        # KR은 .KS 먼저, 비면 .KQ(코스닥) 폴백
+        syms = [sym, sym[:-3] + ".KQ"] if sym.endswith(".KS") else [sym]
+        for s in syms:
+            try:
+                ed = yf.Ticker(s).get_earnings_dates(limit=16)
+            except Exception:
+                ed = None
+            if ed is not None and len(ed.index):
                 for idx in ed.index:
                     d = idx.date().isoformat() if hasattr(idx, "date") else str(idx)[:10]
                     if d >= floor:
                         out.append({"date": d, "type": "earnings", "title": f"{code} 실적발표", "symbol": code})
-        except Exception:
-            pass
+                break
         # 중복 날짜 제거
         seen, uq = set(), []
         for e in out:
@@ -120,9 +124,15 @@ def dividend_events(loader, codes):
     if key in _div_cache:
         return _div_cache[key]
     out = []
+    # 배당 대상만(지수/환율/원자재선물/크립토/KRX금 제외) — 비대상 코드가 엔진을 깨뜨림
+    dcodes = [c for c in codes if not (c.startswith("^") or c.upper() == "KRX_GOLD"
+              or c.endswith("=X") or c.endswith("=F") or "-" in c)]
+    if not dcodes:
+        _div_cache[key] = out
+        return out
     try:
         from modules import dividend_history as DH
-        res = DH.build_dividend_chart(loader, [{"code": c, "quantity": 1} for c in codes])
+        res = DH.build_dividend_chart(loader, [{"code": c, "quantity": 1} for c in dcodes])
         floor = (datetime.date.today() - datetime.timedelta(days=400)).isoformat()
         for y in res.get("events", {}):
             for e in res["events"][y]:

@@ -13,6 +13,8 @@
 .cal-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
 .cal-filters button { border: 1.5px solid var(--border); background: var(--bg); color: var(--text-muted); border-radius: 16px; padding: 5px 11px; font-size: 0.76rem; cursor: pointer; font-family: inherit; }
 .cal-filters button.on { border-color: var(--blue); color: var(--blue); font-weight: 700; }
+.cal-settings-btn { display: inline-flex; align-items: center; gap: 5px; background: var(--blue); color: #fff; border-radius: 9px; padding: 7px 14px; font-size: 0.82rem; font-weight: 700; text-decoration: none; }
+.cal-settings-btn:hover { opacity: 0.9; }
 
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
 .cal-dow { text-align: center; font-size: 0.72rem; color: var(--text-muted); font-weight: 700; padding: 4px 0; }
@@ -63,6 +65,7 @@
       <button data-f="earnings">실적</button>
       <button data-f="dividend">배당</button>
     </div>
+    <a href="/settings" class="cal-settings-btn">⚙ 표시 설정</a>
   </div>
 
   <div class="cal-legend">

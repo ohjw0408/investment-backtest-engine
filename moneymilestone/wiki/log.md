@@ -1,5 +1,9 @@
 # Log
 
+## [2026-06-15] fix+feature | 캘린더 — 한국 실적·배당 + 소스/개별종목 설정 + 설정버튼 강조
+
+오너 피드백. ① **한국 종목 실적 누락**: `_yf_stock`이 6자리(국내) None 처리 → 수정(`.KS`, 비면 `.KQ` 폴백). 005930·000660 실적 표시(get_earnings_dates 과거+미래). ② **한국 배당 누락**: 배당엔진은 005930 정상이었으나 `dividend_events`가 codes에 지수/환율/크립토(^GSPC·KRW=X·BTC-USD) 섞이면 `build_dividend_chart`가 throw→전체 배당 소실. 배당 대상만 필터(지수/=X/=F/-/KRX_GOLD 제외). ③ **소스별·개별종목 설정**: config에 `sources{holdings,portfolios,watchlist}` + `excluded[codes]` 추가. `/api/calendar/config`가 로그인 시 `symbols`(소스별 종목+이름) 반환, `/settings`에서 소스 토글 + 개별 체크. `_calendar_user_codes(uid,cfg)`가 소스 on/off + 개별 제외 적용. ④ **설정 버튼 강조**: 캘린더 상단 "⚙ 표시 설정" 파란 버튼(기존 작은 링크 대체). E2E(005930 실적+배당·SCHD 배당·소스/개별 제외 반영). **한국 경제지표 발표일정 = 무료 API 없음(FRED는 미국만) → 미지원. FOMC = FRED 회의일 미제공, 보류(추후 방법 모색).**
+
 ## [2026-06-15] feature | 캘린더 — 과거 실적·사용자 지표설정·로그인 게이팅
 
 오너 피드백 3건. ① **과거 실적 누락**: yfinance `Ticker.calendar`는 다음 1건만 → `get_earnings_dates(limit=16)`로 **과거+미래 분기 실적일** 전부(NVDA 5/20 등). 과거 400일~미래 윈도우. ② **사용자 지표 선택**: `/settings`에 "📅 캘린더 설정" 섹션 — 경제지표 8종 체크 + 실적/배당 토글. 저장 = `user_settings.calendar_config`(JSON, 신규 컬럼) + `get/save_calendar_config` + `/api/calendar/config` GET·POST. `/api/calendar`가 로그인 시 설정 적용(econ_ids·show_earnings·show_dividend 필터). ③ **로그인 게이팅**: 비로그인 = 경제지표 전체만(실적·배당 없음), 캘린더 실적/배당 필터 클릭 시 로그인 유도 + 설정 링크. 검증 E2E(NVDA 과거실적 6건·config 저장→CPI만+배당off 반영·비로그인 지표만).

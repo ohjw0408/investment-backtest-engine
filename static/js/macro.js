@@ -46,8 +46,9 @@
       const cp = (s.change_pct != null) ? ` (${s.change_pct > 0 ? '+' : ''}${s.change_pct.toFixed(2)}%)` : '';
       chgTxt = `${up ? '▲' : dn ? '▼' : '–'} ${fmtVal(Math.abs(s.change), s.unit)}${cp}`;
     }
-    const flag = s.country === 'US' ? '🇺🇸' : '🇰🇷';
-    return `<div class="mc-card" data-code="${s.code}" data-name="${s.name_ko}">
+    const flag = s.country === 'US' ? '🇺🇸' : s.country === 'KR' ? '🇰🇷' : '🌏';
+    const tip = (s.desc || '').replace(/"/g, '&quot;');
+    return `<div class="mc-card" data-code="${s.code}" data-name="${s.name_ko}" title="${tip}">
       <div class="flag">${flag} ${s.freq}</div>
       <div class="nm">${s.name_ko}</div>
       <div class="val">${fmtVal(s.last_val, s.unit)}<span class="unit">${s.unit}</span></div>

@@ -20,7 +20,9 @@
 
 **피드백 3건 + Step3(같은 날):** ① 겹쳐보기 **기본 표시=원값(개별 축)** (정규화는 한 시리즈가 스케일 독점 → 나머지 평평). ② **Step3 Celery beat 자동갱신** — `macro_loader.refresh()`(증분, 시리즈별 마지막일 이후만 fetch·upsert) + `tasks.refresh_macro` + `celery_app` beat 2회/일(US장마감 21:30 UTC·KR장마감 07:00 UTC). ③ **시장 대표 지수 15종 추가**(신규 source 'yf'=yfinance, 카테고리 "주가지수"): US=S&P500·다우·나스닥종합·나스닥100·러셀2000 / KR=코스피·코스닥 / GL=닛케이·항셍·상해·대만·센섹스·FTSE·DAX·유로스톡스. 신규 **🌏 글로벌지수 토글**(country=GL). `ensure_data`가 신규 시리즈(행 0)만 자동 백필 → 배포 시 지수 자동 적재. **거시지표 총 105종.** 검증 = Playwright(US 주가지수 카테고리·GL 8지수·커스텀 원값 3축·콘솔에러 0) + refresh 증분 105종.
 
-**다음:** Step 5 설명 콘텐츠(LLM, macro_series.description 빈값) → Step 6 캘린더(`market_events`+yfinance 실적+FRED releases) / PART C3 포폴비교 통합(오너 결정).
+**Step 5 완료(지표 설명문):** 105종 전 지표에 1~2줄 한글 설명(교육·정보용) 작성 → `macro_loader.DESCRIPTIONS` dict + `seed_descriptions()`(멱등 UPDATE). `_upsert`가 DESCRIPTIONS에서 desc 주입, `ensure_data`가 배포 시 항상 시드(데이터 재백필 없이 설명만 갱신). UI = 모달 상세에 설명 박스 + 카드 hover title 툴팁. 검증 = 105/105 desc 채움 + Playwright(카드 title·모달 desc 표시·콘솔에러 0).
+
+**다음:** Step 6 캘린더(`market_events`+yfinance 실적+FRED releases) / PART C3 포폴비교 통합(오너 결정).
 
 ## [2026-06-15] fix+feature | C1 버그픽스 4종 + 지수 캔들 회귀 복구 + 새로고침/수동가격
 

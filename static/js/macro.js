@@ -19,6 +19,7 @@
   const $ = (id) => document.getElementById(id);
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
+  function mcFlag(c) { return c === 'US' ? '🇺🇸' : c === 'KR' ? '🇰🇷' : c === 'COMM' ? '🛢' : '🌏'; }
   function dnum(d) { const [y, m, day] = d.split('-').map(Number); return y + (m - 1) / 12 + (day - 1) / 365; }
   function fracToDate(f) { const y = Math.floor(f); const m = Math.min(12, Math.round((f - y) * 12) + 1); return `${y}-${String(m).padStart(2, '0')}`; }
 
@@ -46,7 +47,7 @@
       const cp = (s.change_pct != null) ? ` (${s.change_pct > 0 ? '+' : ''}${s.change_pct.toFixed(2)}%)` : '';
       chgTxt = `${up ? '▲' : dn ? '▼' : '–'} ${fmtVal(Math.abs(s.change), s.unit)}${cp}`;
     }
-    const flag = s.country === 'US' ? '🇺🇸' : s.country === 'KR' ? '🇰🇷' : '🌏';
+    const flag = mcFlag(s.country);
     const tip = (s.desc || '').replace(/"/g, '&quot;');
     return `<div class="mc-card" data-code="${s.code}" data-name="${s.name_ko}" title="${tip}">
       <div class="flag">${flag} ${s.freq}</div>
@@ -136,7 +137,7 @@
     let html = '';
     if (macros.length) html += `<div class="mc-dd-grouphdr">거시지표</div>` +
       macros.slice(0, 12).map(s => `<div class="mc-dd-item" data-k="${s.code}" data-l="${s.name_ko}">
-        <span>${s.country === 'US' ? '🇺🇸' : '🇰🇷'} ${s.name_ko}</span><span class="b">${s.unit}</span></div>`).join('');
+        <span>${mcFlag(s.country)} ${s.name_ko}</span><span class="b">${s.unit}</span></div>`).join('');
     // 종목 검색
     try {
       const syms = await (await fetch(`/api/search?q=${encodeURIComponent(q)}`)).json();
@@ -314,7 +315,7 @@
     const d = await (await fetch(`/api/macro/series/${code}`)).json();
     if (d.error) { $('mcModalTitle').textContent = '데이터 없음'; return; }
     window._mcDetail = d; candleCache = null; intradayCache = {}; detailMonths = 60; detailType = 'line'; candleInterval = '1D';
-    const flag = d.country === 'US' ? '🇺🇸 미국' : d.country === 'KR' ? '🇰🇷 한국' : '🌏 글로벌';
+    const flag = d.country === 'US' ? '🇺🇸 미국' : d.country === 'KR' ? '🇰🇷 한국' : d.country === 'COMM' ? '🛢 원자재' : '🌏 글로벌';
     $('mcModalTitle').textContent = d.name_ko;
     $('mcModalSub').textContent = `${flag} · 단위 ${d.unit} · ${d.points.length.toLocaleString()}개 관측 · ${d.points[0][0]}~${d.points.at(-1)[0]}`;
     if (d.desc) { $('mcModalDesc').style.display = 'block'; $('mcModalDesc').textContent = d.desc; }
@@ -384,13 +385,13 @@
   $('mcToggle').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
     $('mcToggle').querySelectorAll('button').forEach(x => x.classList.remove('on'));
     b.classList.add('on'); VIEW = b.dataset.view;
-    const showSearch = (VIEW === 'US' || VIEW === 'KR' || VIEW === 'GL');
+    const showSearch = (VIEW === 'US' || VIEW === 'KR' || VIEW === 'GL' || VIEW === 'COMM');
     $('mcSearchBar').style.display = showSearch ? 'block' : 'none';
     if (VIEW === 'CMP') renderCompare();
     else if (VIEW === 'CUSTOM') renderCustom();
     else renderCountry(VIEW, $('mcSearch').value);
   }));
-  $('mcSearch').addEventListener('input', () => { if (VIEW === 'US' || VIEW === 'KR' || VIEW === 'GL') renderCountry(VIEW, $('mcSearch').value); });
+  $('mcSearch').addEventListener('input', () => { if (VIEW === 'US' || VIEW === 'KR' || VIEW === 'GL' || VIEW === 'COMM') renderCountry(VIEW, $('mcSearch').value); });
   $('mcFsBtn').addEventListener('click', () => {
     const box = document.querySelector('.mc-modal-box');
     if (!document.fullscreenElement) { box.requestFullscreen && box.requestFullscreen(); }

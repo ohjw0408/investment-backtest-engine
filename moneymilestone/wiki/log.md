@@ -1,5 +1,9 @@
 # Log
 
+## [2026-06-15] feature | 거시지표 원자재 22종 추가 (🛢 카테고리)
+
+오너 요청. 원자재 선물 22종 yfinance(`_comm` 헬퍼, 카테고리 "원자재", country COMM, 🛢 토글): 금속(금GC=F·은·구리HG=F·백금·팔라듐)·에너지(천연가스NG=F·가솔린·난방유)·곡물(옥수수·밀·대두·대두유/박·귀리·쌀)·소프트(커피·설탕·코코아·면화·OJ)·축산(생우·돈육). WTI/브렌트는 기존 FRED(시장환율) 보유라 제외. **거시지표 총 151종.** 원자재도 캔들 적용(get_series is_index = 주가지수∪원자재) — 선물은 거래량 실제 표시(구리 12,199). 전 신규 desc. ensure_data 배포 시 자동 백필. 검증 Playwright(원자재 22카드·구리 캔들+거래량·콘솔에러 0).
+
 ## [2026-06-15] feature | 거시지표 지수 캔들 = symbol 페이지 기능 동등(거래량·간격·시간봉)
 
 오너: "거래량 왜 안나와·간격 왜 못바꿔·주식검색 캔들 그대로." → symbol.html 캔들 서브시스템을 macro로 이식(지수 39종). **간격 탭**(1시간/1일/1주/1개월/1년, 캔들 모드 시 기간탭과 교체) + **거래량 히스토그램**(하단 26%, 봉색) + 간격별 **기본 줌**(1H 2일·1D 75일·1W 1년·1M 7년·1Y 전체) + **1시간봉**(intraday) + 힌트. 데이터 = yfinance 직접: `fetch_yf_ohlc`에 volume 추가 + `fetch_yf_intraday`(60m)·`get_intraday_cached` + `/api/macro/intraday/<code>`. JS = resampleOHLC·bucketKey·getCandleData·drawCandle(LightweightCharts, 캔들+거래량+줌) 이식. ※ 가격지수(^SOX 등)는 yfinance 거래량 0(지수 특성) — 시간봉/주식형은 거래량 표시. 검증 Playwright(코스피 캔들 1D/1W/1H·간격탭 교체·힌트·콘솔에러 0).

@@ -22,7 +22,7 @@ INDEX_DB = BASE / "data" / "meta" / "index_master.db"
 FRED_KEY_FILE = BASE / "data" / "meta" / "fred_api_key.txt"
 ECOS_KEY_FILE = BASE / "data" / "meta" / "ecos_api_key.txt"
 
-CATEGORIES = ["주가지수", "금리", "인플레이션", "고용", "통화·유동성", "신용·리스크", "경기·성장", "시장·환율"]
+CATEGORIES = ["주가지수", "원자재", "금리", "인플레이션", "고용", "통화·유동성", "신용·리스크", "경기·성장", "시장·환율"]
 
 
 def _fred(sid, freq, cat, name, unit, country="US"):
@@ -41,6 +41,12 @@ def _yf(code, yfsym, country, name):
     """yfinance 시장 지수. country=US/KR/GL."""
     return {"code": f"IDX_{code}", "src": "yf", "yf": yfsym, "freq": "D",
             "category": "주가지수", "name_ko": name, "unit": "지수", "country": country}
+
+
+def _comm(code, yfsym, name, unit="$"):
+    """yfinance 원자재 선물. country=COMM."""
+    return {"code": f"COMM_{code}", "src": "yf", "yf": yfsym, "freq": "D",
+            "category": "원자재", "name_ko": name, "unit": unit, "country": "COMM"}
 
 
 # ── 지표 레지스트리 (오너 승인 2026-06-15, 코드 실호출 검증) ──────────────
@@ -193,6 +199,30 @@ SERIES = [
     _yf("STI", "^STI", "GL", "STI (싱가포르)"),
     _yf("NIFTY", "^NSEI", "GL", "니프티 50 (인도)"),
     _yf("JKSE", "^JKSE", "GL", "IDX 종합 (인도네시아)"),
+
+    # 원자재 선물 (yfinance)
+    _comm("GOLD", "GC=F", "금", "$/oz"),
+    _comm("SILVER", "SI=F", "은", "$/oz"),
+    _comm("COPPER", "HG=F", "구리", "$/lb"),
+    _comm("PLATINUM", "PL=F", "백금", "$/oz"),
+    _comm("PALLADIUM", "PA=F", "팔라듐", "$/oz"),
+    _comm("NATGAS", "NG=F", "천연가스", "$/MMBtu"),
+    _comm("GASOLINE", "RB=F", "가솔린(RBOB)", "$/gal"),
+    _comm("HEATOIL", "HO=F", "난방유", "$/gal"),
+    _comm("CORN", "ZC=F", "옥수수", "¢/bu"),
+    _comm("WHEAT", "ZW=F", "밀", "¢/bu"),
+    _comm("SOYBEAN", "ZS=F", "대두(콩)", "¢/bu"),
+    _comm("SOYOIL", "ZL=F", "대두유", "¢/lb"),
+    _comm("SOYMEAL", "ZM=F", "대두박", "$/ton"),
+    _comm("OATS", "ZO=F", "귀리", "¢/bu"),
+    _comm("RICE", "ZR=F", "쌀", "$/cwt"),
+    _comm("COFFEE", "KC=F", "커피", "¢/lb"),
+    _comm("SUGAR", "SB=F", "설탕", "¢/lb"),
+    _comm("COCOA", "CC=F", "코코아", "$/ton"),
+    _comm("COTTON", "CT=F", "면화", "¢/lb"),
+    _comm("OJ", "OJ=F", "오렌지주스", "¢/lb"),
+    _comm("CATTLE", "LE=F", "생우(소)", "¢/lb"),
+    _comm("HOGS", "HE=F", "돈육(돼지)", "¢/lb"),
 ]
 
 SERIES_BY_CODE = {s["code"]: s for s in SERIES}
@@ -340,6 +370,29 @@ DESCRIPTIONS = {
     "IDX_STI": "STI. 싱가포르 증시 대표 지수입니다.",
     "IDX_NIFTY": "니프티 50. 인도 NSE 대표 지수입니다.",
     "IDX_JKSE": "IDX 종합지수. 인도네시아 자카르타증시 대표 지수입니다.",
+    # 원자재
+    "COMM_GOLD": "금 선물. 대표 안전자산·인플레 헤지. 실질금리·달러와 역의 관계가 큽니다.",
+    "COMM_SILVER": "은 선물. 안전자산이자 산업용 수요. 금/은 비율은 위험선호 가늠에 쓰입니다.",
+    "COMM_COPPER": "구리 선물('Dr.Copper'). 산업 전반에 쓰여 경기 선행 신호로 통합니다.",
+    "COMM_PLATINUM": "백금 선물. 자동차 촉매·산업 수요 중심 귀금속.",
+    "COMM_PALLADIUM": "팔라듐 선물. 가솔린차 촉매 핵심 금속.",
+    "COMM_NATGAS": "천연가스 선물(헨리허브). 난방·발전 수요로 계절성·변동성이 큽니다.",
+    "COMM_GASOLINE": "RBOB 가솔린 선물. 정제마진·소비자 유가의 선행 지표.",
+    "COMM_HEATOIL": "난방유 선물. 디젤·난방 수요 지표.",
+    "COMM_CORN": "옥수수 선물. 사료·에탄올 수요, 곡물가의 기준.",
+    "COMM_WHEAT": "밀 선물. 식량 물가의 대표 곡물.",
+    "COMM_SOYBEAN": "대두(콩) 선물. 사료·식용유 원료, 미·중 교역 민감.",
+    "COMM_SOYOIL": "대두유 선물. 식용유·바이오디젤 원료.",
+    "COMM_SOYMEAL": "대두박 선물. 가축 사료 핵심.",
+    "COMM_OATS": "귀리 선물.",
+    "COMM_RICE": "쌀 선물.",
+    "COMM_COFFEE": "커피(아라비카) 선물. 대표 소프트 커머디티.",
+    "COMM_SUGAR": "설탕 선물.",
+    "COMM_COCOA": "코코아 선물.",
+    "COMM_COTTON": "면화 선물. 섬유 수요 지표.",
+    "COMM_OJ": "오렌지주스 선물.",
+    "COMM_CATTLE": "생우(소) 선물. 축산물 가격.",
+    "COMM_HOGS": "돈육(돼지) 선물. 축산물 가격.",
 }
 
 
@@ -698,7 +751,7 @@ def get_series(code, limit=None):
     spec = SERIES_BY_CODE.get(code, {})
     return {"code": code, "name_ko": m["name_ko"], "unit": m["unit"],
             "country": m["country"], "freq": m["freq"], "desc": m["description"] or "",
-            "yf": spec.get("yf"), "is_index": spec.get("category") == "주가지수",
+            "yf": spec.get("yf"), "is_index": spec.get("category") in ("주가지수", "원자재"),
             "points": pts}
 
 

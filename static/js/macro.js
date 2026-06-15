@@ -5,6 +5,8 @@
   let detailChart = null, cmpChart = null, custChart = null;
   const PALETTE = ['#1976D2', '#E65100', '#2E7D32', '#7B1FA2', '#C2185B', '#00838F'];
   let custom = [];          // [{key,label,color}]
+  let custStart = null, custEnd = null, custViewMode = 'norm';  // 구간·표시모드
+  let custRaw = {};         // 최근 fetch 원본 {key:series}
 
   const $ = (id) => document.getElementById(id);
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -90,7 +92,7 @@
         <div class="mc-dd" id="mcCustDD"></div>
       </div>
       <div class="mc-chips" id="mcChips"></div>
-      <div class="mc-cust-opt" id="mcCustOpt"></div>
+      <div class="mc-cust-ctrl" id="mcCustCtrl"></div>
       <div class="mc-cmp-card"><div class="mc-chart-wrap"><canvas id="mcCustChart"></canvas></div></div>`;
     const inp = $('mcCustInput'), dd = $('mcCustDD');
     let t = null;
@@ -139,33 +141,77 @@
     $('mcChips').innerHTML = custom.map(c => `<span class="mc-chip2" style="background:${c.color}">${c.label}<button data-k="${c.key}">×</button></span>`).join('')
       || `<span class="mc-nores">위에서 지표·종목을 추가하세요.</span>`;
     $('mcChips').querySelectorAll('button').forEach(b => b.addEventListener('click', () => removeCustom(b.dataset.k)));
-    // 옵션(정확히 2개일 때 원값 2축 토글)
-    const opt = $('mcCustOpt');
-    if (custom.length === 2) {
-      opt.innerHTML = `<label><input type="radio" name="cmode" value="norm" checked> 정규화(시작=100)</label>
-        <label><input type="radio" name="cmode" value="dual"> 원값(좌우 2축)</label>`;
-      opt.querySelectorAll('input').forEach(r => r.addEventListener('change', loadCustomChart));
-    } else opt.innerHTML = custom.length ? `<span>여러 단위 혼합 → 공통 시작점=100 정규화</span>` : '';
   }
 
-  function custMode() { const r = document.querySelector('input[name="cmode"]:checked'); return (custom.length === 2 && r) ? r.value : 'norm'; }
+  function renderCustCtrl() {
+    const ctrl = $('mcCustCtrl');
+    if (!ctrl) return;
+    if (!custom.length) { ctrl.innerHTML = ''; return; }
+    ctrl.innerHTML = `
+      <span class="grp">📅 구간:
+        <input type="date" id="mcStart" value="${custStart || ''}">
+        ~ <input type="date" id="mcEnd" value="${custEnd || ''}"></span>
+      <span class="grp">
+        <button class="qr" data-y="1">1년</button><button class="qr" data-y="5">5년</button>
+        <button class="qr" data-y="10">10년</button><button class="qr" data-y="0">전체</button></span>
+      <span class="grp">표시:
+        <label><input type="radio" name="cmode" value="norm" ${custViewMode === 'norm' ? 'checked' : ''}> 정규화(시작=100)</label>
+        <label><input type="radio" name="cmode" value="raw" ${custViewMode === 'raw' ? 'checked' : ''}> 원값(개별 축)</label></span>`;
+    $('mcStart').addEventListener('change', (e) => { custStart = e.target.value; drawCustom(); });
+    $('mcEnd').addEventListener('change', (e) => { custEnd = e.target.value; drawCustom(); });
+    ctrl.querySelectorAll('input[name=cmode]').forEach(r => r.addEventListener('change', (e) => { custViewMode = e.target.value; drawCustom(); }));
+    ctrl.querySelectorAll('.qr').forEach(b => b.addEventListener('click', () => {
+      const yrs = +b.dataset.y;
+      const ends = Object.values(custRaw).map(s => s.points.at(-1)?.[0]).filter(Boolean).sort();
+      custEnd = ends.length ? ends.at(-1) : null;
+      if (yrs === 0) {
+        const mins = Object.values(custRaw).map(s => s.points[0]?.[0]).filter(Boolean).sort();
+        custStart = mins.length ? mins.at(-1) : null;   // 공통 시작(가장 늦은 시작일)
+      } else if (custEnd) {
+        const d = new Date(custEnd); d.setFullYear(d.getFullYear() - yrs);
+        custStart = d.toISOString().slice(0, 10);
+      }
+      renderCustCtrl(); drawCustom();
+    }));
+  }
 
   async function loadCustomChart() {
-    if (!custom.length) { custChart = drawLine('mcCustChart', custChart, [], ''); return; }
+    if (!custom.length) { custRaw = {}; renderCustCtrl(); custChart = drawLine('mcCustChart', custChart, [], ''); return; }
     const keys = custom.map(c => c.key).join(',');
     const d = await (await fetch(`/api/macro/multi?keys=${encodeURIComponent(keys)}`)).json();
-    const map = {}; (d.series || []).forEach(s => map[s.key] = s);
-    const mode = custMode();
-    if (mode === 'dual') {
-      const ds = custom.map((c, i) => { const s = map[c.key]; if (!s) return null;
-        return { ...lineDS(`${c.label} (${s.unit || '원값'})`, s.points, c.color), yAxisID: i === 0 ? 'y' : 'y1' }; }).filter(Boolean);
-      custChart = drawDual('mcCustChart', custChart, ds, map);
+    custRaw = {}; (d.series || []).forEach(s => custRaw[s.key] = s);
+    // 기본 구간: 공통 시작(가장 늦은 시작일) ~ 최신
+    if (!custStart) {
+      const mins = Object.values(custRaw).map(s => s.points[0]?.[0]).filter(Boolean).sort();
+      custStart = mins.length ? mins.at(-1) : null;
+    }
+    if (!custEnd) {
+      const maxs = Object.values(custRaw).map(s => s.points.at(-1)?.[0]).filter(Boolean).sort();
+      custEnd = maxs.length ? maxs.at(-1) : null;
+    }
+    renderCustCtrl();
+    drawCustom();
+  }
+
+  function inRange(p) { return (!custStart || p[0] >= custStart) && (!custEnd || p[0] <= custEnd); }
+
+  function drawCustom() {
+    if (!custom.length) { custChart = drawLine('mcCustChart', custChart, [], ''); return; }
+    if (custViewMode === 'raw') {
+      const datasets = [], axes = {};
+      const txt = css('--text-muted') || '#888', grid = css('--border') || '#e0e0e0';
+      custom.forEach((c, i) => {
+        const s = custRaw[c.key]; if (!s) return;
+        const pts = s.points.filter(inRange); if (!pts.length) return;
+        const ax = 'y' + i;
+        axes[ax] = { position: i % 2 ? 'right' : 'left', ticks: { color: c.color, font: { size: 10 } },
+          grid: { drawOnChartArea: i === 0, color: grid } };
+        datasets.push({ ...lineDS(`${c.label} (${s.unit || '원값'})`, pts, c.color), yAxisID: ax });
+      });
+      custChart = drawAxes('mcCustChart', custChart, datasets, axes);
     } else {
-      // 공통 시작점 정규화: 모든 시리즈가 데이터 있는 가장 늦은 시작일 기준
-      const starts = custom.map(c => map[c.key]).filter(Boolean).map(s => s.points[0] && s.points[0][0]).filter(Boolean);
-      const common = starts.length ? starts.sort().slice(-1)[0] : null;
-      const ds = custom.map(c => { const s = map[c.key]; if (!s) return null;
-        let pts = common ? s.points.filter(p => p[0] >= common) : s.points;
+      const ds = custom.map(c => { const s = custRaw[c.key]; if (!s) return null;
+        const pts = s.points.filter(inRange);
         const base = pts.find(p => p[1])?.[1]; if (!base) return null;
         return lineDS(c.label, pts.map(p => [p[0], p[1] / base * 100]), c.color); }).filter(Boolean);
       custChart = drawLine('mcCustChart', custChart, ds, '정규화(시작=100)');
@@ -189,11 +235,11 @@
     if (prev) prev.destroy();
     return new Chart($(id).getContext('2d'), { type: 'line', data: { datasets }, options: baseOpts(unitLabel, datasets.length > 1) });
   }
-  function drawDual(id, prev, datasets, map) {
+  function drawAxes(id, prev, datasets, axes) {
     if (prev) prev.destroy();
     const o = baseOpts('', true);
-    const txt = css('--text-muted') || '#888', grid = css('--border') || '#e0e0e0';
-    o.scales.y1 = { position: 'right', ticks: { color: txt }, grid: { drawOnChartArea: false } };
+    delete o.scales.y;            // 시리즈별 개별 y축으로 교체
+    Object.assign(o.scales, axes);
     return new Chart($(id).getContext('2d'), { type: 'line', data: { datasets }, options: o });
   }
 

@@ -14,7 +14,9 @@
 
 **오너 라이브 피드백 후속(같은 날, Step4 보강):** ① **전체 히스토리** — fetch start 1990 하드캡 제거(FRED 1900-01-01·ECOS 1900) → 시리즈 출범부터(DGS10 1962·CPI 1947·UNRATE 1948, 총 394,593행). `ensure_data`가 1990캡(US_DGS10 min date≥1990) 감지 시 서버 자동 재백필 → 배포만으로 히스토리 업그레이드. ② **PC 풀폭** — `.main-content`가 grid `1fr 308px`라 좁은 1fr에 갇혀 2칸/줄이던 것 → `.mc-wrap{grid-column:1/-1}` + max-width 1560 + 조밀 그리드(minmax 158) = PC 6칸/줄(C1 설정페이지와 동일 패턴). ③ **검색** — US/KR 뷰 상단 검색창, 이름 부분일치 실시간 필터. ④ **임의 겹쳐보기**(🔬 토글) — 단위 무시하고 N개(≤6) 추세 비교. 거시지표 90종 + **종목/ETF/지수**(`/api/search`+`get_symbol_data`) 검색추가. 기본=공통 시작점=100 정규화, 2개일 땐 원값 좌우 2축 토글. 신규 `/api/macro/multi?keys=`(토큰 = 거시코드 또는 `SYM:<종목>`). 검증 = Playwright(PC 6칸·검색 4건·커스텀 기본2+차트·AAPL 종목추가 3칩·콘솔에러 0) + multi 엔드포인트(KR_M2 270 + USDKRW 17444 + AAPL 6651 혼합).
 
-**다음:** Step 3 Celery beat 자동갱신 → Step 5 설명 콘텐츠(LLM, macro_series.description 현재 빈값) → Step 6 캘린더(`market_events` + yfinance 실적 + FRED releases).
+**겹쳐보기 고도화(피드백 후속, PART C C1·C2):** ① **비교 구간 설정** — 커스텀에 시작/종료일 date 입력 + 퀵(1·5·10년·전체), 정규화 기준점 = 사용자 구간 시작일(기존 공통 최소일 고정 → 변경). ② **N≥3 다축** — "정규화 ↔ 원값(개별 축)" 토글을 전 N에서 제공(기존 3개↑ 자동 정규화 폴백 해제, Chart.js 시리즈별 y축 좌우 교대·축틱 색상=시리즈색). `drawDual`→`drawAxes`(N축 일반화). 검증 Playwright(구간컨트롤·원값모드·3칩 다축·1년 퀵→시작일·콘솔에러 0). **C3(포폴 비교탭 통합)=큰 작업, 계획만 기록.**
+
+**다음:** Step 3 Celery beat 자동갱신 → Step 5 설명 콘텐츠(LLM, macro_series.description 현재 빈값) → Step 6 캘린더(`market_events` + yfinance 실적 + FRED releases) / PART C3 포폴비교 통합(오너 결정).
 
 ## [2026-06-15] fix+feature | C1 버그픽스 4종 + 지수 캔들 회귀 복구 + 새로고침/수동가격
 

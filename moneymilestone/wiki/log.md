@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-15] fix | 캘린더 배당=배당엔진(ETF)·내자산 수집·지표 미래월·FOMC제외
+
+오너 피드백(배당 안 뜸·7월 텅·FOMC 매일). **검증 결함 자인**: 최초 AAPL(주식)로만 확인해 ETF 케이스 누락. 오너 실제 ETF(SCHD·QQQM·458730·133690)로 재검증·수정.
+- **배당 소스 교체**: yfinance Ticker.calendar는 ETF에 빈값({}) → `dividend_history.build_dividend_chart`(corporate_actions 이력+CAGR 투영) 사용. ETF·**월배당(458730)**·미래 예상분("(예상)") 정상. price_daily.db corporate_actions가 소스.
+- **종목 수집 누락**: 저장포폴+홈위젯만 봤고 **내 자산(get_holdings) 누락** → 추가(보유+포폴+관심, cap 50).
+- **지표 미래월**: `realtime_end`=+150일 + `no_data=true`(FOMC 제외했으니 daily 안 됨) → 7월+ 발표일 표시. (no_data=false면 미래 예정일이 데이터 없어 누락되는 역설)
+- **FOMC**: FRED 릴리스가 회의일 미제공(매 영업일 갱신일 반환) → 하드코딩 거부, 제외.
+- 실적: yfinance 개별주만(ETF/국내 스킵). events_for 중복 제거.
+- 로그인 E2E(오너 ETF, mint_session): 6월 지표9+배당3, 7월 지표7+458730. 커밋 0ace7df→d8ba5f7.
+
 ## [2026-06-15] feature | 증시 캘린더 `/calendar` (Step 6, PART B 완료)
 
 플랜 `거시지표_캘린더_plan.md` PART B. **읽기 전용 캘린더**(알림 X — 추후 리밸런싱 알림 때). 이벤트 3종: **경제지표 발표일**(FRED `/fred/release/dates`, 향후 포함, 주요 9개 release_id 큐레이션 — CPI10·PPI46·고용50·GDP53·PCE54·소매9·산업생산13·JOLTS192·FOMC101) + **내 종목 실적 발표일·배당락일**(yfinance `Ticker.calendar`, 로그인 시 저장 포트폴리오+홈위젯 종목). 신규 `modules/market_calendar.py`(econ_events·symbol_events·events_for, 일 단위 메모리 캐시; KR 6자리→.KS, 지수/금/크립토 제외) + `/calendar` 페이지·`/api/calendar`(공개=지표, 로그인=내 종목 추가) + `templates/calendar.html`·`static/js/calendar.js`(월 그리드 PC·리스트 모바일·필터 전체/지표/실적/배당·prev/next/오늘·색상 범례) + nav/사이드바 "📅 증시 캘린더". 검증 = econ 553이벤트·symbol_events(AAPL 실적7/31·배당락5/11, 005930 동일, 지수/금 제외) + Playwright(30셀·이벤트·월이동·econ필터·콘솔에러 0). ⚠️ 실적·배당 예정일 yfinance 추정(변동·누락 가능) 면책. **거시지표 캘린더 플랜 PART A+B 완료, C3(포폴비교 통합)만 잔여.**

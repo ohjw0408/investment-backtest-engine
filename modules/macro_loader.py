@@ -227,6 +227,71 @@ SERIES = [
 
 SERIES_BY_CODE = {s["code"]: s for s in SERIES}
 
+
+def _vixnode(code, yfsym, name):
+    return {"code": f"US_{code}", "src": "yf", "yf": yfsym, "freq": "D",
+            "category": "신용·리스크", "name_ko": name, "unit": "지수", "country": "US"}
+
+
+# 커브 전용 노드 (만기축 조립용, 카드 그리드 미표시)
+_CURVE_NODES = [
+    _fred("DFII7", "D", "금리", "미 7년 실질금리", "%"),
+    _fred("DFII20", "D", "금리", "미 20년 실질금리", "%"),
+    _fred("DFII30", "D", "금리", "미 30년 실질금리", "%"),
+    _fred("T7YIEM", "M", "인플레이션", "미 7년 기대인플레", "%"),
+    _fred("T20YIEM", "M", "인플레이션", "미 20년 기대인플레", "%"),
+    _fred("T30YIEM", "M", "인플레이션", "미 30년 기대인플레", "%"),
+    _fred("BAMLC1A0C13Y", "D", "신용·리스크", "IG OAS 1-3년", "%"),
+    _fred("BAMLC2A0C35Y", "D", "신용·리스크", "IG OAS 3-5년", "%"),
+    _fred("BAMLC3A0C57Y", "D", "신용·리스크", "IG OAS 5-7년", "%"),
+    _fred("BAMLC4A0C710Y", "D", "신용·리스크", "IG OAS 7-10년", "%"),
+    _fred("BAMLC7A0C1015Y", "D", "신용·리스크", "IG OAS 10-15년", "%"),
+    _fred("BAMLC8A0C15PY", "D", "신용·리스크", "IG OAS 15년+", "%"),
+    _fred("BAMLC0A1CAAA", "D", "신용·리스크", "AAA OAS", "%"),
+    _fred("BAMLC0A2CAA", "D", "신용·리스크", "AA OAS", "%"),
+    _fred("BAMLC0A3CA", "D", "신용·리스크", "A OAS", "%"),
+    _fred("BAMLC0A4CBBB", "D", "신용·리스크", "BBB OAS", "%"),
+    _fred("BAMLH0A1HYBB", "D", "신용·리스크", "BB OAS", "%"),
+    _fred("BAMLH0A2HYB", "D", "신용·리스크", "B OAS", "%"),
+    _fred("BAMLH0A3HYC", "D", "신용·리스크", "CCC OAS", "%"),
+    _ecos("KTB2Y", "817Y002", "D", ["010195000"], "금리", "한 국고채 2년", "%"),
+    _ecos("KTB20Y", "817Y002", "D", ["010220000"], "금리", "한 국고채 20년", "%"),
+    _ecos("KTB30Y", "817Y002", "D", ["010230000"], "금리", "한 국고채 30년", "%"),
+    _vixnode("VIX9D", "^VIX9D", "VIX 9일"),
+    _vixnode("VIX3M", "^VIX3M", "VIX 3개월"),
+    _vixnode("VIX6M", "^VIX6M", "VIX 6개월"),
+]
+for _n in _CURVE_NODES:
+    _n["curve_only"] = True
+SERIES.extend(_CURVE_NODES)
+SERIES_BY_CODE = {s["code"]: s for s in SERIES}
+
+
+# ── 커브 정의 (id, 라벨, 단위, 노드[(라벨, x위치, 코드)], x_labels=범주축 여부) ──
+CURVES = [
+    {"id": "ust", "label": "🇺🇸 미 국채 수익률 커브", "unit": "%", "forward": True, "nodes": [
+        ("1M", 0.08, "US_DGS1MO"), ("3M", 0.25, "US_DGS3MO"), ("6M", 0.5, "US_DGS6MO"),
+        ("1Y", 1, "US_DGS1"), ("2Y", 2, "US_DGS2"), ("3Y", 3, "US_DGS3"), ("5Y", 5, "US_DGS5"),
+        ("7Y", 7, "US_DGS7"), ("10Y", 10, "US_DGS10"), ("20Y", 20, "US_DGS20"), ("30Y", 30, "US_DGS30")]},
+    {"id": "ust_real", "label": "🇺🇸 미 국채 실질(TIPS) 커브", "unit": "%", "nodes": [
+        ("5Y", 5, "US_DFII5"), ("7Y", 7, "US_DFII7"), ("10Y", 10, "US_DFII10"),
+        ("20Y", 20, "US_DFII20"), ("30Y", 30, "US_DFII30")]},
+    {"id": "ktb", "label": "🇰🇷 한 국고채 수익률 커브", "unit": "%", "nodes": [
+        ("1Y", 1, "KR_KTB1Y"), ("2Y", 2, "KR_KTB2Y"), ("3Y", 3, "KR_KTB3Y"),
+        ("10Y", 10, "KR_KTB10Y"), ("20Y", 20, "KR_KTB20Y"), ("30Y", 30, "KR_KTB30Y")]},
+    {"id": "bei", "label": "🇺🇸 미 기대인플레(BEI) 커브", "unit": "%", "nodes": [
+        ("5Y", 5, "US_T5YIE"), ("7Y", 7, "US_T7YIEM"), ("10Y", 10, "US_T10YIE"),
+        ("20Y", 20, "US_T20YIEM"), ("30Y", 30, "US_T30YIEM")]},
+    {"id": "ig_mat", "label": "🇺🇸 미 IG 회사채 OAS — 만기 커브", "unit": "%", "nodes": [
+        ("1-3Y", 2, "US_BAMLC1A0C13Y"), ("3-5Y", 4, "US_BAMLC2A0C35Y"), ("5-7Y", 6, "US_BAMLC3A0C57Y"),
+        ("7-10Y", 8.5, "US_BAMLC4A0C710Y"), ("10-15Y", 12.5, "US_BAMLC7A0C1015Y"), ("15+Y", 18, "US_BAMLC8A0C15PY")]},
+    {"id": "rating", "label": "🇺🇸 미 회사채 등급별 OAS 커브", "unit": "%", "x_labels": True, "nodes": [
+        ("AAA", 1, "US_BAMLC0A1CAAA"), ("AA", 2, "US_BAMLC0A2CAA"), ("A", 3, "US_BAMLC0A3CA"),
+        ("BBB", 4, "US_BAMLC0A4CBBB"), ("BB", 5, "US_BAMLH0A1HYBB"), ("B", 6, "US_BAMLH0A2HYB"), ("CCC", 7, "US_BAMLH0A3HYC")]},
+    {"id": "vix", "label": "🇺🇸 VIX 기간구조", "unit": "지수", "x_labels": True, "nodes": [
+        ("9일", 1, "US_VIX9D"), ("30일", 2, "US_VIXCLS"), ("3개월", 3, "US_VIX3M"), ("6개월", 4, "US_VIX6M")]},
+]
+
 # ── 지표 설명 (교육·정보용, 1~2줄) ──────────────────────────────────────
 DESCRIPTIONS = {
     # 미국 금리·통화정책
@@ -707,6 +772,8 @@ def get_overview():
     by_code = {m["code"]: m for m in metas}
     cats = {}
     for spec in SERIES:
+        if spec.get("curve_only"):
+            continue
         m = by_code.get(spec["code"])
         if not m:
             continue
@@ -808,6 +875,44 @@ def ensure_data():
 
 
 backfill_if_empty = ensure_data  # 하위호환 별칭
+
+
+def get_curves_list():
+    return [{"id": c["id"], "label": c["label"], "unit": c["unit"],
+             "x_labels": c.get("x_labels", False), "forward": c.get("forward", False)} for c in CURVES]
+
+
+def get_curve(curve_id):
+    """커브: 노드별 월말 시계열 매트릭스 + 최신 스냅샷. (만기축 단면 + 시간 슬라이더용)"""
+    spec = next((c for c in CURVES if c["id"] == curve_id), None)
+    if not spec:
+        return None
+    conn = _conn()
+    node_labels = [n[0] for n in spec["nodes"]]
+    node_x = [n[1] for n in spec["nodes"]]
+    codes = [n[2] for n in spec["nodes"]]
+    monthly, all_m, latest_vals, latest_date = [], set(), [], None
+    for code in codes:
+        rows = conn.execute(
+            "SELECT date, value FROM macro_observations WHERE code=? ORDER BY date", (code,)).fetchall()
+        m = {}
+        for r in rows:
+            m[r["date"][:7]] = r["value"]   # 월말(마지막) 값
+        monthly.append(m)
+        all_m |= set(m.keys())
+        if rows:
+            latest_vals.append(rows[-1]["value"])
+            if latest_date is None or rows[-1]["date"] > latest_date:
+                latest_date = rows[-1]["date"]
+        else:
+            latest_vals.append(None)
+    conn.close()
+    months = sorted(all_m)
+    matrix = [[m.get(mo) for m in monthly] for mo in months]
+    return {"id": spec["id"], "label": spec["label"], "unit": spec["unit"],
+            "x_labels": spec.get("x_labels", False), "forward": spec.get("forward", False),
+            "labels": node_labels, "x": node_x, "months": months, "matrix": matrix,
+            "latest": {"date": latest_date, "values": latest_vals}}
 
 
 if __name__ == "__main__":

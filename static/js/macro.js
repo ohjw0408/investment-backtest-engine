@@ -241,6 +241,90 @@
     }
   }
 
+  // ── 커브 (만기축 단면) ──
+  let curveList = null, curCurve = null, curveSnaps = {}, curveMonthIdx = -1, curveFwd = false;
+
+  async function renderCurves() {
+    if (!curveList) curveList = (await (await fetch('/api/macro/curves')).json()).curves;
+    $('mcBody').innerHTML = `
+      <div class="mc-cust-intro">만기(가로축)에 따른 값의 단면 = <b>커브</b>. 최신 + 과거 시점을 겹쳐 형태 변화를 봅니다. (예: 국채 커브 역전, 신용 스프레드 확대)</div>
+      <div class="mc-presets" id="mcCurveBtns">${curveList.map((c, i) => `<button class="mc-preset ${i === 0 ? 'on' : ''}" data-id="${c.id}">${c.label}</button>`).join('')}</div>
+      <div class="mc-cmp-card">
+        <div class="mc-cust-ctrl" id="mcCurveCtrl"></div>
+        <div class="mc-chart-wrap"><canvas id="mcCurveChart"></canvas></div>
+      </div>`;
+    $('mcCurveBtns').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      $('mcCurveBtns').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+      loadCurve(b.dataset.id);
+    }));
+    loadCurve(curveList[0].id);
+  }
+
+  async function loadCurve(id) {
+    curCurve = await (await fetch(`/api/macro/curve/${id}`)).json();
+    curveSnaps = { '1y': true, '3y': false, '5y': false };
+    curveMonthIdx = -1; curveFwd = false;
+    renderCurveCtrl(); drawCurveChart();
+  }
+
+  function renderCurveCtrl() {
+    const c = curCurve, last = c.months.length - 1;
+    let html = `<span class="grp">비교:
+      <label><input type="checkbox" data-s="1y" ${curveSnaps['1y'] ? 'checked' : ''}> 1년 전</label>
+      <label><input type="checkbox" data-s="3y" ${curveSnaps['3y'] ? 'checked' : ''}> 3년 전</label>
+      <label><input type="checkbox" data-s="5y" ${curveSnaps['5y'] ? 'checked' : ''}> 5년 전</label></span>`;
+    if (c.forward) html += `<span class="grp"><label><input type="checkbox" id="mcFwd" ${curveFwd ? 'checked' : ''}> implied forward(근사)</label></span>`;
+    html += `<span class="grp" style="flex:1;min-width:200px">시점: <input type="range" id="mcCurveSlider" min="0" max="${last}" value="${curveMonthIdx < 0 ? last : curveMonthIdx}" style="flex:1"> <span id="mcCurveMo" style="min-width:64px">${curveMonthIdx < 0 ? '최신' : c.months[curveMonthIdx]}</span></span>`;
+    const ctrl = $('mcCurveCtrl'); ctrl.innerHTML = html;
+    ctrl.querySelectorAll('input[type=checkbox][data-s]').forEach(cb => cb.addEventListener('change', e => { curveSnaps[e.target.dataset.s] = e.target.checked; drawCurveChart(); }));
+    const fwd = $('mcFwd'); if (fwd) fwd.addEventListener('change', e => { curveFwd = e.target.checked; drawCurveChart(); });
+    $('mcCurveSlider').addEventListener('input', e => {
+      curveMonthIdx = +e.target.value === last ? -1 : +e.target.value;
+      $('mcCurveMo').textContent = curveMonthIdx < 0 ? '최신' : c.months[curveMonthIdx];
+      drawCurveChart();
+    });
+  }
+
+  function snapAt(c, monthsBack) {
+    const idx = c.months.length - 1 - monthsBack * 12;
+    return idx >= 0 ? { label: `${monthsBack}년 전 (${c.months[idx]})`, values: c.matrix[idx] } : null;
+  }
+  function impliedForward(x, y) {  // 근사: 연속 만기 사이 1구간 선도금리
+    const out = [];
+    for (let i = 1; i < x.length; i++) {
+      if (y[i] == null || y[i - 1] == null) { out.push(null); continue; }
+      const f = (y[i] * x[i] - y[i - 1] * x[i - 1]) / (x[i] - x[i - 1]);
+      out.push({ x: (x[i] + x[i - 1]) / 2, y: f });
+    }
+    return out;
+  }
+
+  function drawCurveChart() {
+    const c = curCurve;
+    const pts = (vals) => c.x.map((xx, i) => (vals[i] == null ? null : { x: xx, y: vals[i] })).filter(Boolean);
+    const ds = [];
+    ds.push({ label: `최신 (${c.latest.date})`, data: pts(c.latest.values), borderColor: '#1976D2', backgroundColor: '#1976D2', borderWidth: 2.4, pointRadius: 3, tension: 0.2 });
+    const snapCols = { '1y': '#E65100', '3y': '#7B1FA2', '5y': '#00838F' };
+    ['1y', '3y', '5y'].forEach(k => { if (curveSnaps[k]) { const s = snapAt(c, +k[0]); if (s) ds.push({ label: s.label, data: pts(s.values), borderColor: snapCols[k], backgroundColor: snapCols[k], borderWidth: 1.6, pointRadius: 2, tension: 0.2, borderDash: [5, 3] }); } });
+    if (curveMonthIdx >= 0) ds.push({ label: `선택 (${c.months[curveMonthIdx]})`, data: pts(c.matrix[curveMonthIdx]), borderColor: '#2E7D32', backgroundColor: '#2E7D32', borderWidth: 2, pointRadius: 3, tension: 0.2 });
+    if (c.forward && curveFwd) { const fy = impliedForward(c.x, c.latest.values); ds.push({ label: 'implied fwd(근사)', data: fy.filter(Boolean), borderColor: '#C2185B', backgroundColor: '#C2185B', borderWidth: 1.6, pointRadius: 2, tension: 0.2, borderDash: [2, 2] }); }
+    const grid = css('--border') || '#e0e0e0', txt = css('--text-muted') || '#888';
+    if (custChart && custChart.canvas && custChart.canvas.id === 'mcCurveChart') custChart.destroy();
+    if (window._mcCurveChart) window._mcCurveChart.destroy();
+    window._mcCurveChart = new Chart($('mcCurveChart').getContext('2d'), {
+      type: 'line', data: { datasets: ds },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'nearest', intersect: false },
+        plugins: { legend: { labels: { color: txt, font: { size: 11 } } },
+          tooltip: { callbacks: { title: it => { const xx = it[0].parsed.x; const i = c.x.indexOf(xx); return i >= 0 ? c.labels[i] : ('만기 ' + xx); } } } },
+        scales: {
+          x: { type: 'linear', title: { display: true, text: c.x_labels ? '' : '만기(년)', color: txt },
+            ticks: { color: txt, callback: v => { const i = c.x.indexOf(v); return i >= 0 ? c.labels[i] : v; } }, grid: { color: grid } },
+          y: { ticks: { color: txt }, grid: { color: grid }, title: { display: true, text: c.unit, color: txt } } },
+      },
+    });
+  }
+
   // ── 공통 차트 ──
   function lineDS(label, points, color) {
     return { label, data: points.map(p => ({ x: dnum(p[0]), y: p[1] })), borderColor: color, backgroundColor: color, borderWidth: 1.6, pointRadius: 0, tension: 0.1 };
@@ -389,6 +473,7 @@
     $('mcSearchBar').style.display = showSearch ? 'block' : 'none';
     if (VIEW === 'CMP') renderCompare();
     else if (VIEW === 'CUSTOM') renderCustom();
+    else if (VIEW === 'CURVE') renderCurves();
     else renderCountry(VIEW, $('mcSearch').value);
   }));
   $('mcSearch').addEventListener('input', () => { if (VIEW === 'US' || VIEW === 'KR' || VIEW === 'GL' || VIEW === 'COMM') renderCountry(VIEW, $('mcSearch').value); });

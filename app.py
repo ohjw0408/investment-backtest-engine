@@ -1866,6 +1866,19 @@ def api_macro_intraday(code):
     rng = request.args.get('range', 'max')
     return jsonify({'rows': macro_loader.get_intraday_cached(spec['yf'], rng)})
 
+@app.route('/api/macro/curves')
+def api_macro_curves():
+    from modules import macro_loader
+    return jsonify({'curves': macro_loader.get_curves_list()})
+
+@app.route('/api/macro/curve/<curve_id>')
+def api_macro_curve(curve_id):
+    from modules import macro_loader
+    data = macro_loader.get_curve(curve_id)
+    if not data:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(data)
+
 @app.route('/api/macro/multi')
 def api_macro_multi():
     """임의 시리즈 N개 겹쳐보기. 토큰 = 거시지표 코드 또는 'SYM:<종목코드>'.

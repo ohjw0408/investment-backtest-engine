@@ -1847,6 +1847,32 @@ def api_macro_compare():
         return jsonify({'error': 'not found'}), 404
     return jsonify(data)
 
+@app.route('/api/macro/multi')
+def api_macro_multi():
+    """임의 시리즈 N개 겹쳐보기. 토큰 = 거시지표 코드 또는 'SYM:<종목코드>'.
+       단위가 제각각이라 프런트에서 시작=100 정규화(또는 2개일 때 2축). 원값 반환."""
+    from modules import macro_loader
+    keys = [k for k in request.args.get('keys', '').split(',') if k][:6]
+    out = []
+    for k in keys:
+        if k.startswith('SYM:'):
+            code = k[4:].upper()
+            try:
+                d = portfolio_engine.loader.get_symbol_data(code)
+                pts = [[p['date'], p['close']] for p in d.get('prices', [])
+                       if p.get('close') is not None]
+                if pts:
+                    out.append({'key': k, 'label': d.get('name') or code,
+                                'unit': d.get('currency') or '', 'points': pts})
+            except Exception:
+                pass
+        else:
+            s = macro_loader.get_series(k)
+            if s:
+                out.append({'key': k, 'label': s['name_ko'], 'unit': s['unit'],
+                            'points': s['points']})
+    return jsonify({'series': out})
+
 @app.route('/api/risk-return', methods=['POST'])
 def risk_return():
     """저장 포트폴리오 + 벤치마크 위험-수익 산점도 데이터 (P3 리스크리턴도표)."""

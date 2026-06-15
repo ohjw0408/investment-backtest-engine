@@ -189,18 +189,18 @@ def _ecos_time_to_iso(t, cyc):
 
 def _ecos_period_bounds(cyc):
     if cyc == "D":
-        return "19900101", "20261231"
+        return "19000101", "20261231"
     if cyc == "M":
-        return "199001", "202612"
+        return "190001", "202612"
     if cyc == "Q":
-        return "1990Q1", "2026Q4"
+        return "1900Q1", "2026Q4"
     if cyc == "A":
-        return "1990", "2026"
-    return "19900101", "20261231"
+        return "1900", "2026"
+    return "19000101", "20261231"
 
 
 # ── fetch: FRED ──────────────────────────────────────────────────────────
-def fetch_fred(sid, start="1990-01-01"):
+def fetch_fred(sid, start="1900-01-01"):
     key = _fred_key()
     url = ("https://api.stlouisfed.org/fred/series/observations"
            f"?series_id={sid}&api_key={key}&file_type=json&observation_start={start}")
@@ -408,17 +408,26 @@ def get_compare(code_a, code_b):
     return {"mode": mode, "unit": a["unit"] if raw else "지수(시작=100)", "a": a, "b": b}
 
 
-def backfill_if_empty():
-    """관측치 테이블이 비어있을 때만 전체 백필 (배포 멱등 훅)."""
+def ensure_data():
+    """배포 멱등 훅: 비어있으면 최초 백필. 1990 캡(구버전) 감지 시 전체 히스토리 재백필."""
     conn = sqlite3.connect(str(INDEX_DB))
     ensure_schema(conn)
     n = conn.execute("SELECT COUNT(*) FROM macro_observations").fetchone()[0]
+    # US_DGS10은 1962년부터 존재 → min date가 1990 이후면 구버전 캡 데이터
+    probe = conn.execute(
+        "SELECT MIN(date) FROM macro_observations WHERE code='US_DGS10'").fetchone()[0]
     conn.close()
-    if n > 0:
-        print(f"macro_observations already {n} rows - skip backfill")
-        return
-    print("macro_observations empty - initial backfill")
-    backfill()
+    if n == 0:
+        print("macro_observations empty - initial backfill")
+        backfill()
+    elif probe and probe >= "1990-01-01":
+        print(f"history capped at {probe} - re-backfill full history")
+        backfill()
+    else:
+        print(f"macro_observations {n} rows, history from {probe} - skip")
+
+
+backfill_if_empty = ensure_data  # 하위호환 별칭
 
 
 if __name__ == "__main__":
@@ -428,6 +437,6 @@ if __name__ == "__main__":
     elif arg == "--backfill":
         backfill(sys.argv[2:] or None)
     elif arg == "--ensure":
-        backfill_if_empty()
+        ensure_data()
     else:
         print("usage: python -m modules.macro_loader [--validate | --backfill [CODE ...] | --ensure]")

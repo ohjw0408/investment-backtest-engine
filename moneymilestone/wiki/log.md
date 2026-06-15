@@ -12,6 +12,8 @@
 
 **배포 완료(커밋 0df9740):** push→Actions→Hetzner. deploy.yml에 `venv/bin/python -m modules.macro_loader --ensure || true`(서버 테이블 비었을 때만 최초 백필; FRED/ECOS 키 서버보유) 추가. 서버 자동백필 작동 확인 = 프로덕션 `/api/macro/overview` 90종 반환. 읽기경로 ensure_schema로 빈테이블 크래시 방지(C1 index_ohlc 교훈). **라이브 검증:** Playwright(moneymilestone.duckdns.org/macro) US 67·KR 23카드·상세/비교 캔버스 렌더·콘솔에러 0.
 
+**오너 라이브 피드백 후속(같은 날, Step4 보강):** ① **전체 히스토리** — fetch start 1990 하드캡 제거(FRED 1900-01-01·ECOS 1900) → 시리즈 출범부터(DGS10 1962·CPI 1947·UNRATE 1948, 총 394,593행). `ensure_data`가 1990캡(US_DGS10 min date≥1990) 감지 시 서버 자동 재백필 → 배포만으로 히스토리 업그레이드. ② **PC 풀폭** — `.main-content`가 grid `1fr 308px`라 좁은 1fr에 갇혀 2칸/줄이던 것 → `.mc-wrap{grid-column:1/-1}` + max-width 1560 + 조밀 그리드(minmax 158) = PC 6칸/줄(C1 설정페이지와 동일 패턴). ③ **검색** — US/KR 뷰 상단 검색창, 이름 부분일치 실시간 필터. ④ **임의 겹쳐보기**(🔬 토글) — 단위 무시하고 N개(≤6) 추세 비교. 거시지표 90종 + **종목/ETF/지수**(`/api/search`+`get_symbol_data`) 검색추가. 기본=공통 시작점=100 정규화, 2개일 땐 원값 좌우 2축 토글. 신규 `/api/macro/multi?keys=`(토큰 = 거시코드 또는 `SYM:<종목>`). 검증 = Playwright(PC 6칸·검색 4건·커스텀 기본2+차트·AAPL 종목추가 3칩·콘솔에러 0) + multi 엔드포인트(KR_M2 270 + USDKRW 17444 + AAPL 6651 혼합).
+
 **다음:** Step 3 Celery beat 자동갱신 → Step 5 설명 콘텐츠(LLM, macro_series.description 현재 빈값) → Step 6 캘린더(`market_events` + yfinance 실적 + FRED releases).
 
 ## [2026-06-15] fix+feature | C1 버그픽스 4종 + 지수 캔들 회귀 복구 + 새로고침/수동가격

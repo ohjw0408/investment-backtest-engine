@@ -3,7 +3,7 @@
 
 {% block head %}
 <style>
-.mc-wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+.mc-wrap { grid-column: 1 / -1; max-width: 1560px; margin: 0 auto; width: 100%; box-sizing: border-box; padding: 24px; }
 .mc-title { font-size: 1.15rem; font-weight: 800; }
 .mc-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
 .mc-disc { font-size: 0.74rem; color: var(--gold-deep, #B26A00); background: var(--gold-pale, #FFF8E1); border-radius: 8px; padding: 7px 10px; margin-top: 10px; }
@@ -17,7 +17,28 @@
 .mc-cat { margin-top: 22px; }
 .mc-cat-head { font-size: 0.95rem; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 .mc-cat-head .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--blue); }
-.mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px; }
+
+/* 검색 */
+.mc-searchbar { margin-top: 14px; position: relative; }
+.mc-searchbar input { width: 100%; max-width: 420px; padding: 9px 13px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--input-bg, var(--bg)); color: var(--text); font-size: 0.85rem; font-family: inherit; box-sizing: border-box; }
+.mc-nores { color: var(--text-muted); font-size: 0.82rem; padding: 20px 4px; }
+
+/* 커스텀 겹쳐보기 */
+.mc-cust-intro { font-size: 0.82rem; color: var(--text-muted); margin: 10px 0 12px; line-height: 1.5; }
+.mc-cust-search { position: relative; max-width: 480px; }
+.mc-cust-search input { width: 100%; padding: 9px 13px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--input-bg, var(--bg)); color: var(--text); font-size: 0.85rem; font-family: inherit; box-sizing: border-box; }
+.mc-dd { position: absolute; top: 100%; left: 0; right: 0; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; margin-top: 4px; max-height: 280px; overflow-y: auto; z-index: 60; box-shadow: var(--shadow-lg); display: none; }
+.mc-dd.open { display: block; }
+.mc-dd-item { padding: 9px 13px; cursor: pointer; font-size: 0.8rem; display: flex; justify-content: space-between; gap: 8px; }
+.mc-dd-item:hover { background: var(--bg); }
+.mc-dd-item .b { font-size: 0.68rem; color: var(--text-muted); }
+.mc-dd-grouphdr { padding: 6px 13px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); background: var(--bg); position: sticky; top: 0; }
+.mc-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.mc-chip2 { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: 16px; font-size: 0.8rem; font-weight: 600; color: #fff; }
+.mc-chip2 button { border: none; background: none; color: #fff; cursor: pointer; font-size: 0.9rem; padding: 0; line-height: 1; opacity: 0.85; }
+.mc-cust-opt { display: flex; gap: 14px; align-items: center; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; flex-wrap: wrap; }
+.mc-cust-opt label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 
 /* 지표 카드 */
 .mc-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 13px 14px; cursor: pointer; transition: border-color .15s, transform .1s; position: relative; }
@@ -68,6 +89,11 @@
     <button data-view="US" class="on">🇺🇸 미국</button>
     <button data-view="KR">🇰🇷 한국</button>
     <button data-view="CMP">🆚 한·미 비교</button>
+    <button data-view="CUSTOM">🔬 겹쳐보기</button>
+  </div>
+
+  <div class="mc-searchbar" id="mcSearchBar">
+    <input type="text" id="mcSearch" placeholder="🔍 지표 검색 (예: 금리, CPI, 실업)…" autocomplete="off">
   </div>
 
   <div id="mcBody"><div class="mc-loading">불러오는 중…</div></div>
@@ -96,5 +122,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/macro.js') }}?v=20260615macro1"></script>
+<script src="{{ url_for('static', filename='js/macro.js') }}?v=20260615macro2"></script>
 {% endblock %}

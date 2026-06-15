@@ -265,13 +265,47 @@
     return new Chart($(id).getContext('2d'), { type: 'line', data: { datasets }, options: o });
   }
 
-  // ── 상세 모달 ──
-  let detailMonths = 60, detailType = 'line', candleChart = null, candleCache = null;
+  // ── 상세 모달 (라인=기간 / 캔들=간격, 거래량·줌·시간봉 — symbol 페이지 동일) ──
+  let detailMonths = 60, detailType = 'line', candleInterval = '1D';
+  let candleChart = null, candleCache = null, intradayCache = {};
+  const CANDLE_DEFAULT_DAYS = { '1H': 2, '1D': 75, '1W': 365, '1M': 2555, '1Y': 0 };
 
   function cutoffDate(lastStr, months) {
     if (!months || months <= 0) return null;
     const d = new Date(lastStr); d.setMonth(d.getMonth() - months);
     return d.toISOString().slice(0, 10);
+  }
+  function bucketKey(dateStr, unit) {
+    if (unit === 'M') return dateStr.slice(0, 7);
+    if (unit === 'Y') return dateStr.slice(0, 4);
+    const d = new Date(dateStr), onejan = new Date(d.getFullYear(), 0, 1);
+    const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+    return d.getFullYear() + '-W' + week;
+  }
+  function resampleOHLC(prices, unit) {
+    const out = []; let key = null, cur = null;
+    for (const p of prices) {
+      if (p.open == null) continue;
+      const k = bucketKey(p.date, unit);
+      if (k !== key) { if (cur) out.push(cur); key = k; cur = { date: p.date, open: p.open, high: p.high, low: p.low, close: p.close, volume: p.volume || 0 }; }
+      else { cur.high = Math.max(cur.high, p.high); cur.low = Math.min(cur.low, p.low); cur.close = p.close; cur.volume += (p.volume || 0); }
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
+  async function fetchMacroIntraday(code, rng) {
+    if (!intradayCache[rng]) {
+      const r = await (await fetch(`/api/macro/intraday/${code}?range=${rng}`)).json();
+      intradayCache[rng] = r.rows || [];
+    }
+    return intradayCache[rng];
+  }
+  async function getCandleData(code, interval) {
+    if (interval === '1H') return { prices: await fetchMacroIntraday(code, 'max'), intraday: true };
+    const all = candleCache || [];
+    if (interval === '1D') return { prices: all, intraday: false };
+    const unit = interval === '1W' ? 'W' : interval === '1M' ? 'M' : 'Y';
+    return { prices: resampleOHLC(all, unit), intraday: false };
   }
 
   async function openDetail(code) {
@@ -279,52 +313,71 @@
     $('mcModalTitle').textContent = '불러오는 중…'; $('mcModalSub').textContent = ''; $('mcModalDesc').style.display = 'none';
     const d = await (await fetch(`/api/macro/series/${code}`)).json();
     if (d.error) { $('mcModalTitle').textContent = '데이터 없음'; return; }
-    window._mcDetail = d; candleCache = null; detailMonths = 60; detailType = 'line';
+    window._mcDetail = d; candleCache = null; intradayCache = {}; detailMonths = 60; detailType = 'line'; candleInterval = '1D';
     const flag = d.country === 'US' ? '🇺🇸 미국' : d.country === 'KR' ? '🇰🇷 한국' : '🌏 글로벌';
     $('mcModalTitle').textContent = d.name_ko;
     $('mcModalSub').textContent = `${flag} · 단위 ${d.unit} · ${d.points.length.toLocaleString()}개 관측 · ${d.points[0][0]}~${d.points.at(-1)[0]}`;
     if (d.desc) { $('mcModalDesc').style.display = 'block'; $('mcModalDesc').textContent = d.desc; }
-    // 지수만 캔들 토글 노출
     $('mcChartType').style.display = d.is_index ? 'inline-flex' : 'none';
     $('mcChartType').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === 'line'));
     $('mcPeriod').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === '60'));
+    $('mcInterval').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.i === '1D'));
     renderDetail();
   }
 
   async function renderDetail() {
     const d = window._mcDetail;
-    const showCandle = detailType === 'candle' && d.is_index;
-    $('mcLineWrap').style.display = showCandle ? 'none' : 'block';
-    $('mcCandleWrap').style.display = showCandle ? 'block' : 'none';
-    const cut = cutoffDate(d.points.at(-1)[0], detailMonths);
-    if (showCandle) {
+    const candle = detailType === 'candle' && d.is_index;
+    $('mcPeriod').style.display = candle ? 'none' : 'inline-flex';
+    $('mcInterval').style.display = candle ? 'inline-flex' : 'none';
+    $('mcLineWrap').style.display = candle ? 'none' : 'block';
+    $('mcCandleWrap').style.display = candle ? 'block' : 'none';
+    if (candle) {
       if (!candleCache) {
         const r = await (await fetch(`/api/macro/ohlc/${d.code}`)).json();
         candleCache = (r.rows || []).filter(p => p.open != null && p.close != null);
       }
-      const rows = candleCache.filter(p => !cut || p.date >= cut)
-        .map(p => ({ time: p.date, open: p.open, high: p.high, low: p.low, close: p.close }));
-      drawCandle(rows);
+      const labelMap = { '1H': '1시간', '1D': '1일', '1W': '1주', '1M': '1개월', '1Y': '1년' };
+      $('mcHint').textContent = candleInterval === '1H'
+        ? '⚠ 캔들 1개 = 1시간 · 시간봉은 최근 약 730일(2년)까지. (스크롤·줌으로 조정)'
+        : `캔들 1개 = ${labelMap[candleInterval]} · 전체 기간 (기본 화면 밖은 스크롤·줌)`;
+      const { prices, intraday } = await getCandleData(d.code, candleInterval);
+      drawCandle(prices, intraday, candleInterval);
     } else {
+      $('mcHint').textContent = '';
+      const cut = cutoffDate(d.points.at(-1)[0], detailMonths);
       const pts = cut ? d.points.filter(p => p[0] >= cut) : d.points;
       detailChart = drawLine('mcDetailChart', detailChart, [lineDS(d.name_ko, pts, '#1976D2')], d.unit);
     }
   }
 
-  function drawCandle(rows) {
+  function drawCandle(prices, intraday, interval) {
     const wrap = $('mcCandleWrap');
-    wrap.innerHTML = '';
     if (candleChart) { try { candleChart.remove(); } catch (e) {} candleChart = null; }
+    wrap.innerHTML = '';
+    if (!prices || !prices.length) return;
     const txt = css('--text-muted') || '#888', grid = css('--border') || '#e0e0e0';
     candleChart = LightweightCharts.createChart(wrap, {
       width: wrap.clientWidth, height: wrap.clientHeight || 380,
       layout: { background: { color: 'transparent' }, textColor: txt },
       grid: { vertLines: { color: grid }, horzLines: { color: grid } },
-      timeScale: { timeVisible: false },
+      timeScale: { timeVisible: !!intraday, secondsVisible: false, borderColor: grid },
+      rightPriceScale: { borderColor: grid, scaleMargins: { top: 0.08, bottom: 0.26 } },
+      crosshair: { mode: 0 },
     });
+    const toTime = p => intraday ? Math.floor(new Date(p.date.replace(' ', 'T')).getTime() / 1000) : p.date;
     const s = candleChart.addCandlestickSeries({ upColor: '#2E7D32', downColor: '#C62828', borderVisible: false, wickUpColor: '#2E7D32', wickDownColor: '#C62828' });
-    s.setData(rows);
-    candleChart.timeScale().fitContent();
+    s.setData(prices.map(p => ({ time: toTime(p), open: p.open, high: p.high, low: p.low, close: p.close })));
+    const vol = candleChart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } });
+    candleChart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
+    vol.setData(prices.map(p => ({ time: toTime(p), value: p.volume || 0, color: (p.close >= p.open) ? 'rgba(46,125,50,0.45)' : 'rgba(198,40,40,0.45)' })));
+    // 간격별 기본 줌
+    const days = CANDLE_DEFAULT_DAYS[interval] || 0, ts = candleChart.timeScale();
+    if (days > 0 && prices.length > 1) {
+      const last = prices[prices.length - 1], lastT = toTime(last);
+      const fromT = intraday ? lastT - days * 86400 : (() => { const dd = new Date(last.date); dd.setDate(dd.getDate() - days); return dd.toISOString().slice(0, 10); })();
+      try { ts.setVisibleRange({ from: fromT, to: lastT }); } catch (e) { ts.fitContent(); }
+    } else ts.fitContent();
   }
 
   // ── 이벤트 ──
@@ -351,6 +404,10 @@
   $('mcPeriod').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
     $('mcPeriod').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on');
     detailMonths = +b.dataset.m; renderDetail();
+  }));
+  $('mcInterval').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    $('mcInterval').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+    candleInterval = b.dataset.i; renderDetail();
   }));
   $('mcChartType').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
     $('mcChartType').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on');

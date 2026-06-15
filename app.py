@@ -1856,6 +1856,16 @@ def api_macro_ohlc(code):
         return jsonify({'error': 'no ohlc'}), 404
     return jsonify({'rows': macro_loader.get_ohlc_cached(spec['yf'])})
 
+@app.route('/api/macro/intraday/<code>')
+def api_macro_intraday(code):
+    """지수 1시간봉(캔들 1H용). yfinance 직접."""
+    from modules import macro_loader
+    spec = macro_loader.SERIES_BY_CODE.get(code)
+    if not spec or spec.get('src') != 'yf':
+        return jsonify({'error': 'no intraday'}), 404
+    rng = request.args.get('range', 'max')
+    return jsonify({'rows': macro_loader.get_intraday_cached(spec['yf'], rng)})
+
 @app.route('/api/macro/multi')
 def api_macro_multi():
     """임의 시리즈 N개 겹쳐보기. 토큰 = 거시지표 코드 또는 'SYM:<종목코드>'.

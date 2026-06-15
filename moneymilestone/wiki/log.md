@@ -1,5 +1,9 @@
 # Log
 
+## [2026-06-15] feature | 거시지표 지수 캔들 = symbol 페이지 기능 동등(거래량·간격·시간봉)
+
+오너: "거래량 왜 안나와·간격 왜 못바꿔·주식검색 캔들 그대로." → symbol.html 캔들 서브시스템을 macro로 이식(지수 39종). **간격 탭**(1시간/1일/1주/1개월/1년, 캔들 모드 시 기간탭과 교체) + **거래량 히스토그램**(하단 26%, 봉색) + 간격별 **기본 줌**(1H 2일·1D 75일·1W 1년·1M 7년·1Y 전체) + **1시간봉**(intraday) + 힌트. 데이터 = yfinance 직접: `fetch_yf_ohlc`에 volume 추가 + `fetch_yf_intraday`(60m)·`get_intraday_cached` + `/api/macro/intraday/<code>`. JS = resampleOHLC·bucketKey·getCandleData·drawCandle(LightweightCharts, 캔들+거래량+줌) 이식. ※ 가격지수(^SOX 등)는 yfinance 거래량 0(지수 특성) — 시간봉/주식형은 거래량 표시. 검증 Playwright(코스피 캔들 1D/1W/1H·간격탭 교체·힌트·콘솔에러 0).
+
 ## [2026-06-15] fix | 거시지표 후속 — 지수 캔들 소스·전체화면·겹쳐보기 tooltip 정렬
 
 오너 피드백 3건. ① **지수 캔들 누락**(SOX 등 6/39: ^RUT·^STOXX50E·^SOX·^NSEI open 없음, 000001.SS·DX-Y.NYB 코드파싱 ValueError) — 원인 = 캔들이 종목용 `/api/symbol`(get_symbol_data) 사용, 지수에서 불안정. → 신규 `fetch_yf_ohlc`+`get_ohlc_cached`(yfinance 직접, 메모리캐시) + `/api/macro/ohlc/<code>` 엔드포인트로 전환 → 39종 전부 OHLC 확보. ② **전체화면** — 모달바에 ⛶ 버튼(`.mc-modal-box` Fullscreen API), `:fullscreen` 시 차트 `calc(100vh-180px)`, fullscreenchange→renderDetail 재렌더(캔들 clientHeight 동적). ③ **겹쳐보기 tooltip 시점 안 맞음**(원값 개별축에서 시리즈마다 x 다른데 mode 'index'가 배열 인덱스로 매칭 → 좌우로 튐) → `interaction/tooltip mode 'index'→'x'`(시간축 기준 정렬). 검증 Playwright(SOX 캔들·⛶ 버튼·custom mode='x'·콘솔에러 0).

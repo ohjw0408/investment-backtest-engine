@@ -420,7 +420,7 @@ _OHLC_CACHE = {}
 
 
 def fetch_yf_ohlc(yfsym, start="1900-01-01"):
-    """yfinance OHLC (캔들용). get_symbol_data가 일부 지수에서 실패해 직접 사용."""
+    """yfinance OHLCV (캔들용). get_symbol_data가 일부 지수에서 실패해 직접 사용."""
     import yfinance as yf
     h = yf.Ticker(yfsym).history(start=start, auto_adjust=False)
     out = []
@@ -428,8 +428,10 @@ def fetch_yf_ohlc(yfsym, start="1900-01-01"):
         o, hi, lo, c = row.get("Open"), row.get("High"), row.get("Low"), row.get("Close")
         if c is None or c != c:
             continue
+        vol = row.get("Volume")
         out.append({"date": idx.strftime("%Y-%m-%d"),
-                    "open": float(o), "high": float(hi), "low": float(lo), "close": float(c)})
+                    "open": float(o), "high": float(hi), "low": float(lo), "close": float(c),
+                    "volume": float(vol) if vol is not None and vol == vol else 0})
     return out
 
 
@@ -441,6 +443,37 @@ def get_ohlc_cached(yfsym):
         except Exception:
             _OHLC_CACHE[yfsym] = []
     return _OHLC_CACHE[yfsym]
+
+
+_INTRADAY_CACHE = {}
+
+
+def fetch_yf_intraday(yfsym, range_key="max"):
+    """yfinance 1시간봉. range_key: 1d/1w/max(=730d). (date='YYYY-MM-DD HH:MM')."""
+    import yfinance as yf
+    period = {"1d": "5d", "1w": "1mo", "max": "730d"}.get(range_key, "730d")
+    h = yf.Ticker(yfsym).history(period=period, interval="60m", auto_adjust=False)
+    out = []
+    for idx, row in h.iterrows():
+        c = row.get("Close")
+        if c is None or c != c:
+            continue
+        vol = row.get("Volume")
+        out.append({"date": idx.strftime("%Y-%m-%d %H:%M"),
+                    "open": float(row.get("Open")), "high": float(row.get("High")),
+                    "low": float(row.get("Low")), "close": float(c),
+                    "volume": float(vol) if vol is not None and vol == vol else 0})
+    return out
+
+
+def get_intraday_cached(yfsym, range_key):
+    k = f"{yfsym}:{range_key}"
+    if k not in _INTRADAY_CACHE:
+        try:
+            _INTRADAY_CACHE[k] = fetch_yf_intraday(yfsym, range_key)
+        except Exception:
+            _INTRADAY_CACHE[k] = []
+    return _INTRADAY_CACHE[k]
 
 
 def fetch_ecos(stat, cyc, items, key=None):

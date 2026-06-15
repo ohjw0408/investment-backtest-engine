@@ -31,6 +31,15 @@
 .cal-ev.clickable, .cal-list-ev.clickable { cursor: pointer; }
 .cal-ev.clickable:hover { filter: brightness(1.12); }
 
+/* 로딩 애니메이션 */
+.cal-loading { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 64px 20px; color: var(--text-muted); text-align: center; }
+.cal-spinner { width: 38px; height: 38px; border-radius: 50%;
+  border: 3.5px solid var(--border); border-top-color: var(--blue); animation: cal-spin 0.7s linear infinite; }
+.cal-loading-txt { font-size: 0.88rem; font-weight: 700; }
+.cal-loading-txt span { font-size: 0.76rem; font-weight: 400; opacity: 0.8; }
+@keyframes cal-spin { to { transform: rotate(360deg); } }
+
 /* 배당 1주당 금액 팝오버 */
 .cal-pop { position: fixed; display: none; z-index: 2000; min-width: 200px; max-width: 280px;
   background: var(--card); border: 1.5px solid var(--border); border-radius: 12px;
@@ -99,5 +108,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/calendar.js') }}?v=20260615cal3"></script>
+<script src="{{ url_for('static', filename='js/calendar.js') }}?v=20260615cal4"></script>
 {% endblock %}

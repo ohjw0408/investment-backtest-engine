@@ -7,12 +7,15 @@
 캐시 = 날짜 단위 메모리(하루 1회 갱신).
 """
 import datetime
+import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import requests
 
 BASE = Path(__file__).resolve().parent.parent
 FRED_KEY_FILE = BASE / "data" / "meta" / "fred_api_key.txt"
+ECON_CACHE_FILE = BASE / "data" / "meta" / "cal_econ_cache.json"
 
 # FRED release_id → 표시명 (주요 지표만 큐레이션)
 CAL_RELEASES = {
@@ -51,24 +54,44 @@ def _econ_events_all():
     tk = today.isoformat()
     if tk in _econ_cache:
         return _econ_cache[tk]
+    # 디스크 캐시(오늘자) — 서버 재시작에도 FRED 8회 재호출 회피
+    try:
+        if ECON_CACHE_FILE.exists():
+            disk = json.loads(ECON_CACHE_FILE.read_text(encoding="utf-8"))
+            if disk.get("date") == tk:
+                _econ_cache.clear(); _econ_cache[tk] = disk["events"]
+                return disk["events"]
+    except Exception:
+        pass
     key = _fred_key()
     rt_start = (today - datetime.timedelta(days=45)).isoformat()
     rt_end = (today + datetime.timedelta(days=150)).isoformat()
-    out = []
-    for rid, label in CAL_RELEASES.items():
+
+    def _fetch(item):
+        rid, label = item
         try:
             r = requests.get("https://api.stlouisfed.org/fred/release/dates",
                              params={"release_id": rid, "api_key": key, "file_type": "json",
                                      "realtime_start": rt_start, "realtime_end": rt_end,
                                      "sort_order": "asc", "include_release_dates_with_no_data": "true",
                                      "limit": 200},
-                             timeout=20).json()
-            for d in r.get("release_dates", []):
-                out.append({"date": d["date"], "type": "econ", "title": label, "rid": rid})
+                             timeout=15).json()
+            return [{"date": d["date"], "type": "econ", "title": label, "rid": rid}
+                    for d in r.get("release_dates", [])]
         except Exception:
-            continue
+            return []
+
+    out = []
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        for res in ex.map(_fetch, list(CAL_RELEASES.items())):
+            out.extend(res)
     _econ_cache.clear()
     _econ_cache[tk] = out
+    try:
+        ECON_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        ECON_CACHE_FILE.write_text(json.dumps({"date": tk, "events": out}), encoding="utf-8")
+    except Exception:
+        pass
     return out
 
 
@@ -170,9 +193,11 @@ def events_for(codes, loader=None, econ_ids=None, show_earnings=True, show_divid
                         names[c] = nm
         except Exception:
             pass
-    if show_earnings:
-        for c in codes:
-            out.extend(earnings_events(c, names.get(c)))
+    if show_earnings and codes:
+        # 종목별 yfinance 실적조회 병렬화 (순차 = N×네트워크 지연)
+        with ThreadPoolExecutor(max_workers=min(8, len(codes))) as ex:
+            for res in ex.map(lambda c: earnings_events(c, names.get(c)), codes):
+                out.extend(res)
     if show_dividend and loader is not None and codes:
         out.extend(dividend_events(loader, codes, names))
     seen, uniq = set(), []

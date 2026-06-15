@@ -25,6 +25,7 @@
 
   function showDivPop(el) {
     const pop = $('calPop');
+    if (!pop) return;
     const krw = parseFloat(el.dataset.krw), usd = parseFloat(el.dataset.usd);
     const proj = el.dataset.proj === '1';
     let amt = '—';
@@ -44,7 +45,18 @@
   }
   function hideDivPop() { const p = $('calPop'); if (p) p.style.display = 'none'; }
 
+  function showLoading() {
+    const spin = `<div class="cal-loading" style="grid-column:1/-1;">
+      <div class="cal-spinner"></div>
+      <div class="cal-loading-txt">캘린더 불러오는 중…<br><span>경제지표·실적·배당 일정을 모으고 있어요</span></div>
+    </div>`;
+    if ($('calGrid')) $('calGrid').innerHTML = spin;
+    if ($('calList')) $('calList').innerHTML = spin;
+    if ($('calDows')) $('calDows').innerHTML = '';
+  }
+
   async function load() {
+    showLoading();
     try {
       const r = await (await fetch('/api/calendar')).json();
       EVENTS = r.events || [];

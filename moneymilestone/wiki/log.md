@@ -2,6 +2,10 @@
 
 > 🔴 **다음 최우선 과제 (오너 지정, 2026-06-15): 증시 캘린더 — ① 한국 경제지표 발표일 ② 미국 FOMC 회의일 데이터 수집 방법 의논·구현.** 현재 둘 다 미지원(FRED는 미국 지표만·회의일 미제공, ECOS는 발표캘린더 API 없음). 무료/안정 소스 조사 필요(후보: 한은·통계청 공개 일정 페이지 파싱, Fed FOMC 공표 일정 페이지, investpy/economic-calendar 라이브러리 등). 착수 전 이 항목부터.
 
+## [2026-06-15] perf+ui | 캘린더 로딩 애니메이션 + FRED/yfinance 병렬화·디스크캐시
+
+오너: 클릭 안 됨·로딩 느림·로딩 표시 없음. ① **클릭 원인** = `app.run(use_reloader=False)`라 .py 변경이 자동 반영 안 됨 → 서버 재시작 필요(JS/템플릿은 debug=True로 자동). ② **로딩 애니메이션**: `calendar.js` load() 진입 즉시 `showLoading()` 스피너(`.cal-spinner` 회전 + 문구) 표시. ③ **속도**: `_econ_events_all` FRED 8개 호출을 `ThreadPoolExecutor(8)` 병렬 + **디스크 캐시**(`data/meta/cal_econ_cache.json`, 오늘자 — 서버 재시작에도 FRED 재호출 회피, gitignore). `events_for` 실적조회(yfinance per-code)도 병렬화. timeout 20→15s. ④ `showDivPop` null 가드. JS v=cal4. 검증: 모듈 import + 병렬 econ 51건 디스크캐시 기록 확인.
+
 ## [2026-06-15] feature+move | 캘린더 배당락 클릭=1주당 배당금 + 광고문구 비교탭 이동
 
 오너 2건. ① **광고 유도문구 이동**: 내 자산 자산현황 탭 상단 "더 정밀한 분석이 필요하세요?"(백테스트·투자계산기 유도) 카드를 제거하고 **포트폴리오 비교 탭(`/risk-return`)** 비교대상 선택카드 아래로 이동(`.rr-card`로 스타일 변환). ② **배당락 클릭 = 1주당 배당금**: 캘린더 배당 이벤트 클릭 시 팝오버로 1주당 배당금(예상/확정) 표시. `market_calendar.dividend_events`가 `build_dividend_chart`(qty=1) 결과의 `krw_pre`/`usd_pre`/`projected`를 이벤트에 `dps_krw`/`dps_usd`/`projected`로 부착. `calendar.js` = 배당 이벤트에 data-* 부착 + 위임 클릭 → `#calPop` 팝오버(종목명·배당락일·1주당 ₩(±$)·예상/확정 태그). 그리드+모바일 리스트 공통, 바깥 클릭/스크롤 시 닫힘. JS v=cal3.

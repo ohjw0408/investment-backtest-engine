@@ -55,6 +55,7 @@ data/*.csv
 !data/meta/us_etf_list.csv
 
 data/meta/*.txt
+data/meta/cal_econ_cache.json
 
 *.db
 

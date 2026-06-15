@@ -1932,10 +1932,12 @@ def api_calendar():
                         'logged_in': False, 'symbol_count': 0})
     cfg = get_calendar_config(uid) or _default_calendar_config()
     codes = _calendar_user_codes(uid, cfg)
+    _, names = _calendar_grouped(uid)
     ev = market_calendar.events_for(codes, portfolio_engine.loader,
                                     econ_ids=set(cfg.get('econ', [])),
                                     show_earnings=cfg.get('show_earnings', True),
-                                    show_dividend=cfg.get('show_dividend', True))
+                                    show_dividend=cfg.get('show_dividend', True),
+                                    names=names)
     return jsonify({'events': ev, 'logged_in': True, 'symbol_count': len(codes)})
 
 @app.route('/api/calendar/config')
@@ -1947,6 +1949,17 @@ def api_calendar_config_get():
            'available_econ': [{'id': rid, 'label': lbl} for rid, lbl in market_calendar.CAL_RELEASES.items()]}
     if uid:
         groups, names = _calendar_grouped(uid)
+        try:
+            from modules.dividend_history import _load_names
+            allc = [c for g in groups for c in groups[g]]
+            loaded = _load_names(allc)
+            for c in allc:
+                if not names.get(c):
+                    nm = loaded.get(c.upper())
+                    if nm:
+                        names[c] = nm
+        except Exception:
+            pass
         out['symbols'] = {g: [{'code': c, 'name': names.get(c, c)} for c in groups[g]]
                           for g in groups}
     return jsonify(out)

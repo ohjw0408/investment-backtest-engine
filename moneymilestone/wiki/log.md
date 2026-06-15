@@ -1,5 +1,9 @@
 # Log
 
+## [2026-06-15] fix | 캘린더 이벤트·설정에 종목명 표시(티커→이름)
+
+오너: "005930 실적발표" → "삼성전자 실적발표". `events_for`에 종목명 주입 — `dividend_history._load_names`(symbol_master) + 그룹 제공명 병합 → 실적/배당 제목·설정 종목목록이 이름 사용(없으면 코드 폴백). earnings_events(code,name)·dividend_events(...,names). `/api/calendar`가 `_calendar_grouped` 이름맵 전달, config GET도 _load_names로 보강. E2E(삼성전자 실적발표·설정목록 이름).
+
 ## [2026-06-15] fix+feature | 캘린더 — 한국 실적·배당 + 소스/개별종목 설정 + 설정버튼 강조
 
 오너 피드백. ① **한국 종목 실적 누락**: `_yf_stock`이 6자리(국내) None 처리 → 수정(`.KS`, 비면 `.KQ` 폴백). 005930·000660 실적 표시(get_earnings_dates 과거+미래). ② **한국 배당 누락**: 배당엔진은 005930 정상이었으나 `dividend_events`가 codes에 지수/환율/크립토(^GSPC·KRW=X·BTC-USD) 섞이면 `build_dividend_chart`가 throw→전체 배당 소실. 배당 대상만 필터(지수/=X/=F/-/KRX_GOLD 제외). ③ **소스별·개별종목 설정**: config에 `sources{holdings,portfolios,watchlist}` + `excluded[codes]` 추가. `/api/calendar/config`가 로그인 시 `symbols`(소스별 종목+이름) 반환, `/settings`에서 소스 토글 + 개별 체크. `_calendar_user_codes(uid,cfg)`가 소스 on/off + 개별 제외 적용. ④ **설정 버튼 강조**: 캘린더 상단 "⚙ 표시 설정" 파란 버튼(기존 작은 링크 대체). E2E(005930 실적+배당·SCHD 배당·소스/개별 제외 반영). **한국 경제지표 발표일정 = 무료 API 없음(FRED는 미국만) → 미지원. FOMC = FRED 회의일 미제공, 보류(추후 방법 모색).**

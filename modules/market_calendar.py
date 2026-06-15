@@ -82,12 +82,13 @@ def _yf_stock(code):
     return c
 
 
-def earnings_events(code):
-    """미국 개별주 실적 발표일 (yfinance). ETF/지수 등은 없음. 캐시(일 단위)."""
+def earnings_events(code, name=None):
+    """개별주 실적 발표일 (yfinance, 과거+미래 분기). ETF/지수 없음. 캐시(일 단위)."""
+    label = name or code
     tk = datetime.date.today().isoformat()
     ck = (code, tk)
     if ck in _earn_cache:
-        return _earn_cache[ck]
+        return [{**e, "title": f"{label} 실적발표"} for e in _earn_cache[ck]]
     sym = _yf_stock(code)
     out = []
     if sym:
@@ -104,7 +105,7 @@ def earnings_events(code):
                 for idx in ed.index:
                     d = idx.date().isoformat() if hasattr(idx, "date") else str(idx)[:10]
                     if d >= floor:
-                        out.append({"date": d, "type": "earnings", "title": f"{code} 실적발표", "symbol": code})
+                        out.append({"date": d, "type": "earnings", "title": f"{label} 실적발표", "symbol": code})
                 break
         # 중복 날짜 제거
         seen, uq = set(), []
@@ -117,12 +118,14 @@ def earnings_events(code):
     return out
 
 
-def dividend_events(loader, codes):
+def dividend_events(loader, codes, names=None):
     """배당락일 (앱 배당엔진 = corporate_actions 이력 + 투영). ETF·월배당 포함. 캐시(일 단위)."""
+    names = names or {}
     tk = datetime.date.today().isoformat()
     key = (tuple(sorted(codes)), tk)
     if key in _div_cache:
-        return _div_cache[key]
+        return [{**e, "title": f"{names.get(e['symbol'], e['symbol'])} 배당락"
+                 + (" (예상)" if "(예상)" in e["title"] else "")} for e in _div_cache[key]]
     out = []
     # 배당 대상만(지수/환율/원자재선물/크립토/KRX금 제외) — 비대상 코드가 엔진을 깨뜨림
     dcodes = [c for c in codes if not (c.startswith("^") or c.upper() == "KRX_GOLD"
@@ -140,23 +143,36 @@ def dividend_events(loader, codes):
                 if not d or d < floor:
                     continue
                 pred = bool(e.get("predicted")) or (d > tk)
-                out.append({"date": d, "type": "dividend", "symbol": e.get("code"),
-                            "title": f"{e.get('code')} 배당락" + (" (예상)" if pred else "")})
+                code = e.get("code")
+                out.append({"date": d, "type": "dividend", "symbol": code,
+                            "title": f"{names.get(code, code)} 배당락" + (" (예상)" if pred else "")})
     except Exception:
         pass
     _div_cache[key] = out
     return out
 
 
-def events_for(codes, loader=None, econ_ids=None, show_earnings=True, show_dividend=True):
-    """경제지표 + 실적(개별주) + 배당락(배당엔진). config로 필터."""
+def events_for(codes, loader=None, econ_ids=None, show_earnings=True, show_dividend=True, names=None):
+    """경제지표 + 실적(개별주) + 배당락(배당엔진). 종목명(names) 적용. config로 필터."""
     out = list(econ_events(econ_ids))
     codes = list(dict.fromkeys(codes or []))
+    names = dict(names or {})
+    if codes:
+        try:
+            from modules.dividend_history import _load_names
+            loaded = _load_names(codes)
+            for c in codes:
+                if not names.get(c):
+                    nm = loaded.get(c.upper())
+                    if nm:
+                        names[c] = nm
+        except Exception:
+            pass
     if show_earnings:
         for c in codes:
-            out.extend(earnings_events(c))
+            out.extend(earnings_events(c, names.get(c)))
     if show_dividend and loader is not None and codes:
-        out.extend(dividend_events(loader, codes))
+        out.extend(dividend_events(loader, codes, names))
     seen, uniq = set(), []
     for e in out:
         k = (e["date"], e["type"], e["title"])

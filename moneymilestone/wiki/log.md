@@ -22,6 +22,8 @@
 
 **Step 5 완료(지표 설명문):** 105종 전 지표에 1~2줄 한글 설명(교육·정보용) 작성 → `macro_loader.DESCRIPTIONS` dict + `seed_descriptions()`(멱등 UPDATE). `_upsert`가 DESCRIPTIONS에서 desc 주입, `ensure_data`가 배포 시 항상 시드(데이터 재백필 없이 설명만 갱신). UI = 모달 상세에 설명 박스 + 카드 hover title 툴팁. 검증 = 105/105 desc 채움 + Playwright(카드 title·모달 desc 표시·콘솔에러 0).
 
+**지수 확장(피드백 — 대표지수만은 섭섭):** 섹터·스타일·글로벌 24종 추가 → 거시지표 **총 129종**(주가지수 39). US= 필라델피아 반도체(SOX)·FANG+·다우운송/유틸·NYSE종합·S&P100/400/600·러셀1000/3000·윌셔5000·달러인덱스(DXY). KR= 코스피200. GL= STOXX600·CAC40·IBEX·SMI·ASX200·TSX·보베스파·멕시코·STI·니프티50·인니. 전 신규 desc 포함. ensure_data가 배포 시 신규만 자동 백필. 프론트 변경 없음(loader만).
+
 **다음:** Step 6 캘린더(`market_events`+yfinance 실적+FRED releases) / PART C3 포폴비교 통합(오너 결정).
 
 ## [2026-06-15] fix+feature | C1 버그픽스 4종 + 지수 캔들 회귀 복구 + 새로고침/수동가격

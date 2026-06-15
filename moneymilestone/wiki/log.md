@@ -1,5 +1,11 @@
 # Log
 
+> 🔴 **다음 최우선 과제 (오너 지정, 2026-06-15): 증시 캘린더 — ① 한국 경제지표 발표일 ② 미국 FOMC 회의일 데이터 수집 방법 의논·구현.** 현재 둘 다 미지원(FRED는 미국 지표만·회의일 미제공, ECOS는 발표캘린더 API 없음). 무료/안정 소스 조사 필요(후보: 한은·통계청 공개 일정 페이지 파싱, Fed FOMC 공표 일정 페이지, investpy/economic-calendar 라이브러리 등). 착수 전 이 항목부터.
+
+## [2026-06-15] fix | 내 자산·내 포트폴리오 종목명 표시(티커→이름, 근본수정)
+
+오너: 내 자산·포트폴리오에서 005930 등 티커가 종목명 자리에 나옴. **근본 수정** = `_resolve_names`(app) → `dividend_history._load_names`(symbol_master.db `symbols` **15,015종 전수**) 코드→이름. 하드코딩 아님. `myassets_data` 보유종목에 name 주입 + `myassets.html` 행=종목명(굵게)+티커(작게). `portfolio_list`·`portfolio item` ticker name 빈 경우 보강. symbol_master에 없는 일부(지수/크립토)만 코드 폴백.
+
 ## [2026-06-15] fix | 캘린더 이벤트·설정에 종목명 표시(티커→이름)
 
 오너: "005930 실적발표" → "삼성전자 실적발표". `events_for`에 종목명 주입 — `dividend_history._load_names`(symbol_master) + 그룹 제공명 병합 → 실적/배당 제목·설정 종목목록이 이름 사용(없으면 코드 폴백). earnings_events(code,name)·dividend_events(...,names). `/api/calendar`가 `_calendar_grouped` 이름맵 전달, config GET도 _load_names로 보강. E2E(삼성전자 실적발표·설정목록 이름).

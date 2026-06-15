@@ -88,9 +88,11 @@
 .mc-modal-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .mc-fs { border: 1.5px solid var(--border); background: var(--bg); color: var(--text-muted); border-radius: 8px; padding: 6px 11px; font-size: 0.95rem; cursor: pointer; font-family: inherit; line-height: 1; }
 .mc-fs:hover { border-color: var(--blue); color: var(--blue); }
-/* 전체화면 시 차트 확대 */
-.mc-modal-box:fullscreen { width: 100vw; height: 100vh; max-width: none; max-height: none; border-radius: 0; overflow-y: auto; }
-.mc-modal-box:fullscreen .mc-chart-wrap { height: calc(100vh - 180px); }
+/* 전체화면 시 차트 확대 — 설명 숨기고 차트가 남은 공간 전부 채움(스크롤 X) */
+.mc-modal-box:fullscreen { width: 100vw; height: 100vh; max-width: none; max-height: none; border-radius: 0; overflow: hidden; display: flex; flex-direction: column; }
+.mc-modal-box:fullscreen .mc-desc { display: none !important; }
+.mc-modal-box:fullscreen .mc-modal-sub { display: none; }
+.mc-modal-box:fullscreen .mc-chart-wrap { flex: 1; height: auto; min-height: 0; }
 .mc-period { display: inline-flex; gap: 2px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 2px; }
 .mc-period button { border: none; background: none; padding: 5px 12px; border-radius: 6px; font-size: 0.76rem; cursor: pointer; color: var(--text-muted); font-family: inherit; font-weight: 600; }
 .mc-period button.on { background: var(--blue); color: #fff; }

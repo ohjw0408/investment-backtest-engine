@@ -298,6 +298,8 @@ Completion note - YYYY-MM-DD
 
 ## Current Recommended Next Action
 
+> 🟢 **2026-06-15 (세션 마감): 기능 사실상 완성 — 출시 준비 단계.** 이 세션 완료(전부 배포): 캘린더 마감(배당락 클릭·정책일정 Tier1 FOMC/금통위)·포폴 비교탭 추세 겹쳐보기(거시 C3)·비교탭 UI 재배치·버그픽스 3종(리밸런싱 합계·BRK.B 점티커·겹쳐보기 hover). **거시+캘린더 플랜 전체 종결.** **다음 최우선 = 성능 최적화**(`성능최적화_plan.md`, 전 연산경로 전수 정독 완료) — 최대레버 P0=롤링 윈도우 가격 재로드 제거(Accumulation+MultiAccount 분석기), 1vCPU/4GB 제약·결과불변, 선행=골든마스터 하니스. **현재 오너 일시중지.** PHASE4 잔여 = D1 TDF·D2 연금통합·C2 자산군비교(B4=스킵).
+
 > ✅ **2026-06-12 추가 (절세액 P2/P3 완전 마감 — 인출기 절세 패널, 라이브 검증까지):** 오너 지시로 P2/P3 실상 점검 → P2 백테스트·P3 적립기/연금수령세는 G5 복제로 기완료, 유일 갭 = 인출기(wd) 절세 패널 → 오너 결정 "구현". `sell_with_tax` 위탁가정 누적(이중집계 가드) + wd 절세 3종 + 렌더. 검증 = `test_l_save_wd.py` 6 PASS ±1원 + 회귀 246 PASS + 실데이터 + jsdom + **라이브 probe PASS**(`probe_wd_savings_live.js`: 패널·각주·위탁 불변식 0·합산=Σ). 커밋 90649dc·f670e51. 상세 = status update 62. **절세액 P1~P3 마감(P4 배당금계산기 보류). 다음 = P3 포트폴리오 즐겨찾기(B1, 리스크리턴도표 선행) OR 기타 — 오너 결정.**
 
 > ✅ **2026-06-12 (ISA 전환 계산기 완료 — P1 세금계산기 v1, 배포·라이브 검증까지):** 오너 결정 = **(a) 분할 이전 모델 + 독립 페이지.** 신규 `/tax-switch`(A 위탁유지 vs B 연 1회 ISA 한도 분할이전, 세후 비교 + breakeven + 이전계획). 엔진 = `MultiAccountSimulationLoop` optional 확장(carried_cost_basis·switch_policy·yearly_after_tax_snapshot, 기본 OFF=기존 무변경) + `tax_switch_logic.py`. 검증 = 신규 8 PASS 손계산 ±1원 + 회귀 240 PASS + Playwright 186 PASS + **라이브 풀플로우 PASS**(`live_tax_switch.js`: 458730 5천만/3천만/5y → 212윈도우, B +49만, breakeven 4년차 84%, 콘솔에러 0). 커밋 c65cf80. 상세 = status update 61 + `세금계산기_plan.md`. **다음 = 절세액 P2/P3(P2) OR 포트폴리오 즐겨찾기(P3) OR 기타 — 오너 결정.**

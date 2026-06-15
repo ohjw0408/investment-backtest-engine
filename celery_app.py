@@ -38,4 +38,13 @@ celery.conf.beat_schedule = {
         'task': 'tasks.refresh_krx_gold',
         'schedule': crontab(hour=23, minute=30, day_of_week='mon-fri'),  # 08:30 KST next day
     },
+    # 거시지표 증분 갱신 — 미국 장 마감 후(21:30 UTC≈06:30 KST 익일) + 한국 장 마감 후(07:00 UTC≈16:00 KST)
+    'refresh-macro-us-close': {
+        'task': 'tasks.refresh_macro',
+        'schedule': crontab(hour=21, minute=30, day_of_week='tue-sat'),
+    },
+    'refresh-macro-kr-close': {
+        'task': 'tasks.refresh_macro',
+        'schedule': crontab(hour=7, minute=0, day_of_week='mon-fri'),
+    },
 }

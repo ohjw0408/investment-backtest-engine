@@ -5,7 +5,7 @@
   let detailChart = null, cmpChart = null, custChart = null;
   const PALETTE = ['#1976D2', '#E65100', '#2E7D32', '#7B1FA2', '#C2185B', '#00838F'];
   let custom = [];          // [{key,label,color}]
-  let custStart = null, custEnd = null, custViewMode = 'norm';  // 구간·표시모드
+  let custStart = null, custEnd = null, custViewMode = 'raw';  // 구간·표시모드 (기본=원값 개별축)
   let custRaw = {};         // 최근 fetch 원본 {key:series}
   let activePreset = 0;
   // 큐레이션 예시: 종목·지수·거시지표를 섞어 "겹쳐보기"가 뭔지 한눈에
@@ -119,7 +119,7 @@
   function loadPreset(i) {
     activePreset = i;
     custom = PRESETS[i].items.map(([key, label], idx) => ({ key, label, color: PALETTE[idx % PALETTE.length] }));
-    custStart = custEnd = null; custViewMode = 'norm';
+    custStart = custEnd = null; custViewMode = 'raw';
     const ps = $('mcPresets');
     if (ps) ps.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.i === i));
     renderChips(); loadCustomChart();
@@ -287,13 +287,13 @@
   $('mcToggle').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
     $('mcToggle').querySelectorAll('button').forEach(x => x.classList.remove('on'));
     b.classList.add('on'); VIEW = b.dataset.view;
-    const showSearch = (VIEW === 'US' || VIEW === 'KR');
+    const showSearch = (VIEW === 'US' || VIEW === 'KR' || VIEW === 'GL');
     $('mcSearchBar').style.display = showSearch ? 'block' : 'none';
     if (VIEW === 'CMP') renderCompare();
     else if (VIEW === 'CUSTOM') renderCustom();
     else renderCountry(VIEW, $('mcSearch').value);
   }));
-  $('mcSearch').addEventListener('input', () => { if (VIEW === 'US' || VIEW === 'KR') renderCountry(VIEW, $('mcSearch').value); });
+  $('mcSearch').addEventListener('input', () => { if (VIEW === 'US' || VIEW === 'KR' || VIEW === 'GL') renderCountry(VIEW, $('mcSearch').value); });
   $('mcModalX').addEventListener('click', () => $('mcModal').classList.remove('open'));
   $('mcModal').addEventListener('click', (e) => { if (e.target === $('mcModal')) $('mcModal').classList.remove('open'); });
   $('mcPeriod').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {

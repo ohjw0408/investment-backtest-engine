@@ -307,3 +307,16 @@ def refresh_krx_gold():
     finally:
         if conn:
             conn.close()
+
+
+@celery.task
+def refresh_macro():
+    """거시경제 지표 증분 갱신 (Celery Beat 자동 실행). FRED·ECOS·yfinance 시장지수."""
+    try:
+        from modules import macro_loader
+        n = macro_loader.refresh()
+        print(f"[refresh_macro] {n} series updated")
+        return {"status": "ok", "updated": n}
+    except Exception as e:
+        print(f"[refresh_macro] 오류: {e}")
+        raise

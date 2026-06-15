@@ -22,7 +22,7 @@ INDEX_DB = BASE / "data" / "meta" / "index_master.db"
 FRED_KEY_FILE = BASE / "data" / "meta" / "fred_api_key.txt"
 ECOS_KEY_FILE = BASE / "data" / "meta" / "ecos_api_key.txt"
 
-CATEGORIES = ["금리", "인플레이션", "고용", "통화·유동성", "신용·리스크", "경기·성장", "시장·환율"]
+CATEGORIES = ["주가지수", "금리", "인플레이션", "고용", "통화·유동성", "신용·리스크", "경기·성장", "시장·환율"]
 
 
 def _fred(sid, freq, cat, name, unit, country="US"):
@@ -35,6 +35,12 @@ def _ecos(code, stat, cyc, items, cat, name, unit):
     return {"code": f"KR_{code}", "src": "ecos", "stat": stat, "cyc": cyc,
             "items": items, "freq": cyc, "category": cat, "name_ko": name,
             "unit": unit, "country": "KR"}
+
+
+def _yf(code, yfsym, country, name):
+    """yfinance 시장 지수. country=US/KR/GL."""
+    return {"code": f"IDX_{code}", "src": "yf", "yf": yfsym, "freq": "D",
+            "category": "주가지수", "name_ko": name, "unit": "지수", "country": country}
 
 
 # ── 지표 레지스트리 (오너 승인 2026-06-15, 코드 실호출 검증) ──────────────
@@ -143,6 +149,23 @@ SERIES = [
     _ecos("CURRENT_ACCT", "301Y013", "M", ["000000"], "시장·환율", "한국 경상수지", "백만$"),
     _ecos("HOUSE_PRICE", "901Y062", "M", ["P63A"], "경기·성장", "한국 주택매매가격지수(KB)", "지수"),
     _ecos("HOUSEHOLD_CREDIT", "151Y001", "Q", ["1000000"], "신용·리스크", "한국 가계신용", "십억원"),
+
+    # 시장 대표 지수 (yfinance)
+    _yf("SP500", "^GSPC", "US", "S&P 500"),
+    _yf("DOW", "^DJI", "US", "다우존스 산업평균"),
+    _yf("NASDAQ", "^IXIC", "US", "나스닥 종합"),
+    _yf("NDX", "^NDX", "US", "나스닥 100"),
+    _yf("RUSSELL2000", "^RUT", "US", "러셀 2000"),
+    _yf("KOSPI", "^KS11", "KR", "코스피"),
+    _yf("KOSDAQ", "^KQ11", "KR", "코스닥"),
+    _yf("NIKKEI", "^N225", "GL", "닛케이 225 (일본)"),
+    _yf("HANGSENG", "^HSI", "GL", "항셍 (홍콩)"),
+    _yf("SHANGHAI", "000001.SS", "GL", "상해종합 (중국)"),
+    _yf("TWSE", "^TWII", "GL", "대만 가권"),
+    _yf("SENSEX", "^BSESN", "GL", "센섹스 (인도)"),
+    _yf("FTSE", "^FTSE", "GL", "FTSE 100 (영국)"),
+    _yf("DAX", "^GDAXI", "GL", "DAX (독일)"),
+    _yf("ESTOXX", "^STOXX50E", "GL", "유로스톡스 50"),
 ]
 
 SERIES_BY_CODE = {s["code"]: s for s in SERIES}
@@ -209,6 +232,18 @@ def fetch_fred(sid, start="1900-01-01"):
 
 
 # ── fetch: ECOS ──────────────────────────────────────────────────────────
+def fetch_yf(yfsym, start="1900-01-01"):
+    import yfinance as yf
+    h = yf.Ticker(yfsym).history(start=start, auto_adjust=False)
+    out = []
+    for idx, row in h.iterrows():
+        v = row.get("Close")
+        if v is None or v != v:   # NaN
+            continue
+        out.append((idx.strftime("%Y-%m-%d"), float(v)))
+    return out
+
+
 def fetch_ecos(stat, cyc, items, key=None):
     key = key or _ecos_key()
     s, e = _ecos_period_bounds(cyc)
@@ -242,7 +277,12 @@ def _upsert(conn, spec, rows):
         [(spec["code"], d, v) for d, v in rows],
     )
     last = max(d for d, _ in rows)
-    src = f"fred:{spec['sid']}" if spec["src"] == "fred" else f"ecos:{spec['stat']}/{'/'.join(spec['items'])}"
+    if spec["src"] == "fred":
+        src = f"fred:{spec['sid']}"
+    elif spec["src"] == "yf":
+        src = f"yf:{spec['yf']}"
+    else:
+        src = f"ecos:{spec['stat']}/{'/'.join(spec['items'])}"
     conn.execute(
         "INSERT OR REPLACE INTO macro_series "
         "(code,name_ko,category,country,unit,freq,source,description,last_update) "
@@ -254,10 +294,15 @@ def _upsert(conn, spec, rows):
     return len(rows)
 
 
-def fetch_one(spec):
+def fetch_one(spec, start=None):
     if spec["src"] == "fred":
-        return fetch_fred(spec["sid"])
-    return fetch_ecos(spec["stat"], spec["cyc"], spec["items"])
+        return fetch_fred(spec["sid"], start=start or "1900-01-01")
+    if spec["src"] == "yf":
+        return fetch_yf(spec["yf"], start=start or "1900-01-01")
+    rows = fetch_ecos(spec["stat"], spec["cyc"], spec["items"])
+    if start:
+        rows = [r for r in rows if r[0] >= start]
+    return rows
 
 
 def backfill(codes=None):
@@ -275,6 +320,28 @@ def backfill(codes=None):
             print(f"  [{spec['code']:<22}] FAIL {str(ex)[:60]}")
         time.sleep(0.05)
     conn.close()
+
+
+def refresh():
+    """증분 갱신 (Celery beat용): 각 시리즈 마지막 날짜 이후만 fetch·upsert."""
+    conn = sqlite3.connect(str(INDEX_DB))
+    ensure_schema(conn)
+    updated = 0
+    for spec in SERIES:
+        last = conn.execute(
+            "SELECT MAX(date) FROM macro_observations WHERE code=?", (spec["code"],)).fetchone()[0]
+        try:
+            rows = fetch_one(spec, start=last)
+            if last:
+                rows = [r for r in rows if r[0] >= last]
+            n = _upsert(conn, spec, rows)
+            updated += 1 if n else 0
+        except Exception as ex:
+            print(f"  refresh FAIL {spec['code']}: {str(ex)[:50]}")
+        time.sleep(0.03)
+    conn.close()
+    print(f"macro refresh done ({updated}/{len(SERIES)})")
+    return updated
 
 
 def validate():
@@ -420,9 +487,20 @@ def ensure_data():
     if n == 0:
         print("macro_observations empty - initial backfill")
         backfill()
-    elif probe and probe >= "1990-01-01":
+        return
+    if probe and probe >= "1990-01-01":
         print(f"history capped at {probe} - re-backfill full history")
         backfill()
+        return
+    # 신규 추가된 시리즈(행 0)만 채움 (예: 지수 추가)
+    conn = sqlite3.connect(str(INDEX_DB))
+    have = {r[0] for r in conn.execute(
+        "SELECT DISTINCT code FROM macro_observations").fetchall()}
+    conn.close()
+    missing = [s["code"] for s in SERIES if s["code"] not in have]
+    if missing:
+        print(f"backfill {len(missing)} new series: {missing}")
+        backfill(missing)
     else:
         print(f"macro_observations {n} rows, history from {probe} - skip")
 
@@ -438,5 +516,7 @@ if __name__ == "__main__":
         backfill(sys.argv[2:] or None)
     elif arg == "--ensure":
         ensure_data()
+    elif arg == "--refresh":
+        refresh()
     else:
-        print("usage: python -m modules.macro_loader [--validate | --backfill [CODE ...] | --ensure]")
+        print("usage: python -m modules.macro_loader [--validate | --backfill [CODE ...] | --ensure | --refresh]")

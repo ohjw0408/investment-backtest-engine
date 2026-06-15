@@ -24,7 +24,7 @@ CAL_RELEASES = {
     9:  "🇺🇸 소매판매",
     13: "🇺🇸 산업생산",
     192: "🇺🇸 JOLTS 구인",
-    101: "🇺🇸 FOMC",
+    # FOMC(101)는 FRED 릴리스가 매 영업일 갱신일을 반환 → 회의일 아님, 제외.
 }
 
 _econ_cache = {}    # {today: [events]}
@@ -49,7 +49,7 @@ def econ_events():
             r = requests.get("https://api.stlouisfed.org/fred/release/dates",
                              params={"release_id": rid, "api_key": key, "file_type": "json",
                                      "realtime_start": start, "sort_order": "asc",
-                                     "include_release_dates_with_no_data": "true", "limit": 400},
+                                     "include_release_dates_with_no_data": "false", "limit": 400},
                              timeout=20).json()
             for d in r.get("release_dates", []):
                 out.append({"date": d["date"], "type": "econ", "title": label})

@@ -113,25 +113,7 @@
   <div class="rr-title">📊 포트폴리오 비교</div>
   <div class="rr-sub">저장한 포트폴리오와 벤치마크를 한눈에 비교해요. 배당 재투자(총수익)·전 종목 공통 겹침 기간 기준.</div>
 
-  <!-- 비교 대상 선택 -->
-  <div class="rr-card">
-    <div class="rr-card-title">⭐ 내 포트폴리오</div>
-    <div id="rrPfList" class="rr-pf-list"><span style="color:var(--text-muted);font-size:0.82rem;">⏳ 불러오는 중...</span></div>
-
-    <div class="rr-card-title" style="margin-top:16px;">📈 벤치마크</div>
-    <div class="rr-bench-row">
-      <span id="rrChips"></span>
-      <div class="rr-search-wrap">
-        <input type="text" id="rrSearch" class="rr-input" placeholder="벤치마크 추가 (종목/ETF 검색)" autocomplete="off">
-        <div class="rr-dropdown" id="rrDropdown"></div>
-      </div>
-    </div>
-
-    <div style="margin-top:16px;">
-      <button class="btn-primary" id="rrCompareBtn" onclick="rrCompare()">비교하기</button>
-    </div>
-  </div>
-
+  <!-- 광고 CTA (맨 위) -->
   <div class="rr-card" style="display:flex;align-items:center;gap:16px;background:rgba(25,118,210,0.08);border-color:rgba(25,118,210,0.45);">
     <span style="font-size:2rem;flex-shrink:0;">📊</span>
     <div style="flex:1;">
@@ -160,6 +142,32 @@
     <div id="rrOvCtrl" class="rr-ov-ctrl"></div>
     <div class="rr-chart-wrap" style="height:380px;"><canvas id="rrOvChart"></canvas></div>
     <div id="rrOvEmpty" class="rr-empty" style="display:none;padding:30px 20px;">위에서 항목을 추가하면 추세 차트가 그려집니다.</div>
+  </div>
+
+  <!-- 포트폴리오 정밀 비교 (선택 + 결과) -->
+  <div class="rr-card" id="rrCompareCard" style="border-color:rgba(25,118,210,0.45);">
+    <div style="font-size:1.05rem;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      🔬 포트폴리오 정밀 비교
+      <span style="font-weight:500;color:var(--text-muted);font-size:0.78rem;">핵심 지표 표 · 리스크-리턴 산점도 · 레이더 차트로 깊이 분석</span>
+    </div>
+    <div style="font-size:0.8rem;color:var(--text-muted);margin:4px 0 14px;">위 겹쳐보기는 추세만 봐요. 아래에서 포트폴리오를 골라 <b>수익·위험·배당 등 11개 지표를 정밀 비교</b>하세요.</div>
+
+    <div class="rr-card-title">⭐ 내 포트폴리오</div>
+    <div id="rrPfList" class="rr-pf-list"><span style="color:var(--text-muted);font-size:0.82rem;">⏳ 불러오는 중...</span></div>
+
+    <div class="rr-card-title" style="margin-top:16px;">📈 벤치마크</div>
+    <div class="rr-bench-row">
+      <span id="rrChips"></span>
+      <div class="rr-search-wrap">
+        <input type="text" id="rrSearch" class="rr-input" placeholder="벤치마크 추가 (종목/ETF 검색)" autocomplete="off">
+        <div class="rr-dropdown" id="rrDropdown"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:18px;">
+      <button class="btn-primary" id="rrCompareBtn" onclick="rrCompare()"
+        style="font-size:1.05rem;font-weight:800;padding:14px 30px;width:100%;border-radius:11px;">📊 정밀 비교하기</button>
+    </div>
   </div>
 
   <!-- 결과 -->

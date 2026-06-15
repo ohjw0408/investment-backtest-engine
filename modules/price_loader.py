@@ -18,6 +18,15 @@ DB_PATH         = PRICE_CACHE_DIR / "price_daily.db"
 INDEX_DB_PATH   = META_DIR / "index_master.db"
 
 
+def _yf_dl_ticker(code) -> str:
+    """yfinance 다운로드용 티커. US 클래스주(BRK.B→BRK-B)는 점→하이픈.
+       KR .KS/.KQ·지수(^)·선물/환율(=)은 그대로."""
+    c = str(code)
+    if c.endswith(".KS") or c.endswith(".KQ") or c.startswith("^") or "=" in c:
+        return c
+    return c.replace(".", "-") if "." in c else c
+
+
 def _load_us_tickers() -> set:
     us_etf_path = META_DIR / "us_etf_list.csv"
     tickers = set()
@@ -370,7 +379,7 @@ class PriceLoader:
 
     def fetch_from_api(self, code, start, end):
         df = yf.download(
-            code, start=start, end=end,
+            _yf_dl_ticker(code), start=start, end=end,
             progress=False, auto_adjust=False,
             actions=True, threads=False
         )
@@ -581,7 +590,10 @@ class PriceLoader:
         import sqlite3 as _sq
         from datetime import datetime as _dt, timedelta as _td
 
-        code     = str(code).split(".")[0].upper()
+        code = str(code).upper()
+        # KR yfinance 접미사(.KS/.KQ)만 제거 — US 점 티커(BRK.B 등)는 보존
+        if code.endswith(".KS") or code.endswith(".KQ"):
+            code = code.rsplit(".", 1)[0]
         today    = _dt.today().strftime("%Y-%m-%d")
         start_dl = "2000-01-01"
 
@@ -781,7 +793,7 @@ class PriceLoader:
 
         # get_price 실패 시 yfinance 직접 (BTC-USD 등)
         if df is None or df.empty:
-            yf_code = self._kr_yf_ticker(code) if is_kr else code
+            yf_code = self._kr_yf_ticker(code) if is_kr else _yf_dl_ticker(code)
             raw = yf.download(
                 yf_code, period="5y", progress=False,
                 auto_adjust=False, actions=True, threads=False
@@ -892,7 +904,7 @@ class PriceLoader:
         aum = expense_ratio = None
         market_cap = per = pbr = sector = None
         try:
-            yf_code = self._kr_yf_ticker(code) if is_kr else code
+            yf_code = self._kr_yf_ticker(code) if is_kr else _yf_dl_ticker(code)
             info    = yf.Ticker(yf_code).info
             if not name: name = info.get("longName", code)
             if not issuer:

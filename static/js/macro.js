@@ -332,8 +332,11 @@
   function baseOpts(unitLabel, legend) {
     const grid = css('--border') || '#e0e0e0', txt = css('--text-muted') || '#888';
     return {
-      responsive: true, maintainAspectRatio: false, interaction: { mode: 'x', intersect: false },
-      plugins: { legend: { display: legend, labels: { color: txt, font: { size: 11 } } }, tooltip: { mode: 'x', intersect: false, callbacks: { title: (it) => fracToDate(it[0].parsed.x) } } },
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: legend, labels: { color: txt, font: { size: 11 } } },
+        tooltip: { mode: 'index', intersect: false,
+          filter: (item, i, arr) => arr.findIndex(a => a.datasetIndex === item.datasetIndex) === i,
+          callbacks: { title: (it) => fracToDate(it[0].parsed.x) } } },
       scales: { x: { type: 'linear', ticks: { color: txt, callback: (v) => fracToDate(v), maxTicksLimit: 9 }, grid: { color: grid } },
         y: { ticks: { color: txt }, grid: { color: grid }, title: { display: !!unitLabel, text: unitLabel, color: txt } } },
     };

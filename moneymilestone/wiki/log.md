@@ -4,6 +4,22 @@
 >
 > 🔵 **다음 후보: PHASE4 잔여 = D1 · D2 · C2 · B4** (C1·A4·D4 완료).
 
+## [2026-06-16] perf | 시뮬 연산 본체 최적화 — 배당 per-day pandas 제거 (2.2x)
+
+오너 "가격로드만 줄였냐, 연산 핵심 줄여라". 프로파일(실 DB 롤링 세금ON)로 시뮬 연산 핫스팟 특정:
+`DividendEngine.process`가 총시간 64% — 매일·종목마다 死코드 멤버십(union reindex라 항상 True) +
+`price_data[t].loc[date,"dividend"]`(비싼 pandas 스칼라), 배당 0인 날도 전부. **수정**: close처럼 dividend도
+numpy 정수인덱스 추출 → 당일 dict 엔진 전달(`.loc[date]=.iloc[i]=values[i]` byte 동일). SimulationLoop +
+MultiAccountSimulationLoop(`_gross_dividend_by_ticker`+`process`+`_price_dict_for_account` 死코드 제거) 둘 다.
+**측정: 실 DB 롤링 3.13s→1.41s=2.21x**(배당 numpy 단독). 남은 핫스팟 `cash_allocator`(greedy 매수 알고리즘)·
+`total_value`는 정확성 민감이라 미변경(결과 변경 위험=대원칙 위반). 死코드·pandas→numpy "증명상 동일"만 적용.
+
+**검증(대원칙=결과불변)**: ① 골든마스터 4종 매 단계 불변 ② **실 DB A/B 하니스 `scripts/perf_ab.py` 18시나리오**
+(위탁/ISA/연금/IRP × US/KR ETF·KR주식·금·지수·혼합 × accum/wd/multi × reinvest/withdraw/hold ×
+gain_harvest·ISA풍차·월배당) **원본 vs 최적화 byte 동일** ③ 전체 pytest 298 passed(1 failed=저장포폴
+사전존재버그, perf 무관 — pre-perf 91806c7서도 동일 실패).
+_작성: Claude_
+
 ## [2026-06-16] fix | 성능 P1-1 토폴로지 정정 (2 vCPU + Celery concurrency=2)
 
 오너 지적: 실서버 = **2 vCPU + Celery worker concurrency=2**(`worker_prefetch_multiplier=1`=2동시+대기열). 플랜의 "1 vCPU"가 부정확 — config(서버 systemd `domino-celery.service`, repo 미포함) 실독 안 하고 플랜 문구 신뢰한 실수. **P1-1 `_effective_workers()`가 서버서 `min(cpu_count,6)`=2→Pool(2) 오작동**: 동시 2요청 시 2(Celery)+4(Pool) 프로세스가 2코어 경합 + `full_price_data` 4벌 복제 → 4GB OOM. **수정**: 기본=인프로세스(1), `SIM_MAX_WORKERS>1` 명시 시에만 Pool(비-Celery 다코어 배치용). 전략 결론(per-request 인프로세스)은 동일, 임계값만 정정. 검증=골든 불변(기본·`=2` 둘 다) + withdrawal 회귀 18 PASS. 권장=worker service 파일 repo 커밋(가시성).

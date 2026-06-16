@@ -14,6 +14,20 @@
 
 → **P1-1 수정**: `_effective_workers()` 기본을 인프로세스(1)로(과거 `min(cpu_count,6)`=서버서 2→Pool(2) 오작동). `SIM_MAX_WORKERS>1` 명시 시에만 Pool. 골든 불변 확인(기본·`=2` 둘 다).
 
+## ▶ 시뮬 연산(per-day) 최적화 — 2026-06-16 (오너 "연산 핵심 줄여라")
+
+가격로드(P0)에 더해 **시뮬 연산 본체** 프로파일로 핫스팟 직접 특정·제거:
+- **프로파일(실 DB 롤링, 세금ON)**: `DividendEngine.process`가 총시간 **64%** — 매일·종목마다 `date not in index`(union reindex라 항상 True인 死코드) + `price_data[t].loc[date,"dividend"]`(비싼 pandas 스칼라). 배당 0인 날 포함 전부.
+- **수정**: close처럼 dividend도 numpy 정수인덱스로 추출 → 당일 dict을 엔진에 전달. `.loc[date]=.iloc[i]=values[i]` byte 동일.
+  - `DividendEngine.process`/`TaxedDividendEngine`/`DividendSimulator 래퍼`: `dividend_today` 선택 인자.
+  - `SimulationLoop.run`: dividend numpy 추출 + per-day dividend_today 전달.
+  - `MultiAccountSimulationLoop`: `_gross_dividend_by_ticker`+`process` 둘 다 numpy화 + `_price_dict_for_account` 死코드 멤버십 제거.
+- **측정(실 DB, 세금ON 3종목 15년 20윈도우): 3.13s → 1.41s = 2.21x** (배당 numpy 단독). 프로파일 10.6s→3.26s.
+- **남은 핫스팟 = `cash_allocator.allocate_cash`(greedy 1주씩 매수 알고리즘)·`total_value` 산술 — 정확성 민감 알고리즘이라 미변경(결과 변경 위험 = 대원칙 위반).** 死코드·pandas→numpy 같은 "증명상 byte 동일" 변환만 적용함.
+
+### 검증 강화 — 실 DB A/B 하니스 `scripts/perf_ab.py`
+골든마스터(합성)에 더해 **실 DB + 실 종목**으로 분류·세금·계좌 분기를 전부 태우는 18 시나리오 A/B(원본 vs 최적화): 위탁/ISA/연금저축/IRP × US ETF·KR ETF·KR주식·금·지수·혼합 × accum/withdrawal/multi × reinvest/withdraw/hold × gain_harvest·ISA풍차·월배당. **원본 대비 byte 동일 확인.** + 전체 pytest 298 passed(1 failed=저장포폴 사전존재버그, perf 무관 — pre-perf 91806c7서도 동일 실패 확인).
+
 ## ▶ 진행 현황 (2026-06-16, Claude)
 
 **선행(골든마스터+벤치) + P0 + P1 = 전부 완료·결과불변 검증.** 미배포(로컬 커밋, 오너 배포 결정 대기).

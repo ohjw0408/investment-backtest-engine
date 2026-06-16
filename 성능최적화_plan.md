@@ -23,7 +23,15 @@
 
 **회귀:** 변경 모듈 타겟 테스트 누계 ~190+ PASS(accum·multi·withdrawal·ISA·합성·tax-switch·fee·배당·백테 소비자). 전체 pytest는 오너 지시상 미실행(공유 엔진이라 필요시 오너 확인).
 
-**남은 작업 = P2(I/O ThreadPool: C3 겹쳐보기·watchlist·gap-fill)·P3(후처리·합성벡터화·fast-path).** P2/P3은 네트워크/데이터경로라 **골든마스터로 검증 불가 → 라이브 서버 배포 + 지수곡선 대조 필요**(별도 검증 regime). 오너 결정: 위 P0+P1 배포 여부 + P2 착수 여부.
+### P2 (I/O ThreadPool) — 2026-06-16 구현 (오너 "배포 + P2 전체 착수")
+
+- ✅ **P2-1 C3 겹쳐보기 포폴지수 병렬(`app.py _portfolio_index_series`)**: 보유종목마다 `get_symbol_data`(~2s, I/O 지배) 순차 → `ThreadPoolExecutor(min(8,n))` 병렬. **데이터 출처 무변경**(get_symbol_data 그대로) → 곡선 불변. `series` dict 삽입순서 = tickers순(ex.map 순서보존) = 원본과 동일 합산순서 → **float 동일**. 10종목 ~20s→~2~3s 기대.
+- ✅ **P2-2 watchlist_quotes 병렬(`app.py`)**: 코드별 `_watchlist_quote` 순차 → ThreadPool. `ex.map` 순서보존 + None 필터 → 결과 동일. 콜드캐시 5~15s→1~2s 기대.
+- ✅ **P2-3 get_price 트레일링 gap-fill 단락(`price_loader.py`)**: DB 최종일==직전영업일이면 매 호출 yfinance fetch가 0행(낭비). 코드별 `_gapfill_trail_day[code]==end_date`면 트레일링 api_call 스킵(historical 보충은 유지). 첫 시도 0행→DB 불변→재시도 동일결과 = **결과 불변**.
+
+**P2 로컬 검증**: 구문 OK + 골든마스터 4종 불변(실 get_price 경로라 무관) + 패치로더로 _portfolio_index_series(시작=100·날짜오름차순·가중합) + watchlist 순서보존/None필터 PASS. **라이브 검증(지수곡선 대조)은 배포 후 probe.**
+
+**남은 = P3(후처리 pandas 중복·synthetic 벡터화·무세금 fast-path) — 후순위.** 오너 결정.
 
 ---
 

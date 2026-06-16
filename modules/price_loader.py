@@ -469,7 +469,15 @@ class PriceLoader:
             if start_date < db_min:
                 api_calls.append((start_date, db_min - timedelta(days=1)))
             if end_date > db_max:
-                api_calls.append((db_max + timedelta(days=1), end_date))
+                # P2-3: 트레일링(최신분) gap-fill을 코드별 같은 날 1회로 제한.
+                # DB 최종일이 직전영업일까지면 매 호출 yfinance fetch가 0행 반환(낭비) — 위젯·시세
+                # 콜드경로서 누적. 같은 end_date를 오늘 이미 시도했으면 스킵(첫 시도가 0행이어도 DB
+                # 최종일 불변이므로 재시도해도 동일 결과 → 결과 불변). historical 보충(위)은 그대로 수행.
+                if not hasattr(self, "_gapfill_trail_day"):
+                    self._gapfill_trail_day = {}
+                if self._gapfill_trail_day.get(code) != end_date:
+                    self._gapfill_trail_day[code] = end_date
+                    api_calls.append((db_max + timedelta(days=1), end_date))
 
         # ── API 호출 ──────────────────────────────────────────
         yf_code = self._kr_yf_ticker(code) if self.is_kr_etf(code) else code

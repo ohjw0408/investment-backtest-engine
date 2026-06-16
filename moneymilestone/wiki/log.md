@@ -4,6 +4,16 @@
 >
 > 🔵 **다음 후보: PHASE4 잔여 = D1 · D2 · C2 · B4** (C1·A4·D4 완료).
 
+## [2026-06-16] perf | 성능 최적화 P2 (I/O ThreadPool) 구현
+
+오너 "지금 배포 + P2 전체 착수"(P0+P1은 927e8eb 배포완료). I/O-bound 병렬화 — CPU-bound 아니라 1코어도 이득.
+- **P2-1 C3 겹쳐보기 포폴지수**(`app.py _portfolio_index_series`): 보유종목별 `get_symbol_data`(~2s) 순차→`ThreadPoolExecutor(min(8,n))`. **데이터 출처 무변경**→곡선 불변. series dict 삽입순=tickers순(ex.map 순서보존)=원본 합산순 동일→float 동일. 10종목 ~20s→~2~3s.
+- **P2-2 watchlist_quotes**(`app.py`): `_watchlist_quote` 순차→ThreadPool. ex.map 순서보존+None필터→결과 동일. 콜드 5~15s→1~2s.
+- **P2-3 get_price 트레일링 gap-fill 단락**(`price_loader.py`): DB 최종일=직전영업일이면 매 호출 yfinance 0행 낭비. 코드별 같은 end_date 오늘 이미 시도면 트레일링 api_call 스킵(historical 보충 유지). 첫시도 0행→DB불변→재시도 동일=결과불변.
+
+**검증**: 구문 OK + 골든마스터 4종 불변(실 get_price라 무관) + 패치로더 로컬(_portfolio_index_series 시작100·날짜오름차순·가중합 / watchlist 순서보존·None필터) PASS. ⚠️ **라이브 지수곡선 대조 = 배포 후 probe 필요**(네트워크/데이터경로라 골든 검증 불가). **남은=P3(후순위)**.
+_작성: Claude_
+
 ## [2026-06-16] perf | 성능 최적화 P0+P1 구현·결과불변 검증(미배포)
 
 오너 "성능최적화 읽고 실행해". `성능최적화_plan.md` 실행순서대로 **선행(골든마스터)→P0→P1 완료**, 전부 결과불변.

@@ -1165,7 +1165,14 @@ def home_config_save():
 @app.route('/api/watchlist/quotes')
 def watchlist_quotes():
     codes = [c.strip() for c in request.args.get('codes', '').split(',') if c.strip()][:60]
-    return jsonify([q for c in codes if (q := _watchlist_quote(c))])
+    if not codes:
+        return jsonify([])
+    # P2-2: 코드별 _watchlist_quote가 순차였음(콜드캐시 = N×네트워크 지연).
+    # I/O-bound라 ThreadPool 병렬이 1코어에서도 이득. ex.map = 입력 순서 보존, 결과 동일.
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=min(8, len(codes))) as ex:
+        quotes = list(ex.map(_watchlist_quote, codes))
+    return jsonify([q for q in quotes if q])
 
 
 # -----------------------------------------------
@@ -2026,22 +2033,38 @@ def _portfolio_index_series(tickers, years=6):
     """저장 포트폴리오 → 비중 고정 정규화 지수(시작=100) 일별 시계열. 오버레이 추세 비교용.
        비중 합으로 정규화, 종목별 종가를 시작일=100으로 환산해 가중합 → 통화 무관."""
     from datetime import datetime, timedelta
+    from concurrent.futures import ThreadPoolExecutor
     cutoff = (datetime.now() - timedelta(days=int(years * 365))).strftime('%Y-%m-%d')
     wsum = sum(float(t.get('weight') or 0) for t in tickers) or 1.0
-    series = {}
+
+    valid = []
     for t in tickers:
         code = str(t.get('code') or '').upper()
         w = float(t.get('weight') or 0) / wsum
-        if w <= 0 or not code:
-            continue
+        if w > 0 and code:
+            valid.append((code, w))
+    if not valid:
+        return []
+
+    # P2-1: 보유종목마다 get_symbol_data(~2s, I/O 지배)를 순차 호출하던 것(10종목=~20s) →
+    # ThreadPool 병렬(I/O-bound라 1코어도 이득). 데이터 출처·종가 동일 → 가중합 지수곡선 불변.
+    def _fetch(cw):
+        code, w = cw
         try:
             d = portfolio_engine.loader.get_symbol_data(code)
             m = {p['date']: p['close'] for p in d.get('prices', [])
                  if p.get('close') and p['date'] >= cutoff}
-            if m:
-                series[code] = (w, m)
+            return (code, w, m) if m else None
         except Exception:
-            continue
+            return None
+
+    with ThreadPoolExecutor(max_workers=min(8, len(valid))) as ex:
+        fetched = list(ex.map(_fetch, valid))
+    series = {}
+    for r in fetched:
+        if r:
+            code, w, m = r
+            series[code] = (w, m)
     if not series:
         return []
     common = None

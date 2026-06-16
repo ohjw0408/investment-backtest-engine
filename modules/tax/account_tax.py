@@ -246,7 +246,7 @@ class TaxedDividendEngine:
         self.financial_income_by_year: dict[int, float] = {}
         self._sim_div_this_year = 0.0
 
-    def process(self, portfolio, price_data, price_dict, date, dividend_mode):
+    def process(self, portfolio, price_data, price_dict, date, dividend_mode, dividend_today=None):
         """DividendEngine.process() 시그니처와 동일."""
         if self._session is not None:
             self._session.touch(date)
@@ -263,7 +263,7 @@ class TaxedDividendEngine:
 
         # 원본 배당 계산
         gross_by_ticker = self.base_engine.process(
-            portfolio, price_data, price_dict, date, dividend_mode
+            portfolio, price_data, price_dict, date, dividend_mode, dividend_today=dividend_today
         )
 
         # 세금 적용

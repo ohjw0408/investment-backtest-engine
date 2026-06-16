@@ -39,10 +39,12 @@ class SimulationLoop:
 
         # 🔥 1️⃣ price numpy 캐싱 (핵심 최적화)
         price_array = {}
+        dividend_array = {}   # 당일 배당도 numpy로 — DividendEngine의 per-day pandas .loc 제거용
 
         for ticker in config.tickers:
             df = price_data[ticker]
             price_array[ticker] = df["close"].values
+            dividend_array[ticker] = df["dividend"].values if "dividend" in df.columns else None
 
         total_dates = len(dates)
         update_step = max(1, total_dates // 20)
@@ -101,12 +103,19 @@ class SimulationLoop:
                             portfolio._avg_costs[t] *= scale
 
             # ── dividend ─────────────────────────────
+            # 당일 배당을 numpy 정수인덱스로 추출(price_dict와 동일 패턴) → 엔진서 pandas .loc 제거.
+            dividend_today = {}
+            for ticker in config.tickers:
+                da = dividend_array[ticker]
+                if da is not None:
+                    dividend_today[ticker] = da[i]
             dividend_by_ticker = self.dividend_engine.process(
                 portfolio,
                 price_data,
                 price_dict,
                 date,
-                config.dividend_mode
+                config.dividend_mode,
+                dividend_today=dividend_today,
             )
 
             dividend_total = sum(dividend_by_ticker.values())

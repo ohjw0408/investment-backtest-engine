@@ -43,8 +43,9 @@ class _GrossRecordingDividendEngine:
         self._inner = DividendEngine()
         self._sink = sink
 
-    def process(self, portfolio, price_data, price_dict, date, dividend_mode):
-        gross = self._inner.process(portfolio, price_data, price_dict, date, dividend_mode)
+    def process(self, portfolio, price_data, price_dict, date, dividend_mode, dividend_today=None):
+        gross = self._inner.process(portfolio, price_data, price_dict, date, dividend_mode,
+                                    dividend_today=dividend_today)
         for t, g in gross.items():
             if g > 0:
                 self._sink[t] = self._sink.get(t, 0.0) + g

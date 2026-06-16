@@ -14,6 +14,14 @@ class CashAllocator:
         if portfolio.cash <= 0:
             return
 
+        # 살 수 있는 종목의 최저가보다 cash가 적으면 어차피 0주 매수(1차 int(min(deficit,cash)/price)=0,
+        # 2차 cash<price→break) → deficit 빌드·정렬 전부 스킵. 결과 byte 동일. 재투자 잔돈으로 매일
+        # allocate_cash가 풀가동되던 핫스팟(투자계산기 총시간 65%) 단락.
+        buyable = [price_dict[t] for t in target_weights
+                   if t != "CASH" and t in price_dict and price_dict[t] and price_dict[t] > 0]
+        if buyable and portfolio.cash < min(buyable):
+            return
+
         # -----------------------------
         # 현재 포트 가치 계산
         # -----------------------------

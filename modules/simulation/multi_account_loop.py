@@ -135,9 +135,11 @@ class MultiAccountSimulationLoop:
 
         price_array: dict[str, Any] = {}
         valid_index: dict[str, Any] = {}
+        dividend_array: dict[str, Any] = {}   # 당일 배당 numpy — per-day pandas .loc 제거용
         for ticker, df in price_data.items():
             price_array[ticker] = df["close"].values
             valid_index[ticker] = df.index
+            dividend_array[ticker] = df["dividend"].values if "dividend" in df.columns else None
 
         combined_rows: list[dict[str, Any]] = []
         total_dates = len(dates)
@@ -170,6 +172,12 @@ class MultiAccountSimulationLoop:
                     injections = {}
                     transfers = {}
 
+            # 당일 배당을 numpy 정수인덱스로 추출(전 계좌 공유) → 엔진/세금 gross서 pandas .loc 제거.
+            dividend_today = {}
+            for ticker, da in dividend_array.items():
+                if da is not None:
+                    dividend_today[ticker] = da[i]
+
             for rt in runtimes:
                 price_dict = self._price_dict_for_account(
                     rt["config"].tickers, price_array, valid_index, i, date
@@ -186,6 +194,7 @@ class MultiAccountSimulationLoop:
                 dividend_by_ticker, cash_flow = self._step_account(
                     rt, price_data, price_dict, date,
                     contribution_override=override, transfer_override=transfer_in,
+                    dividend_today=dividend_today,
                 )
                 portfolio = rt["portfolio"]
                 total_value = float(portfolio.total_value(price_dict))
@@ -698,7 +707,9 @@ class MultiAccountSimulationLoop:
     ) -> dict[str, float]:
         price_dict: dict[str, float] = {}
         for ticker in tickers:
-            if ticker not in valid_index or date not in valid_index[ticker]:
+            # `date not in valid_index[ticker]`는 union reindex라 항상 True인 死코드 → 제거.
+            # 실제 결측 판정은 아래 가격 NaN/≤0 필터가 담당(late-start 종목 등).
+            if ticker not in valid_index:
                 continue
             arr = price_array[ticker]
             if i >= len(arr):
@@ -824,6 +835,7 @@ class MultiAccountSimulationLoop:
         self, rt: dict[str, Any], price_data, price_dict, date,
         contribution_override: float | None = None,
         transfer_override: float = 0.0,
+        dividend_today: dict | None = None,
     ) -> tuple[dict, float]:
         portfolio = rt["portfolio"]
         config = rt["config"]
@@ -862,6 +874,7 @@ class MultiAccountSimulationLoop:
             price_data,
             date,
             taxed=hasattr(rt["dividend_engine"], "tax_engine"),
+            dividend_today=dividend_today,
         )
         dividend_by_ticker = rt["dividend_engine"].process(
             portfolio,
@@ -869,6 +882,7 @@ class MultiAccountSimulationLoop:
             price_dict,
             date,
             config.dividend_mode,
+            dividend_today=dividend_today,
         )
         if gross_dividend_by_ticker:
             dividend_tax = sum(
@@ -955,14 +969,21 @@ class MultiAccountSimulationLoop:
 
         return dividend_by_ticker, float(cash_flow)
 
-    def _gross_dividend_by_ticker(self, portfolio, price_data, date, taxed: bool) -> dict[str, float]:
+    def _gross_dividend_by_ticker(self, portfolio, price_data, date, taxed: bool,
+                                  dividend_today: dict | None = None) -> dict[str, float]:
         if not taxed:
             return {}
         gross: dict[str, float] = {}
         for ticker, position in portfolio.positions.items():
-            if ticker not in price_data or date not in price_data[ticker].index:
-                continue
-            dividend = price_data[ticker].loc[date, "dividend"]
+            if dividend_today is not None:
+                # 고속 경로: numpy 당일 배당(=.loc[date] 동일). 死코드 멤버십·pandas 스칼라 제거.
+                dividend = dividend_today.get(ticker)
+                if dividend is None:
+                    continue
+            else:
+                if ticker not in price_data or date not in price_data[ticker].index:
+                    continue
+                dividend = price_data[ticker].loc[date, "dividend"]
             if dividend > 0:
                 gross[ticker] = float(dividend) * float(position.quantity)
         return gross

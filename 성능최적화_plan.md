@@ -23,7 +23,8 @@
   - `SimulationLoop.run`: dividend numpy 추출 + per-day dividend_today 전달.
   - `MultiAccountSimulationLoop`: `_gross_dividend_by_ticker`+`process` 둘 다 numpy화 + `_price_dict_for_account` 死코드 멤버십 제거.
 - **측정(실 DB, 세금ON 3종목 15년 20윈도우): 3.13s → 1.41s = 2.21x** (배당 numpy 단독). 프로파일 10.6s→3.26s.
-- **남은 핫스팟 = `cash_allocator.allocate_cash`(greedy 1주씩 매수 알고리즘)·`total_value` 산술 — 정확성 민감 알고리즘이라 미변경(결과 변경 위험 = 대원칙 위반).** 死코드·pandas→numpy 같은 "증명상 byte 동일" 변환만 적용함.
+- **`cash_allocator.allocate_cash` 조기탈출(2026-06-16 추가)**: 프로파일상 무세금 투자계산기 총시간 65% 차지. 원인=재투자/적립 후 남는 잔돈(cash>0이나 최저 주가 미만)이 매일 dividend sweep의 allocate_cash를 풀가동(deficit 빌드+sort)시키며 0주 매수. **살 수 있는 종목 최저가>cash면 1차 int(min(deficit,cash)/price)=0·2차 cash<price→break라 어차피 0주 → deficit·sort 스킵.** 결과 byte 동일(매수0인 경우만 단락, greedy 알고리즘 무변경). **무세금 계산기 1.35s→0.94s=1.44x**(배당opt 위에 추가). total_value 호출 385k→115k로 급감.
+- **여기서 안전 최적화 소진.** 남은 비용 = per-day 파이썬 루프 자체(simulation_loop 0.34s)·history_recorder dict 빌드(0.29s, 출력 필수)·total_value 산술. 더 줄이려면 **(a) cash_allocator greedy 1주매수·total_value 알고리즘 변경 (b) per-day 루프 전체 벡터화/JIT** — 둘 다 결과 변경 위험이라 **대원칙(결과불변)상 미적용.** "증명상 byte 동일"(死코드·pandas→numpy·無매수 단락)만 적용함.
 
 ### 검증 강화 — 실 DB A/B 하니스 `scripts/perf_ab.py`
 골든마스터(합성)에 더해 **실 DB + 실 종목**으로 분류·세금·계좌 분기를 전부 태우는 18 시나리오 A/B(원본 vs 최적화): 위탁/ISA/연금저축/IRP × US ETF·KR ETF·KR주식·금·지수·혼합 × accum/withdrawal/multi × reinvest/withdraw/hold × gain_harvest·ISA풍차·월배당. **원본 대비 byte 동일 확인.** + 전체 pytest 298 passed(1 failed=저장포폴 사전존재버그, perf 무관 — pre-perf 91806c7서도 동일 실패 확인).

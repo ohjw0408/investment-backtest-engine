@@ -4,6 +4,17 @@
 >
 > 🔵 **다음 후보: PHASE4 잔여 = D1 · D2 · C2 · B4** (C1·A4·D4 완료).
 
+## [2026-06-16] perf | cash_allocator 무매수 조기탈출 — 투자계산기 1.44x
+
+오너 "투자계산기·은퇴계산기 줄일 곳 없나"(셋 다 SimulationLoop 공유 → P0+배당opt 이미 적용). 재프로파일:
+무세금 투자계산기 총시간 65%가 `cash_allocator.allocate_cash`. 원인=재투자/적립 후 잔돈(cash>0이나
+최저 주가 미만)이 매일 dividend sweep서 allocate_cash 풀가동(deficit+sort)하며 0주 매수. **수정**: 살 수
+있는 종목 최저가>cash면 1차 int=0·2차 break라 어차피 0주 → deficit·sort 스킵(결과 byte 동일, greedy 무변경).
+**무세금 계산기 1.35s→0.94s=1.44x**, total_value 호출 385k→115k.
+검증=골든 4종 불변 + 실DB A/B 18시나리오 원본 byte 동일 + 회귀 73 PASS.
+**여기서 안전 최적화 소진** — 남은(per-day 루프·recorder·total_value)은 알고리즘/벡터화라 결과변경 위험→미적용(대원칙).
+_작성: Claude_
+
 ## [2026-06-16] perf | 시뮬 연산 본체 최적화 — 배당 per-day pandas 제거 (2.2x)
 
 오너 "가격로드만 줄였냐, 연산 핵심 줄여라". 프로파일(실 DB 롤링 세금ON)로 시뮬 연산 핫스팟 특정:

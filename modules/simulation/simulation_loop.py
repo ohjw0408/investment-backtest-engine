@@ -39,12 +39,10 @@ class SimulationLoop:
 
         # 🔥 1️⃣ price numpy 캐싱 (핵심 최적화)
         price_array = {}
-        valid_index = {}
 
         for ticker in config.tickers:
             df = price_data[ticker]
             price_array[ticker] = df["close"].values
-            valid_index[ticker] = df.index
 
         total_dates = len(dates)
         update_step = max(1, total_dates // 20)
@@ -56,13 +54,10 @@ class SimulationLoop:
             price_dict = {}
 
             # 🔥 2️⃣ pandas loc → numpy 접근
+            # 모든 종목이 union 인덱스로 reindex돼 있어 dates의 모든 i가 유효(과거 멤버십
+            # 테스트 `date in df.index`는 항상 True인 死코드 → 제거, 결과 불변·per-day×종목 비용 절감).
             for ticker in config.tickers:
-
-                if date not in valid_index[ticker]:
-                    continue
-
-                price = price_array[ticker][i]
-                price_dict[ticker] = price
+                price_dict[ticker] = price_array[ticker][i]
 
             if not price_dict:
                 continue

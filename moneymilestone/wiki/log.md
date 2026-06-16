@@ -4,6 +4,18 @@
 >
 > 🔵 **다음 후보: PHASE4 잔여 = D1 · D2 · C2 · B4** (C1·A4·D4 완료).
 
+## [2026-06-16] perf | 성능 최적화 P0+P1 구현·결과불변 검증(미배포)
+
+오너 "성능최적화 읽고 실행해". `성능최적화_plan.md` 실행순서대로 **선행(골든마스터)→P0→P1 완료**, 전부 결과불변.
+- **선행 골든마스터+벤치 하니스** `scripts/perf_golden.py`(+`tests/golden/perf_golden.json`). DB·네트워크 0 — 결정론 합성가격 `_FakeLoader`를 PortfolioEngine에 주입해 **실제 load/get_price 경로** 구동(대표 4종: accum 단일·2종목세금, multi 2계좌세금, withdrawal). `save`/`check`(±rel 1e-9 + wall-time). BBB 2000시작 = union/ffill 경계 커버.
+- **P0-1 AccumulationAnalyzer**·**P0-2 MultiAccountAnalyzer**: 윈도우마다 `price_loader.load`(DB+reindex+ffill) 재실행 → `[roll_start,data_end]` **1회 로드 + `_slice_window`**(WithdrawalAnalyzer 모범패턴). multi는 **주입 price_provider 경로(tax-switch·테스트) 제외**(윈도우 date-range 의미 상이) — 프로덕션 경로만. 합성/ISA 슬라이스 보존.
+- **P1-1 Pool 1 vCPU 가드**(withdrawal): `_effective_workers()`(cpu_count+`SIM_MAX_WORKERS`). 워커=1이면 **인프로세스 순차**(Pool 미생성 → full_price_data 복제·fork·OOM 제거). `SIM_MAX_WORKERS=1`로도 결과동일 확인.
+- **P1-2 per-day 멤버십 死코드 제거**(simulation_loop): `date not in valid_index`는 union reindex로 **항상 True**(프로덕션 effective_start 공통 → NaN 없음). NaN-check로 바꾸지 않고 제거(late-start NaN 흐름 보존)=순수 속도이득. 공유엔진 — 백테·배당·멀티·인출 회귀 PASS.
+- **P1-3 엔진 가격캐시 LRU 상한 8**(portfolio_engine): ISA 풍차 무한증식 방지. 순수 메모이제이션=결과불변.
+
+**실측(하니스 로컬):** accum 1.14~1.21×·multi 1.02×. ⚠️하니스 get_price 인메모리라 절대속도 과소 — 프로덕션 P0 실이득은 중복 DB read 제거로 **5~20×**. 하니스 목적=결과불변 증명(달성). **회귀 ~190+ PASS**(accum·multi·withdrawal·ISA·합성·tax-switch·fee·배당·백테). 전체 pytest 미실행(공유엔진, 오너 지시). **남은=P2(I/O ThreadPool)·P3 — 골든마스터 검증불가, 라이브 배포+지수곡선 대조 필요. 배포·P2착수 = 오너 결정.**
+_작성: Claude_
+
 ## [2026-06-15] plan | 연산 성능 최적화 계획(`성능최적화_plan.md`)
 
 오너 요청 = 전 연산경로(시뮬엔진·가격로더·세금·겹쳐보기) 정독 후 1 vCPU/4GB·결과불변 최적화 계획. **핵심 발견:** ① **롤링 윈도우 가격 재로드(P0)** = AccumulationAnalyzer(:170)·MultiAccountAnalyzer(_load_prices)가 윈도우마다 `price_loader.load`(DB+reindex+ffill) 재실행(수백회). **WithdrawalAnalyzer(:226)는 이미 1회 로드+슬라이스** = 모범 패턴 존재 → 미적용 분석기를 끌어올리면 결과불변·5~20×. ② **1 vCPU에서 multiprocessing.Pool 역효과** — 속도이득0 + 프로세스마다 full_price_data 복제로 4GB OOM 위험(WithdrawalAnalyzer Pool). ③ per-day 멤버십테스트·엔진캐시 무한증식·C3 겹쳐보기 보유종목별 get_symbol_data(~2s)·watchlist 순차. **전략:** CPU-bound=일 줄이기(중복제거·벡터화), I/O-bound=ThreadPool 병렬. **선행=골든마스터+벤치 하니스(결과불변 안전장치).** 미착수(계획만).

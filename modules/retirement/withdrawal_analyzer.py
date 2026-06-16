@@ -18,6 +18,19 @@ MIN_CASES    = 30
 SYNTHETIC_DF = 5
 N_WORKERS    = min(os.cpu_count() or 2, 6)
 
+
+def _effective_workers() -> int:
+    """P1-1: 1 vCPU에서 Pool은 역효과(속도이득0 + full_price_data 프로세스 복제 → OOM).
+    유효 워커 수를 cpu_count와 SIM_MAX_WORKERS 상한으로 산출. 1이면 호출측이 인프로세스 실행."""
+    cap = N_WORKERS
+    env = os.environ.get("SIM_MAX_WORKERS")
+    if env:
+        try:
+            cap = min(cap, max(1, int(env)))
+        except ValueError:
+            pass
+    return max(1, cap)
+
 # ── 워커 전역 변수 ────────────────────────────────────────
 _w_price_data: dict = {}
 _w_dates:      list = []
@@ -274,22 +287,31 @@ class WithdrawalAnalyzer:
             for s, e, rid in windows
         ]
 
-        # 4. 병렬 실행 (progress_callback 있으면 imap_unordered로 케이스 단위 보고)
+        # 4. 실행 — 워커>1이면 Pool 병렬, 1이면(1 vCPU) 인프로세스 순차(P1-1).
         import time as _t
-        _start = _t.time()
-        total  = len(task_args)
+        _start  = _t.time()
+        total   = len(task_args)
+        workers = _effective_workers()
 
-        if self.progress_callback:
+        if workers <= 1:
+            # 1 vCPU: Pool 생성 안 함 — full_price_data 복제·fork 오버헤드 회피, 속도는 동일.
+            _init_wd_worker(full_price_data, all_dates)
+            raw_results = []
+            for completed, a in enumerate(task_args, 1):
+                raw_results.append(_run_wd_case(a))
+                if self.progress_callback:
+                    self.progress_callback(current=completed, total=total,
+                                           elapsed=_t.time() - _start)
+        elif self.progress_callback:
             from multiprocessing import Pool as _Pool
             try:
                 raw_results = []
-                with _Pool(N_WORKERS, initializer=_init_wd_worker,
+                with _Pool(workers, initializer=_init_wd_worker,
                            initargs=(full_price_data, all_dates)) as pool:
                     for completed, result in enumerate(
                             pool.imap_unordered(_run_wd_case, task_args), 1):
                         raw_results.append(result)
                         elapsed = _t.time() - _start
-                        eta = elapsed / completed * (total - completed) if completed > 0 else None
                         self.progress_callback(current=completed, total=total, elapsed=elapsed)
             except Exception as e:
                 if self.verbose:
@@ -301,7 +323,7 @@ class WithdrawalAnalyzer:
                     elapsed = _t.time() - _start
                     self.progress_callback(current=completed, total=total, elapsed=elapsed)
         else:
-            raw_results = self._run_parallel(task_args, full_price_data, all_dates)
+            raw_results = self._run_parallel(task_args, full_price_data, all_dates, workers)
 
         # 5. metrics 변환
         cases = []
@@ -341,11 +363,11 @@ class WithdrawalAnalyzer:
 
         return cases
 
-    def _run_parallel(self, task_args, full_price_data, all_dates):
+    def _run_parallel(self, task_args, full_price_data, all_dates, workers=None):
         from multiprocessing import Pool
         try:
             with Pool(
-                processes   = N_WORKERS,
+                processes   = workers or N_WORKERS,
                 initializer = _init_wd_worker,
                 initargs    = (full_price_data, all_dates),
             ) as pool:

@@ -43,6 +43,9 @@ class PortfolioEngine:
 
         # 🔥 전체 범위 캐시: (tickers, data_start, data_end) → (price_data, dates)
         self._price_cache = {}
+        # P1-3: 롤링이 윈도우마다 distinct (start,end) 키를 적재(재사용 0) → 무한증식·RAM 위협.
+        # 순수 메모이제이션이라 상한 초과 시 가장 오래된 엔트리 축출(결과 불변, 미스 시 재로드).
+        self._price_cache_max = 8
 
     # -------------------------------------------------
     # 전체 범위 로드 (캐시)
@@ -148,6 +151,9 @@ class PortfolioEngine:
         )
         key = (tickers_key, config.start_date, config.end_date)
         self._price_cache[key] = (price_data, dates)
+        # LRU 상한 — 가장 오래 전 삽입 엔트리부터 축출(dict 삽입 순서).
+        while len(self._price_cache) > self._price_cache_max:
+            self._price_cache.pop(next(iter(self._price_cache)))
         return price_data, dates
 
     # -------------------------------------------------

@@ -131,6 +131,22 @@ class AccumulationAnalyzer:
                         - relativedelta(months=WINDOW_SYNTH_TARGET_CASES * self.step_months))
             roll_start = min(self.data_start, extended)
 
+        # P0-1: 윈도우마다 price_loader.load(DB read+reindex+ffill)를 재실행하던 것을
+        # [roll_start, data_end] 1회 로드 후 윈도우 슬라이스로 대체(WithdrawalAnalyzer 모범 패턴).
+        # 합성 보충(per-window synthetic) 경로는 제외 — 윈도우별 독립 생성이라 그대로 둔다.
+        self._full_pd = None
+        self._full_dates = None
+        if not (self.use_synthetic and self.synthetic_params):
+            try:
+                self._full_pd, self._full_dates = self.portfolio_engine.price_loader.load(
+                    self.tickers,
+                    roll_start.strftime("%Y-%m-%d"),
+                    self.data_end.strftime("%Y-%m-%d"),
+                    allow_synthetic=self.use_synthetic,
+                )
+            except Exception:
+                self._full_pd = None
+
         total_cases = self._estimate_total_cases(roll_start) if self.progress_callback else 0
         start_time  = time.time()
         cases, cur, run_id = [], roll_start, 1
@@ -166,6 +182,8 @@ class AccumulationAnalyzer:
                 try:
                     if self.use_synthetic and self.synthetic_params:
                         price_data, dates = self._load_with_per_window_synthetic(cur, end)
+                    elif self._full_pd is not None:
+                        price_data, dates = self._slice_window(cur, end)
                     else:
                         price_data, dates = self.portfolio_engine.price_loader.load(
                             self.tickers,
@@ -265,6 +283,16 @@ class AccumulationAnalyzer:
             run_id += 1
         return cases
 
+    def _slice_window(self, start_ts, end_ts):
+        """P0-1: 사전 로드한 전체 프레임에서 [start_ts, end_ts] 윈도우를 슬라이스.
+        per-window price_loader.load와 동일 결과(이미 union·reindex·ffill된 전체에서 잘라냄).
+        WithdrawalAnalyzer._run_wd_case와 같은 슬라이싱 방식."""
+        dates = [d for d in self._full_dates if start_ts <= d <= end_ts]
+        price_data = {
+            ticker: df.loc[(df.index >= start_ts) & (df.index <= end_ts)]
+            for ticker, df in self._full_pd.items()
+        }
+        return price_data, dates
 
     def _run_isa_renewal_cycle(
         self,
@@ -302,6 +330,8 @@ class AccumulationAnalyzer:
             try:
                 if self.use_synthetic and self.synthetic_params:
                     price_data, dates = self._load_with_per_window_synthetic(current_start, cycle_end)
+                elif self._full_pd is not None:
+                    price_data, dates = self._slice_window(current_start, cycle_end)
                 else:
                     price_data, dates = self.portfolio_engine.price_loader.load(
                         self.tickers,
@@ -356,6 +386,8 @@ class AccumulationAnalyzer:
             try:
                 if self.use_synthetic and self.synthetic_params:
                     price_data, dates = self._load_with_per_window_synthetic(current_start, rem_end)
+                elif self._full_pd is not None:
+                    price_data, dates = self._slice_window(current_start, rem_end)
                 else:
                     price_data, dates = self.portfolio_engine.price_loader.load(
                         self.tickers,

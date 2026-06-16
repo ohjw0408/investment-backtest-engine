@@ -8,6 +8,25 @@
 
 ---
 
+## ▶ 진행 현황 (2026-06-16, Claude)
+
+**선행(골든마스터+벤치) + P0 + P1 = 전부 완료·결과불변 검증.** 미배포(로컬 커밋, 오너 배포 결정 대기).
+
+- ✅ **선행: 골든마스터+벤치 하니스** `scripts/perf_golden.py` (+ `tests/golden/perf_golden.json`). DB·네트워크 0 — 결정론 합성가격 `_FakeLoader`를 PortfolioEngine에 주입해 **실제 load/get_price 경로** 구동. 대표 4종(accum 단일/2종목세금·multi 2계좌세금·withdrawal). `save`로 스냅샷, `check`로 ±tol(rel 1e-9) 비교 + wall-time. BBB 종목 2000 시작 = union/ffill 경계 커버. **각 최적화 후 `check` = 전부 결과불변 PASS.**
+- ✅ **P0-1 AccumulationAnalyzer**: 윈도우마다 `price_loader.load` 재실행 → `[roll_start,data_end]` 1회 로드 + `_slice_window`(WithdrawalAnalyzer 모범패턴). 합성 보충·ISA 풍차 경로도 동일 슬라이스 적용(합성 prefix는 제외). 결과불변.
+- ✅ **P0-2 MultiAccountAnalyzer**: 동일 패턴. 단 **주입 price_provider 경로(tax-switch·테스트)는 제외**(윈도우별 date-range 의미 상이) — 프로덕션 `price_loader.load` 경로만. 결과불변.
+- ✅ **P1-1 Pool 1 vCPU 가드(WithdrawalAnalyzer)**: `_effective_workers()`(cpu_count + `SIM_MAX_WORKERS` 상한). 워커=1이면 **인프로세스 순차**(Pool 미생성 → full_price_data 복제·fork 제거, OOM 방지). >1이면 Pool. 결과불변(`SIM_MAX_WORKERS=1`로도 동일 확인).
+- ✅ **P1-2 per-day 멤버십 테스트 제거(simulation_loop.py)**: `date not in valid_index[ticker]`는 전 종목 union reindex로 **항상 True인 死코드**(프로덕션은 effective_start 공통 → NaN도 없음). NaN-check로 바꾸지 않고(late-start NaN 흐름 보존) **제거** = 순수 속도이득. 공유 엔진 — 백테·배당·멀티·인출 소비자 타겟 회귀 PASS.
+- ✅ **P1-3 엔진 가격캐시 LRU 상한(portfolio_engine)**: `_price_cache` 상한 8 + 초과 시 최老 축출. ISA 풍차(run_simulation) 무한증식 방지. 순수 메모이제이션 → 결과불변.
+
+**실측(하니스, 로컬 멀티코어):** accum_single 1.14×·accum_dual_tax 1.21×·multi 1.02×·withdrawal 1.0×. ⚠️ **하니스의 get_price는 인메모리라 절대속도는 실제보다 과소** — 프로덕션 get_price는 sqlite+merge+FX로 윈도우당 0.3~0.8s라 **P0 실이득(중복 DB read 제거)은 5~20×로 훨씬 큼**. 하니스 목적 = 절대속도 아닌 **결과불변 증명**(달성).
+
+**회귀:** 변경 모듈 타겟 테스트 누계 ~190+ PASS(accum·multi·withdrawal·ISA·합성·tax-switch·fee·배당·백테 소비자). 전체 pytest는 오너 지시상 미실행(공유 엔진이라 필요시 오너 확인).
+
+**남은 작업 = P2(I/O ThreadPool: C3 겹쳐보기·watchlist·gap-fill)·P3(후처리·합성벡터화·fast-path).** P2/P3은 네트워크/데이터경로라 **골든마스터로 검증 불가 → 라이브 서버 배포 + 지수곡선 대조 필요**(별도 검증 regime). 오너 결정: 위 P0+P1 배포 여부 + P2 착수 여부.
+
+---
+
 ## 0. 1 vCPU / 4GB가 의미하는 것 (전략 토대)
 
 - **CPU-bound 코드(시뮬 루프·세금·통계)**: 코어가 1개 → **스레드·멀티프로세스로 빨라지지 않는다**(GIL + 단일 코어). 오히려:

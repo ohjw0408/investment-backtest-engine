@@ -295,6 +295,22 @@ class MultiAccountAnalyzer:
         else:
             roll_start = self.data_start
 
+        # P0-2: 윈도우마다 _load_prices(price_loader.load = DB read+reindex+ffill)를 재실행하던 것을
+        # [data_start, data_end] 1회 로드 후 윈도우 슬라이스로 대체(WithdrawalAnalyzer 모범 패턴).
+        # 주입 price_provider 경로(tax-switch·테스트)는 윈도우별 date-range 의미가 달라 제외 —
+        # 프로덕션 price_loader.load 경로만 최적화. cur<data_start 합성 prefix 윈도우도 제외.
+        self._full_pd = None
+        self._full_dates = None
+        if self.price_provider is None:
+            try:
+                self._full_pd, self._full_dates = self._load_prices(
+                    self._all_tickers(),
+                    self.data_start.strftime("%Y-%m-%d"),
+                    self.data_end.strftime("%Y-%m-%d"),
+                )
+            except Exception:
+                self._full_pd = None
+
         total_cases = self._estimate_total_cases(roll_start) if self.progress_callback else 0
         start_time = time.time()
         cases: list[dict[str, Any]] = []
@@ -310,6 +326,8 @@ class MultiAccountAnalyzer:
             try:
                 if self._synth_params and cur < self.data_start:
                     price_data, dates = self._load_window_synthetic(all_tickers, cur, end)
+                elif self._full_pd is not None:
+                    price_data, dates = self._slice_window(cur, end)
                 else:
                     price_data, dates = self._load_prices(
                         all_tickers,
@@ -469,6 +487,16 @@ class MultiAccountAnalyzer:
             run_id += 1
 
         return cases
+
+    def _slice_window(self, start_ts, end_ts):
+        """P0-2: 사전 로드한 전체 프레임에서 [start_ts, end_ts] 윈도우를 슬라이스.
+        per-window _load_prices(price_loader.load)와 동일 결과(이미 union·reindex·ffill됨)."""
+        dates = [d for d in self._full_dates if start_ts <= d <= end_ts]
+        price_data = {
+            ticker: df.loc[(df.index >= start_ts) & (df.index <= end_ts)]
+            for ticker, df in self._full_pd.items()
+        }
+        return price_data, dates
 
     def _all_tickers(self) -> list[str]:
         seen = []

@@ -4,6 +4,11 @@
 >
 > 🔵 **다음 후보: PHASE4 잔여 = D1 · D2 · C2 · B4** (C1·A4·D4 완료).
 
+## [2026-06-16] fix | 성능 P1-1 토폴로지 정정 (2 vCPU + Celery concurrency=2)
+
+오너 지적: 실서버 = **2 vCPU + Celery worker concurrency=2**(`worker_prefetch_multiplier=1`=2동시+대기열). 플랜의 "1 vCPU"가 부정확 — config(서버 systemd `domino-celery.service`, repo 미포함) 실독 안 하고 플랜 문구 신뢰한 실수. **P1-1 `_effective_workers()`가 서버서 `min(cpu_count,6)`=2→Pool(2) 오작동**: 동시 2요청 시 2(Celery)+4(Pool) 프로세스가 2코어 경합 + `full_price_data` 4벌 복제 → 4GB OOM. **수정**: 기본=인프로세스(1), `SIM_MAX_WORKERS>1` 명시 시에만 Pool(비-Celery 다코어 배치용). 전략 결론(per-request 인프로세스)은 동일, 임계값만 정정. 검증=골든 불변(기본·`=2` 둘 다) + withdrawal 회귀 18 PASS. 권장=worker service 파일 repo 커밋(가시성).
+_작성: Claude_
+
 ## [2026-06-16] perf | 성능 최적화 P2 (I/O ThreadPool) 구현
 
 오너 "지금 배포 + P2 전체 착수"(P0+P1은 927e8eb 배포완료). I/O-bound 병렬화 — CPU-bound 아니라 1코어도 이득.

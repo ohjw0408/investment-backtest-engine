@@ -20,16 +20,18 @@ N_WORKERS    = min(os.cpu_count() or 2, 6)
 
 
 def _effective_workers() -> int:
-    """P1-1: 1 vCPU에서 Pool은 역효과(속도이득0 + full_price_data 프로세스 복제 → OOM).
-    유효 워커 수를 cpu_count와 SIM_MAX_WORKERS 상한으로 산출. 1이면 호출측이 인프로세스 실행."""
-    cap = N_WORKERS
+    """P1-1: 배포 = 2 vCPU + Celery worker concurrency=2(worker_prefetch_multiplier=1, 대기열).
+    요청 병렬성은 Celery가 이미 코어 수만큼 제공 → 요청 1건 안에서 Pool을 또 띄우면 동시 2요청 시
+    2(Celery)+4(Pool) 프로세스가 2코어 경합(오버서브스크립션) + full_price_data 프로세스 복제로
+    4GB OOM. 따라서 **기본 = 인프로세스(1)**. SIM_MAX_WORKERS>1로 명시할 때만 Pool 사용
+    (비-Celery·다코어 배치 스크립트 전용). 1이면 호출측이 인프로세스 실행."""
     env = os.environ.get("SIM_MAX_WORKERS")
     if env:
         try:
-            cap = min(cap, max(1, int(env)))
+            return max(1, min(int(env), N_WORKERS))
         except ValueError:
             pass
-    return max(1, cap)
+    return 1
 
 # ── 워커 전역 변수 ────────────────────────────────────────
 _w_price_data: dict = {}
@@ -287,14 +289,15 @@ class WithdrawalAnalyzer:
             for s, e, rid in windows
         ]
 
-        # 4. 실행 — 워커>1이면 Pool 병렬, 1이면(1 vCPU) 인프로세스 순차(P1-1).
+        # 4. 실행 — 기본 인프로세스 순차(P1-1, Celery concurrency가 요청 병렬성 제공).
+        #    SIM_MAX_WORKERS>1 명시 시에만 Pool 병렬(비-Celery 다코어 배치용).
         import time as _t
         _start  = _t.time()
         total   = len(task_args)
         workers = _effective_workers()
 
         if workers <= 1:
-            # 1 vCPU: Pool 생성 안 함 — full_price_data 복제·fork 오버헤드 회피, 속도는 동일.
+            # Pool 생성 안 함 — full_price_data 프로세스 복제·fork·코어 경합 회피, 결과 동일.
             _init_wd_worker(full_price_data, all_dates)
             raw_results = []
             for completed, a in enumerate(task_args, 1):

@@ -8,6 +8,12 @@
 
 ---
 
+## ⚠️ 토폴로지 정정 (2026-06-16, 오너 지적)
+
+**실서버 = 2 vCPU + 4GB. 메인엔진 = Celery worker concurrency=2**(`worker_prefetch_multiplier=1` → 2 동시처리, 초과분 대기열). 본 플랜 본문의 "1 vCPU"는 부정확. **단 전략 결론은 동일**: 요청 병렬성은 Celery가 **이미 코어 수만큼** 제공 → CPU-bound 시뮬은 요청 안에서 추가 병렬(multiprocessing.Pool) 띄우면 오버서브스크립션 + RAM 복제 → **per-request 인프로세스가 정답**. (worker concurrency는 서버 systemd `domino-celery.service`에만 있고 repo 미포함 → 코드만 읽고는 안 보임. 가시성 위해 repo 커밋 권장.)
+
+→ **P1-1 수정**: `_effective_workers()` 기본을 인프로세스(1)로(과거 `min(cpu_count,6)`=서버서 2→Pool(2) 오작동). `SIM_MAX_WORKERS>1` 명시 시에만 Pool. 골든 불변 확인(기본·`=2` 둘 다).
+
 ## ▶ 진행 현황 (2026-06-16, Claude)
 
 **선행(골든마스터+벤치) + P0 + P1 = 전부 완료·결과불변 검증.** 미배포(로컬 커밋, 오너 배포 결정 대기).

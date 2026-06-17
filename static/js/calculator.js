@@ -750,6 +750,8 @@ function renderResult(data, payload) {
   document.getElementById('resultContent').style.display = 'block';
   _lastCalcResult = data;
 
+  renderCalcAttribution();
+
   // 에러/경고 배너 초기화
   ['accountRestrictBanner', 'isaLimitErrorBanner', 'isaCapBanner'].forEach(id => {
     const el = document.getElementById(id);
@@ -1426,4 +1428,48 @@ function calcDownloadImg() {
     a.download = 'simulation-result.png';
     a.click();
   });
+}
+
+// ── 종목별 상승 견인 / 하락 방어 (롤링 분포) ──
+async function renderCalcAttribution() {
+  const card = document.getElementById('calcAttrCard');
+  const body = document.getElementById('calcAttrBody');
+  if (!card) return;
+  const tk = (tickers || []).filter(t => (t.weight || 0) > 0).map(t => ({ code: t.code, weight: t.weight }));
+  if (tk.length < 2) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  body.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">계산 중…</div>';
+  try {
+    const j = await (await fetch('/api/attribution/rolling', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tickers: tk })
+    })).json();
+    if (!j.ok || !j.attribution) { card.style.display = 'none'; return; }
+    calcAttrRender(j.attribution);
+  } catch (e) { card.style.display = 'none'; }
+}
+
+function calcAttrRender(a) {
+  const codes = Object.keys(a.up);
+  const nm = a.names || {};
+  const ce = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  // 상승 견인 평균 큰 순
+  codes.sort((x, y) => a.up[y].mean - a.up[x].mean);
+  const grn = 'var(--green,#2E7D32)', blu = 'var(--blue)', mut = 'var(--text-muted)';
+  let html = `<div style="font-size:0.78rem;color:${mut};margin-bottom:8px;">롤링 ${a.windows}개 구간 평균 · 값=비중×수익 기여(%p) · 괄호=p25~p75</div>`;
+  html += `<table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+    <tr style="color:${mut};font-size:0.76rem;text-align:right;">
+      <th style="text-align:left;padding:6px 4px;">종목</th>
+      <th style="padding:6px 4px;">📈 상승 견인</th>
+      <th style="padding:6px 4px;">🛡️ 하락 방어</th></tr>`;
+  html += codes.map(c => {
+    const u = a.up[c], d = a.down[c];
+    return `<tr style="border-top:1px solid var(--border);text-align:right;">
+      <td style="text-align:left;padding:7px 4px;font-weight:700;">${ce(nm[c] || c)}<div style="font-size:0.72rem;color:${mut};font-weight:400;">${ce(c)}</div></td>
+      <td style="padding:7px 4px;color:${grn};font-weight:700;">+${u.mean.toFixed(2)}%p<div style="font-size:0.72rem;color:${mut};font-weight:400;">${u.p25.toFixed(2)}~${u.p75.toFixed(2)}</div></td>
+      <td style="padding:7px 4px;color:${d.mean>=0?grn:blu};font-weight:700;">${d.mean>=0?'+':''}${d.mean.toFixed(2)}%p<div style="font-size:0.72rem;color:${mut};font-weight:400;">${d.p25.toFixed(2)}~${d.p75.toFixed(2)}</div></td>
+    </tr>`;
+  }).join('');
+  html += '</table><div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">🛡️ 하락 방어 = 하락장 구간 기여. 0에 가깝거나 +일수록 잘 버틴 자산.</div>';
+  document.getElementById('calcAttrBody').innerHTML = html;
 }

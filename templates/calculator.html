@@ -421,6 +421,13 @@
         </div>
       </div>
 
+      <!-- 종목별 상승 견인 / 하락 방어 (롤링 분포) -->
+      <div class="result-card" id="calcAttrCard" style="display:none;margin-top:14px;">
+        <div class="result-card-title">🧩 종목별 상승 견인 · 하락 방어 (평균)</div>
+        <div class="result-card-desc">과거 롤링 구간들에서 종목이 상승장엔 얼마나 견인하고 하락장엔 얼마나 버텼는지 평균이에요. (원화 기준)</div>
+        <div id="calcAttrBody"></div>
+      </div>
+
     </div>
   </div>
 
@@ -431,5 +438,5 @@
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260613feecard2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260614fan5"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260617attr"></script>
 {% endblock %}

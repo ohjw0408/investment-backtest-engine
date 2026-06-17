@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-17] feature | 기여도 분석 (상승 견인 · 하락 방어 지분)
+
+종목별 수익 기여 분해(비중×수익, 부호 가법). 원화 기준(환율 포함).
+
+- 엔진 `modules/attribution.py`(analyze_window/regime/rolling). 14 PASS.
+- 내 자산: 텍스트 요약(견인 지분%/방어). `/api/myassets/attribution`.
+- 백테스트: 값 그래프 가로 드래그→그 구간 다이버징 막대+지분%. `/api/attribution/window`.
+- 투자계산기: 롤링 168윈도우 분포 표(평균±p25~p75). `/api/attribution/rolling`.
+- 실측: 2022 TLT 낙폭 96%(원화 환헤지로 SPY 선방) 등. 라이브 배포.
+
 ## [2026-06-17] feature | 저장 포트폴리오 = 일일 리밸 수익 추종 + 포폴 알림/즐겨찾기
 
 오너 정정: 저장 포폴 알림 = 개별종목/리밸런싱 아님 → **전체 포폴 수익률**(매일 리밸 가정).

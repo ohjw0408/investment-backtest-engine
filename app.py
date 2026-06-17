@@ -1226,6 +1226,28 @@ def attribution_window():
     return jsonify({'ok': True, 'attribution': res})
 
 
+@app.route('/api/attribution/rolling', methods=['POST'])
+def attribution_rolling():
+    """투자계산기 — 롤링 윈도우별 상승기여·하락방어 분포(평균). 비로그인 허용."""
+    body = request.get_json(silent=True) or {}
+    tk = body.get('tickers') or []
+    codes, weights = [], {}
+    for t in tk:
+        c = str(t.get('code', '')).upper()
+        if c:
+            codes.append(c)
+            weights[c] = float(t.get('weight') or 0)
+    if len(codes) < 2:
+        return jsonify({'ok': False, 'reason': 'need 2+ tickers'})
+    from modules import attribution
+    res = attribution.analyze_rolling(portfolio_engine.loader, codes, weights)
+    if not res:
+        return jsonify({'ok': False, 'reason': 'no_data'})
+    names = _resolve_names(codes)
+    res['names'] = {c: names.get(c, c) for c in codes}
+    return jsonify({'ok': True, 'attribution': res})
+
+
 @app.route('/api/myassets/attribution')
 def myassets_attribution():
     """내 자산 — 상승 견인/하락 방어 종목 요약(보유 비중 기준, 최근 6년)."""

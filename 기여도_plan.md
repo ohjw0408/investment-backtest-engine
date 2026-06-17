@@ -1,6 +1,18 @@
 # 기여도(Attribution) 분석 plan
 
-작성: 2026-06-17. Owner 요청. 상태: 📋 계획 + 착수.
+작성: 2026-06-17. Owner 요청. 상태: ✅ **전체 구현·배포(2026-06-17).**
+
+## ▶ 완료 기록 (2026-06-17)
+
+- 엔진 `modules/attribution.py` — aligned_series(date컬럼 정렬)·daily_returns·regime_masks·
+  contributions·shares + analyze_window/regime/rolling. 단위테스트 14 PASS. **원화 기준(apply_fx)** = 환율 포함 실수익.
+- **내 자산**: `/api/myassets/attribution`(보유 비중) → 자산현황 탭 텍스트(지분% 중심). 견인/방어 1줄씩.
+- **백테스트**: 값 추이 그래프 가로 드래그(chartjs-zoom) → `/api/attribution/window` → 다이버징 막대+지분%. 구간 해제 버튼.
+- **투자계산기**: `/api/attribution/rolling`(롤링 168윈도우) → 결과 하단 표(상승 견인/하락 방어 평균±p25~p75).
+- 실시세 검증: SPY/TLT — 2022구간 TLT 낙폭 96%, 롤링 SPY 견인/TLT 방어 우위. 전부 라이브 배포.
+
+---
+
 
 ## 목적
 

@@ -1202,6 +1202,48 @@ def _portfolio_quote(uid, pid):
     }
 
 
+@app.route('/api/myassets/attribution')
+def myassets_attribution():
+    """내 자산 — 상승 견인/하락 방어 종목 요약(보유 비중 기준, 최근 6년)."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    from datetime import datetime as _dt, timedelta as _td
+    holdings = get_holdings(uid)
+    today = _dt.today().strftime('%Y-%m-%d')
+    start = (_dt.today() - _td(days=20)).strftime('%Y-%m-%d')
+    weights, total = {}, 0.0
+    for h in holdings:
+        qty = h.get('quantity') or 0
+        if qty <= 0:
+            continue
+        code = str(h.get('code', '')).upper()
+        mp = h.get('manual_price')
+        if mp is not None:
+            price = mp
+        else:
+            try:
+                df = portfolio_engine.loader.get_price(code, start, today, apply_fx=True)
+                price = float(df['close'].iloc[-1]) if df is not None and not df.empty else 0.0
+            except Exception:
+                price = 0.0
+        val = qty * (price or 0)
+        if val > 0:
+            weights[code] = weights.get(code, 0.0) + val
+            total += val
+    if total <= 0 or len(weights) < 2:
+        return jsonify({'ok': False, 'reason': 'insufficient'})
+    from modules import attribution
+    res = attribution.analyze_regime(portfolio_engine.loader, list(weights.keys()), weights)
+    if not res:
+        return jsonify({'ok': False, 'reason': 'no_data'})
+    names = _resolve_names(list(weights.keys()))
+    for key in ('up_driver', 'down_defender'):
+        if res.get(key):
+            res[key]['name'] = names.get(res[key]['code'], res[key]['code'])
+    return jsonify({'ok': True, 'attribution': res})
+
+
 @app.route('/api/home-config/add-portfolio', methods=['POST'])
 def home_add_portfolio():
     """저장 포트폴리오를 홈 위젯(즐겨찾기)에 추종 항목으로 추가."""

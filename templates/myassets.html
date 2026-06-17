@@ -187,6 +187,12 @@
       </div>
     </div>
 
+    <div class="ma-card" id="attrCard" style="display:none;">
+      <div class="ma-card-title">🛡️ 상승 견인 · 하락 방어</div>
+      <div id="attrBody" style="font-size:0.92rem;line-height:1.7;"></div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">* 최근 6년·보유 비중 기준. 종목 기여 = 비중 × 수익. 시세 15분 지연.</div>
+    </div>
+
     <div class="ma-card">
       <div class="ma-card-title" style="display:flex;align-items:center;justify-content:space-between;">
         <span>📊 자산 추이</span>
@@ -417,6 +423,35 @@ async function loadAll() {
   renderHoldings();
   renderSummary();
   renderGroupOptions();
+  loadAttribution();
+}
+
+// ── 상승 견인 · 하락 방어 요약 ──
+async function loadAttribution() {
+  const card = document.getElementById('attrCard');
+  const body = document.getElementById('attrBody');
+  if (!card) return;
+  try {
+    const j = await (await fetch('/api/myassets/attribution', { cache: 'no-store' })).json();
+    if (!j.ok || !j.attribution) { card.style.display = 'none'; return; }
+    const a = j.attribution;
+    const up = a.up_driver, dn = a.down_defender;
+    let html = '';
+    if (up) html += `📈 상승장 상승의 <b style="color:var(--green,#2E7D32)">${Math.round(up.share)}%</b>는 <b>${maEsc(up.name)}</b> 이(가) 견인했어요`;
+    if (up && dn) html += '<br>';
+    if (dn) {
+      if (dn.contrib >= 0)
+        html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 오히려 <b style="color:var(--blue)">+${dn.contrib.toFixed(1)}%p</b> 방어(헤지)했어요`;
+      else
+        html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 낙폭의 <b style="color:var(--blue)">${Math.round(Math.abs(dn.share))}%</b>만 차지하며 가장 잘 버텼어요`;
+    }
+    body.innerHTML = html || '데이터가 부족해요.';
+    card.style.display = '';
+  } catch (e) { card.style.display = 'none'; }
+}
+
+function maEsc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
 // ── 새로고침 (서버 공유 캐시 15분 floor — 더 자주 눌러도 같은 값) ──

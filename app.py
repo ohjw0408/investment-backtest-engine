@@ -1226,9 +1226,9 @@ def attribution_window():
     return jsonify({'ok': True, 'attribution': res})
 
 
-@app.route('/api/attribution/rolling', methods=['POST'])
-def attribution_rolling():
-    """투자계산기 — 롤링 윈도우별 상승기여·하락방어 분포(평균). 비로그인 허용."""
+@app.route('/api/attribution/capture', methods=['POST'])
+def attribution_capture():
+    """투자계산기 — 비중 무관 상승/하락 포착률(방어력). 비로그인 허용."""
     body = request.get_json(silent=True) or {}
     tk = body.get('tickers') or []
     codes, weights = [], {}
@@ -1240,7 +1240,7 @@ def attribution_rolling():
     if len(codes) < 2:
         return jsonify({'ok': False, 'reason': 'need 2+ tickers'})
     from modules import attribution
-    res = attribution.analyze_rolling(portfolio_engine.loader, codes, weights)
+    res = attribution.analyze_capture(portfolio_engine.loader, codes, weights)
     if not res:
         return jsonify({'ok': False, 'reason': 'no_data'})
     names = _resolve_names(codes)
@@ -1280,14 +1280,24 @@ def myassets_attribution():
     if total <= 0 or len(weights) < 2:
         return jsonify({'ok': False, 'reason': 'insufficient'})
     from modules import attribution
-    res = attribution.analyze_regime(portfolio_engine.loader, list(weights.keys()), weights)
-    if not res:
+    cap = attribution.analyze_capture(portfolio_engine.loader, list(weights.keys()), weights, years=6)
+    if not cap or not cap.get('assets'):
         return jsonify({'ok': False, 'reason': 'no_data'})
     names = _resolve_names(list(weights.keys()))
-    for key in ('up_driver', 'down_defender'):
-        if res.get(key):
-            res[key]['name'] = names.get(res[key]['code'], res[key]['code'])
-    return jsonify({'ok': True, 'attribution': res})
+    A = cap['assets']
+    # 견인 = 상승장 기여(비중×수익) 최대 / 방어 = 하락 포착률 최소(덜 빠짐)
+    driver_code = max(A, key=lambda c: A[c]['contrib_up'])
+    defender_code = min(A, key=lambda c: (A[c]['down_capture']
+                                          if A[c]['down_capture'] is not None else 9e9))
+    out = {
+        'period': cap['period'], 'n_up': cap['n_up'], 'n_down': cap['n_down'],
+        'up_driver': {'code': driver_code, 'name': names.get(driver_code, driver_code),
+                      'contrib': A[driver_code]['contrib_up']},
+        'down_defender': {'code': defender_code, 'name': names.get(defender_code, defender_code),
+                          'down_capture': A[defender_code]['down_capture'],
+                          'down_ret': A[defender_code]['down_ret']},
+    }
+    return jsonify({'ok': True, 'attribution': out})
 
 
 @app.route('/api/home-config/add-portfolio', methods=['POST'])

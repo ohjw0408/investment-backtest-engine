@@ -375,6 +375,13 @@
           <span>🧩 구간 기여 지분 <span id="btAttrRange" style="font-weight:400;color:var(--text-muted);font-size:0.76rem;"></span></span>
           <button onclick="btAttrReset()" style="padding:4px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text-muted);font-size:0.76rem;font-weight:700;cursor:pointer;">구간 해제</button>
         </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+          <input type="date" id="btAttrStart" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:0.82rem;">
+          <span style="color:var(--text-muted);">~</span>
+          <input type="date" id="btAttrEnd" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:0.82rem;">
+          <button onclick="btAttrManual()" style="padding:7px 14px;border:none;border-radius:8px;background:var(--blue);color:#fff;font-size:0.82rem;font-weight:700;cursor:pointer;">이 구간 분석</button>
+          <span style="font-size:0.74rem;color:var(--text-muted);">· 또는 위 그래프를 드래그</span>
+        </div>
         <div id="btAttrBody"></div>
       </div>
 
@@ -1203,6 +1210,17 @@ function renderValueChart(history) {
   const values = history.map(h => h.portfolio_value);
   const invested = history.map(h => h.total_invested);
   _btAttrLabels = labels;
+  // 구간 기여 카드 표시 + 날짜 프리필(모바일=드래그 안 되므로 수동 입력 가능)
+  if (labels.length > 1 && btTickers.length >= 2) {
+    const card = document.getElementById('btAttrCard');
+    if (card) {
+      card.style.display = '';
+      const s = document.getElementById('btAttrStart'), e = document.getElementById('btAttrEnd');
+      if (s && e) { s.min = e.min = labels[0]; s.max = e.max = labels[labels.length-1]; s.value = labels[0]; e.value = labels[labels.length-1]; }
+      document.getElementById('btAttrBody').innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">그래프를 드래그하거나 날짜를 골라 구간을 정하면 종목별 기여 지분이 나와요.</div>';
+      document.getElementById('btAttrRange').textContent = '';
+    }
+  }
 
   btCharts.value = new Chart(document.getElementById('btValueChart').getContext('2d'), {
     type: 'line',
@@ -1261,6 +1279,8 @@ async function btAttrAnalyze(start, end) {
   if (!btTickers.length) return;
   card.style.display = '';
   document.getElementById('btAttrRange').textContent = `(${start} ~ ${end})`;
+  const si = document.getElementById('btAttrStart'), ei = document.getElementById('btAttrEnd');
+  if (si) si.value = start; if (ei) ei.value = end;
   bodyEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:10px;">계산 중…</div>';
   try {
     const j = await (await fetch('/api/attribution/window', {
@@ -1297,7 +1317,9 @@ function btAttrRender(a) {
 
 function btAttrReset() {
   if (btCharts.value && btCharts.value.resetZoom) btCharts.value.resetZoom();
-  document.getElementById('btAttrCard').style.display = 'none';
+  if (btCharts.drawdown && btCharts.drawdown.resetZoom) btCharts.drawdown.resetZoom();
+  document.getElementById('btAttrRange').textContent = '';
+  document.getElementById('btAttrBody').innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">그래프를 드래그하거나 날짜를 골라 구간을 정하면 종목별 기여 지분이 나와요.</div>';
 }
 
 function btE(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
@@ -1464,6 +1486,18 @@ function renderDrawdownChart(history) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: {
         callbacks: { label: ctx => ctx.parsed.y.toFixed(2) + '%' }
+      },
+      zoom: {
+        zoom: {
+          drag: { enabled: true, backgroundColor: 'rgba(198,40,40,0.15)' },
+          mode: 'x',
+          onZoomComplete: ({ chart }) => {
+            const x = chart.scales.x;
+            const i0 = Math.max(0, Math.round(x.min));
+            const i1 = Math.min(_btAttrLabels.length - 1, Math.round(x.max));
+            if (i1 - i0 >= 1) btAttrAnalyze(_btAttrLabels[i0], _btAttrLabels[i1]);
+          }
+        }
       }},
       scales: {
         x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
@@ -1471,6 +1505,13 @@ function renderDrawdownChart(history) {
       }
     }
   });
+}
+
+function btAttrManual() {
+  const s = document.getElementById('btAttrStart').value;
+  const e = document.getElementById('btAttrEnd').value;
+  if (!s || !e || s >= e) { alert('시작일이 종료일보다 앞서야 해요.'); return; }
+  btAttrAnalyze(s, e);
 }
 
 // ── 분할매도 절세 패널 업데이트 (Phase 2e) ──

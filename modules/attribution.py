@@ -144,6 +144,47 @@ def analyze_regime(loader, codes, weights, years=6, apply_fx=True):
     }
 
 
+def _mean(vals):
+    return sum(vals) / len(vals) if vals else 0.0
+
+
+def analyze_capture(loader, codes, weights, years=20, start=None, end=None, apply_fx=True):
+    """비중 무관 상승/하락 포착률 — '방어력'을 직관적으로.
+
+    down_capture = (종목 하락장 평균 일수익) / (포폴 하락장 평균 일수익)
+      <1 덜 빠짐(방어↑), <0 헤지(오히려 오름), >1 더 빠짐.
+    up_capture = 상승장 동일. 높을수록 상승 견인.
+    포폴 하락/상승장 = 포폴 자체 일간 등락 기준.
+    """
+    if not start or not end:
+        end = datetime.today().strftime("%Y-%m-%d")
+        start = (datetime.today() - timedelta(days=int(years * 365))).strftime("%Y-%m-%d")
+    dates, series = aligned_series(loader, codes, start, end, apply_fx=apply_fx)
+    if not series:
+        return None
+    pdates, rets = daily_returns(dates, series)
+    if not pdates:
+        return None
+    up, down, port = regime_masks(rets, weights)
+    port_up = _mean([port[t] for t in up])
+    port_down = _mean([port[t] for t in down])
+    w = _norm_weights(weights, list(rets.keys()))
+    assets = {}
+    for c in rets:
+        up_ret = _mean([rets[c][t] for t in up])
+        down_ret = _mean([rets[c][t] for t in down])
+        assets[c] = {
+            "up_ret": up_ret * 100.0, "down_ret": down_ret * 100.0,
+            "up_capture": (up_ret / port_up) if port_up else None,
+            "down_capture": (down_ret / port_down) if port_down else None,
+            # 견인 지분(비중×수익 누적, %p) — 누가 포폴 상승/하락을 끌었나
+            "contrib_up": w[c] * sum(rets[c][t] for t in up) * 100.0,
+            "contrib_down": w[c] * sum(rets[c][t] for t in down) * 100.0,
+        }
+    return {"period": [pdates[0], pdates[-1]], "n_up": len(up), "n_down": len(down),
+            "port_up": port_up * 100.0, "port_down": port_down * 100.0, "assets": assets}
+
+
 def _percentile(vals, p):
     if not vals:
         return 0.0

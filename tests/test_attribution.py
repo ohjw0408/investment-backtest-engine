@@ -59,6 +59,16 @@ roll = at.analyze_rolling(loader, ["GRW", "DEF"], W, window_days=2, step=1, year
 ok("rolling windows>0", roll["windows"] > 0)
 ok("rolling 구조(up/down mean)", "mean" in roll["up"]["GRW"] and "mean" in roll["down"]["DEF"])
 
+# capture: 비중 무관 방어력 (DEF가 GRW보다 덜 빠짐 → down_capture 작아야)
+cap = at.analyze_capture(loader, ["GRW", "DEF"], W, start=D[0], end=D[-1])
+ga, da = cap["assets"]["GRW"], cap["assets"]["DEF"]
+ok("DEF down_capture < GRW (방어 우위)", da["down_capture"] < ga["down_capture"],
+   f"GRW={ga['down_capture']:.2f} DEF={da['down_capture']:.2f}")
+ok("GRW up_capture > DEF (견인 우위)", ga["up_capture"] > da["up_capture"])
+cap2 = at.analyze_capture(loader, ["GRW", "DEF"], {"GRW": 80, "DEF": 20}, start=D[0], end=D[-1])
+ok("방어 순위 비중무관(80/20에서도 DEF 우위)",
+   cap2["assets"]["DEF"]["down_capture"] < cap2["assets"]["GRW"]["down_capture"])
+
 # 빈 데이터 방어
 ok("빈 종목 → None", at.analyze_window(FakeLoader({}), ["X"], {"X": 100}, D[0], D[-1]) is None)
 

@@ -437,13 +437,16 @@ async function loadAttribution() {
     const a = j.attribution;
     const up = a.up_driver, dn = a.down_defender;
     let html = '';
-    if (up) html += `📈 상승장 상승의 <b style="color:var(--green,#2E7D32)">${Math.round(up.share)}%</b>는 <b>${maEsc(up.name)}</b> 이(가) 견인했어요`;
+    if (up) html += `📈 상승장에선 <b>${maEsc(up.name)}</b> 이(가) 가장 많이 끌어올렸어요 <span style="color:var(--text-muted);font-size:0.82rem;">(기여 +${up.contrib.toFixed(1)}%p)</span>`;
     if (up && dn) html += '<br>';
     if (dn) {
-      if (dn.contrib >= 0)
-        html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 오히려 <b style="color:var(--blue)">+${dn.contrib.toFixed(1)}%p</b> 방어(헤지)했어요`;
+      const dc = dn.down_capture;
+      if (dc == null)
+        html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 가장 잘 버텼어요`;
+      else if (dc < 0)
+        html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 오히려 올라 <b style="color:var(--blue)">헤지</b> 역할을 했어요`;
       else
-        html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 낙폭의 <b style="color:var(--blue)">${Math.round(Math.abs(dn.share))}%</b>만 차지하며 가장 잘 버텼어요`;
+        html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 가장 잘 버텼어요 <span style="color:var(--text-muted);font-size:0.82rem;">(포폴이 빠질 때 <b style="color:var(--blue)">${dc.toFixed(1)}배</b>만)</span>`;
     }
     body.innerHTML = html || '데이터가 부족해요.';
     card.style.display = '';

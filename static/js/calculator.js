@@ -1430,7 +1430,7 @@ function calcDownloadImg() {
   });
 }
 
-// ── 종목별 상승 견인 / 하락 방어 (롤링 분포) ──
+// ── 종목별 상승 견인(참여율) / 하락 방어(방어율) ──
 async function renderCalcAttribution() {
   const card = document.getElementById('calcAttrCard');
   const body = document.getElementById('calcAttrBody');
@@ -1440,7 +1440,7 @@ async function renderCalcAttribution() {
   card.style.display = 'block';
   body.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">계산 중…</div>';
   try {
-    const j = await (await fetch('/api/attribution/rolling', {
+    const j = await (await fetch('/api/attribution/capture', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tickers: tk })
     })).json();
@@ -1450,26 +1450,40 @@ async function renderCalcAttribution() {
 }
 
 function calcAttrRender(a) {
-  const codes = Object.keys(a.up);
-  const nm = a.names || {};
+  const A = a.assets, nm = a.names || {};
+  const codes = Object.keys(A);
   const ce = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-  // 상승 견인 평균 큰 순
-  codes.sort((x, y) => a.up[y].mean - a.up[x].mean);
-  const grn = 'var(--green,#2E7D32)', blu = 'var(--blue)', mut = 'var(--text-muted)';
-  let html = `<div style="font-size:0.78rem;color:${mut};margin-bottom:8px;">롤링 ${a.windows}개 구간 평균 · 값=비중×수익 기여(%p) · 괄호=p25~p75</div>`;
+  const grn = 'var(--green,#2E7D32)', red = 'var(--red,#C62828)', blu = 'var(--blue)', mut = 'var(--text-muted)';
+  // 하락 방어 잘하는 순(down_capture 작을수록 위)
+  codes.sort((x, y) => (A[x].down_capture ?? 9) - (A[y].down_capture ?? 9));
+
+  const upCell = u => {
+    if (u.up_capture == null) return '—';
+    const c = u.up_capture >= 1 ? grn : mut;
+    return `<span style="color:${c};font-weight:700;">${u.up_capture.toFixed(2)}배</span>`
+      + `<div style="font-size:0.72rem;color:${mut};">하루 평균 +${u.up_ret.toFixed(2)}%</div>`;
+  };
+  const dnCell = d => {
+    if (d.down_capture == null) return '—';
+    let label, col;
+    if (d.down_capture < 0) { label = '헤지 ↑'; col = grn; }
+    else if (d.down_capture < 1) { label = d.down_capture.toFixed(2) + '배'; col = grn; }
+    else { label = d.down_capture.toFixed(2) + '배'; col = red; }
+    return `<span style="color:${col};font-weight:700;">${label}</span>`
+      + `<div style="font-size:0.72rem;color:${mut};">하루 평균 ${d.down_ret >= 0 ? '+' : ''}${d.down_ret.toFixed(2)}%</div>`;
+  };
+
+  let html = `<div style="font-size:0.78rem;color:${mut};margin-bottom:8px;">분석 구간 ${a.period[0]} ~ ${a.period[1]} · 상승 ${a.n_up}일 / 하락 ${a.n_down}일</div>`;
   html += `<table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
     <tr style="color:${mut};font-size:0.76rem;text-align:right;">
       <th style="text-align:left;padding:6px 4px;">종목</th>
-      <th style="padding:6px 4px;">📈 상승 견인</th>
-      <th style="padding:6px 4px;">🛡️ 하락 방어</th></tr>`;
-  html += codes.map(c => {
-    const u = a.up[c], d = a.down[c];
-    return `<tr style="border-top:1px solid var(--border);text-align:right;">
+      <th style="padding:6px 4px;">📈 상승 참여율</th>
+      <th style="padding:6px 4px;">🛡️ 하락 방어율</th></tr>`;
+  html += codes.map(c => `<tr style="border-top:1px solid var(--border);text-align:right;">
       <td style="text-align:left;padding:7px 4px;font-weight:700;">${ce(nm[c] || c)}<div style="font-size:0.72rem;color:${mut};font-weight:400;">${ce(c)}</div></td>
-      <td style="padding:7px 4px;color:${grn};font-weight:700;">+${u.mean.toFixed(2)}%p<div style="font-size:0.72rem;color:${mut};font-weight:400;">${u.p25.toFixed(2)}~${u.p75.toFixed(2)}</div></td>
-      <td style="padding:7px 4px;color:${d.mean>=0?grn:blu};font-weight:700;">${d.mean>=0?'+':''}${d.mean.toFixed(2)}%p<div style="font-size:0.72rem;color:${mut};font-weight:400;">${d.p25.toFixed(2)}~${d.p75.toFixed(2)}</div></td>
-    </tr>`;
-  }).join('');
-  html += '</table><div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">🛡️ 하락 방어 = 하락장 구간 기여. 0에 가깝거나 +일수록 잘 버틴 자산.</div>';
+      <td style="padding:7px 4px;">${upCell(A[c])}</td>
+      <td style="padding:7px 4px;">${dnCell(A[c])}</td>
+    </tr>`).join('');
+  html += `</table><div style="font-size:0.72rem;color:${mut};margin-top:8px;">참여율 = 포폴 1%↑ 때 이 종목 X%↑ · 방어율 = 포폴 1%↓ 때 이 종목 X%↓ (작을수록·음수일수록 방어 ↑)</div>`;
   document.getElementById('calcAttrBody').innerHTML = html;
 }

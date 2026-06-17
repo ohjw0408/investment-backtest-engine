@@ -357,6 +357,13 @@
         </div>
       </div>
 
+      <!-- 종목별 상승 견인 / 하락 방어 -->
+      <div class="result-card" id="calcAttrCard" style="display:none;">
+        <div class="result-card-title">🛡️ 종목별 상승 견인 · 하락 방어</div>
+        <div class="result-card-desc">비중과 무관하게 각 종목이 <b>상승장에 얼마나 따라 오르고(참여율)</b>, <b>하락장에 얼마나 덜 빠지는지(방어율)</b>를 봐요. 방어율 1보다 작을수록 잘 막고, 0보다 작으면 오히려 올라 헤지예요. (원화 기준)</div>
+        <div id="calcAttrBody"></div>
+      </div>
+
       <!-- 지표 히스토그램 그리드 -->
       <div class="hist-section-title">지표 분포</div>
       <div class="hist-grid">
@@ -421,13 +428,6 @@
         </div>
       </div>
 
-      <!-- 종목별 상승 견인 / 하락 방어 (롤링 분포) -->
-      <div class="result-card" id="calcAttrCard" style="display:none;margin-top:14px;">
-        <div class="result-card-title">🧩 종목별 상승 견인 · 하락 방어 (평균)</div>
-        <div class="result-card-desc">과거 롤링 구간들에서 종목이 상승장엔 얼마나 견인하고 하락장엔 얼마나 버텼는지 평균이에요. (원화 기준)</div>
-        <div id="calcAttrBody"></div>
-      </div>
-
     </div>
   </div>
 
@@ -438,5 +438,5 @@
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260613feecard2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260617attr"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260618attr2"></script>
 {% endblock %}

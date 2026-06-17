@@ -1202,6 +1202,30 @@ def _portfolio_quote(uid, pid):
     }
 
 
+@app.route('/api/attribution/window', methods=['POST'])
+def attribution_window():
+    """백테 사용자 지정 구간 — 종목별 기여 + 지분(다이버징). 비로그인 허용(가격 계산)."""
+    body = request.get_json(silent=True) or {}
+    tk = body.get('tickers') or []
+    codes, weights = [], {}
+    for t in tk:
+        c = str(t.get('code', '')).upper()
+        if c:
+            codes.append(c)
+            weights[c] = float(t.get('weight') or 0)
+    start, end = body.get('start'), body.get('end')
+    if len(codes) < 2 or not start or not end:
+        return jsonify({'ok': False, 'reason': 'need 2+ tickers + range'})
+    from modules import attribution
+    res = attribution.analyze_window(portfolio_engine.loader, codes, weights, start, end)
+    if not res:
+        return jsonify({'ok': False, 'reason': 'no_data'})
+    names = _resolve_names(codes)
+    for r in res['rows']:
+        r['name'] = names.get(r['code'], r['code'])
+    return jsonify({'ok': True, 'attribution': res})
+
+
 @app.route('/api/myassets/attribution')
 def myassets_attribution():
     """내 자산 — 상승 견인/하락 방어 종목 요약(보유 비중 기준, 최근 6년)."""

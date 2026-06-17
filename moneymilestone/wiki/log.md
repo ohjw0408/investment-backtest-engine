@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-17] feature | 저장 포트폴리오 = 일일 리밸 수익 추종 + 포폴 알림/즐겨찾기
+
+오너 정정: 저장 포폴 알림 = 개별종목/리밸런싱 아님 → **전체 포폴 수익률**(매일 리밸 가정).
+
+- 일일 리밸 정규화 지수 `alert_runner.compute_portfolio_index`(가중수익률 복리·원화환산) = 알림+위젯 공용 단일소스.
+- 포폴 수익 룰(scope=portfolio+portfolio_id, daily_pct·new_high·new_low). engine IDX 통화 포인트 표기.
+- 홈 위젯에 포폴 추종(item code `PF:<id>`, `_portfolio_quote`, `/api/home-config/add-portfolio`, 위젯클릭→상세).
+- myportfolios: 카드 🔔(수익룰)·⭐(홈추가)·종목행→`/symbol`. 검증 66 PASS + 렌더 스모크.
+
 ## [2026-06-17] ux | 알림 인라인 진입점 (토스풍 종 아이콘)
 
 오너: "토스 보고 배워와" — `/alerts` 탭만으론 불친절. 종목 검색·내자산·내포폴에서 바로 설정.

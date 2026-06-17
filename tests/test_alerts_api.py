@@ -120,5 +120,26 @@ ok("context portfolios 구조",
 ok("context 비로그인 → logged_in False",
    __import__("app").app.test_client().get("/api/alerts/context").get_json()["logged_in"] is False)
 
+# ── 5. 포트폴리오 수익 룰 검증 + 홈 추가 ──
+c, e = v({"rule_type": "daily_pct", "portfolio_id": 3, "direction": "up", "threshold": 3})
+ok("포폴 daily_pct 정상 → scope portfolio", e is None and c["scope"] == "portfolio" and c["portfolio_id"] == 3)
+c, e = v({"rule_type": "new_high", "portfolio_id": 3, "window": "all"})
+ok("포폴 신고가 정상", e is None and c["window"] == "all")
+_, e = v({"rule_type": "target_price", "portfolio_id": 3, "direction": "above", "threshold": 100})
+ok("포폴 목표가 → 미지원 에러", e is not None)
+
+# 홈 추가
+pid_api = None
+for p in __import__("modules.auth_manager", fromlist=["get_portfolios"]).get_portfolios(UID):
+    if p["name"] == "성장주":
+        pid_api = p["id"]
+r = cl.post("/api/home-config/add-portfolio", json={"id": pid_api})
+ok("홈 추가 200", r.status_code == 200 and r.get_json().get("ok"))
+r = cl.post("/api/home-config/add-portfolio", json={"id": pid_api})
+ok("홈 재추가 → already", r.get_json().get("already") is True)
+hw = __import__("modules.auth_manager", fromlist=["get_home_widgets"]).get_home_widgets(UID)
+ok("위젯에 PF 항목 존재",
+   any(i.get("code") == f"PF:{pid_api}" for w in (hw or []) for i in w.get("items", [])))
+
 print(f"\n{_p} PASS / {_f} FAIL")
 sys.exit(1 if _f else 0)

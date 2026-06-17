@@ -209,8 +209,54 @@
     sheet.innerHTML = '<div class="mmal-grip"></div><div class="mmal-empty">불러오는 중…</div>';
     Promise.all([api('/api/alerts/context'), getRules()]).then(function (res) {
       var pf = (res[0].j.portfolios || []).filter(function (p) { return String(p.id) === String(pid); })[0];
-      renderGroup(pf ? pf.name : '포트폴리오 알림', pf ? pf.symbols : [], res[1], false);
+      renderPortfolio(pid, pf ? pf.name : '포트폴리오', res[1].j ? res[1].j.rules : res[1]);
     });
+  }
+
+  function renderPortfolio(pid, name, allRules) {
+    allRules = allRules || [];
+    var mine = allRules.filter(function (r) { return r.scope === 'portfolio' && String(r.portfolio_id) === String(pid) && r.rule_type !== 'rebalance_band'; });
+    var h = '<div class="mmal-grip"></div>' +
+      '<div class="mmal-hd"><div><div class="mmal-ttl">🔔 ' + esc(name) + '</div>' +
+      '<div class="mmal-sub">전체 포트폴리오 수익 기준(매일 리밸런싱 가정) · 시세 15분 지연</div></div>' +
+      '<button class="mmal-x" onclick="mmAlert._close()">✕</button></div>';
+    h += '<div class="mmal-sec"><div class="mmal-sec-t">설정된 알림</div><div id="mmalMine">';
+    h += mine.length ? mine.map(ruleRow).join('') : '<div class="mmal-empty">아직 없어요.</div>';
+    h += '</div></div>';
+    h += '<div class="mmal-sec"><div class="mmal-sec-t">새 알림</div>';
+    h += '<div class="mmal-add"><div class="mmal-add-h">일간 수익률</div><div class="mmal-add-row">' +
+      seg('mmalPctDir', [['up', '▲상승'], ['down', '▼하락'], ['both', '↕양방향']], 'up') +
+      '<input class="mmal-inp" id="mmalPctVal" type="number" step="any" placeholder="3">%' +
+      '<button class="mmal-go" data-padd="pct">추가</button></div></div>';
+    h += '<div class="mmal-add"><div class="mmal-add-h">수익 신고가 / 신저가</div><div class="mmal-add-row">' +
+      seg('mmalExtKind', [['new_high', '신고가'], ['new_low', '신저가']], 'new_high') +
+      seg('mmalExtWin', [['52w', '52주'], ['all', '전체']], '52w') +
+      '<button class="mmal-go" data-padd="ext">추가</button></div></div>';
+    h += '<div class="mmal-err" id="mmalErr"></div></div>';
+    sheet.innerHTML = h;
+    bindSeg();
+    sheet.querySelectorAll('[data-padd]').forEach(function (b) {
+      b.onclick = function () { addPortfolioRule(pid, name, b.getAttribute('data-padd')); };
+    });
+    bindRuleRows(function () { openPortfolio(pid); });
+  }
+
+  function addPortfolioRule(pid, name, kind) {
+    var body = { portfolio_id: Number(pid), cooldown_h: 24 };
+    if (kind === 'pct') {
+      body.rule_type = 'daily_pct';
+      body.direction = segVal('mmalPctDir');
+      body.threshold = parseFloat(document.getElementById('mmalPctVal').value);
+    } else {
+      body.rule_type = segVal('mmalExtKind');
+      body.window = segVal('mmalExtWin');
+    }
+    api('/api/alerts/rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) {
+        if (!r.ok) { document.getElementById('mmalErr').textContent = r.j.error || '추가 실패'; return; }
+        if (window.mmRefreshBell) window.mmRefreshBell();
+        openPortfolio(pid);
+      });
   }
 
   function renderGroup(title, symbols, allRules, withRebalance) {

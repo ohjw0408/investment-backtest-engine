@@ -1178,17 +1178,90 @@ def home_config_save():
     return jsonify({'ok': True})
 
 
+def _portfolio_quote(uid, pid):
+    """저장 포트폴리오 → 일일 리밸 정규화 지수 기반 위젯 시세. 실패 시 None."""
+    try:
+        pf = get_portfolio(uid, int(pid))
+    except (TypeError, ValueError):
+        return None
+    if not pf:
+        return None
+    from modules.alerts import alert_runner
+    closes = alert_runner.compute_portfolio_index(portfolio_engine.loader, pf.get('tickers') or [])
+    if len(closes) < 2:
+        return None
+    cur, prev = closes[-1], closes[-2]
+    change = round((cur - prev) / prev * 100, 2) if prev else 0.0
+    return {
+        "code": f"PF:{pid}", "name": pf.get('name', '포트폴리오'),
+        "value": f"{cur:,.1f}",
+        "change": f"{'+' if change >= 0 else ''}{change}%",
+        "up": change >= 0,
+        "spark": [round(c, 2) for c in closes[-20:]],
+        "currency": "IDX", "is_portfolio": True,
+    }
+
+
+@app.route('/api/home-config/add-portfolio', methods=['POST'])
+def home_add_portfolio():
+    """저장 포트폴리오를 홈 위젯(즐겨찾기)에 추종 항목으로 추가."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    body = request.get_json(silent=True) or {}
+    pf = get_portfolio(uid, body.get('id'))
+    if not pf:
+        return jsonify({'error': '포트폴리오를 찾을 수 없어요.'}), 404
+    item = {'code': f"PF:{pf['id']}", 'name': pf['name'], 'type': 'portfolio'}
+    import copy
+    widgets = get_home_widgets(uid) or copy.deepcopy(DEFAULT_HOME_WIDGETS)
+    # "내 포트폴리오" 위젯 찾거나 생성
+    target = next((w for w in widgets if w.get('key') == 'w_portfolios'), None)
+    if target is None:
+        target = {'key': 'w_portfolios', 'name': '내 포트폴리오', 'items': []}
+        widgets.append(target)
+    if any(str(i.get('code')) == item['code'] for i in target['items']):
+        return jsonify({'ok': True, 'already': True})
+    if len(target['items']) >= 30:
+        return jsonify({'error': '위젯당 최대 30개까지 추가할 수 있어요.'}), 400
+    target['items'].append(item)
+    cleaned, err = _clean_home_widgets(widgets)
+    if err:
+        return jsonify({'error': err}), 400
+    save_home_widgets(uid, cleaned)
+    return jsonify({'ok': True})
+
+
 @app.route('/api/watchlist/quotes')
 def watchlist_quotes():
     codes = [c.strip() for c in request.args.get('codes', '').split(',') if c.strip()][:60]
     if not codes:
         return jsonify([])
+    # 저장 포트폴리오 토큰(PF:<id>)은 사용자별 → 공유 캐시 우회, 따로 처리.
+    uid = session.get('user_id')
+    pf_ids = {}   # code -> quote
+    sym_codes = []
+    for c in codes:
+        if c.upper().startswith('PF:'):
+            if uid:
+                pf_ids[c] = _portfolio_quote(uid, c.split(':', 1)[1])
+        else:
+            sym_codes.append(c)
     # P2-2: 코드별 _watchlist_quote가 순차였음(콜드캐시 = N×네트워크 지연).
     # I/O-bound라 ThreadPool 병렬이 1코어에서도 이득. ex.map = 입력 순서 보존, 결과 동일.
-    from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=min(8, len(codes))) as ex:
-        quotes = list(ex.map(_watchlist_quote, codes))
-    return jsonify([q for q in quotes if q])
+    sym_q = {}
+    if sym_codes:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(8, len(sym_codes))) as ex:
+            for c, q in zip(sym_codes, ex.map(_watchlist_quote, sym_codes)):
+                sym_q[c] = q
+    # 입력 순서 보존
+    out = []
+    for c in codes:
+        q = pf_ids.get(c) if c.upper().startswith('PF:') else sym_q.get(c)
+        if q:
+            out.append(q)
+    return jsonify(out)
 
 
 # -----------------------------------------------
@@ -1224,6 +1297,36 @@ def _validate_alert_payload(body):
         if not (0 < band <= 100):
             return None, '밴드 %는 0 초과 100 이하여야 합니다.'
         out['threshold'] = band
+        return out, None
+
+    # 저장 포트폴리오 수익 룰 (portfolio_id 지정, 전체 포폴 지수 기반)
+    if body.get('portfolio_id') is not None:
+        try:
+            pid = int(body.get('portfolio_id'))
+        except (TypeError, ValueError):
+            return None, '포트폴리오가 올바르지 않습니다.'
+        if rt not in ('daily_pct', 'new_high', 'new_low'):
+            return None, '포트폴리오 알림은 일간 수익률·신고가·신저가만 지원해요.'
+        out['scope'] = 'portfolio'
+        out['portfolio_id'] = pid
+        out['code'] = None
+        if rt in ('new_high', 'new_low'):
+            win = str(body.get('window', '52w'))
+            if win not in ('52w', 'all'):
+                return None, '윈도우는 52w 또는 all 이어야 합니다.'
+            out['window'] = win
+            return out, None
+        direction = str(body.get('direction', '')).strip()
+        if direction not in _ALERT_DIRECTIONS['daily_pct']:
+            return None, '방향 값이 올바르지 않습니다.'
+        out['direction'] = direction
+        try:
+            thr = float(body.get('threshold'))
+        except (TypeError, ValueError):
+            return None, '변동률 %를 입력해주세요.'
+        if not (0 < thr <= 100):
+            return None, '변동률 %는 0 초과 100 이하여야 합니다.'
+        out['threshold'] = thr
         return out, None
 
     # symbol 룰 공통

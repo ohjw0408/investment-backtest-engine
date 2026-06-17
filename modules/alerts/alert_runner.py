@@ -76,6 +76,90 @@ def _ctx_for_rule(bundle, rule):
     }
 
 
+def compute_portfolio_index(loader, tickers, years=6, daily_rebal=True):
+    """저장 포트폴리오 → 정규화 지수(시작=100) 종가 리스트(오래된→최신).
+
+    daily_rebal=True: 매일 비중 고정 리밸런싱 가정(일별 가중 수익률 복리). 원화환산(apply_fx=True)
+    으로 실제 수익 추종. 데이터 부족 시 [].
+    """
+    today = datetime.today()
+    start = (today - timedelta(days=int(years * 365))).strftime("%Y-%m-%d")
+    end = today.strftime("%Y-%m-%d")
+    wsum = sum(float(t.get("weight") or 0) for t in tickers) or 1.0
+    valid = []
+    for t in tickers:
+        code = str(t.get("code") or "").upper()
+        w = float(t.get("weight") or 0) / wsum
+        if w > 0 and code:
+            valid.append((code, w))
+    if not valid:
+        return []
+
+    series = {}
+    for code, w in valid:
+        try:
+            df = loader.get_price(code, start, end, apply_fx=True)
+        except Exception:
+            df = None
+        if df is None or df.empty or "close" not in df:
+            continue
+        m = {str(d): float(c) for d, c in zip(df.index.astype(str), df["close"]) if c == c}
+        if m:
+            series[code] = (w, m)
+    if not series:
+        return []
+
+    common = None
+    for _, m in series.values():
+        ks = set(m.keys())
+        common = ks if common is None else (common & ks)
+    dates = sorted(common or [])
+    if len(dates) < 2:
+        return []
+
+    if daily_rebal:
+        idx = 100.0
+        out = [100.0]
+        for k in range(1, len(dates)):
+            d0, d1 = dates[k - 1], dates[k]
+            day = 0.0
+            for _, (w, m) in series.items():
+                p0 = m.get(d0)
+                if p0:
+                    day += w * (m[d1] / p0 - 1.0)
+            idx *= (1.0 + day)
+            out.append(idx)
+        return out
+    # buy-and-hold
+    t0 = dates[0]
+    out = []
+    for dt in dates:
+        val = 0.0
+        for _, (w, m) in series.items():
+            base = m.get(t0)
+            if base:
+                val += w * (m[dt] / base) * 100.0
+        out.append(val)
+    return out
+
+
+def build_portfolio_bundle(loader, tickers, name):
+    """포트폴리오 지수 → 평가 컨텍스트(symbol bundle과 동일 형태, currency='IDX')."""
+    closes = compute_portfolio_index(loader, tickers, daily_rebal=True)
+    if len(closes) < 2:
+        return None
+    cur, prev = closes[-1], closes[-2]
+    change_pct = (cur - prev) / prev * 100 if prev else 0.0
+    prior = closes[:-1]
+    win52 = prior[-252:] if len(prior) > 252 else prior
+    return {
+        "cur": cur, "prev_close": prev, "change_pct": change_pct,
+        "currency": "IDX", "name": name,
+        "high_all": max(prior), "low_all": min(prior),
+        "high_52w": max(win52), "low_52w": min(win52),
+    }
+
+
 def compute_user_groups(loader, user_id):
     """리밸런싱용 — 사용자 보유자산 그룹별 현재비중 vs 목표비중.
 
@@ -152,7 +236,8 @@ def run_alert_evaluation(loader, rules=None, now=None):
     for code in symbol_codes:
         bundles[code] = _build_symbol_ctx(loader, code, need_all.get(code, False))
 
-    group_cache = {}  # user_id -> groups
+    group_cache = {}     # user_id -> groups (리밸런싱)
+    pf_cache = {}        # (user_id, portfolio_id) -> bundle (포트폴리오 수익)
     fired = 0
     for r in rules:
         try:
@@ -162,6 +247,16 @@ def run_alert_evaluation(loader, rules=None, now=None):
                     group_cache[uid] = compute_user_groups(loader, uid)
                 ctx = {"groups": group_cache[uid]}
                 ev = evaluate_rule(r, ctx, now)
+            elif r.get("scope") == "portfolio" and r.get("portfolio_id") is not None:
+                key = (r["user_id"], r["portfolio_id"])
+                if key not in pf_cache:
+                    pf = auth_manager.get_portfolio(r["user_id"], r["portfolio_id"])
+                    pf_cache[key] = build_portfolio_bundle(
+                        loader, pf.get("tickers") or [], pf.get("name", "포트폴리오")) if pf else None
+                bundle = pf_cache[key]
+                if not bundle:
+                    continue
+                ev = evaluate_rule(r, _ctx_for_rule(bundle, r), now)
             else:
                 bundle = bundles.get((r.get("code") or "").upper())
                 if not bundle:

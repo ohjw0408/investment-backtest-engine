@@ -30,6 +30,21 @@
   로드 + `window.MM_LOGGED_IN`.
 - 검증: test_alerts_api 31 PASS(+context 3) + 4화면 렌더 스모크 PASS.
 
+### ▶ 후속2: 저장 포트폴리오 = 일일 리밸 수익 추종 (2026-06-17, 오너 정정)
+
+오너 정정: 저장 포폴 알림 = 개별종목/리밸런싱 아님 → **전체 포트폴리오 수익률**(매일 리밸런싱 가정).
+추가 요청: `/myportfolios` 카드 알림 버튼, 종목 클릭→상세, 즐겨찾기(홈 위젯)에 포폴 추가.
+
+- **일일 리밸 지수:** `alert_runner.compute_portfolio_index(loader, tickers, daily_rebal=True)` — 일별 가중
+  수익률 복리(비중 고정 리밸), 원화환산(apply_fx=True) 실수익 추종. 단일 소스(알림+위젯 공용).
+- **포폴 수익 룰:** scope='portfolio'+portfolio_id, rule_type ∈ {daily_pct·new_high·new_low}(target_price
+  미지원). engine은 IDX 통화로 포인트 표기. runner가 (uid,pid)별 지수 1회계산→평가. `_validate_alert_payload`
+  포폴 분기. (리밸런싱 밴드는 내 자산 holdings 전용 유지)
+- **위젯 추종:** 홈 위젯 item `code='PF:<id>'` → `_portfolio_quote`(일일리밸 지수 최신값·일변동·스파크,
+  사용자별·공유캐시 우회). `/api/home-config/add-portfolio`(myportfolios ⭐버튼). 위젯 클릭=PF→`/myportfolios/<id>`.
+- **myportfolios:** 카드 🔔(openPortfolio 수익룰)·⭐(홈추가)·종목행 클릭→`/symbol/<code>`.
+- 검증: engine 19 + runner 10(+포폴지수·발화) + api 37(+포폴검증·홈추가) = 66 PASS + 홈/포폴 렌더 스모크.
+
 > 원안(아래)은 그대로 유지 — 참조용.
 
 ---

@@ -170,13 +170,15 @@ function mpRenderList() {
           <div class="mp-date">수정 ${esc(date)} · 종목 ${p.tickers.length}개</div>
         </div>
         <div class="mp-actions">
+          <button class="icon-btn" title="수익 알림 설정" onclick="mmAlert.openPortfolio(${p.id})">🔔</button>
+          <button class="icon-btn" title="홈 즐겨찾기에 추가" onclick="mpAddHome(${p.id})">⭐</button>
           <button class="icon-btn" title="상세 열기 (수량·배당·추이)" onclick="location.href='/myportfolios/${p.id}'">📂</button>
           <button class="icon-btn" title="수정" onclick="mpOpenEdit(${p.id})">✏️</button>
           <button class="icon-btn danger" title="삭제" onclick="mpDelete(${p.id})">🗑</button>
         </div>
       </div>
       ${p.tickers.map(t => `
-        <div class="mp-ticker-row">
+        <div class="mp-ticker-row" style="cursor:pointer;" title="종목 상세 보기" onclick="location.href='/symbol/${esc(t.code)}'">
           <span class="mp-badge" style="background:${badgeColor(t.badge)}">${esc(t.badge || '—')}</span>
           <span class="mp-code">${esc(t.code)}</span>
           <span class="mp-tname">${esc(t.name || '')}</span>
@@ -319,6 +321,18 @@ async function mpDelete(id) {
     if (!res.ok) { alert('삭제에 실패했어요.'); return; }
     await mpLoad();
   } catch (e) { alert('삭제에 실패했어요. 네트워크를 확인해주세요.'); }
+}
+
+async function mpAddHome(id) {
+  try {
+    const res = await fetch('/api/home-config/add-portfolio', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || '추가에 실패했어요.'); return; }
+    alert(data.already ? '이미 홈 즐겨찾기에 있어요.' : '홈 화면 즐겨찾기에 추가했어요. (수익 추종)');
+  } catch (e) { alert('추가에 실패했어요. 네트워크를 확인해주세요.'); }
 }
 
 mpLoad();

@@ -86,5 +86,27 @@ fired3 = alert_runner.run_alert_evaluation(loader)
 ev_reb = alert_store.get_events(UID2)
 ok("리밸런싱 발화", fired3 == 1 and ev_reb and "리밸런싱" in ev_reb[0]["title"])
 
+# ── 저장 포트폴리오 수익 알림 (일일 리밸 지수) ──
+UID3 = 11
+am.init_portfolios_db()
+ploader = FakeLoader({
+    "AAA": [100, 100, 101],   # 마지막날 +1%
+    "BBB": [100, 100, 103],   # 마지막날 +3%
+})
+# 일일 리밸 지수: d0=100, d1=100, d2=100*(1+0.5*0.01+0.5*0.03)=102
+idx = alert_runner.compute_portfolio_index(
+    ploader, [{"code": "AAA", "weight": 50}, {"code": "BBB", "weight": 50}])
+ok("포폴 지수 길이 3", len(idx) == 3)
+ok("일일 리밸 마지막 ~102", abs(idx[-1] - 102.0) < 1e-6)
+
+am.upsert_portfolio(UID3, "5050", [{"code": "AAA", "name": "A", "weight": 50},
+                                   {"code": "BBB", "name": "B", "weight": 50}])
+pid = am.get_portfolios(UID3)[0]["id"]
+alert_store.create_rule(UID3, scope="portfolio", portfolio_id=pid,
+                        rule_type="daily_pct", direction="up", threshold=1)
+firedp = alert_runner.run_alert_evaluation(ploader)
+evp = alert_store.get_events(UID3)
+ok("포폴 수익 알림 발화(+2% ≥1%)", firedp == 1 and evp and "5050" in evp[0]["title"])
+
 print(f"\n{_p} PASS / {_f} FAIL")
 sys.exit(1 if _f else 0)

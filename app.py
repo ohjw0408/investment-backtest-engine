@@ -1378,6 +1378,9 @@ def alerts_rules_create():
     clean, err = _validate_alert_payload(request.get_json(silent=True) or {})
     if err:
         return jsonify({'error': err}), 400
+    # 포트폴리오 룰은 본인 소유 포폴만 (남의 id로 죽은 룰 생성 방지)
+    if clean.get('portfolio_id') is not None and not get_portfolio(uid, clean['portfolio_id']):
+        return jsonify({'error': '포트폴리오를 찾을 수 없어요.'}), 404
     try:
         rid = alert_store.create_rule(uid, **clean)
     except ValueError as e:

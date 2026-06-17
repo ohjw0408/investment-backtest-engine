@@ -141,5 +141,13 @@ hw = __import__("modules.auth_manager", fromlist=["get_home_widgets"]).get_home_
 ok("위젯에 PF 항목 존재",
    any(i.get("code") == f"PF:{pid_api}" for w in (hw or []) for i in w.get("items", [])))
 
+# 포트폴리오 룰 소유 검증(라우트)
+r = cl.post("/api/alerts/rules", json={"rule_type": "daily_pct", "portfolio_id": pid_api,
+                                       "direction": "both", "threshold": 2})
+ok("본인 포폴 룰 생성 200", r.status_code == 200)
+r = cl.post("/api/alerts/rules", json={"rule_type": "daily_pct", "portfolio_id": 999999,
+                                       "direction": "both", "threshold": 2})
+ok("남의/없는 포폴 룰 → 404", r.status_code == 404)
+
 print(f"\n{_p} PASS / {_f} FAIL")
 sys.exit(1 if _f else 0)

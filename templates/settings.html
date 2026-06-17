@@ -119,6 +119,7 @@
 let _weWidgets = [];
 let _weTarget = -1;
 let _weSearchTimer = null;
+let _wePortfolios = [];   // 내 저장 포트폴리오 (위젯에 종목처럼 추가용)
 
 const WE_PRESETS = [
   { code: '^GSPC', name: 'S&P 500' },
@@ -143,6 +144,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   document.getElementById('widgetEditor').style.display = 'block';
+  try { _wePortfolios = await (await fetch('/api/portfolio/list')).json(); }
+  catch (e) { _wePortfolios = []; }
   weRender();
 
   const si = document.getElementById('weSearch');
@@ -200,7 +203,13 @@ function weOpenModal(wi) {
   const si = document.getElementById('weSearch');
   si.value = '';
   document.getElementById('weResults').innerHTML = '';
-  document.getElementById('wePresets').innerHTML =
+  const pfChips = _wePortfolios.length
+    ? `<div style="width:100%;font-size:0.72rem;color:var(--text-muted);font-weight:700;margin:4px 0 2px;">📊 내 포트폴리오 (수익 추종)</div>`
+      + _wePortfolios.map(p => `<button class="we-preset" onclick="weAddItem('PF:${p.id}','${weEsc(p.name)}')">⭐ ${weEsc(p.name)}</button>`).join('')
+      + `<div style="width:100%;height:1px;background:var(--border);margin:8px 0;"></div>`
+      + `<div style="width:100%;font-size:0.72rem;color:var(--text-muted);font-weight:700;margin-bottom:2px;">시장 지수</div>`
+    : '';
+  document.getElementById('wePresets').innerHTML = pfChips +
     WE_PRESETS.map(p => `<button class="we-preset" onclick="weAddItem('${weEsc(p.code)}','${weEsc(p.name)}')">${weEsc(p.name)}</button>`).join('');
   setTimeout(() => si.focus(), 50);
 }

@@ -58,8 +58,10 @@ PRICE_DB_PATH  = Path(__file__).parent / "data" / "price_cache" / "price_daily.d
 SHARE_IMG_DIR  = Path(__file__).parent / "share_images"
 SHARE_IMG_DIR.mkdir(exist_ok=True)
 
+from modules.alerts import alert_store
 init_holdings_db()
 init_portfolios_db()
+alert_store.init_alerts_db()
 data_engine          = DataEngine()
 info_engine          = InfoEngine()
 portfolio_engine     = PortfolioEngine()
@@ -303,6 +305,20 @@ def settings():
 @app.route('/settings')
 def settings_page():
     return render_template('settings.html')
+
+@app.route('/alerts')
+def alerts_page():
+    uid = session.get('user_id')
+    symbols = []
+    if uid:
+        groups, names = _calendar_grouped(uid)
+        seen = set()
+        for g in ('holdings', 'portfolios', 'watchlist'):
+            for c in groups.get(g, []):
+                if c not in seen:
+                    seen.add(c)
+                    symbols.append({'code': c, 'name': names.get(c, c)})
+    return render_template('alerts.html', symbols=symbols)
 
 # -----------------------------------------------
 # API - 검색
@@ -1173,6 +1189,163 @@ def watchlist_quotes():
     with ThreadPoolExecutor(max_workers=min(8, len(codes))) as ex:
         quotes = list(ex.map(_watchlist_quote, codes))
     return jsonify([q for q in quotes if q])
+
+
+# -----------------------------------------------
+# API - 알림 (룰 + 수신함)
+# -----------------------------------------------
+
+_ALERT_DIRECTIONS = {
+    'daily_pct':    {'up', 'down', 'both'},
+    'target_price': {'above', 'below'},
+}
+
+
+def _validate_alert_payload(body):
+    """룰 생성/수정 입력 검증. (clean_dict, error) 반환."""
+    rt = str(body.get('rule_type', '')).strip()
+    if rt not in alert_store.VALID_TYPES:
+        return None, '알 수 없는 알림 종류입니다.'
+
+    out = {'rule_type': rt}
+    try:
+        cooldown = int(body.get('cooldown_h', 24))
+    except (TypeError, ValueError):
+        return None, '쿨다운 값이 올바르지 않습니다.'
+    out['cooldown_h'] = max(1, min(cooldown, 24 * 30))
+
+    if rt == 'rebalance_band':
+        out['scope'] = 'portfolio'
+        out['code'] = None
+        try:
+            band = float(body.get('threshold'))
+        except (TypeError, ValueError):
+            return None, '밴드 % 값을 입력해주세요.'
+        if not (0 < band <= 100):
+            return None, '밴드 %는 0 초과 100 이하여야 합니다.'
+        out['threshold'] = band
+        return out, None
+
+    # symbol 룰 공통
+    code = str(body.get('code', '')).strip().upper()
+    if not code:
+        return None, '종목 코드가 필요합니다.'
+    out['scope'] = 'symbol'
+    out['code'] = code
+
+    if rt in ('new_high', 'new_low'):
+        win = str(body.get('window', '52w'))
+        if win not in ('52w', 'all'):
+            return None, '윈도우는 52w 또는 all 이어야 합니다.'
+        out['window'] = win
+        return out, None
+
+    # daily_pct / target_price → direction + threshold
+    direction = str(body.get('direction', '')).strip()
+    if direction not in _ALERT_DIRECTIONS[rt]:
+        return None, '방향 값이 올바르지 않습니다.'
+    out['direction'] = direction
+    try:
+        thr = float(body.get('threshold'))
+    except (TypeError, ValueError):
+        return None, '임계값을 입력해주세요.'
+    if rt == 'daily_pct':
+        if not (0 < thr <= 100):
+            return None, '변동률 %는 0 초과 100 이하여야 합니다.'
+    else:  # target_price
+        if thr <= 0:
+            return None, '목표가는 0보다 커야 합니다.'
+    out['threshold'] = thr
+    return out, None
+
+
+@app.route('/api/alerts/rules')
+def alerts_rules_get():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    return jsonify({'rules': alert_store.get_rules(uid)})
+
+
+@app.route('/api/alerts/rules', methods=['POST'])
+def alerts_rules_create():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    clean, err = _validate_alert_payload(request.get_json(silent=True) or {})
+    if err:
+        return jsonify({'error': err}), 400
+    try:
+        rid = alert_store.create_rule(uid, **clean)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, 'id': rid})
+
+
+@app.route('/api/alerts/rules/<int:rule_id>', methods=['PATCH'])
+def alerts_rules_update(rule_id):
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    body = request.get_json(silent=True) or {}
+    fields = {}
+    if 'enabled' in body:
+        fields['enabled'] = 1 if body['enabled'] else 0
+    for k in ('threshold', 'cooldown_h', 'direction', 'window'):
+        if k in body:
+            fields[k] = body[k]
+    if not fields:
+        return jsonify({'error': '변경할 값이 없습니다.'}), 400
+    alert_store.update_rule(uid, rule_id, **fields)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/alerts/rules/<int:rule_id>', methods=['DELETE'])
+def alerts_rules_delete(rule_id):
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    alert_store.delete_rule(uid, rule_id)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/alerts/events')
+def alerts_events_get():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    unread = request.args.get('unread') == '1'
+    try:
+        limit = max(1, min(int(request.args.get('limit', 50)), 200))
+    except ValueError:
+        limit = 50
+    return jsonify({'events': alert_store.get_events(uid, unread_only=unread, limit=limit)})
+
+
+@app.route('/api/alerts/unread-count')
+def alerts_unread_count():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'count': 0})
+    return jsonify({'count': alert_store.unread_count(uid)})
+
+
+@app.route('/api/alerts/events/<int:event_id>/read', methods=['POST'])
+def alerts_event_read(event_id):
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    alert_store.mark_read(uid, event_id)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/alerts/read-all', methods=['POST'])
+def alerts_read_all():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    alert_store.mark_all_read(uid)
+    return jsonify({'ok': True})
 
 
 # -----------------------------------------------

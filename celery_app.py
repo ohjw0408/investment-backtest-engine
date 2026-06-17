@@ -47,4 +47,9 @@ celery.conf.beat_schedule = {
         'task': 'tasks.refresh_macro',
         'schedule': crontab(hour=7, minute=0, day_of_week='mon-fri'),
     },
+    # 알림 룰 평가 — 장중 15분마다(US 13:30~20:00 + KR 00:00~06:30 UTC). task 내부서 장시간 재확인.
+    'evaluate-alerts': {
+        'task': 'tasks.evaluate_alerts',
+        'schedule': crontab(minute='*/15', hour='0-6,13-20', day_of_week='mon-fri'),
+    },
 }

@@ -18,6 +18,27 @@
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260614widget">
+  <style>
+  .mm-bell-wrap { position: relative; }
+  .mm-bell-badge { position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px;
+    box-sizing: border-box; background: #C62828; color: #fff; font-size: 0.64rem; font-weight: 700;
+    border-radius: 9px; line-height: 16px; text-align: center; }
+  .mm-bell-dd { display: none; position: absolute; right: 0; top: calc(100% + 8px); width: 320px; max-width: 86vw;
+    background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+    z-index: 1000; overflow: hidden; }
+  .mm-bell-dd.open { display: block; }
+  .mm-bell-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px;
+    border-bottom: 1.5px solid var(--border); font-size: 0.86rem; font-weight: 800; }
+  .mm-bell-all { font-size: 0.74rem; font-weight: 700; color: var(--blue); text-decoration: none; }
+  .mm-bell-list { max-height: 360px; overflow-y: auto; }
+  .mm-bell-it { padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .mm-bell-it:last-child { border-bottom: none; }
+  .mm-bell-it.unread { background: color-mix(in srgb, var(--blue) 8%, transparent); }
+  .mm-bell-it-t { font-size: 0.82rem; font-weight: 700; }
+  .mm-bell-it-b { font-size: 0.73rem; color: var(--text-muted); margin-top: 2px; }
+  .mm-bell-it-time { font-size: 0.66rem; color: var(--text-muted); margin-top: 3px; }
+  .mm-bell-empty { padding: 26px 14px; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
+  </style>
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -55,6 +76,18 @@
   </div>
   <div class="nav-right">
     {% if user %}
+      <div class="mm-bell-wrap" id="mmBellWrap">
+        <button class="nav-icon-btn" id="mmBell" aria-label="알림" title="알림" style="position:relative;">
+          🔔<span class="mm-bell-badge" id="mmBellBadge" style="display:none;"></span>
+        </button>
+        <div class="mm-bell-dd" id="mmBellDd">
+          <div class="mm-bell-head">
+            <span>알림</span>
+            <a href="/alerts" class="mm-bell-all">전체 보기</a>
+          </div>
+          <div class="mm-bell-list" id="mmBellList"></div>
+        </div>
+      </div>
       <img src="{{ user.picture }}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">
       <span class="user-greeting">안녕하세요, {{ user.name }}님!</span>
       <a href="/auth/logout" style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;padding:4px 10px;border:1.5px solid var(--border);border-radius:8px;">로그아웃</a>
@@ -117,6 +150,9 @@
     </a>
     <a class="sidebar-item {% if request.path.startswith('/search') %}active{% endif %}" href="/search">
       <span>🔍</span> 종목 검색
+    </a>
+    <a class="sidebar-item {% if request.path.startswith('/alerts') %}active{% endif %}" href="/alerts">
+      <span>🔔</span> 알림
     </a>
     <a class="sidebar-item {% if request.path.startswith('/settings') %}active{% endif %}" href="/settings">
       <span>⚙️</span> 설정
@@ -270,6 +306,65 @@ function mmCopyText(text) {
   document.body.removeChild(ta);
   return Promise.resolve();
 }
+
+// ── 알림 종(로그인 시) ──
+(function () {
+  const wrap = document.getElementById('mmBellWrap');
+  if (!wrap) return;
+  const btn = document.getElementById('mmBell');
+  const dd = document.getElementById('mmBellDd');
+  const badge = document.getElementById('mmBellBadge');
+  const list = document.getElementById('mmBellList');
+
+  function fmtAgo(iso) {
+    const s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (s < 60) return '방금'; if (s < 3600) return Math.floor(s / 60) + '분 전';
+    if (s < 86400) return Math.floor(s / 3600) + '시간 전';
+    return new Date(iso).toLocaleDateString('ko-KR');
+  }
+
+  async function refreshCount() {
+    try {
+      const j = await (await fetch('/api/alerts/unread-count')).json();
+      const n = j.count || 0;
+      badge.style.display = n ? 'block' : 'none';
+      badge.textContent = n > 99 ? '99+' : n;
+    } catch (e) {}
+  }
+  window.mmRefreshBell = refreshCount;
+
+  async function loadList() {
+    list.innerHTML = '<div class="mm-bell-empty">불러오는 중…</div>';
+    try {
+      const j = await (await fetch('/api/alerts/events?limit=12')).json();
+      const evs = j.events || [];
+      if (!evs.length) { list.innerHTML = '<div class="mm-bell-empty">받은 알림이 없어요.</div>'; return; }
+      list.innerHTML = evs.map(e => `
+        <div class="mm-bell-it ${e.read_at ? '' : 'unread'}" data-id="${e.id}">
+          <div class="mm-bell-it-t">${e.title}</div>
+          <div class="mm-bell-it-b">${e.body}</div>
+          <div class="mm-bell-it-time">${fmtAgo(e.created_at)}</div>
+        </div>`).join('');
+      list.querySelectorAll('.mm-bell-it.unread').forEach(el => el.onclick = async () => {
+        await fetch(`/api/alerts/events/${el.dataset.id}/read`, { method: 'POST' });
+        el.classList.remove('unread');
+        refreshCount();
+      });
+    } catch (e) { list.innerHTML = '<div class="mm-bell-empty">오류가 발생했어요.</div>'; }
+  }
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = dd.classList.toggle('open');
+    if (open) loadList();
+  });
+  document.addEventListener('click', (e) => {
+    if (!wrap.contains(e.target)) dd.classList.remove('open');
+  });
+
+  refreshCount();
+  setInterval(refreshCount, 60000);
+})();
 </script>
 </body>
 </html>

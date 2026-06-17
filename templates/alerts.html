@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}알림 — Money Milestone{% endblock %}
+
+{% block head %}
+<style>
+.al-wrap { grid-column: 1 / -1; max-width: 920px; margin: 0 auto; width: 100%; box-sizing: border-box; padding: 24px; }
+.al-title { font-size: 1.15rem; font-weight: 800; }
+.al-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+.al-card { border: 1.5px solid var(--border); background: var(--card); border-radius: 12px; padding: 18px; margin-top: 18px; }
+.al-card h3 { font-size: 0.98rem; font-weight: 800; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+.al-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.al-field { display: flex; flex-direction: column; gap: 4px; }
+.al-field label { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; }
+.al-field select, .al-field input { border: 1.5px solid var(--border); background: var(--bg); color: var(--text);
+  border-radius: 8px; padding: 7px 10px; font-size: 0.88rem; font-family: inherit; min-width: 120px; }
+.al-btn { background: var(--blue); color: #fff; border: none; border-radius: 9px; padding: 9px 18px;
+  font-size: 0.86rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+.al-btn:hover { opacity: 0.9; }
+.al-btn.ghost { background: var(--bg); color: var(--text-muted); border: 1.5px solid var(--border); }
+.al-err { color: #C62828; font-size: 0.8rem; margin-top: 8px; min-height: 1em; }
+.al-list { display: flex; flex-direction: column; gap: 8px; }
+.al-item { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--border); border-radius: 9px;
+  padding: 10px 12px; background: var(--bg); }
+.al-item.off { opacity: 0.5; }
+.al-item-main { flex: 1; min-width: 0; }
+.al-item-t { font-size: 0.88rem; font-weight: 700; }
+.al-item-d { font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; }
+.al-pill { font-size: 0.66rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; background: var(--blue); color: #fff; }
+.al-ev { border-left: 3px solid var(--blue); padding: 8px 12px; background: var(--bg); border-radius: 0 8px 8px 0; }
+.al-ev.read { border-left-color: var(--border); opacity: 0.6; }
+.al-ev-t { font-size: 0.86rem; font-weight: 700; }
+.al-ev-b { font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; }
+.al-ev-time { font-size: 0.68rem; color: var(--text-muted); margin-top: 4px; }
+.al-empty { color: var(--text-muted); font-size: 0.84rem; padding: 14px 4px; }
+.al-x { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 4px; }
+.al-toggle { cursor: pointer; }
+.al-login { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="al-wrap">
+  <div class="al-title">🔔 알림</div>
+  <div class="al-sub">보유·관심 종목의 가격 변동·신고가/신저가·리밸런싱을 감시해 알려드려요. 시세는 15분 지연.</div>
+
+  {% if not user %}
+  <div class="al-card"><div class="al-login">알림은 로그인 후 사용할 수 있어요.</div></div>
+  {% else %}
+
+  <!-- 새 알림 만들기 -->
+  <div class="al-card">
+    <h3>새 알림 만들기</h3>
+    <div class="al-row">
+      <div class="al-field">
+        <label>종류</label>
+        <select id="alType">
+          <option value="daily_pct">일간 변동률 ±%</option>
+          <option value="target_price">목표가 도달</option>
+          <option value="new_high">신고가 갱신</option>
+          <option value="new_low">신저가 갱신</option>
+          <option value="rebalance_band">리밸런싱 밴드 이탈</option>
+        </select>
+      </div>
+      <div class="al-field" id="fSymbol">
+        <label>종목</label>
+        <select id="alCode"></select>
+      </div>
+      <div class="al-field" id="fCodeManual" style="display:none;">
+        <label>직접 입력</label>
+        <input id="alCodeManual" placeholder="예: AAPL, 005930" />
+      </div>
+      <div class="al-field" id="fDir" style="display:none;">
+        <label>방향</label>
+        <select id="alDir"></select>
+      </div>
+      <div class="al-field" id="fWindow" style="display:none;">
+        <label>기간</label>
+        <select id="alWindow"><option value="52w">52주</option><option value="all">전체기간</option></select>
+      </div>
+      <div class="al-field" id="fThreshold">
+        <label id="alThrLabel">기준 %</label>
+        <input id="alThr" type="number" step="any" placeholder="5" />
+      </div>
+      <button class="al-btn" id="alCreate">알림 추가</button>
+    </div>
+    <div class="al-err" id="alErr"></div>
+  </div>
+
+  <!-- 내 알림 -->
+  <div class="al-card">
+    <h3>내 알림 <span class="al-sub" id="alRuleCount"></span></h3>
+    <div class="al-list" id="alRules"><div class="al-empty">불러오는 중…</div></div>
+  </div>
+
+  <!-- 수신함 -->
+  <div class="al-card">
+    <h3>수신함 <button class="al-btn ghost" id="alReadAll" style="margin-left:auto;padding:5px 12px;font-size:0.76rem;">모두 읽음</button></h3>
+    <div class="al-list" id="alEvents"><div class="al-empty">불러오는 중…</div></div>
+  </div>
+
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if user %}
+<script>
+const MM_SYMBOLS = {{ symbols|tojson }};
+const TYPE_LABEL = { daily_pct: '일간 변동률', target_price: '목표가', new_high: '신고가', new_low: '신저가', rebalance_band: '리밸런싱' };
+const DIR_OPTS = {
+  daily_pct:    [['up','상승'],['down','하락'],['both','양방향']],
+  target_price: [['above','이상'],['below','이하']],
+};
+
+function $(id){ return document.getElementById(id); }
+
+// 종목 셀렉트 채우기
+(function(){
+  const sel = $('alCode');
+  if (MM_SYMBOLS.length) {
+    sel.innerHTML = MM_SYMBOLS.map(s => `<option value="${s.code}">${s.name} (${s.code})</option>`).join('')
+      + '<option value="__manual__">+ 직접 입력</option>';
+  } else {
+    sel.innerHTML = '<option value="__manual__">직접 입력</option>';
+  }
+})();
+
+function syncForm(){
+  const t = $('alType').value;
+  const isReb = t === 'rebalance_band';
+  const isExtreme = (t === 'new_high' || t === 'new_low');
+  const manual = !isReb && $('alCode').value === '__manual__';
+  $('fSymbol').style.display = isReb ? 'none' : '';
+  $('fCodeManual').style.display = manual ? '' : 'none';
+  $('fDir').style.display = (t === 'daily_pct' || t === 'target_price') ? '' : 'none';
+  $('fWindow').style.display = isExtreme ? '' : 'none';
+  $('fThreshold').style.display = isExtreme ? 'none' : '';
+  if (t === 'daily_pct') { $('alThrLabel').textContent = '변동률 %'; $('alThr').placeholder = '5'; }
+  else if (t === 'target_price') { $('alThrLabel').textContent = '목표가'; $('alThr').placeholder = '150'; }
+  else if (isReb) { $('alThrLabel').textContent = '밴드 %p'; $('alThr').placeholder = '5'; $('fThreshold').style.display=''; }
+  // 방향 옵션
+  if (DIR_OPTS[t]) $('alDir').innerHTML = DIR_OPTS[t].map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+}
+$('alType').addEventListener('change', syncForm);
+$('alCode').addEventListener('change', syncForm);
+syncForm();
+
+async function createRule(){
+  $('alErr').textContent = '';
+  const t = $('alType').value;
+  const body = { rule_type: t, cooldown_h: 24 };
+  if (t === 'rebalance_band') {
+    body.threshold = parseFloat($('alThr').value);
+  } else {
+    body.code = ($('alCode').value === '__manual__') ? $('alCodeManual').value.trim() : $('alCode').value;
+    if (t === 'new_high' || t === 'new_low') {
+      body.window = $('alWindow').value;
+    } else {
+      body.direction = $('alDir').value;
+      body.threshold = parseFloat($('alThr').value);
+    }
+  }
+  const r = await fetch('/api/alerts/rules', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) { $('alErr').textContent = j.error || '추가 실패'; return; }
+  loadRules();
+}
+$('alCreate').addEventListener('click', createRule);
+
+function ruleDesc(r){
+  if (r.rule_type === 'daily_pct') return `하루 ${({up:'+',down:'-',both:'±'})[r.direction]||'±'}${r.threshold}% 변동 시`;
+  if (r.rule_type === 'target_price') return `가격 ${r.threshold} ${r.direction==='above'?'이상':'이하'} 도달 시`;
+  if (r.rule_type === 'new_high') return `${r.window==='all'?'전체기간':'52주'} 신고가 갱신 시`;
+  if (r.rule_type === 'new_low') return `${r.window==='all'?'전체기간':'52주'} 신저가 갱신 시`;
+  if (r.rule_type === 'rebalance_band') return `목표 비중 ±${r.threshold}%p 이탈 시`;
+  return '';
+}
+
+async function loadRules(){
+  const r = await fetch('/api/alerts/rules');
+  const j = await r.json();
+  const rules = j.rules || [];
+  $('alRuleCount').textContent = rules.length ? `(${rules.length}개)` : '';
+  const box = $('alRules');
+  if (!rules.length) { box.innerHTML = '<div class="al-empty">아직 만든 알림이 없어요.</div>'; return; }
+  box.innerHTML = rules.map(r => `
+    <div class="al-item ${r.enabled ? '' : 'off'}">
+      <span class="al-pill">${TYPE_LABEL[r.rule_type]||r.rule_type}</span>
+      <div class="al-item-main">
+        <div class="al-item-t">${r.code || '내 자산 그룹'}</div>
+        <div class="al-item-d">${ruleDesc(r)}</div>
+      </div>
+      <button class="al-btn ghost al-toggle" data-id="${r.id}" data-on="${r.enabled}" style="padding:5px 10px;font-size:0.74rem;">${r.enabled?'끄기':'켜기'}</button>
+      <button class="al-x" data-del="${r.id}" title="삭제">✕</button>
+    </div>`).join('');
+  box.querySelectorAll('.al-toggle').forEach(b => b.onclick = async () => {
+    await fetch(`/api/alerts/rules/${b.dataset.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({enabled: b.dataset.on !== '1'}) });
+    loadRules();
+  });
+  box.querySelectorAll('.al-x').forEach(b => b.onclick = async () => {
+    await fetch(`/api/alerts/rules/${b.dataset.del}`, { method:'DELETE' });
+    loadRules();
+  });
+}
+
+function timeAgo(iso){
+  const d = new Date(iso); const s = (Date.now()-d.getTime())/1000;
+  if (s < 60) return '방금'; if (s < 3600) return Math.floor(s/60)+'분 전';
+  if (s < 86400) return Math.floor(s/3600)+'시간 전'; return d.toLocaleDateString('ko-KR');
+}
+
+async function loadEvents(){
+  const r = await fetch('/api/alerts/events?limit=50');
+  const j = await r.json();
+  const evs = j.events || [];
+  const box = $('alEvents');
+  if (!evs.length) { box.innerHTML = '<div class="al-empty">받은 알림이 없어요.</div>'; return; }
+  box.innerHTML = evs.map(e => `
+    <div class="al-ev ${e.read_at ? 'read' : ''}">
+      <div class="al-ev-t">${e.title}</div>
+      <div class="al-ev-b">${e.body}</div>
+      <div class="al-ev-time">${timeAgo(e.created_at)}</div>
+    </div>`).join('');
+}
+$('alReadAll').addEventListener('click', async () => {
+  await fetch('/api/alerts/read-all', { method:'POST' });
+  loadEvents();
+  if (window.mmRefreshBell) window.mmRefreshBell();
+});
+
+loadRules();
+loadEvents();
+</script>
+{% endif %}
+{% endblock %}

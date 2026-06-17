@@ -1,5 +1,21 @@
 # Log
 
+## [2026-06-17] feature | 알림 기능 (가격·신고가/신저가·리밸런싱, 인앱 수신함)
+
+오너 신규 요청. 기존 플랜 부실(PHASE4=인앱 밴드 배지만) → 새 `알림_plan.md` 작성. 오너 결정: 전달=인앱
+수신함(🔔)만(푸시/이메일 추후), 신고가/신저가=52주·전체 룰별 선택, 평가=장중 15~30분.
+
+- **룰 5종:** 일간 변동률 ±%(상승/하락/양방향) · 목표가 도달(이상/이하) · 신고가 · 신저가(52주/전체) ·
+  리밸런싱 밴드 이탈(holdings asset_groups 실제비중 vs target_pct).
+- **백엔드:** `modules/alerts/` — `alert_engine.py`(순수 평가+쿨다운/재무장) · `alert_store.py`(alert_rules/
+  alert_events, users.db 재사용, 한도 50) · `alert_runner.py`(종목 dedup·윈도우별 1회 로드·리밸 비중계산).
+- **API:** `/api/alerts/rules`(CRUD) + `/events`·`/unread-count`·`read`·`read-all`, 서버검증 `_validate_alert_payload`.
+- **평가:** tasks.py `evaluate_alerts`(장중게이트) + celery_app beat `*/15 hour 0-6,13-20 mon-fri`.
+  같은 종목 여러 룰 = 캐시 dedup → yfinance 밴 안전.
+- **프론트:** `/alerts`(룰 생성/목록/수신함) + base.html 네비 🔔 종(미읽음 배지·드롭다운·60s 폴링)+사이드바 링크.
+- **검증:** test_alert_engine 19 + test_alerts_api 28 + test_alert_runner 7(FakeLoader, 네트워크0) = 54 PASS.
+  렌더 스모크 PASS. **잔여 = 라이브 검증(배포 후 실제 룰 발화).**
+
 > 🟢 **캘린더 정책일정 (2026-06-15): ✅ Tier 1 완료·배포** = US FOMC + KR 금통위 결정일 큐레이션(`policy_meetings.json`, 연 1회 수동 갱신). **Tier 2(한국 경제지표 발표일) = 오너 보류 결정** (PoC: 깨끗한 API 없음·kostat HTML 스크래핑만 가능, 유지보수 부담). 나중에 재검토.
 >
 > 🔵 **다음 후보: PHASE4 잔여 = D1 · D2 · C2 · B4** (C1·A4·D4 완료).

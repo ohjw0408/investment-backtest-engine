@@ -309,6 +309,38 @@ def refresh_krx_gold():
             conn.close()
 
 
+def _any_market_open(now_utc=None):
+    """US 정규장(13:30~20:00 UTC) 또는 KR 정규장(00:00~06:30 UTC), 월~금."""
+    from datetime import datetime as _dt
+    now = now_utc or _dt.utcnow()
+    if now.weekday() >= 5:
+        return False
+    m = now.hour * 60 + now.minute
+    us = 13 * 60 + 30 <= m <= 20 * 60
+    kr = 0 <= m <= 6 * 60 + 30
+    return us or kr
+
+
+@celery.task
+def evaluate_alerts():
+    """장중 15분마다 Celery Beat 실행 — 사용자 알림 룰 평가, 발화 시 수신함 적재."""
+    if not _any_market_open():
+        return {"status": "market_closed"}
+    try:
+        from modules.alerts.alert_runner import run_alert_evaluation
+        from modules.price_loader import PriceLoader
+        from modules import auth_manager
+        auth_manager.init_db()  # 워커 프로세스에서 users.db 연결 보장
+        from modules.alerts import alert_store
+        alert_store.init_alerts_db()
+        fired = run_alert_evaluation(PriceLoader())
+        print(f"[evaluate_alerts] {fired} alerts fired")
+        return {"status": "ok", "fired": fired}
+    except Exception as e:
+        print(f"[evaluate_alerts] 오류: {e}")
+        raise
+
+
 @celery.task
 def refresh_macro():
     """거시경제 지표 증분 갱신 (Celery Beat 자동 실행). FRED·ECOS·yfinance 시장지수."""

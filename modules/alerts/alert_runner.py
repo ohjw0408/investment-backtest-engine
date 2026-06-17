@@ -103,7 +103,9 @@ def compute_portfolio_index(loader, tickers, years=6, daily_rebal=True):
             df = None
         if df is None or df.empty or "close" not in df:
             continue
-        m = {str(d): float(c) for d, c in zip(df.index.astype(str), df["close"]) if c == c}
+        # 날짜는 'date' 컬럼(인덱스는 정수). 종목 간 같은 날짜로 정렬해야 일수익이 맞음.
+        dcol = df["date"] if "date" in df else df.index
+        m = {str(d): float(c) for d, c in zip(dcol, df["close"]) if c == c}
         if m:
             series[code] = (w, m)
     if not series:

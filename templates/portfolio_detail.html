@@ -263,7 +263,7 @@ function renderWeight(){
   // 종목 구성 행 (비중 + 배분금액)
   document.getElementById('pdCompose').innerHTML = items.map(t => {
     const val = pdAmount > 0 ? pdAmount * t.weight / 100 : null;
-    return `<div class="pd-row">
+    return `<div class="pd-row" style="cursor:pointer;" title="종목 상세 보기" onclick="location.href='/symbol/${esc(t.code)}'">
       <span class="pd-badge" style="background:${badgeColor(t.badge)}">${esc(t.badge || '—')}</span>
       <span class="pd-code">${esc(t.code)}</span>
       <span class="pd-name">${esc(t.name || '')}</span>

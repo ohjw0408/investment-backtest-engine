@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-17] ux | 알림 인라인 진입점 (토스풍 종 아이콘)
+
+오너: "토스 보고 배워와" — `/alerts` 탭만으론 불친절. 종목 검색·내자산·내포폴에서 바로 설정.
+
+- 공통 위젯 `static/js/alert_widget.js`(바텀시트/센터모달, 자체 CSS): `mmAlert.openSymbol/openAssets/openPortfolio`.
+- 진입점: 네비 검색 드롭다운·`/search` 카드·`/symbol/<code>` 헤더·`/myassets` 상단(리밸런싱+종목별)·
+  `/myportfolios/<id>` 제목줄. base.html 위젯 로드 + `MM_LOGGED_IN`.
+- 신규 API `/api/alerts/context`(내 종목 holdings/portfolios/watchlist). 검증 31 PASS + 4화면 렌더 스모크.
+
 ## [2026-06-17] feature | 알림 기능 (가격·신고가/신저가·리밸런싱, 인앱 수신함)
 
 오너 신규 요청. 기존 플랜 부실(PHASE4=인앱 밴드 배지만) → 새 `알림_plan.md` 작성. 오너 결정: 전달=인앱

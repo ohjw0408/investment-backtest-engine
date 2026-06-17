@@ -108,5 +108,17 @@ ok("DELETE 200", r.status_code == 200)
 ok("삭제 반영",
    all(rr["code"] != "QQQ" for rr in cl.get("/api/alerts/rules").get_json()["rules"]))
 
+# ── 4. /api/alerts/context ──
+am.init_holdings_db(); am.init_portfolios_db()
+am.upsert_holding(UID, "AAPL", quantity=10, avg_price=100)
+am.upsert_portfolio(UID, "성장주", [{"code": "NVDA", "name": "엔비디아"}, {"code": "MSFT", "name": "MS"}])
+ctx = cl.get("/api/alerts/context").get_json()
+ok("context holdings 포함", any(h["code"] == "AAPL" for h in ctx["holdings"]))
+ok("context portfolios 구조",
+   ctx["portfolios"] and ctx["portfolios"][0]["name"] == "성장주"
+   and any(s["code"] == "NVDA" for s in ctx["portfolios"][0]["symbols"]))
+ok("context 비로그인 → logged_in False",
+   __import__("app").app.test_client().get("/api/alerts/context").get_json()["logged_in"] is False)
+
 print(f"\n{_p} PASS / {_f} FAIL")
 sys.exit(1 if _f else 0)

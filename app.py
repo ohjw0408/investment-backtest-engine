@@ -1309,6 +1309,31 @@ def alerts_rules_delete(rule_id):
     return jsonify({'ok': True})
 
 
+@app.route('/api/alerts/context')
+def alerts_context():
+    """알림 설정 진입점용 — 내 종목(보유/포폴/관심) 목록. 그룹 모달에서 사용."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'logged_in': False, 'holdings': [], 'portfolios': [], 'watchlist': []})
+    groups, names = _calendar_grouped(uid)
+    def _syms(codes):
+        return [{'code': c, 'name': names.get(c, c)} for c in codes]
+    portfolios = []
+    try:
+        for pf in get_portfolios(uid):
+            syms = [{'code': str(t['code']).upper(), 'name': t.get('name', t['code'])}
+                    for t in pf.get('tickers', []) if isinstance(t, dict) and t.get('code')]
+            portfolios.append({'id': pf['id'], 'name': pf['name'], 'symbols': syms})
+    except Exception:
+        pass
+    return jsonify({
+        'logged_in': True,
+        'holdings': _syms(groups.get('holdings', [])),
+        'portfolios': portfolios,
+        'watchlist': _syms(groups.get('watchlist', [])),
+    })
+
+
 @app.route('/api/alerts/events')
 def alerts_events_get():
     uid = session.get('user_id')

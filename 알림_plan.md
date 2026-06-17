@@ -16,6 +16,20 @@
   스모크: 로그인/비로그인 렌더 PASS.
 - 설계 미세조정: 리밸런싱 = **holdings asset_groups 실제비중 vs target_pct만**(saved_portfolio는 실보유 없어 비중 비교 제외, 단 그 종목들은 symbol 룰 대상엔 포함). 일간변동률 기준 = **전일 종가 대비**.
 
+### ▶ 후속: 토스풍 인라인 진입점 (2026-06-17, 오너 "토스 보고 배워와")
+
+`/alerts` 허브는 유지하되, 알림 설정을 종목/포폴/자산 화면에서 바로 열도록 종(🔔) 진입점 추가.
+
+- **공통 위젯** `static/js/alert_widget.js` — 바텀시트(모바일)/센터모달(PC), 자체 CSS 주입.
+  `mmAlert.openSymbol(code,name)` / `openAssets()` / `openPortfolio(id)`. 비로그인=로그인 유도.
+  종목 모달=기존 룰 목록(토글/삭제)+세그먼트 빠른추가(변동률·목표가·신고/신저). 그룹 모달=리밸런싱
+  스위치(자산만)+구성종목 리스트(각 행→종목 모달, 설정된 알림 수 배지).
+- **신규 API** `/api/alerts/context` — 내 종목(holdings/portfolios[+id·symbols]/watchlist).
+- **진입점:** 네비 검색 드롭다운·`/search` 카드(🔔)·`/symbol/<code>` 헤더(🔔 알림)·`/myassets` 상단
+  (🔔 알림 설정→리밸런싱+종목별)·`/myportfolios/<id>` 제목줄(🔔 알림→구성종목별). base.html에 위젯
+  로드 + `window.MM_LOGGED_IN`.
+- 검증: test_alerts_api 31 PASS(+context 3) + 4화면 렌더 스모크 PASS.
+
 > 원안(아래)은 그대로 유지 — 참조용.
 
 ---

@@ -86,7 +86,10 @@
   {% else %}
 
   <a href="/myportfolios" class="pd-back">← 내 포트폴리오</a>
-  <div class="pd-title" id="pdName">⏳ 로딩 중...</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <div class="pd-title" id="pdName">⏳ 로딩 중...</div>
+    <button class="mm-alert-btn" onclick="mmAlert.openPortfolio({{ pid }})">🔔 알림</button>
+  </div>
   <div class="pd-sub">총 투자금액만 입력하면 저장된 비중대로 자동 배분해 비중·자산 추이·배당금을 계산합니다.</div>
 
   <!-- 정밀 분석 유도 배너 -->

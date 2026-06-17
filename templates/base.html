@@ -38,6 +38,14 @@
   .mm-bell-it-b { font-size: 0.73rem; color: var(--text-muted); margin-top: 2px; }
   .mm-bell-it-time { font-size: 0.66rem; color: var(--text-muted); margin-top: 3px; }
   .mm-bell-empty { padding: 26px 14px; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
+  .nav-search-bell { margin-left: auto; background: none; border: none; cursor: pointer; font-size: 1rem;
+    padding: 4px 6px; border-radius: 8px; flex-shrink: 0; opacity: 0.65; }
+  .nav-search-bell:hover { opacity: 1; background: var(--bg); }
+  /* 화면별 종 진입 버튼 공통 */
+  .mm-alert-btn { display: inline-flex; align-items: center; gap: 5px; background: var(--card);
+    border: 1.5px solid var(--border); color: var(--text); border-radius: 10px; padding: 7px 13px;
+    font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .mm-alert-btn:hover { border-color: var(--blue); color: var(--blue); }
   </style>
   {% block head %}{% endblock %}
 </head>
@@ -169,6 +177,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.2.0/chartjs-plugin-zoom.min.js"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}?v=20260611ui"></script>
+<script>window.MM_LOGGED_IN = {{ 'true' if user else 'false' }};</script>
+<script src="{{ url_for('static', filename='js/alert_widget.js') }}?v=20260617"></script>
 {% block scripts %}{% endblock %}
 
 <script>
@@ -246,6 +256,7 @@ if (navInput) {
               <div class="nav-search-name">${item.code}</div>
               ${item.subtitle ? `<div class="nav-search-sub">${item.subtitle}</div>` : ''}
             </div>
+            ${window.MM_LOGGED_IN ? `<button class="nav-search-bell" title="알림 설정" onclick="event.stopPropagation();mmAlert.openSymbol('${item.code}','${item.name.replace(/'/g, "\\'")}')">🔔</button>` : ''}
           </div>
         `).join('');
 

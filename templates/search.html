@@ -36,6 +36,9 @@
   display: flex; flex-direction: column; gap: 6px;
 }
 .result-card:hover { border-color: var(--blue-bright); box-shadow: var(--shadow); }
+.result-bell { background: none; border: none; cursor: pointer; font-size: 0.95rem; padding: 2px 4px;
+  border-radius: 7px; opacity: 0.6; }
+.result-bell:hover { opacity: 1; }
 
 .card-top { display: flex; align-items: center; justify-content: space-between; }
 .result-badge {
@@ -153,7 +156,10 @@ input.addEventListener('input', () => {
           <a class="result-card" href="/symbol/${item.code}" data-code="${item.code}">
             <div class="card-top">
               <span class="result-badge" style="background:${color(item.badge)}22;color:${color(item.badge)}">${item.badge}</span>
-              <span class="card-price">${priceStr}</span>
+              <span style="display:flex;align-items:center;gap:8px;">
+                <span class="card-price">${priceStr}</span>
+                ${window.MM_LOGGED_IN ? `<button class="result-bell" title="알림 설정" onclick="event.preventDefault();event.stopPropagation();mmAlert.openSymbol('${item.code}','${(item.name||'').replace(/'/g, "\\'")}')">🔔</button>` : ''}
+              </span>
             </div>
             <div class="card-name">${item.name}</div>
             <div style="display:flex;justify-content:space-between;align-items:center;">

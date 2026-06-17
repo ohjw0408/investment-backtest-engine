@@ -259,6 +259,7 @@ function renderPage(data) {
           <div class="symbol-name">${data.name}</div>
           <div class="symbol-code">${data.code}</div>
         </div>
+        ${window.MM_LOGGED_IN ? `<button class="mm-alert-btn" style="margin-left:6px;" onclick="mmAlert.openSymbol('${data.code}','${(data.name||'').replace(/'/g, "\\'")}')">🔔 알림</button>` : ''}
       </div>
       <div class="symbol-header-right">
         <div class="symbol-price">${fmtPrice(cur, curr)}</div>

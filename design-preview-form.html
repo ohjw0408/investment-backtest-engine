@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>폼/계산기 아키타입 — 상태 포함 (Money Milestone)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --logo:#ff6a00;
+  --brand:#0052ff; --brand-hover:#003ecc; --brand-bright:#4a7dff; --brand-tint:#eaf0ff; --brand-text:#0052ff; --on-brand:#fff;
+  --up:#05b169; --up-tint:#e6f7ef; --down:#cf202f; --down-tint:#fdeaec; --gold:#f4b000;
+  --canvas:#fff; --soft:#f7f7f7; --strong:#eef0f3; --hairline:#dee1e6;
+  --ink:#0a0b0d; --body:#5b616e; --muted:#7c828a;
+  --dark:#0a0b0d;
+  --shadow:0 4px 12px rgba(0,0,0,.04); --shadow-lg:0 8px 32px rgba(0,0,0,.08);
+  --font:'Inter','Noto Sans KR',-apple-system,system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --r-pill:100px; --r-full:9999px;
+}
+[data-theme="dark"]{
+  --brand:#4a7dff; --brand-hover:#6a96ff; --brand-tint:#16223d; --brand-text:#4a7dff;
+  --up:#27c281; --up-tint:#0f2a20; --down:#ff5a5f; --down-tint:#2e1518; --gold:#ffc94d;
+  --canvas:#0a0b0d; --soft:#0f1115; --strong:#1e2127; --hairline:#2a2d33;
+  --ink:#f5f6f8; --body:#a8acb3; --muted:#7c828a;
+  --shadow:0 4px 12px rgba(0,0,0,.4); --shadow-lg:0 8px 32px rgba(0,0,0,.6);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--canvas);color:var(--ink);-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+a{text-decoration:none;color:inherit}
+
+/* nav (홈 목업과 동일 언어) */
+.nav{height:64px;background:var(--canvas);border-bottom:1px solid var(--hairline);display:flex;align-items:center;gap:24px;padding:0 24px;position:sticky;top:0;z-index:50}
+.brand{font-size:19px;font-weight:600;letter-spacing:-.4px;display:flex;align-items:center;gap:9px}
+.brand .mark{width:26px;height:26px;border-radius:7px;background:var(--logo);display:flex;align-items:center;justify-content:center;font-size:14px}
+.brand .ms{color:var(--logo)}
+.nlinks{display:flex;gap:2px;margin-left:8px}
+.nlinks a{font-size:14px;font-weight:500;color:var(--body);padding:8px 12px;border-radius:var(--r-pill)}
+.nlinks a:hover{background:var(--strong);color:var(--ink)}
+.nright{margin-left:auto;display:flex;align-items:center;gap:10px}
+.search{display:flex;align-items:center;gap:8px;background:var(--strong);border-radius:var(--r-pill);padding:9px 16px;width:200px;color:var(--muted);font-size:14px}
+.ibtn{width:40px;height:40px;border-radius:var(--r-full);border:none;background:var(--strong);color:var(--ink);cursor:pointer;font-size:16px}
+
+.shell{display:flex;max-width:1280px;margin:0 auto}
+.side{width:208px;flex-shrink:0;padding:24px 12px;border-right:1px solid var(--hairline);min-height:calc(100vh - 64px)}
+.slabel{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 12px 8px}
+.side a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);font-size:14px;font-weight:500;color:var(--body)}
+.side a:hover{background:var(--soft);color:var(--ink)}
+.side a.active{background:var(--brand-tint);color:var(--brand-text);font-weight:600}
+.main{flex:1;min-width:0;padding:32px}
+
+/* page header */
+.phead{margin-bottom:24px}
+.phead h1{font-size:32px;font-weight:600;letter-spacing:-.6px}
+.phead p{font-size:14px;color:var(--body);margin-top:6px}
+
+/* form layout */
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+.card{background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-xl);overflow:hidden}
+.card-pad{padding:24px}
+.step{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:600;margin-bottom:16px}
+.step .n{width:24px;height:24px;border-radius:var(--r-sm);background:var(--brand);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+.field label{font-size:14px;font-weight:600}
+.field .help{font-size:13px;color:var(--muted)}
+.input,.select{font-family:var(--font);font-size:16px;color:var(--ink);background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-md);padding:12px 14px;width:100%}
+.input:focus,.select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)}
+.field.err .input{border-color:var(--down)}
+.errmsg{font-size:13px;color:var(--down);display:flex;align-items:center;gap:5px}
+.suffix{position:relative}
+.suffix .u{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font);font-size:15px;font-weight:600;padding:13px 22px;border-radius:var(--r-pill);border:none;cursor:pointer}
+.btn-primary{background:var(--brand);color:var(--on-brand)}
+.btn-primary:hover{background:var(--brand-hover)}
+.btn-ghost{background:var(--strong);color:var(--ink)}
+.btn-row{display:flex;gap:10px;margin-top:4px}
+
+/* result panel */
+.res-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;padding:64px 24px;color:var(--muted);min-height:360px}
+.res-empty .ic{font-size:40px;opacity:.5}
+.res-empty .t{font-size:16px;font-weight:600;color:var(--ink)}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--hairline);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--hairline)}
+.metric{background:var(--canvas);padding:18px 20px}
+.metric .k{font-size:13px;color:var(--muted)}
+.metric .v{font-size:24px;font-weight:600;margin-top:4px;font-family:var(--mono)}
+.metric .v.up{color:var(--up)}
+.band{background:var(--dark);color:#fff;border-radius:var(--r-lg);padding:20px;margin-top:18px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.band p{font-size:13px;color:#a8acb3;margin-top:4px}
+
+/* states gallery */
+.gallery{margin-top:48px;border-top:1px dashed var(--hairline);padding-top:28px}
+.gallery h2{font-size:18px;font-weight:600;margin-bottom:6px}
+.gallery .gsub{font-size:13px;color:var(--muted);margin-bottom:20px}
+.gg{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.gbox{border:1px solid var(--hairline);border-radius:var(--r-lg);padding:18px;min-height:150px;display:flex;flex-direction:column}
+.gtag{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em}
+.state{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;gap:8px;color:var(--muted)}
+.spin{width:26px;height:26px;border-radius:var(--r-full);border:3px solid var(--hairline);border-top-color:var(--brand);animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.banner{display:flex;align-items:center;gap:10px;background:var(--down-tint);color:var(--down);border-radius:var(--r-md);padding:12px 14px;font-size:14px;font-weight:500}
+.toast{display:inline-flex;align-items:center;gap:10px;background:var(--up);color:#fff;font-size:14px;font-weight:500;padding:12px 18px;border-radius:var(--r-pill);box-shadow:var(--shadow-lg);align-self:flex-start}
+.dlg{border:1px solid var(--hairline);border-radius:var(--r-lg);overflow:hidden}
+.dlg-b{padding:16px;font-size:14px;color:var(--body)}
+.dlg-t{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.dlg-f{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--hairline)}
+.dlg-f .btn{padding:8px 16px;font-size:14px}
+.skel{height:14px;border-radius:6px;background:linear-gradient(90deg,var(--soft),var(--strong),var(--soft));background-size:200% 100%;animation:sh 1.3s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+
+.hint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--canvas);font-size:13px;padding:10px 18px;border-radius:var(--r-pill);box-shadow:var(--shadow-lg)}
+@media(max-width:980px){.side{display:none}.cols{grid-template-columns:1fr}.gg{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="brand"><span class="mark">📈</span>Money <span class="ms">Milestone</span></div>
+  <div class="nlinks"><a>홈</a><a>계산기 ▾</a><a>분석 ▾</a><a>시장 ▾</a><a>내 자산 ▾</a></div>
+  <div class="nright"><div class="search">🔍 종목, ETF 검색…</div><button class="ibtn" id="tg">🌙</button></div>
+</nav>
+<div class="shell">
+  <aside class="side">
+    <div class="slabel">계산기</div>
+    <a class="active">🧮 투자 계산기</a><a>💰 배당금 계산기</a><a>⚡ 간편 계산기</a><a>🔄 ISA 전환</a><a>🌅 은퇴 설계</a>
+  </aside>
+  <main class="main">
+    <div class="phead">
+      <h1>투자 계산기</h1>
+      <p>포트폴리오를 구성하고 미래 자산을 시뮬레이션합니다.</p>
+    </div>
+
+    <div class="cols">
+      <!-- 입력 폼 + 검증에러 상태 -->
+      <section class="card card-pad">
+        <div class="step"><span class="n">1</span> 투자 금액</div>
+        <div class="field">
+          <label>초기 투자금</label>
+          <div class="suffix"><input class="input mono" value="10,000,000"><span class="u">원</span></div>
+          <div class="help">₩10,000,000</div>
+        </div>
+        <div class="field err">
+          <label>월 적립액</label>
+          <div class="suffix"><input class="input mono" value="-50,000"><span class="u">원</span></div>
+          <div class="errmsg">⚠ 0 이상의 금액을 입력하세요</div>
+        </div>
+        <div class="field">
+          <label>투자 기간</label>
+          <select class="select"><option>20년</option><option>10년</option><option>30년</option></select>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary">시뮬레이션 실행</button>
+          <button class="btn btn-ghost">초기화</button>
+        </div>
+      </section>
+
+      <!-- 결과 패널 (채워진 상태) -->
+      <section class="card card-pad">
+        <div class="step"><span class="n">2</span> 시뮬레이션 결과</div>
+        <div class="metrics">
+          <div class="metric"><div class="k">예상 최종 자산</div><div class="v">₩4.82억</div></div>
+          <div class="metric"><div class="k">총 수익률</div><div class="v up">+182%</div></div>
+          <div class="metric"><div class="k">연평균(CAGR)</div><div class="v">9.4%</div></div>
+          <div class="metric"><div class="k">납입 원금</div><div class="v">₩2.2억</div></div>
+        </div>
+        <div class="band">
+          <div><div style="font-size:16px;font-weight:600">백테스트로 검증하기</div><p>이 포트폴리오를 과거 30년 데이터로 돌려봅니다.</p></div>
+          <button class="btn btn-primary">백테스트 ›</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===== 상태 갤러리 ===== -->
+    <section class="gallery">
+      <h2>상태 — 모든 페이지 공통 (공용 컴포넌트)</h2>
+      <div class="gsub">결과 없음·로딩·에러·검증실패·토스트·확인창. 페이지마다 새로 안 만들고 이 한 세트를 전부 재사용 → 어느 페이지든 같은 결.</div>
+      <div class="gg">
+        <div class="gbox"><div class="gtag">빈 상태 (결과 전)</div>
+          <div class="state"><div style="font-size:36px;opacity:.5">📊</div><div style="font-weight:600;color:var(--ink)">결과가 여기 표시됩니다</div><div style="font-size:13px">왼쪽에서 값을 입력하고 실행하세요</div></div></div>
+        <div class="gbox"><div class="gtag">로딩</div>
+          <div class="state"><div class="spin"></div><div>계산 중…</div>
+            <div style="width:100%;display:flex;flex-direction:column;gap:8px;margin-top:12px"><div class="skel" style="width:80%"></div><div class="skel" style="width:60%"></div><div class="skel"></div></div></div></div>
+        <div class="gbox"><div class="gtag">에러 배너</div>
+          <div class="state" style="justify-content:flex-start"><div class="banner">⚠ 데이터를 불러오지 못했어요. 다시 시도해주세요.</div></div></div>
+        <div class="gbox"><div class="gtag">검증 실패 (필드)</div>
+          <div class="field err" style="margin:0"><label>목표가</label><input class="input" value="abc"><div class="errmsg">⚠ 숫자만 입력 가능합니다</div></div></div>
+        <div class="gbox"><div class="gtag">토스트 (성공)</div>
+          <div class="state" style="justify-content:center"><div class="toast">✓ 포트폴리오가 저장됐어요</div></div></div>
+        <div class="gbox" style="padding:0"><div class="gtag" style="padding:18px 18px 0">확인창 (confirm 교체)</div>
+          <div class="dlg" style="border:none"><div class="dlg-b"><div class="dlg-t">알림을 삭제할까요?</div>이 작업은 되돌릴 수 없습니다.</div>
+            <div class="dlg-f"><button class="btn btn-ghost">취소</button><button class="btn btn-primary" style="background:var(--down)">삭제</button></div></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="hint">🧩 폼/계산기 아키타입 + 상태 세트 · 우측 상단 🌙 라이트/다크</div>
+<script>document.getElementById('tg').onclick=function(){var h=document.documentElement,d=h.getAttribute('data-theme')==='dark';h.setAttribute('data-theme',d?'light':'dark');this.textContent=d?'🌙':'☀️';};</script>
+</body>
+</html>

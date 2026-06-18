@@ -1,8 +1,26 @@
 # 디자인 통일 작업 계획 — 코인베이스 룩 · 주황 voltage
 
-> 작성: 2026-06-18 · 상태: 계획 확정 대기
+> 작성: 2026-06-18 · 상태: 진행 중 (P0~P1 일부)
 > 목적: 24개 페이지의 산재된 디자인(인라인 732곳·`<style>` 20곳·동적 UI 다수)을
 > 하나의 디자인 시스템으로 통일. **단순 리스킨이 아니라 UX/UI 전면 개선 + 기능 100% 보존.**
+
+---
+
+## ▶ 다음 세션 시작점 (2026-06-18 정리)
+
+**확정 방식 (오너 결정):**
+- **접근 = B 점진**: 100% 한 방 ❌. 골격 일관화 → 목업 대비 부품 하나씩 폴리시. (단계마다 검증·롤백 가능, 재작업 최소)
+- **검증 = 옵션 2**: 로컬 서버 + dev 세션 로그인(`tests/mint_session.py`)으로 디자인 검증 (로컬=라이브 동일 코드라 디자인은 픽셀 동일, 차이는 오너 실데이터뿐). 데이터 의존 부분만 오너가 라이브 스팟체크. Playwright로 입력→결과 실동작까지 확인.
+- 검증 절차: `venv\Scripts\python.exe app.py` (백그라운드) → `mint_session.py`로 쿠키 → Playwright(프로젝트 폴더서 `node`, ESM `import {chromium} from 'playwright'`)로 스샷 → `design-shots/`(gitignored).
+
+**현재 상태:**
+- ✅ P0 파운데이션(토큰·components.css·액센트 10색) · 네비 셸(상단 그룹드롭+사이드바) · **홈 재구성(목업 충실: CTA·다크밴드·여백)**
+- ⚠️ **재작업 대기(1차 리스킨분)**: calendar·macro·search·alerts → 아키타입 밀도로 다시
+- ❌ 미착수: 폼(calculator·dividend·retirement·tax_switch·simple·settings·tax_settings) · 분석(backtest·risk_return·symbol) · 리스트(myportfolios·myassets·portfolio_detail·share)
+
+**홈 잔여 폴리시(목업 100% 위해):** 차트(Chart.js→목업 SVG풍?) · 시장카드 티커 서브라인 · 자산패널(원형아이콘 행+가로 스택바) · 마스킹/빈 상태 디자인. = 부품 단위 폴리시 항목.
+
+**다음 세션 첫 작업:** 검증 루프 띄우고(로컬+mint_session) → 홈 부품 폴리시 OR 폼 아키타입 묶음 착수. 오너와 시작 페이지 합의.
 
 ---
 

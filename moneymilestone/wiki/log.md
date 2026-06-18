@@ -1,5 +1,18 @@
 # Log
 
+## [2026-06-19] UX | 내 자산(myassets) 홈패턴 이식 — 깊이·duotone·pill탭·비로그인 데모
+
+오너 결정: 홈 완성 후 타페이지 확장 시작, **내자산부터**. 홈에서 만족한 5포인트(구조>색칠·duotone·깊이·가짜숫자 데모·기능타일) 이식. `templates/myassets.html` 단일 파일.
+
+- **깊이감**: `.main-content` 배경 라이트 `--ds-soft`↓/다크 `--ds-canvas`. `.ma-card` = `--ds-canvas`+`--ds-shadow`(전경분리), 다크 `--ds-dark-el`+border 투명.
+- **pill 탭**: `.ma-tabs/.ma-tab` 박스테두리→pill(홈 위젯탭 결, 활성=`--ds-ink` 채움).
+- **duotone 아이콘**: 이모지 전면 SVG. 템플릿=**로컬 `mi()` Jinja 매크로 12종**(briefcase·chart·scale·plus·layers·pie·shield·trend·coins·calendar·refresh·x·bell, nicon 결동일 F/S 2겹). ⚠️ nicon은 base.html 전용(자식호출 선례無)이라 페이지 로컬 매크로로. JS렌더부=`MAICON`(pencil/trash/undo) + `.icon-btn svg{13px}` 사이징.
+- **비로그인 데모**: 🔒"로그인 필요" 텍스트 → **데모 미리보기 카드**(삼성전자·SPY 2행, 점선카드+"예시"워터마크+"예시 데이터"배지+상단 "데모 미리보기입니다" 배너). 실데이터 착각 차단이 핵심(오너 강조). Google 로그인 CTA.
+- **차트색 토큰 바인딩**: 하드코드 `#1a73e8`(자산추이)·`#1976D2`(배당막대)·`#2E7D32/#C62828`(수익률) → `--brand`(getComputedStyle 그라데)·`var(--up)/var(--down)`(인라인). 예측 주황·비중 파이 유저색·중립 회색은 시맨틱 유지.
+- **버그 동시수정**: 모달 닫기버튼 — JS `getElementById('modalHoldingTitle').textContent=...`가 div 전체 덮어써 **X 버튼 매번 소멸하던 기존 버그**. id를 내부 `<span>`으로 이전(닫기버튼 보존+아이콘 표시).
+
+검증(배선만, 육안=오너 서버확인): Jinja 컴파일 OK · 비로그인/로그인 분기 정확(데모마크업↔탭) · JS참조 ID 30종 전부 존재 · 크롬 이모지 잔여 0 · 양쪽 status 200. 인라인 style/script라 캐시버전 무관. **다음 = 오너 서버 육안 → 피드백 반영, 이후 calculator or backtest.**
+
 ## [2026-06-18] UX | 홈 깊이감 — 전경/후경 분리(음영, 색 추가 없이)
 
 오너: 홈이 라이트·다크 둘 다 단색이라 어색, 카드와 배경 분리 안 됨(홈만 `.main-content` 배경을 흰 canvas로 깔아 흰 카드와 동색 → 평평. 타 페이지는 soft 배경이라 깊이 있음).

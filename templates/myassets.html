@@ -1,19 +1,54 @@
 {% extends "base.html" %}
 {% block title %}내 자산 — Money Milestone{% endblock %}
 
+{# duotone 아이콘: 반투명 면 + currentColor 선 (홈/nicon과 동일 결) #}
+{%- macro mi(n) -%}
+{%- set A = 'class="si-ic" viewBox="0 0 24 24"' -%}
+{%- set F = 'fill="currentColor" fill-opacity=".2"' -%}
+{%- set S = 'fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"' -%}
+{%- if n == 'briefcase' -%}<svg {{ A|safe }}><rect x="3" y="7.5" width="18" height="12.5" rx="2.4" {{ F|safe }}/><rect x="3" y="7.5" width="18" height="12.5" rx="2.4" {{ S|safe }}/><path {{ S|safe }} d="M8 7.5V5.6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1.9M3 13h18"/></svg>
+{%- elif n == 'chart' -%}<svg {{ A|safe }}><path {{ F|safe }} d="M6 11h3v7H6zM11 6h3v12h-3zM16 14h3v4h-3z"/><path {{ S|safe }} d="M4 20h16M6 18v-7h3v7M11 18V6h3v12M16 18v-4h3v4"/></svg>
+{%- elif n == 'scale' -%}<svg {{ A|safe }}><path {{ F|safe }} d="M5 7 2.5 13a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z"/><path {{ S|safe }} d="M12 3v18M7 21h10M5 7h14M5 7 2.5 13a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z"/></svg>
+{%- elif n == 'plus' -%}<svg {{ A|safe }}><circle cx="12" cy="12" r="9" {{ F|safe }}/><circle cx="12" cy="12" r="9" {{ S|safe }}/><path {{ S|safe }} d="M12 8v8M8 12h8"/></svg>
+{%- elif n == 'layers' -%}<svg {{ A|safe }}><path {{ F|safe }} d="m12 3 9 5-9 5-9-5z"/><path {{ S|safe }} d="m12 3 9 5-9 5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5"/></svg>
+{%- elif n == 'pie' -%}<svg {{ A|safe }}><path {{ F|safe }} d="M12 3a9 9 0 1 0 9 9h-9z"/><path {{ S|safe }} d="M12 3a9 9 0 1 0 9 9h-9z"/><path {{ S|safe }} d="M14 3.2A9 9 0 0 1 20.8 10H14z"/></svg>
+{%- elif n == 'shield' -%}<svg {{ A|safe }}><path {{ F|safe }} d="M12 3 5 6v5c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6z"/><path {{ S|safe }} d="M12 3 5 6v5c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6zM9.2 12l1.9 1.9 3.7-3.8"/></svg>
+{%- elif n == 'trend' -%}<svg {{ A|safe }}><path {{ F|safe }} d="M4 20V4l4 8 4-4 8 6v6z"/><path {{ S|safe }} d="M3 17l5-5 4 4 8-9M21 7v4h-4"/></svg>
+{%- elif n == 'coins' -%}<svg {{ A|safe }}><ellipse cx="12" cy="6" rx="7" ry="3" {{ F|safe }}/><path {{ S|safe }} d="M19 6c0 1.7-3.1 3-7 3S5 7.7 5 6s3.1-3 7-3 7 1.3 7 3z"/><path {{ S|safe }} d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
+{%- elif n == 'calendar' -%}<svg {{ A|safe }}><rect x="3" y="5" width="18" height="16" rx="2.6" {{ F|safe }}/><rect x="3" y="5" width="18" height="16" rx="2.6" {{ S|safe }}/><path {{ S|safe }} d="M3 9.5h18M8 3v3.5M16 3v3.5"/></svg>
+{%- elif n == 'refresh' -%}<svg {{ A|safe }}><path {{ S|safe }} d="M21 12a9 9 0 1 1-2.6-6.4M21 3v5h-5"/></svg>
+{%- elif n == 'x' -%}<svg {{ A|safe }}><path {{ S|safe }} d="M6 6l12 12M18 6 6 18"/></svg>
+{%- elif n == 'bell' -%}<svg {{ A|safe }}><path {{ F|safe }} d="M6 9a6 6 0 0 1 12 0c0 6 2.5 6.5 3 8H3c.5-1.5 3-2 3-8z"/><path {{ S|safe }} d="M6 9a6 6 0 0 1 12 0c0 6 2.5 6.5 3 8H3c.5-1.5 3-2 3-8M10 20a2 2 0 0 0 4 0"/></svg>
+{%- endif -%}
+{%- endmacro -%}
+
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260618ds">
 <style>
+/* 깊이: 배경 한 톤 낮춤(후경) + 카드 띄움(전경) — 홈과 동일 패턴 */
+.main-content { background: var(--ds-soft); }
+[data-theme="dark"] .main-content { background: var(--ds-canvas); }
 .ma-wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
 
-/* 탭 */
-.ma-tabs { display: flex; gap: 0; margin-bottom: 20px; border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; width: fit-content; }
-.ma-tab  { padding: 9px 20px; background:var(--card); cursor: pointer; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); border: none; }
-.ma-tab.active { background: var(--blue); color: white; }
+/* 아이콘 (duotone) */
+.ic { width: 18px; height: 18px; flex-shrink: 0; vertical-align: -3px; }
+.si-ic { width: 18px; height: 18px; flex-shrink: 0; vertical-align: -3px; }
+.ma-card-title .si-ic, .ma-card-title .ic { color: var(--brand-text); }
 
-/* 카드 */
-.ma-card { background:var(--card); border-radius: 14px; border: 1.5px solid var(--border); padding: 20px; margin-bottom: 16px; }
-.ma-card-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+/* 탭 — pill (홈 위젯탭과 동일) */
+.ma-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.ma-tab  { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: transparent;
+  border: 1px solid var(--ds-hairline); border-radius: var(--r-pill); cursor: pointer; font-size: 0.85rem;
+  font-weight: 600; color: var(--ds-body); font-family: inherit; }
+.ma-tab:hover { border-color: var(--ds-muted); color: var(--ds-ink); }
+.ma-tab.active { background: var(--ds-ink); color: var(--ds-canvas); border-color: var(--ds-ink); }
+.ma-tab.active .si-ic, .ma-tab.active .ic { color: var(--ds-canvas); }
+
+/* 카드 — 헤어라인 + 그림자(전경 분리) */
+.ma-card { background: var(--ds-canvas); border-radius: var(--r-xl); border: 1px solid var(--ds-hairline);
+  box-shadow: var(--ds-shadow); padding: 20px; margin-bottom: 16px; }
+[data-theme="dark"] .ma-card { background: var(--ds-dark-el); border-color: transparent; }
+.ma-card-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 7px; justify-content: space-between; }
 
 /* 종목 테이블 */
 .holdings-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
@@ -33,6 +68,8 @@
 .icon-btn { width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--border); background:var(--card); cursor: pointer; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; }
 .icon-btn:hover { border-color: var(--blue); color: var(--blue); }
 .icon-btn.danger:hover { border-color:var(--red); color:var(--red); }
+.icon-btn svg, .bic { width: 13px; height: 13px; display: inline-block; vertical-align: middle; }
+#refreshHoldingsBtn svg { width: 15px; height: 15px; }
 
 /* 모달 */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: none; align-items: center; justify-content: center; }
@@ -82,6 +119,32 @@
 .summary-value { font-size: 1.05rem; font-weight: 800; }
 
 .login-required { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+
+/* ── 비로그인 데모 미리보기 (실데이터 아님 — 명확히 표시) ── */
+.ma-demo { max-width: 720px; margin: 0 auto; }
+.ma-demo-banner { display: flex; align-items: center; gap: 10px; background: var(--brand-tint);
+  color: var(--brand-text); border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  border-radius: var(--r-lg); padding: 12px 16px; font-size: 0.86rem; font-weight: 600; margin-bottom: 16px; }
+.ma-demo-banner .si-ic { color: var(--brand-text); }
+/* 데모 카드 = 점선 테두리 + 워터마크로 "예시"임을 강조 */
+.ma-demo-card { position: relative; background: var(--ds-canvas); border: 1.5px dashed var(--ds-hairline);
+  border-radius: var(--r-xl); padding: 20px; overflow: hidden; }
+[data-theme="dark"] .ma-demo-card { background: var(--ds-dark-el); border-color: var(--ds-hairline); }
+.ma-demo-card .ma-card-title { color: var(--ds-ink); }
+.ma-demo-tag { font-size: 0.7rem; font-weight: 700; color: var(--brand-text); background: var(--brand-tint);
+  border-radius: var(--r-pill); padding: 2px 9px; }
+.ma-demo-wm { position: absolute; right: -10px; bottom: -18px; font-size: 5.5rem; font-weight: 900;
+  color: var(--ds-ink); opacity: 0.05; letter-spacing: -2px; pointer-events: none; user-select: none; transform: rotate(-8deg); }
+.ma-demo-tbl { width: 100%; border-collapse: collapse; font-size: 0.86rem; position: relative; z-index: 1; }
+.ma-demo-tbl th { text-align: left; color: var(--ds-muted); font-weight: 600; font-size: 0.76rem; padding: 6px 8px; border-bottom: 1px solid var(--ds-hairline); }
+.ma-demo-tbl td { padding: 9px 8px; border-bottom: 1px solid var(--ds-hairline); color: var(--ds-ink); }
+.ma-demo-tbl tr:last-child td { border-bottom: none; }
+.ma-demo-tbl .num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+.ma-demo-cta { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 22px; text-align: center; }
+.ma-demo-cta .g-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--brand); color: var(--on-brand);
+  border-radius: var(--r-pill); padding: 12px 26px; font-size: 0.95rem; font-weight: 600; text-decoration: none; }
+.ma-demo-cta .g-btn:hover { background: var(--brand-hover); }
+.ma-demo-sub { font-size: 0.8rem; color: var(--ds-muted); }
 
 @media (max-width: 768px) {
   .ma-wrap { padding: 14px 12px; }
@@ -134,22 +197,43 @@
 <div class="ma-wrap">
 
   {% if not user %}
-  <div class="login-required">
-    <div style="font-size:2rem;margin-bottom:12px;">🔒</div>
-    <div style="font-weight:700;font-size:1rem;margin-bottom:8px;">로그인이 필요합니다</div>
-    <a href="/auth/google" style="display:inline-block;margin-top:12px;padding:10px 24px;background:var(--blue);color:white;border-radius:8px;text-decoration:none;font-weight:700;">Google로 로그인</a>
+  <div class="ma-demo">
+    <div class="ma-demo-banner">{{ mi('briefcase') }} 데모 미리보기입니다 — 로그인하면 내 실제 자산이 여기에 표시됩니다.</div>
+    <div class="ma-demo-card">
+      <div class="ma-demo-wm">예시</div>
+      <div class="ma-card-title">보유 종목 <span class="ma-demo-tag">예시 데이터</span></div>
+      <table class="ma-demo-tbl">
+        <thead><tr><th>종목</th><th class="num">평가금액</th><th class="num">비중</th><th class="num">수익률</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>삼성전자</b> <span style="color:var(--ds-muted);font-size:0.74rem;">005930</span></td>
+            <td class="num">₩4,820,000</td><td class="num">36%</td>
+            <td class="num" style="color:var(--up);font-weight:600;">+12.4%</td>
+          </tr>
+          <tr>
+            <td><b>SPY</b> <span style="color:var(--ds-muted);font-size:0.74rem;">S&amp;P 500</span></td>
+            <td class="num">₩8,560,000</td><td class="num">64%</td>
+            <td class="num" style="color:var(--up);font-weight:600;">+9.1%</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="ma-demo-cta">
+        <a href="/auth/google" class="g-btn">{{ mi('plus') }} Google로 로그인하고 내 자산 추가</a>
+        <div class="ma-demo-sub">실시간 시세 · 배당 일정 · 리밸런싱까지 자동 추적</div>
+      </div>
+    </div>
   </div>
   {% else %}
 
   <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-    <button class="mm-alert-btn" onclick="mmAlert.openAssets()">🔔 알림 설정</button>
+    <button class="mm-alert-btn" onclick="mmAlert.openAssets()">{{ mi('bell') }} 알림 설정</button>
   </div>
 
   <div class="ma-tabs">
-    <button class="ma-tab active" onclick="showTab('overview')">📊 자산 현황</button>
-    <button class="ma-tab" onclick="showTab('rebalance')">⚖️ 리밸런싱</button>
-    <button class="ma-tab" onclick="showTab('purchase')">➕ 추가매수</button>
-    <button class="ma-tab" onclick="showTab('groups')">🗂 그룹 관리</button>
+    <button class="ma-tab active" onclick="showTab('overview')">{{ mi('chart') }} 자산 현황</button>
+    <button class="ma-tab" onclick="showTab('rebalance')">{{ mi('scale') }} 리밸런싱</button>
+    <button class="ma-tab" onclick="showTab('purchase')">{{ mi('plus') }} 추가매수</button>
+    <button class="ma-tab" onclick="showTab('groups')">{{ mi('layers') }} 그룹 관리</button>
   </div>
 
   <!-- 자산 현황 탭 -->
@@ -167,9 +251,9 @@
 
     <div class="ma-card">
       <div class="ma-card-title">
-        💼 보유 종목
+        <span style="display:inline-flex;gap:7px;align-items:center;">{{ mi('briefcase') }} 보유 종목</span>
         <span style="display:inline-flex;gap:8px;align-items:center;">
-          <button id="refreshHoldingsBtn" class="icon-btn" title="최신 시세로 새로고침 (서버 캐시 15분)" onclick="refreshHoldings()">🔄</button>
+          <button id="refreshHoldingsBtn" class="icon-btn" title="최신 시세로 새로고침 (서버 캐시 15분)" onclick="refreshHoldings()">{{ mi('refresh') }}</button>
           <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="openAddHolding()">+ 종목 추가</button>
         </span>
       </div>
@@ -180,7 +264,7 @@
     </div>
 
     <div class="ma-card">
-      <div class="ma-card-title">📈 자산 구성</div>
+      <div class="ma-card-title">{{ mi('pie') }} 자산 구성</div>
       <div id="summaryGrid" class="summary-grid"></div>
       <div style="position:relative;height:260px;">
         <canvas id="weightChart"></canvas>
@@ -188,14 +272,14 @@
     </div>
 
     <div class="ma-card" id="attrCard" style="display:none;">
-      <div class="ma-card-title">🛡️ 상승 견인 · 하락 방어</div>
+      <div class="ma-card-title">{{ mi('shield') }} 상승 견인 · 하락 방어</div>
       <div id="attrBody" style="font-size:0.92rem;line-height:1.7;"></div>
       <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">* 최근 6년·보유 비중 기준. 종목 기여 = 비중 × 수익. 시세 15분 지연.</div>
     </div>
 
     <div class="ma-card">
       <div class="ma-card-title" style="display:flex;align-items:center;justify-content:space-between;">
-        <span>📊 자산 추이</span>
+        <span style="display:inline-flex;gap:7px;align-items:center;">{{ mi('trend') }} 자산 추이</span>
         <div style="display:flex;gap:6px;">
           <button class="ma-period-btn active" onclick="setHistoryPeriod(30,this)">1개월</button>
           <button class="ma-period-btn" onclick="setHistoryPeriod(90,this)">3개월</button>
@@ -212,7 +296,7 @@
     <!-- 배당금 -->
     <div class="ma-card" id="divCard">
       <div class="ma-card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-        <span>💵 배당금</span>
+        <span style="display:inline-flex;gap:7px;align-items:center;">{{ mi('coins') }} 배당금</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
           <button class="div-tgl active" data-div-tax="pretax">세전</button>
           <button class="div-tgl" data-div-tax="posttax">세후</button>
@@ -230,7 +314,7 @@
       </div>
       <div id="divDrill" style="margin-top:12px;"></div>
       <div id="divCalWrap" style="margin-top:18px;">
-        <div class="ma-card-title" style="font-size:0.85rem;margin-bottom:8px;">📅 배당 일정 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 월 칸을 누르면 종목별 내역</span></div>
+        <div class="ma-card-title" style="font-size:0.85rem;margin-bottom:8px;">{{ mi('calendar') }} 배당 일정 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 월 칸을 누르면 종목별 내역</span></div>
         <div id="divMonthGrid" class="div-month-grid"></div>
         <div id="divMonthDetail"></div>
         <div id="divCal" class="div-list" style="margin-top:10px;"></div>
@@ -254,7 +338,7 @@
     </div>
     <div class="ma-card">
       <div class="ma-card-title">
-        ⚖️ 리밸런싱 계산
+        <span style="display:inline-flex;gap:7px;align-items:center;">{{ mi('scale') }} 리밸런싱 계산</span>
         <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">그룹별 목표 비중 기준</span>
       </div>
       <div id="rebalStatus" style="min-height:60px;margin-bottom:4px;"></div>
@@ -269,7 +353,7 @@
   <!-- 추가매수 탭 -->
   <div id="tab-purchase" style="display:none;">
     <div class="ma-card">
-      <div class="ma-card-title">➕ 추가매수 계산</div>
+      <div class="ma-card-title">{{ mi('plus') }} 추가매수 계산</div>
       <div class="input-row" style="max-width:300px;">
         <label>추가 투자금액</label>
         <div class="input-group">
@@ -286,7 +370,7 @@
   <div id="tab-groups" style="display:none;">
     <div class="ma-card">
       <div class="ma-card-title">
-        🗂 자산 그룹
+        <span style="display:inline-flex;gap:7px;align-items:center;">{{ mi('layers') }} 자산 그룹</span>
         <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="openAddGroup()">+ 그룹 추가</button>
       </div>
       <div id="groupsWrap"></div>
@@ -296,7 +380,7 @@
   <!-- 종목 추가 모달 -->
   <div class="modal-overlay" id="modalHolding">
     <div class="modal-box">
-      <div class="modal-title" id="modalHoldingTitle" style="display:flex;justify-content:space-between;align-items:center;">종목 추가 <button onclick="closeModal('modalHolding')" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted);">✕</button></div>
+      <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center;"><span id="modalHoldingTitle">종목 추가</span> <button onclick="closeModal('modalHolding')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);display:inline-flex;">{{ mi('x') }}</button></div>
       <input type="hidden" id="holdingId">
 
       <div class="input-row">
@@ -352,7 +436,7 @@
   <!-- 그룹 추가 모달 -->
   <div class="modal-overlay" id="modalGroup">
     <div class="modal-box">
-      <div class="modal-title" id="modalGroupTitle" style="display:flex;justify-content:space-between;align-items:center;">그룹 추가 <button onclick="closeModal('modalGroup')" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted);">✕</button></div>
+      <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center;"><span id="modalGroupTitle">그룹 추가</span> <button onclick="closeModal('modalGroup')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);display:inline-flex;">{{ mi('x') }}</button></div>
       <input type="hidden" id="groupId">
       <div class="input-row">
         <label>그룹명</label>
@@ -389,6 +473,15 @@ let prices   = {};
 let manualCodes = [];
 let weightChart = null;
 let hideAmounts = true;
+
+// JS 렌더용 아이콘 (Jinja 매크로는 JS에서 못 써 별도 정의 — duotone 결 동일)
+const _SS = 'class="bic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"';
+const MAICON = {
+  pencil: `<svg ${_SS}><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>`,
+  trash:  `<svg ${_SS}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"/></svg>`,
+  undo:   `<svg ${_SS}><path d="M9 7 4 12l5 5M4 12h11a5 5 0 0 1 0 10"/></svg>`,
+};
+function _cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
 function fmtKRW(v) {
   if (hideAmounts) return '***,***,***원';
@@ -544,8 +637,8 @@ function renderHoldings() {
             <td data-label="현재가" style="white-space:nowrap;">
               ${fmtKRW(cur)}
               ${isManual ? '<span title="수동 입력 가격" style="font-size:0.62rem;font-weight:800;color:var(--blue);background:var(--blue-pale);border-radius:4px;padding:1px 5px;margin-left:4px;">수동</span>' : ''}
-              <button class="icon-btn" style="width:22px;height:22px;font-size:0.72rem;margin-left:2px;" title="수동 가격 입력" onclick="setManual(${h.id}, ${cur})">✎</button>
-              ${isManual ? `<button class="icon-btn" style="width:22px;height:22px;font-size:0.72rem;" title="자동 시세로 복귀" onclick="clearManual(${h.id})">↺</button>` : ''}
+              <button class="icon-btn" style="width:22px;height:22px;margin-left:2px;" title="수동 가격 입력" onclick="setManual(${h.id}, ${cur})">${MAICON.pencil}</button>
+              ${isManual ? `<button class="icon-btn" style="width:22px;height:22px;" title="자동 시세로 복귀" onclick="clearManual(${h.id})">${MAICON.undo}</button>` : ''}
             </td>
             <td data-label="평가금액"><b>${fmtKRW(val)}</b></td>
             <td data-label="비중">
@@ -554,12 +647,12 @@ function renderHoldings() {
                 <div class="weight-progress"><div class="weight-fill" style="width:${(wt*100).toFixed(1)}%;background:${gc}"></div></div>
               </div>
             </td>
-            <td class="h-return" data-label="수익률" style="font-weight:700;color:${ret===null?'var(--text-muted)':ret>=0?'#2E7D32':'#C62828'}">
+            <td class="h-return" data-label="수익률" style="font-weight:700;color:${ret===null?'var(--text-muted)':ret>=0?'var(--up)':'var(--down)'}">
               ${ret===null?'—':(ret>=0?'+':'')+fmtPct(ret)}
             </td>
             <td class="h-actions">
-              <button class="icon-btn" onclick="openEditHolding(${h.id})" title="수정">✏️</button>
-              <button class="icon-btn danger" onclick="deleteHolding(${h.id})" title="삭제">🗑</button>
+              <button class="icon-btn" onclick="openEditHolding(${h.id})" title="수정">${MAICON.pencil}</button>
+              <button class="icon-btn danger" onclick="deleteHolding(${h.id})" title="삭제">${MAICON.trash}</button>
             </td>
           </tr>`;
         }).join('')}
@@ -576,7 +669,7 @@ function renderSummary() {
   document.getElementById('summaryGrid').innerHTML = [
     { label: '총 평가금액', value: fmtKRW(totalValue), cls: '' },
     { label: '총 매입금액', value: fmtKRW(totalCost), cls: '' },
-    { label: '총 수익률',   value: (totalReturn>=0?'+':'')+fmtPct(totalReturn), cls: totalReturn>=0?'#2E7D32':'#C62828' },
+    { label: '총 수익률',   value: (totalReturn>=0?'+':'')+fmtPct(totalReturn), cls: totalReturn>=0?'var(--up)':'var(--down)' },
     { label: '보유 종목 수', value: holdings.length+'개', cls: '' },
   ].map(i=>`<div class="summary-item"><div class="summary-label">${i.label}</div><div class="summary-value" style="color:${i.cls||'var(--text)'}">${i.value}</div></div>`).join('');
 
@@ -801,8 +894,8 @@ function renderGroups() {
       <div style="width:14px;height:14px;border-radius:50%;background:${g.color};flex-shrink:0;"></div>
       <span style="flex:1;font-weight:600;">${g.name}</span>
       <span style="color:var(--text-muted);font-size:0.82rem;">목표 ${g.target_pct}%</span>
-      <button class="icon-btn" onclick="openEditGroup(${g.id})">✏️</button>
-      <button class="icon-btn danger" onclick="deleteGroup(${g.id})">🗑</button>
+      <button class="icon-btn" onclick="openEditGroup(${g.id})" title="수정">${MAICON.pencil}</button>
+      <button class="icon-btn danger" onclick="deleteGroup(${g.id})" title="삭제">${MAICON.trash}</button>
     </div>
   `).join('');
 }
@@ -1011,7 +1104,8 @@ function renderDivYear() {
   const monthly  = Array(12).fill(0);
   const monthProj = Array(12).fill(false);
   evs.forEach(e => { monthly[e.month - 1] += _valOf(e); if (e.projected) monthProj[e.month - 1] = true; });
-  const colors = monthProj.map(p => p ? 'rgba(251,140,0,0.7)' : '#1976D2');
+  const _divBrand = _cssVar('--brand') || '#0052ff';
+  const colors = monthProj.map(p => p ? 'rgba(251,140,0,0.7)' : _divBrand);
 
   const labels = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   const ctx = document.getElementById('divChart').getContext('2d');
@@ -1212,6 +1306,9 @@ function renderHistoryChart(days) {
   }
 
   const ctx = document.getElementById('maHistoryChart').getContext('2d');
+  const _brand = _cssVar('--brand') || '#0052ff';
+  const _grad = ctx.createLinearGradient(0, 0, 0, 160);
+  _grad.addColorStop(0, _brand + '2e'); _grad.addColorStop(1, _brand + '00');
   if (_maHistoryChart) _maHistoryChart.destroy();
   _maHistoryChart = new Chart(ctx, {
     type: 'line',
@@ -1219,8 +1316,8 @@ function renderHistoryChart(days) {
       labels,
       datasets: [{
         data: values,
-        borderColor: '#1a73e8',
-        backgroundColor: 'rgba(26,115,232,0.08)',
+        borderColor: _brand,
+        backgroundColor: _grad,
         fill: true,
         tension: 0.3,
         pointRadius: 0,

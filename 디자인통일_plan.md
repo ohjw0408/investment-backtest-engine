@@ -6,6 +6,13 @@
 
 ---
 
+## ▶ 진행 (2026-06-19) — myassets 홈패턴 이식
+
+오너 결정 = 홈 다음 **내자산(myassets)부터** 타페이지 확장. 완료(배선검증·main 미푸시, **오너 각 탭 육안 대기**):
+- 깊이(`.main-content` soft배경↓ + `.ma-card` --ds-canvas/그림자, 다크 --ds-dark-el) · pill 탭(홈 위젯탭 결) · duotone 아이콘(템플릿=로컬 `mi()` 매크로 12종, JS렌더=`MAICON` pencil/trash/undo + `.icon-btn svg` 사이징) · 비로그인 데모(삼성전자·SPY 2행, 점선카드+"예시"워터마크+배지+배너, 명백히 데모) · 차트색 brand/up/down 바인딩(자산추이 그라데·배당막대·수익률 인라인 var) · 모달 닫기버튼 `textContent` 덮어쓰기 버그 동시수정(id→내부 span).
+- 검증(배선만, 육안=오너): Jinja 컴파일 OK · 비로그인/로그인 분기 정확(데모↔탭) · JS참조 ID 30종 전부 존재 · 크롬 이모지 잔여 0.
+- **다음 = 오너 육안 피드백 → 반영 → push. 이후 calculator or backtest(오너 택).**
+
 ## ▶ 다음 세션 시작점 (2026-06-18 정리)
 
 **확정 방식 (오너 결정):**
@@ -358,7 +365,7 @@ JS 파일 10개: `alert_widget · calculator · calendar · charts · limit_guar
 | retirement | ☐ | ☐ | ☐ | ☐ | ☐ |
 | backtest | ☐ | ☐ | ☐ | ☐ | ☐ |
 | risk_return | ☐ | ☐ | ☐ | ☐ | ☐ |
-| myassets | ☐ | ☐ | ☐ | ☐ | ☐ |
+| myassets | ☑ | ☑ | ☑ | ☑ | ◐ | ← 홈패턴 이식: 깊이(soft배경+카드그림자+다크el)·duotone아이콘(로컬 mi()매크로+JS MAICON)·pill탭·비로그인 데모(삼성/SPY, "예시"명시)·차트색 brand/up/down 바인딩. 모달 닫기버튼 textContent 버그 동시수정. **E=오너 육안 대기**
 | myportfolios | ☐ | ☐ | ☐ | ☐ | ☐ |
 | portfolio_detail | ☐ | ☐ | ☐ | ☐ | ☐ |
 | symbol | ☐ | ☐ | ☐ | ☐ | ☐ |

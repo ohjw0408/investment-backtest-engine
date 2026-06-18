@@ -68,6 +68,12 @@
 
 /* ── 목업 구조: 여백·CTA·다크밴드·배지 ── */
 .dashboard-grid { display: flex; flex-direction: column; gap: var(--sp-lg); }
+/* 로그인 유저: 이미 사용 중 → 내 포트폴리오 → 시장지수 → 다음 할 일 → (맨 밑) 투자 도구.
+   비로그인은 DOM 순서 그대로(데모·CTA·투자도구·시장지수). */
+.dashboard-grid.is-auth #portfolioCard { order: 1; }
+.dashboard-grid.is-auth #widgetCard    { order: 2; }
+.dashboard-grid.is-auth #actionCard    { order: 3; }
+.dashboard-grid.is-auth .feat-sec      { order: 4; }
 .portfolio-amount { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .portfolio-change { background: var(--up-tint); color: var(--up); padding: 3px 11px; border-radius: var(--r-pill); font-size: 14px; font-weight: 600; }
 .portfolio-change.down { background: var(--down-tint); color: var(--down); }
@@ -159,7 +165,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-grid">
+<div class="dashboard-grid{% if user %} is-auth{% endif %}">
 
   {% if user %}
   <!-- ===== 포트폴리오 카드 (로그인) ===== -->

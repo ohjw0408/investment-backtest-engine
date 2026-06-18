@@ -122,27 +122,18 @@ a { text-decoration: none; color: inherit; }
   top: 0;
   z-index: 200;
   height: 60px;
-  /* 텍스처: brand 글로우(좌측) + 미세 점 그리드 + 수직 그라데. 상단 하이라이트·하단 액센트 라인은 ::after */
+  /* 텍스처: brand 글로우(좌측) + 미세 점 그리드 + 수직 그라데 + 상단 하이라이트(inset) + 하단 헤어라인 */
   background:
     radial-gradient(150px 90px at 0% -10%, color-mix(in srgb, var(--brand) 8%, transparent), transparent 72%),
     radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ds-ink) 7%, transparent) 1.1px, transparent 1.7px) 0 0 / 18px 18px,
     linear-gradient(180deg, var(--ds-canvas), color-mix(in srgb, var(--ds-ink) 4%, var(--ds-canvas)));
+  border-bottom: 1px solid var(--ds-hairline);
   display: flex;
   align-items: center;
   padding: 0 24px;
   gap: 0;
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent),
               0 1px 2px rgba(0,0,0,0.04), 0 6px 18px rgba(0,0,0,0.035);
-}
-/* 하단 액센트 라인: 헤어라인 위에 brand 그라데가 좌→우로 옅게 흐름 */
-.navbar::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 1.5px;
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--brand) 55%, transparent) 0%,
-    var(--ds-hairline) 38%, var(--ds-hairline) 100%);
 }
 [data-theme="dark"] .navbar { box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent),
               0 1px 2px rgba(0,0,0,0.3), 0 6px 18px rgba(0,0,0,0.25); }

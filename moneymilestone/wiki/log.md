@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-18] UX | 아이콘 duotone 전환 — 회색 라인→소프트 채움(칙칙 해결)
+
+오너: 얇은 회색 라인 아이콘 "칙칙하고 딱딱"(활성 1개만 색, 나머지 15개 죽은 회색). 3안 중 **duotone(소프트 채움)** 선택.
+
+- `base.html nicon` 매크로 17종 전부 duotone 재작성: `fill="currentColor" fill-opacity=".2"`(면) + `stroke`(선) 2겹. F/S Jinja set 변수.
+- `components.css .si-ic` 색 = **`--brand`**(회색 아님) + 비활성 opacity .72 / hover .92 / 활성 1. 19px.
+- `index.html .action-ic` 사다리 아이콘 색 brand-text(warn=down/ok=up)로 통일.
+- 시장 헤더 별=gold 유지.
+
+효과 = 사이드바가 은은한 brand 블루 duotone → 따뜻·생기, 활성 홈은 진한 brand+tint pill. 검증 = Playwright 콘솔에러 0. 캐시 `components.css?v=20260618ds4`.
+
 ## [2026-06-18] UX | 아이콘 시스템 — 이모지 전면 교체(사이드바·시장헤더·검색)
 
 오너 딜레마: 이모지=유치/저렴, 얇은 회색라인=밋밋/차가움. 해법 = **"색이 의미를 갖는 라인 아이콘 시스템"**(둥근 기하 stroke 1.75 + 평소 회색→활성 brand + ★gold 유지 + 새로고침 회전 모션).

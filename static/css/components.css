@@ -198,7 +198,7 @@
 .sidebar-item:hover { background:var(--ds-soft); color:var(--ds-ink); }
 .sidebar-item.active { background:var(--brand-tint); color:var(--brand-text); font-weight:600; }
 .sidebar-item.active::before { display:none; }
-/* 아이콘 — 색이 상태 따라감(평소 회색→활성 brand), 친근한 라인 */
-.si-ic { width:18px; height:18px; flex-shrink:0; color:var(--ds-muted); transition:color .15s; }
-.sidebar-item:hover .si-ic { color:var(--ds-ink); }
-.sidebar-item.active .si-ic { color:var(--brand); }
+/* 아이콘 — duotone(면+선) brand 톤, 활성=진하게. 회색 아님 = 따뜻 */
+.si-ic { width:19px; height:19px; flex-shrink:0; color:var(--brand); opacity:.72; transition:opacity .15s; }
+.sidebar-item:hover .si-ic { opacity:.92; }
+.sidebar-item.active .si-ic { opacity:1; }

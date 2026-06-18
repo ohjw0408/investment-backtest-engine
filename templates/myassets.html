@@ -205,6 +205,13 @@
 .rb-act.sell { background: var(--down-tint); color: var(--down); }
 .rb-act.ok { background: var(--ds-soft); color: var(--ds-muted); }
 .rb-track { position: relative; height: 10px; border-radius: 100px; background: var(--ds-strong); margin: 14px 0 10px; }
+/* 허용 구간(목표±밴드) — 슬라이더 연동, left/width 라이브 변동 */
+.rb-band-zone { position: absolute; top: -3px; height: 16px; border-radius: 5px;
+  background: color-mix(in srgb, var(--up) 13%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--up) 55%, transparent);
+  transition: left .25s ease, width .25s ease; pointer-events: none; }
+.rb-card.warn .rb-band-zone { background: color-mix(in srgb, var(--gold-acc) 14%, transparent);
+  border-color: color-mix(in srgb, var(--gold-acc) 60%, transparent); }
 .rb-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 100px; transition: width .4s; }
 .rb-target { position: absolute; top: -5px; width: 3px; height: 20px; border-radius: 2px; background: var(--ds-ink); transition: left .4s; }
 .rb-target::after { content: "목표"; position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
@@ -895,7 +902,6 @@ function renderWeightChart(totalValue) {
 
 // ── 리밸런싱 ──
 let _rebalBand = 0.05;
-let _rebalBandTimer = null;
 
 function syncRebalBand(val) {
   if (!val || isNaN(val) || val < 0.1) return;
@@ -908,8 +914,8 @@ function syncRebalBand(val) {
   // 프리셋 칩 활성표시 (정확히 일치할 때만)
   document.querySelectorAll('.rb-preset').forEach(b =>
     b.classList.toggle('active', parseFloat(b.dataset.band) === val));
-  clearTimeout(_rebalBandTimer);
-  _rebalBandTimer = setTimeout(renderRebalance, 120);  // debounce
+  // 밴드 변경은 금액·차이에 영향 없음 → 전체 재렌더 없이 밴드존만 라이브 갱신
+  updateBandVisuals();
 }
 
 function renderRebalance() {
@@ -965,13 +971,14 @@ function renderRebalance() {
     const diffCls = r.diff > 0 ? 'under' : r.diff < 0 ? 'over' : '';
     const diffTxt = (r.diff >= 0 ? '+' : '') + (r.diff * 100).toFixed(1) + '%p';
     return `
-    <div class="rb-card ${r.outOfBand ? 'warn' : ''}">
+    <div class="rb-card ${r.outOfBand ? 'warn' : ''}" data-cur="${r.curPct}" data-tgt="${r.tgtPct}">
       <div class="rb-card-head">
         <span class="rb-dot" style="background:${r.g.color}"></span>
         <span class="rb-name">${maEsc(r.g.name)}</span>
         <span class="rb-act ${actCls}">${actText}</span>
       </div>
       <div class="rb-track">
+        <div class="rb-band-zone"></div>
         <div class="rb-fill" style="width:${fillW}%;background:${r.g.color}"></div>
         <div class="rb-target" style="left:${tgtL}%"></div>
       </div>
@@ -992,6 +999,30 @@ function renderRebalance() {
     ? `<div style="font-size:0.74rem;color:var(--ds-muted);margin-top:8px;line-height:1.5;">ℹ ${notes.join(' ')}</div>` : '';
 
   document.getElementById('rebalResult').innerHTML = cards + noteBanner;
+  updateBandVisuals();   // 밴드존 위치 + 이탈 하이라이트
+}
+
+// 경고밴드 시각화 갱신 (슬라이더 이동 시 전체 재렌더 없이 라이브 업데이트)
+function updateBandVisuals() {
+  const cards = document.querySelectorAll('#rebalResult .rb-card');
+  if (!cards.length) return;
+  let alertCount = 0;
+  cards.forEach(card => {
+    const tgt = parseFloat(card.dataset.tgt), cur = parseFloat(card.dataset.cur);
+    if (isNaN(tgt) || isNaN(cur)) return;
+    const lo = Math.max(0, (tgt - _rebalBand) * 100);
+    const hi = Math.min(100, (tgt + _rebalBand) * 100);
+    const zone = card.querySelector('.rb-band-zone');
+    if (zone) { zone.style.left = lo + '%'; zone.style.width = Math.max(0, hi - lo) + '%'; }
+    const out = Math.abs(tgt - cur) > _rebalBand;
+    card.classList.toggle('warn', out);
+    if (out) alertCount++;
+  });
+  const _bandPct = (_rebalBand * 100 % 1 === 0) ? Math.round(_rebalBand * 100) : (_rebalBand * 100).toFixed(1);
+  const st = document.getElementById('rebalStatus');
+  if (st) st.innerHTML = alertCount > 0
+    ? `<div class="grp-sum warn">${MAICON.alert} ${alertCount}개 그룹이 ±${_bandPct}%p 밴드를 벗어났어요 — 리밸런싱을 검토하세요</div>`
+    : `<div class="grp-sum ok">${MAICON.check} 모든 그룹이 목표 ±${_bandPct}%p 이내예요 — 균형이 잘 잡혀 있어요</div>`;
 }
 
 // 정수(원) 배분: floats를 합이 정확히 round(total)이 되도록 최대잔여법으로 반올림

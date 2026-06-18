@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-18] UX | 홈 시인성 수정 — 검색박스·자산군패널 제거·빈상태 정리 (오너 직접지적)
+
+오너가 라이브 홈 보고 지적 → Playwright로 직접 확인 후 수정:
+- **nav 검색박스 안 보임** → `components.css .nav-search-box`에 테두리(`--ds-hairline`)+포커스 brand 링+진한 placeholder/아이콘(`--ds-body`). 전역(모든 페이지 nav).
+- **우측 "자산군별 비교" 패널 = 빈칸 글씨 꽉 차 버그처럼** → 오너 승인하에 **패널 전체 제거**(markup+loadAssets 호출/인터벌/함수+asset CSS). 홈 `.main-content` 풀폭(`grid-template-columns:1fr`)+`.dashboard-grid max-width:860px`.
+- **비로그인 빈 포트폴리오 카드**(마스킹 바+잘린 차트텍스트, 온보딩과 중복) → `data.empty`면 `#portfolioCard` 숨김 → 온보딩 히어로만 전면.
+- **비로그인 loadActions 401** → `window.MM_LOGGED_IN` 가드로 비로그인=온보딩 직행(myassets API 호출 안 함, 콘솔 깨끗). 온보딩 HTML `_renderOnboard()`로 추출.
+
+검증 = Playwright 비로그인/로그인 홈 풀스샷 **콘솔에러 0 양쪽**. 캐시 `components.css?v=20260618ds2`. `templates/index.html`+`components.css`+`base.html`.
+
 ## [2026-06-18] UX | 홈 조종석 재설계 — "다음 할 일" 액션 사다리 (색칠→실제 UX)
 
 오너 피드백: 팔레트 통일=여전히 색칠놀이. 직관 UX 원함. → 홈을 범용 대시보드에서 **상태 인식 조종석**으로 구조 재설계(색 아닌 정보순서·흐름).

@@ -5,7 +5,8 @@
 <style>
 /* ═══ HOME — 코인베이스 룩 (이 페이지 전용 오버라이드, block head=홈만 렌더) ═══ */
 .main-content { font-family: var(--font-sans); color: var(--ds-ink); background: var(--ds-canvas);
-  gap: var(--sp-lg); padding: var(--sp-xl); }
+  gap: var(--sp-lg); padding: var(--sp-xl); grid-template-columns: 1fr; }
+.dashboard-grid { max-width: 860px; }
 
 /* 카드 공통 — 헤어라인 + 24px + 그림자 제거 */
 .portfolio-card, .market-card, .asset-card {
@@ -54,20 +55,6 @@
 .wdot { background: var(--ds-hairline); }
 .wdot.active { background: var(--brand); }
 
-/* 우측 패널 자산 */
-.asset-header { border-bottom-color: var(--ds-hairline); padding: var(--sp-lg) var(--sp-lg) var(--sp-sm); }
-.asset-title { font-weight: 600; font-size: var(--fs-title); color: var(--ds-ink); }
-.asset-arrow { color: var(--ds-muted); }
-.asset-item { padding: 12px var(--sp-lg); }
-.asset-item:hover { background: var(--ds-soft); }
-.asset-dot { border-radius: var(--r-full); }
-.asset-name { font-size: var(--fs-sm); font-weight: 600; color: var(--ds-ink); }
-.asset-info .asset-change { color: var(--ds-muted); font-family: var(--font-mono); }
-.asset-bar-wrap { border-top-color: var(--ds-hairline); }
-.asset-bar-label { color: var(--ds-muted); font-weight: 600; }
-.bar-seg { border-radius: var(--r-xs); }
-.bar-col-label { color: var(--ds-muted); }
-
 /* ── 목업 구조: 여백·CTA·다크밴드·배지 ── */
 .dashboard-grid { display: flex; flex-direction: column; gap: var(--sp-lg); }
 .portfolio-amount { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -115,7 +102,7 @@
 <div class="dashboard-grid">
 
   <!-- ===== 포트폴리오 카드 ===== -->
-  <div class="card portfolio-card">
+  <div class="card portfolio-card" id="portfolioCard">
     <div class="portfolio-header">
       <div>
         <div class="card-label">내 포트폴리오</div>
@@ -167,21 +154,6 @@
   </div>
 
 </div>
-
-<!-- ===== 우측 패널 ===== -->
-<div class="right-panel">
-  <div class="card asset-card">
-    <div class="asset-header">
-      <span class="asset-title">자산군별 비교</span>
-      <span class="asset-arrow">›</span>
-    </div>
-    <div id="assetList" class="asset-list"></div>
-    <div class="asset-bar-wrap">
-      <div class="asset-bar-label">금액</div>
-      <div class="stacked-bar" id="stackedBar"></div>
-    </div>
-  </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -190,13 +162,12 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPortfolio();
   loadActions();
   loadWidgets();
-  loadAssets();
   setInterval(loadWidgets, 5 * 60 * 1000);
   let _wrt;
   window.addEventListener('resize', () => { clearTimeout(_wrt); _wrt = setTimeout(renderWidgets, 200); });
   setInterval(() => {
     loadPortfolio(_homePortfolioPeriod);
-    loadAssets();
+    loadActions();
   }, 60 * 1000);
 
   document.querySelectorAll('.period-btn').forEach(btn => {
@@ -238,18 +209,13 @@ async function loadPortfolio(period = '1m') {
   const peekBtn = document.getElementById('peekBtn');
   if (peekBtn) peekBtn.style.display = (data.hide_amounts !== false) ? '' : 'none';
 
+  const card = document.getElementById('portfolioCard');
   if (data.empty) {
-    document.getElementById('portfolioValue').textContent = '—';
-    document.getElementById('portfolioChange').textContent = '';
-    const canvas = document.getElementById('portfolioChart');
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#90A4AE';
-    ctx.font = '13px Noto Sans KR';
-    ctx.textAlign = 'center';
-    ctx.fillText('내 자산에서 포트폴리오를 구성하면 여기에 표시됩니다.', canvas.width / 2, canvas.height / 2);
+    // 포트폴리오 없음 = 카드 숨기고 아래 온보딩이 안내(중복·빈차트 제거)
+    if (card) card.style.display = 'none';
     return;
   }
+  if (card) card.style.display = '';
 
   const { labels, values } = data;
   const slices = { '1m': 22, '3m': 66, '1y': 252, 'all': values.length };
@@ -372,17 +338,12 @@ function _divCard(dv, hide) {
   return { ic: '💰', cls: '', t: `${label} 배당${amt} 예정`, s: `${cur.length}건 · 세후 기준`, href: '/myassets' };
 }
 
-async function loadActions() {
+function _renderOnboard() {
   const head = document.getElementById('actionHead');
   const ladder = document.getElementById('actionLadder');
-  let data;
-  try { data = await (await fetch('/api/myassets/data', { cache: 'no-store' })).json(); }
-  catch (e) { ladder.innerHTML = ''; return; }
-
-  if (data.error || !(data.holdings || []).length) {
-    head.style.display = 'none';
-    ladder.className = '';
-    ladder.innerHTML = `
+  head.style.display = 'none';
+  ladder.className = '';
+  ladder.innerHTML = `
       <div class="onboard">
         <h3>내 포트폴리오, 30년 과거로 검증해보세요</h3>
         <p>종목을 담으면 수익률·배당·은퇴까지 한 번에 시뮬레이션해드려요.</p>
@@ -392,8 +353,17 @@ async function loadActions() {
         </div>
         <div class="onboard-steps"><span>① 종목 추가</span><span class="sep">→</span><span>② 분석 실행</span><span class="sep">→</span><span>③ 목표 추적</span></div>
       </div>`;
-    return;
-  }
+}
+
+async function loadActions() {
+  const head = document.getElementById('actionHead');
+  const ladder = document.getElementById('actionLadder');
+  if (!window.MM_LOGGED_IN) { _renderOnboard(); return; }  // 비로그인 = 온보딩(불필요 401 회피)
+  let data;
+  try { data = await (await fetch('/api/myassets/data', { cache: 'no-store' })).json(); }
+  catch (e) { ladder.innerHTML = ''; return; }
+
+  if (data.error || !(data.holdings || []).length) { _renderOnboard(); return; }
 
   const hide = data.hide_amounts !== false && !_homePeek;
   const rows = [];
@@ -534,49 +504,6 @@ function _renderMobile(body, dots, title) {
 
   body.querySelectorAll('.market-item[data-code]').forEach(el =>
     el.addEventListener('click', () => _widgetGo(el.dataset.code)));
-}
-
-// ── 자산군별 ──
-async function loadAssets() {
-  const res   = await fetch('/api/assets');
-  const items = await res.json();
-
-  const list = document.getElementById('assetList');
-  const barWrap = document.querySelector('.asset-bar-wrap');
-  if (!items.length) {
-    list.innerHTML = '<div style="color:var(--ds-muted);font-size:13px;padding:8px 0 4px">내 자산 탭에서 그룹을 설정하면 자산군 구성이 여기 표시됩니다.</div>';
-    document.getElementById('stackedBar').innerHTML = '';
-    if (barWrap) barWrap.style.display = 'none';
-    return;
-  }
-  if (barWrap) barWrap.style.display = '';
-
-  list.innerHTML = items.map(a => `
-    <div class="asset-item">
-      <div class="asset-dot" style="background:${a.color}22; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center;"></div>
-      <div class="asset-info">
-        <div class="asset-name">${a.name}</div>
-        <div class="asset-change">${Math.round(a.pct * 100)}%</div>
-      </div>
-    </div>
-  `).join('');
-
-  const bar = document.getElementById('stackedBar');
-  bar.innerHTML = '';
-  const col = document.createElement('div');
-  col.className = 'bar-col';
-  items.forEach(a => {
-    const seg = document.createElement('div');
-    seg.className = 'bar-seg';
-    seg.style.height = (a.pct * 130) + 'px';
-    seg.style.background = a.color;
-    col.appendChild(seg);
-  });
-  const lbl = document.createElement('div');
-  lbl.className = 'bar-col-label';
-  lbl.textContent = '목표';
-  col.appendChild(lbl);
-  bar.appendChild(col);
 }
 </script>
 {% endblock %}

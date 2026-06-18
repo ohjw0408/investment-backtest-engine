@@ -173,10 +173,13 @@
   font-weight:500; color:var(--ds-body); white-space:nowrap; text-decoration:none; }
 .mmnav-menu a:hover { background:var(--ds-soft); color:var(--ds-ink); }
 
-/* 검색 pill */
-.nav-search-box { background:var(--ds-strong); border:none; border-radius:var(--r-pill); }
+/* 검색 pill — 흰 배경서 또렷하게(테두리+포커스 brand) */
+.nav-search-box { background:var(--ds-soft); border:1px solid var(--ds-hairline); border-radius:var(--r-pill);
+  transition:border-color .15s, box-shadow .15s; }
+.nav-search-box:focus-within { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-tint); background:var(--ds-canvas); }
 .nav-search-box input { font-family:var(--font-sans); color:var(--ds-ink); }
-.nav-search-icon { color:var(--ds-muted); }
+.nav-search-box input::placeholder { color:var(--ds-body); }
+.nav-search-icon { color:var(--ds-body); }
 
 /* 우측 아이콘 */
 .nav-icon-btn { background:var(--ds-strong); color:var(--ds-ink); border-radius:var(--r-full);

@@ -262,10 +262,10 @@ JS 파일 10개: `alert_widget · calculator · calendar · charts · limit_guar
 | 0. 액센트 FOUC 스크립트(base) | ☑ | — | ☑ | — | ☑ |
 | 2. 액센트 스와치 UI(settings) | ☐ | ☐ | ☐ | ☐ | ☐ |
 | index (홈) | ☑ | ☑ | ☑ | ☑ | ☑ |
-| alerts | ☐ | ☐ | ☐ | ☐ | ☐ |
-| calendar | ☐ | ☐ | ☐ | ☐ | ☐ |
-| macro | ☐ | ☐ | ☐ | ☐ | ☐ |
-| search | ☐ | ☐ | ☐ | ☐ | ☐ |
+| alerts | ☑ | ☑ | ☑ | ☑ | ☑ |
+| calendar | ☑ | ☑ | ☑ | ☑ | ☑ |
+| macro | ☑ | ☑ | ☑ | ☑ | ☑ |
+| search | ☑ | ☑ | ☑ | ☑ | ☑ |
 | settings | ☐ | ☐ | ☐ | ☐ | ☐ |
 | tax_settings | ☐ | ☐ | ☐ | ☐ | ☐ |
 | tax_switch | ☐ | ☐ | ☐ | ☐ | ☐ |

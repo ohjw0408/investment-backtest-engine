@@ -1,5 +1,18 @@
 # Log
 
+## [2026-06-18] design | 디자인 통일 Phase 1 잔여 — 단순페이지 4종
+
+각 페이지 `block head` 스타일블록의 레거시 토큰(--blue/--card/--border/--text 등)·하드코딩
+블루(#1976D2 등) → ds 토큰(--brand/--ds-*)로 교체. 클래스명 보존(각 JS 의존). main-content
+배경 흰 캔버스. 카테고리/범례색(캘린더 이벤트, 검색 뱃지)은 데이터 구분이라 유지.
+
+- **calendar**: pill 네비/필터, 흰 헤어라인 셀, today=brand 보더, 일요일 빨강, 표시설정 brand pill, 배당 팝오버.
+- **macro**: 국가토글·기간/간격/차트타입 pill, 지표카드(모노값·스파크·등락), 겹쳐보기 프리셋/칩/드롭다운, 상세모달.
+- **search**: 검색 pill바(focus brand ring), 결과카드(모노 가격·등락), 뱃지, 상태(입력/검색중/없음/오류).
+- **alerts**: 폼 입력(ds 인풋·focus ring)·brand 버튼, 룰목록(토글/삭제), 수신함(읽음상태), 조건부 로그인.
+- 검증: 4페이지 Playwright 스샷(design-shots/), 전부 200·일관. 기능·ID 무수정.
+- **다음**: Phase 2 폼류(settings·tax_settings·tax_switch·simple) → 3 계산기 → 4 차트 → 5 자산.
+
 ## [2026-06-18] design | 디자인 통일 Phase 1 — 홈 + 네비 셸(코인베이스)
 
 Phase 0 위에 첫 시각 전환. Playwright 라이트/다크 스샷으로 검증.

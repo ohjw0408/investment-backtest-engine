@@ -3,20 +3,22 @@
 
 {% block head %}
 <style>
-.search-page { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+/* ═══ 종목 검색 — 코인베이스 룩 (ds 토큰, 뱃지 카테고리색 유지) ═══ */
+.main-content { background: var(--ds-canvas); }
+.search-page { max-width: 900px; margin: 0 auto; padding: var(--sp-xl) var(--sp-base); font-family: var(--font-sans); color: var(--ds-ink); }
 .search-bar {
   display: flex; align-items: center; gap: 10px;
-  background:var(--card); border: 1.5px solid var(--border);
-  border-radius: 12px; padding: 10px 16px; margin-bottom: 20px;
-  box-shadow: var(--shadow); transition: border-color 0.2s;
+  background: var(--ds-strong); border: 1px solid transparent;
+  border-radius: var(--r-pill); padding: 12px 18px; margin-bottom: 20px;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.search-bar:focus-within { border-color: var(--blue-bright); }
+.search-bar:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-tint); background: var(--ds-canvas); }
 .search-bar input {
   border: none; outline: none; flex: 1;
-  font-size: 1rem; font-family: inherit; color: var(--text);
+  font-size: 1rem; font-family: var(--font-sans); color: var(--ds-ink);
   background: transparent;
 }
-.search-icon { font-size: 1.2rem; color: var(--text-muted); }
+.search-icon { font-size: 1.2rem; color: var(--ds-muted); }
 
 /* 2열 그리드 */
 .results-grid {
@@ -29,47 +31,47 @@
 }
 
 .result-card {
-  background:var(--card); border: 1.5px solid var(--border);
-  border-radius: 12px; padding: 14px 16px;
-  cursor: pointer; text-decoration: none; color: var(--text);
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-lg); padding: 16px 18px;
+  cursor: pointer; text-decoration: none; color: var(--ds-ink);
   transition: border-color 0.15s, box-shadow 0.15s;
   display: flex; flex-direction: column; gap: 6px;
 }
-.result-card:hover { border-color: var(--blue-bright); box-shadow: var(--shadow); }
+.result-card:hover { border-color: var(--brand); box-shadow: var(--ds-shadow); }
 .result-bell { background: none; border: none; cursor: pointer; font-size: 0.95rem; padding: 2px 4px;
   border-radius: 7px; opacity: 0.6; }
 .result-bell:hover { opacity: 1; }
 
 .card-top { display: flex; align-items: center; justify-content: space-between; }
 .result-badge {
-  font-size: 0.68rem; font-weight: 700;
-  padding: 2px 8px; border-radius: 6px; white-space: nowrap;
+  font-size: 0.68rem; font-weight: 600;
+  padding: 3px 9px; border-radius: var(--r-pill); white-space: nowrap;
 }
-.card-price { font-size: 0.9rem; font-weight: 700; color: var(--text); }
-.card-name { font-size: 0.97rem; font-weight: 700; color: var(--text); line-height: 1.3; }
-.card-code { font-size: 0.78rem; color: var(--text-muted); }
+.card-price { font-size: 0.9rem; font-weight: 600; color: var(--ds-ink); font-family: var(--font-mono); }
+.card-name { font-size: 0.97rem; font-weight: 600; color: var(--ds-ink); line-height: 1.3; }
+.card-code { font-size: 0.78rem; color: var(--ds-muted); }
 .card-change {
-  font-size: 0.8rem; font-weight: 700; text-align: right;
+  font-size: 0.8rem; font-weight: 600; text-align: right; font-family: var(--font-mono);
 }
-.card-change.up   { color:var(--green); }
-.card-change.down { color:var(--red); }
-.card-change.flat { color: var(--text-muted); }
+.card-change.up   { color: var(--up); }
+.card-change.down { color: var(--down); }
+.card-change.flat { color: var(--ds-muted); }
 
-.search-hint { text-align: center; color: var(--text-muted); padding: 48px 0; font-size: 0.9rem; }
+.search-hint { text-align: center; color: var(--ds-muted); padding: 48px 0; font-size: 0.9rem; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="search-page">
-  <h2 style="font-size:1.3rem;font-weight:800;margin-bottom:16px;">종목 검색</h2>
+  <h2 style="font-size:var(--fs-h2);font-weight:600;letter-spacing:-0.4px;margin-bottom:16px;">종목 검색</h2>
   <div class="search-bar">
     <span class="search-icon">🔍</span>
     <input type="text" id="searchInput" placeholder="종목명, ETF, 티커 입력..." autocomplete="off" autofocus>
   </div>
   <div id="searchControls" style="display:none;justify-content:space-between;align-items:center;gap:10px;margin:10px 2px 4px;">
-    <span style="font-size:0.7rem;color:var(--text-muted);">⚠ 시세 약 15분 지연 — 새로고침해도 실시간과 다를 수 있습니다</span>
+    <span style="font-size:0.7rem;color:var(--ds-muted);">⚠ 시세 약 15분 지연 — 새로고침해도 실시간과 다를 수 있습니다</span>
     <button id="searchRefreshBtn" onclick="refreshSearchPrices()" title="현재 시세로 새로고침"
-      style="background:var(--card);border:1.5px solid var(--border);border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:0.9rem;flex-shrink:0;color:var(--text);">🔄</button>
+      style="background:var(--ds-canvas);border:1px solid var(--ds-hairline);border-radius:var(--r-full);width:34px;height:34px;cursor:pointer;font-size:0.9rem;flex-shrink:0;color:var(--ds-ink);">🔄</button>
   </div>
   <div id="searchResults">
     <div class="search-hint">종목명 또는 티커를 입력하세요</div>

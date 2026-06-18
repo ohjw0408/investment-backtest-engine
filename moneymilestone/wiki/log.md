@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-18] UX | 홈 깊이감 — 전경/후경 분리(음영, 색 추가 없이)
+
+오너: 홈이 라이트·다크 둘 다 단색이라 어색, 카드와 배경 분리 안 됨(홈만 `.main-content` 배경을 흰 canvas로 깔아 흰 카드와 동색 → 평평. 타 페이지는 soft 배경이라 깊이 있음).
+
+- `.main-content` 배경: 라이트 `--ds-soft`(#f7f7f7 후경) / 다크 `--ds-canvas`(#0a0b0d 최암).
+- 카드(portfolio·market·actionCard·feat-tile·cta.ghost·feat-mini): 배경 `--ds-canvas`(라이트 흰=전경) + **은은한 `--ds-shadow`**(전경 분리), hover `--ds-shadow-lg`. 다크는 `--ds-dark-el`(#16181c elevated, 배경보다 밝게)+border 투명.
+- market-header 배경 transparent(카드 따름).
+
+색 추가 0 — 명도 단차+그림자만. 홈 전용(block head 스코프, 타 페이지 무영향). 검증 = Playwright 라이트/다크 콘솔에러 0.
+
 ## [2026-06-18] UX | 아이콘 duotone 전환 — 회색 라인→소프트 채움(칙칙 해결)
 
 오너: 얇은 회색 라인 아이콘 "칙칙하고 딱딱"(활성 1개만 색, 나머지 15개 죽은 회색). 3안 중 **duotone(소프트 채움)** 선택.

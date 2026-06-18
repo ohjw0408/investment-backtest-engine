@@ -4,15 +4,20 @@
 {% block head %}
 <style>
 /* ═══ HOME — 코인베이스 룩 (이 페이지 전용 오버라이드, block head=홈만 렌더) ═══ */
-.main-content { font-family: var(--font-sans); color: var(--ds-ink); background: var(--ds-canvas);
+/* 깊이: 배경은 한 톤 낮춤(후경), 카드는 띄움(전경) — 라이트=soft/흰카드, 다크=최암/elevated */
+.main-content { font-family: var(--font-sans); color: var(--ds-ink); background: var(--ds-soft);
   gap: var(--sp-lg); padding: var(--sp-xl); grid-template-columns: 1fr; }
+[data-theme="dark"] .main-content { background: var(--ds-canvas); }
 .dashboard-grid { max-width: 860px; }
 
-/* 카드 공통 — 헤어라인 + 24px + 그림자 제거 */
-.portfolio-card, .market-card, .asset-card {
+/* 카드 공통 — 헤어라인 + 24px + 은은한 그림자(전경 분리) */
+.portfolio-card, .market-card, .feat-tile, .cta-card.ghost, #actionCard {
   background: var(--ds-canvas); border: 1px solid var(--ds-hairline);
-  border-radius: var(--r-xl); box-shadow: none; }
-.portfolio-card:hover, .market-card:hover, .asset-card:hover { box-shadow: var(--ds-shadow); }
+  border-radius: var(--r-xl); box-shadow: var(--ds-shadow); }
+[data-theme="dark"] .portfolio-card, [data-theme="dark"] .market-card,
+[data-theme="dark"] .feat-tile, [data-theme="dark"] .cta-card.ghost,
+[data-theme="dark"] #actionCard { background: var(--ds-dark-el); border-color: transparent; }
+.portfolio-card:hover, .market-card:hover, .feat-tile:hover { box-shadow: var(--ds-shadow-lg); }
 
 /* 포트폴리오 */
 .portfolio-header { padding: var(--sp-lg) var(--sp-lg) 0; }
@@ -31,7 +36,7 @@
 .period-btn.active { background: var(--ds-ink); color: var(--ds-canvas); border-color: var(--ds-ink); }
 
 /* 위젯 헤더 — 파랑 → 흰색 */
-.market-header { background: var(--ds-canvas); border-bottom: 1px solid var(--ds-hairline);
+.market-header { background: transparent; border-bottom: 1px solid var(--ds-hairline);
   padding: var(--sp-base) var(--sp-lg); }
 .market-title { color: var(--ds-ink); font-weight: 600; font-size: var(--fs-title); }
 .star { color: var(--gold-acc); display: inline-flex; align-items: center; }
@@ -118,9 +123,11 @@
 .feat-t { font-size: var(--fs-body); font-weight: 600; color: var(--ds-ink); }
 .feat-d { font-size: var(--fs-cap); color: var(--ds-muted); line-height: 1.5; }
 .feat-grid-2 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
-.feat-mini { display: flex; align-items: center; gap: 10px; padding: 13px 16px; background: var(--ds-soft);
-  border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); text-decoration: none; color: inherit; transition: background .15s; }
-.feat-mini:hover { background: var(--ds-strong); }
+.feat-mini { display: flex; align-items: center; gap: 10px; padding: 13px 16px; background: var(--ds-canvas);
+  border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); text-decoration: none; color: inherit;
+  box-shadow: var(--ds-shadow); transition: box-shadow .15s; }
+.feat-mini:hover { box-shadow: var(--ds-shadow-lg); }
+[data-theme="dark"] .feat-mini { background: var(--ds-dark-el); border-color: transparent; }
 .feat-mini .ic { width: 19px; height: 19px; color: var(--ds-body); }
 .feat-mini-t { font-size: var(--fs-sm); font-weight: 600; color: var(--ds-ink); }
 

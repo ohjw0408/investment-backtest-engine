@@ -122,15 +122,6 @@
   display: flex; align-items: center; justify-content: center; }
 .feat-t { font-size: var(--fs-body); font-weight: 600; color: var(--ds-ink); }
 .feat-d { font-size: var(--fs-cap); color: var(--ds-muted); line-height: 1.5; }
-.feat-grid-2 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
-.feat-mini { display: flex; align-items: center; gap: 10px; padding: 13px 16px; background: var(--ds-canvas);
-  border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); text-decoration: none; color: inherit;
-  box-shadow: var(--ds-shadow); transition: box-shadow .15s; }
-.feat-mini:hover { box-shadow: var(--ds-shadow-lg); }
-[data-theme="dark"] .feat-mini { background: var(--ds-dark-el); border-color: transparent; }
-.feat-mini .ic { width: 19px; height: 19px; color: var(--ds-body); }
-.feat-mini-t { font-size: var(--fs-sm); font-weight: 600; color: var(--ds-ink); }
-
 /* ── 비로그인 데모 그래프 오버레이 ── */
 .demo-badge { font-size: var(--fs-cap); font-weight: 600; color: var(--brand-text); background: var(--brand-tint);
   padding: 2px 9px; border-radius: var(--r-pill); margin-left: 6px; vertical-align: middle; }
@@ -161,7 +152,7 @@
 .cta-card.ghost .cta-go { color: var(--brand-text); }
 
 @media (max-width: 720px) {
-  .feat-grid, .feat-grid-2 { grid-template-columns: 1fr 1fr; }
+  .feat-grid { grid-template-columns: 1fr 1fr; }
   .cta-grid { grid-template-columns: 1fr; }
 }
 </style>
@@ -271,18 +262,21 @@
         <div class="feat-d">여러 전략의 리스크 대비 수익을 한눈에 비교</div>
       </a>
     </div>
-    <div class="feat-grid-2">
-      <a href="/dividend-target" class="feat-mini">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
-        <span class="feat-mini-t">배당금 계산기</span>
+    <div class="feat-grid" style="margin-top:14px;">
+      <a href="/simple" class="feat-tile">
+        <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg></div>
+        <div class="feat-t">간편 계산기</div>
+        <div class="feat-d">복잡한 설정 없이 목돈·매달 적립의 미래 가치를 빠르게 계산</div>
       </a>
-      <a href="/retirement" class="feat-mini">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18"/><path d="M5 18a7 7 0 0 1 14 0"/><line x1="12" y1="6" x2="12" y2="3"/><line x1="5" y1="9" x2="3.5" y2="7.5"/><line x1="19" y1="9" x2="20.5" y2="7.5"/></svg>
-        <span class="feat-mini-t">은퇴 설계</span>
+      <a href="/dividend-target" class="feat-tile">
+        <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg></div>
+        <div class="feat-t">배당금 계산기</div>
+        <div class="feat-d">목표 배당수익을 받으려면 얼마를 투자해야 하는지 역산</div>
       </a>
-      <a href="/simple" class="feat-mini">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
-        <span class="feat-mini-t">간편 계산기</span>
+      <a href="/retirement" class="feat-tile">
+        <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18"/><path d="M5 18a7 7 0 0 1 14 0"/><line x1="12" y1="6" x2="12" y2="3"/><line x1="5" y1="9" x2="3.5" y2="7.5"/><line x1="19" y1="9" x2="20.5" y2="7.5"/></svg></div>
+        <div class="feat-t">은퇴 설계</div>
+        <div class="feat-d">은퇴 후 매달 쓸 돈과 그에 필요한 목표 자산을 시뮬레이션</div>
       </a>
     </div>
   </div>

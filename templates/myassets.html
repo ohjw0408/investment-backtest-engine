@@ -891,10 +891,11 @@ function renderWeightChart(totalValue) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: true },   // 파이는 조각 위에서만(전역 index 모드 override)
       plugins: {
         legend: { position: window.innerWidth <= 768 ? 'bottom' : 'right',
                   labels: { boxWidth: 14, font: { size: 11 } } },
-        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toFixed(1)}%` } },
+        tooltip: { mode: 'nearest', intersect: true, callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toFixed(1)}%` } },
       },
     }
   });

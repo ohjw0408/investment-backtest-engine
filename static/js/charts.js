@@ -16,6 +16,15 @@ const MM_CHART_GRID = MM_DARK ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)';
   }
 })();
 
+// 전역 hover/툴팁: 선에 핀포인트로 안 대도 같은 x축 값이 뜨도록 (index 모드, 교차 불요)
+// → 라인/영역/바 차트 어디든 마우스만 근처에 가면 해당 시점 값 표시. 파이/도넛은 자체 override 권장.
+(function () {
+  if (typeof Chart === 'undefined') return;
+  Chart.defaults.interaction = Object.assign({}, Chart.defaults.interaction, { mode: 'index', intersect: false });
+  Chart.defaults.plugins = Chart.defaults.plugins || {};
+  Chart.defaults.plugins.tooltip = Object.assign({}, Chart.defaults.plugins.tooltip, { mode: 'index', intersect: false });
+})();
+
 /**
  * 스파크라인 그리기
  * @param {string} canvasId

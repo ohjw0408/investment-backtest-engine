@@ -109,6 +109,14 @@
 .onboard-cta { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
 .onboard-steps { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 20px; flex-wrap: wrap; font-size: var(--fs-cap); color: var(--ds-muted); font-weight: 500; }
 .onboard-steps .sep { opacity: .5; }
+/* 로딩 스켈레톤 (가리기 ***와 구분 — 움직이는 shimmer). 단일 요소라 렉 없음 */
+.mm-skel { display: inline-block; border-radius: 8px; color: transparent !important;
+  background: linear-gradient(90deg, var(--ds-strong) 25%, var(--ds-hairline) 37%, var(--ds-strong) 63%);
+  background-size: 400% 100%; animation: mm-shimmer 1.4s ease infinite; vertical-align: middle; }
+.mm-skel-val { width: 240px; height: 38px; }
+@keyframes mm-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .mm-skel { animation: none; } }
+
 /* 금액 peek 토글 */
 .peek-btn { background: none; border: none; cursor: pointer; color: var(--ds-muted); font-size: 16px; padding: 2px 4px; line-height: 1; }
 .peek-btn:hover { color: var(--ds-ink); }
@@ -174,8 +182,8 @@
       <div>
         <div class="card-label">내 포트폴리오</div>
         <div class="portfolio-amount">
-          <span id="portfolioValue">***,***,***원</span>
-          <span class="portfolio-change up" id="portfolioChange">(+1.8%)</span>
+          <span id="portfolioValue" class="mm-skel mm-skel-val"></span>
+          <span class="portfolio-change up" id="portfolioChange" style="display:none;"></span>
           <button class="peek-btn" id="peekBtn" title="금액 보기" style="display:none;" onclick="togglePeek()">👁</button>
         </div>
       </div>
@@ -403,7 +411,9 @@ async function loadPortfolio(period = '1m') {
   const slicedLabels = labels.slice(-n);
   const slicedValues = values.slice(-n);
 
-  document.getElementById('portfolioValue').textContent = fmtMaskedKRW(slicedValues[slicedValues.length - 1] || 0);
+  const valEl = document.getElementById('portfolioValue');
+  valEl.classList.remove('mm-skel', 'mm-skel-val');   // 로딩 스켈레톤 해제
+  valEl.textContent = fmtMaskedKRW(slicedValues[slicedValues.length - 1] || 0);
   const periodChange = slicedValues.length > 1
     ? ((slicedValues[slicedValues.length - 1] - slicedValues[0]) / slicedValues[0] * 100).toFixed(2)
     : null;
@@ -412,8 +422,10 @@ async function loadPortfolio(period = '1m') {
     const sign = periodChange >= 0 ? '+' : '';
     changeEl.textContent = sign + periodChange + '%';
     changeEl.className = 'portfolio-change ' + (periodChange >= 0 ? 'up' : 'down');
+    changeEl.style.display = '';
   } else {
     changeEl.textContent = '';
+    changeEl.style.display = 'none';
   }
 
   const canvas = document.getElementById('portfolioChart');

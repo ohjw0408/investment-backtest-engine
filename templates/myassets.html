@@ -70,6 +70,11 @@
 .icon-btn.danger:hover { border-color:var(--red); color:var(--red); }
 .icon-btn svg, .bic { width: 13px; height: 13px; display: inline-block; vertical-align: middle; }
 #refreshHoldingsBtn svg { width: 15px; height: 15px; }
+#refreshHoldingsBtn.spinning svg { animation: ma-spin .7s linear infinite; }
+@keyframes ma-spin { to { transform: rotate(360deg); } }
+.grp-sum svg, .ma-intro svg { width: 16px; height: 16px; vertical-align: -3px; }
+.ma-intro svg { color: var(--brand-text); }
+.rb-act svg { width: 13px; height: 13px; vertical-align: -2px; }
 
 /* 모달 */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: none; align-items: center; justify-content: center; }
@@ -145,6 +150,104 @@
   border-radius: var(--r-pill); padding: 12px 26px; font-size: 0.95rem; font-weight: 600; text-decoration: none; }
 .ma-demo-cta .g-btn:hover { background: var(--brand-hover); }
 .ma-demo-sub { font-size: 0.8rem; color: var(--ds-muted); }
+
+/* ── 금액 가리기 토글 스위치 ── */
+.mm-switch { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+.mm-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.mm-switch .track { width: 46px; height: 26px; border-radius: 100px; background: var(--ds-strong);
+  transition: background .2s; position: relative; flex-shrink: 0; }
+.mm-switch .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+.mm-switch input:checked + .track { background: var(--brand); }
+.mm-switch input:checked + .track::after { transform: translateX(20px); }
+.mm-switch .lbl { margin-left: 10px; font-size: 0.82rem; font-weight: 600; color: var(--ds-body); white-space: nowrap; }
+
+/* ── 섹션 인트로 / 빈 상태 ── */
+.ma-intro { font-size: 0.83rem; color: var(--ds-body); line-height: 1.55; margin-bottom: 16px;
+  background: var(--ds-soft); border-radius: var(--r-md); padding: 13px 15px; }
+[data-theme="dark"] .ma-intro { background: var(--ds-strong); }
+.ma-intro b { color: var(--ds-ink); }
+.ma-empty { text-align: center; padding: 34px 20px; color: var(--ds-muted); }
+.ma-empty .em-ic { width: 46px; height: 46px; border-radius: var(--r-md); background: var(--brand-tint);
+  color: var(--brand-text); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+.ma-empty .em-ic svg { width: 24px; height: 24px; }
+.ma-empty .em-t { font-weight: 700; color: var(--ds-ink); font-size: 0.96rem; }
+.ma-empty .em-d { font-size: 0.83rem; margin-top: 6px; line-height: 1.5; }
+
+/* ── 기관급 경고밴드 슬라이더 ── */
+.rb-band { display: flex; flex-direction: column; gap: 14px; }
+.rb-band-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.rb-band-label { font-size: 0.85rem; font-weight: 700; color: var(--ds-ink); }
+.rb-band-label .sub { display: block; font-size: 0.74rem; font-weight: 400; color: var(--ds-muted); margin-top: 2px; }
+.rb-band-val { font-family: var(--font-mono); font-size: 1.7rem; font-weight: 600; color: var(--brand-text); letter-spacing: -1px; line-height: 1; }
+.rb-band-val small { font-size: 0.9rem; }
+.rb-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 100px;
+  background: var(--ds-strong); outline: none; cursor: pointer; }
+.rb-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--brand); border: 3px solid var(--ds-canvas); box-shadow: 0 2px 6px rgba(0,0,0,.22); cursor: pointer; }
+.rb-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--brand);
+  border: 3px solid var(--ds-canvas); box-shadow: 0 2px 6px rgba(0,0,0,.22); cursor: pointer; }
+.rb-ticks { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--ds-muted); font-family: var(--font-mono); margin-top: -6px; }
+.rb-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.rb-preset { font-size: 0.76rem; font-weight: 600; padding: 6px 13px; border-radius: 100px; border: 1px solid var(--ds-hairline);
+  background: transparent; color: var(--ds-body); cursor: pointer; font-family: inherit; }
+.rb-preset:hover { border-color: var(--ds-muted); }
+.rb-preset.active { background: var(--brand-tint); color: var(--brand-text); border-color: transparent; }
+
+/* ── 리밸런싱 그룹 카드 (diverging 시각화) ── */
+.rb-card { border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); padding: 16px; margin-bottom: 12px; }
+.rb-card.warn { border-color: color-mix(in srgb, var(--gold-acc) 55%, transparent); background: color-mix(in srgb, var(--gold-acc) 7%, transparent); }
+.rb-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.rb-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.rb-name { font-weight: 700; font-size: 0.92rem; flex: 1; }
+.rb-act { font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 100px; white-space: nowrap; }
+.rb-act.buy { background: var(--up-tint); color: var(--up); }
+.rb-act.sell { background: var(--down-tint); color: var(--down); }
+.rb-act.ok { background: var(--ds-soft); color: var(--ds-muted); }
+.rb-track { position: relative; height: 10px; border-radius: 100px; background: var(--ds-strong); margin: 14px 0 10px; }
+.rb-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 100px; transition: width .4s; }
+.rb-target { position: absolute; top: -5px; width: 3px; height: 20px; border-radius: 2px; background: var(--ds-ink); transition: left .4s; }
+.rb-target::after { content: "목표"; position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
+  font-size: 0.6rem; font-weight: 700; color: var(--ds-ink); white-space: nowrap; }
+.rb-nums { display: flex; justify-content: space-between; gap: 10px; font-size: 0.78rem; color: var(--ds-muted); }
+.rb-nums b { font-family: var(--font-mono); color: var(--ds-ink); font-weight: 600; }
+.rb-diff.over { color: var(--down); } .rb-diff.under { color: var(--up); }
+
+/* ── 추가매수 ── */
+.pur-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.pur-chip { font-size: 0.78rem; font-weight: 600; padding: 6px 14px; border-radius: 100px; border: 1px solid var(--ds-hairline);
+  background: transparent; color: var(--ds-body); cursor: pointer; font-family: inherit; }
+.pur-chip:hover { border-color: var(--brand); color: var(--brand-text); }
+.pur-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--ds-hairline); }
+.pur-row:last-of-type { border-bottom: none; }
+.pur-row .pur-bar { flex: 1; height: 6px; border-radius: 100px; background: var(--ds-strong); position: relative; overflow: hidden; }
+.pur-row .pur-bar i { position: absolute; left: 0; top: 0; height: 100%; border-radius: 100px; }
+.pur-buy { font-family: var(--font-mono); font-weight: 700; color: var(--up); white-space: nowrap; }
+
+/* ── 그룹 관리 카드 ── */
+.grp-sum { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; border-radius: var(--r-md); margin-bottom: 14px; font-size: 0.85rem; font-weight: 600; }
+.grp-sum.ok { background: var(--up-tint); color: var(--up); }
+.grp-sum.warn { background: color-mix(in srgb, var(--gold-acc) 14%, transparent); color: var(--gold-deep); }
+.grp-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); margin-bottom: 10px; }
+.grp-emblem { width: 38px; height: 38px; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 800; color: #fff; font-size: 0.85rem; }
+.grp-main { flex: 1; min-width: 0; }
+.grp-name { font-weight: 700; font-size: 0.92rem; }
+.grp-sub { font-size: 0.76rem; color: var(--ds-muted); margin-top: 2px; }
+.grp-tgt { text-align: right; flex-shrink: 0; min-width: 92px; }
+.grp-tgt-v { font-family: var(--font-mono); font-weight: 700; font-size: 1.05rem; color: var(--ds-ink); }
+.grp-tgt-l { font-size: 0.66rem; color: var(--ds-muted); }
+.grp-tgt-bar { height: 5px; border-radius: 100px; background: var(--ds-strong); margin-top: 6px; overflow: hidden; }
+.grp-tgt-bar i { display: block; height: 100%; border-radius: 100px; }
+.grp-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* ── 확인 다이얼로그 ── */
+.confirm-box { width: 360px; max-width: 90vw; text-align: center; }
+.confirm-ic { width: 48px; height: 48px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+.confirm-ic.danger { background: var(--down-tint); color: var(--down); }
+.confirm-ic svg { width: 26px; height: 26px; }
+.confirm-msg { font-size: 0.95rem; font-weight: 700; color: var(--ds-ink); }
+.confirm-sub { font-size: 0.82rem; color: var(--ds-muted); margin-top: 6px; line-height: 1.5; }
+.btn-danger { padding: 9px 20px; background: var(--down); color: #fff; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
 
 @media (max-width: 768px) {
   .ma-wrap { padding: 14px 12px; }
@@ -239,13 +342,19 @@
   <!-- 자산 현황 탭 -->
   <div id="tab-overview">
     <div class="ma-card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div>
-        <div style="font-size:0.9rem;font-weight:800;">금액 가리기</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:3px;">홈 화면과 내 자산 금액을 별표로 표시합니다.</div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="width:38px;height:38px;border-radius:var(--r-md);background:var(--brand-tint);color:var(--brand-text);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c5 0 9 5 9 8a12 12 0 0 1-1.7 2.7M6.6 6.6C3.9 8.2 2 11 2 12c0 1.4 4 7 10 7a9 9 0 0 0 3.6-.7"/><path d="M14.1 14.1a3 3 0 0 1-4.2-4.2M2 2l20 20"/></svg>
+        </span>
+        <div>
+          <div style="font-size:0.9rem;font-weight:800;">금액 가리기</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:3px;">홈 화면과 내 자산 금액을 <b>***</b>로 감춥니다.</div>
+        </div>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap;">
+      <label class="mm-switch">
         <input type="checkbox" id="hideAmountToggle" checked onchange="savePrivacySetting()">
-        <span>가리기</span>
+        <span class="track"></span>
+        <span class="lbl" id="hideAmountLbl">가리는 중</span>
       </label>
     </div>
 
@@ -257,7 +366,7 @@
           <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="openAddHolding()">+ 종목 추가</button>
         </span>
       </div>
-      <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:10px;">⚠ 시세 약 15분 지연 — 새로고침(🔄)해도 실시간과 다를 수 있습니다. 정확한 값이 필요하면 현재가 ✎로 수동 입력하세요.</div>
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:10px;">⚠ 시세 약 15분 지연 — 새로고침해도 실시간과 다를 수 있습니다. 정확한 값이 필요하면 현재가의 수정(연필) 버튼으로 직접 입력하세요.</div>
       <div id="holdingsTableWrap">
         <div style="text-align:center;padding:30px;color:var(--text-muted);">⏳ 로딩 중...</div>
       </div>
@@ -325,16 +434,22 @@
 
   <!-- 리밸런싱 탭 -->
   <div id="tab-rebalance" style="display:none;">
-    <div class="ma-card rebal-band-card" style="display:flex;align-items:center;gap:12px;min-height:56px;">
-      <span style="font-size:0.85rem;font-weight:700;white-space:nowrap;flex-shrink:0;">경고 밴드</span>
-      <input type="range" id="rebalBandSlider" min="0.5" max="20" value="5" step="0.5"
-        oninput="syncRebalBand(parseFloat(this.value))"
-        style="flex:1;min-width:80px;">
-      <input type="number" id="rebalBandInput" value="5" min="0.5" max="20" step="0.5"
-        oninput="syncRebalBand(parseFloat(this.value))"
-        style="width:60px;flex-shrink:0;font-size:0.85rem;font-weight:700;color:var(--blue);border:1px solid var(--border);border-radius:4px;padding:3px 6px;text-align:center;">
-      <span style="font-size:0.85rem;font-weight:700;color:var(--blue);flex-shrink:0;">%</span>
-      <span style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;flex-shrink:0;">이 값 이상 벗어나면 경고</span>
+    <div class="ma-intro">{{ mi('scale') }} <b>리밸런싱</b>은 그룹별 <b>목표 비중</b>에서 얼마나 벗어났는지 보여줍니다. 목표보다 많은 그룹은 <b style="color:var(--down)">매도</b>, 적은 그룹은 <b style="color:var(--up)">매수</b>해 균형을 맞추세요. 목표 비중은 <b>그룹 관리</b> 탭에서 설정합니다.</div>
+    <div class="ma-card">
+      <div class="rb-band">
+        <div class="rb-band-top">
+          <div class="rb-band-label">경고 밴드<span class="sub">목표에서 이 값 이상 벗어나면 리밸런싱 경고</span></div>
+          <div class="rb-band-val">±<span id="rebalBandDisplay">5</span><small>%p</small></div>
+        </div>
+        <input type="range" id="rebalBandSlider" class="rb-slider" min="0.5" max="20" value="5" step="0.5"
+          oninput="syncRebalBand(parseFloat(this.value))">
+        <div class="rb-ticks"><span>0.5</span><span>5</span><span>10</span><span>15</span><span>20</span></div>
+        <div class="rb-presets">
+          <button class="rb-preset" data-band="3" onclick="syncRebalBand(3)">엄격 ±3</button>
+          <button class="rb-preset active" data-band="5" onclick="syncRebalBand(5)">표준 ±5</button>
+          <button class="rb-preset" data-band="10" onclick="syncRebalBand(10)">느슨 ±10</button>
+        </div>
+      </div>
     </div>
     <div class="ma-card">
       <div class="ma-card-title">
@@ -352,27 +467,35 @@
 
   <!-- 추가매수 탭 -->
   <div id="tab-purchase" style="display:none;">
+    <div class="ma-intro">{{ mi('plus') }} 새로 투자할 금액을 입력하면, <b>매도 없이</b> 목표 비중에 가까워지도록 <b>어느 그룹에 얼마씩</b> 넣을지 제안합니다. (목표 대비 부족한 그룹에 우선 배분)</div>
     <div class="ma-card">
-      <div class="ma-card-title">{{ mi('plus') }} 추가매수 계산</div>
-      <div class="input-row" style="max-width:300px;">
-        <label>추가 투자금액</label>
+      <div class="ma-card-title">{{ mi('plus') }} 추가 투자금액</div>
+      <div class="input-row" style="max-width:340px;">
         <div class="input-group">
-          <input type="number" id="purchaseAmount" class="calc-input" value="1000000" min="0" step="100000">
+          <input type="number" id="purchaseAmount" class="calc-input" value="1000000" min="0" step="100000" oninput="calcPurchase()">
           <span class="unit">원</span>
         </div>
       </div>
-      <button class="btn-primary" style="margin-top:8px;" onclick="calcPurchase()">계산하기</button>
-      <div id="purchaseResult" style="margin-top:16px;"></div>
+      <div class="pur-chips">
+        <button class="pur-chip" onclick="setPurchaseAmount(500000)">+50만</button>
+        <button class="pur-chip" onclick="setPurchaseAmount(1000000)">+100만</button>
+        <button class="pur-chip" onclick="setPurchaseAmount(3000000)">+300만</button>
+        <button class="pur-chip" onclick="setPurchaseAmount(5000000)">+500만</button>
+        <button class="pur-chip" onclick="setPurchaseAmount(10000000)">+1000만</button>
+      </div>
+      <div id="purchaseResult" style="margin-top:18px;"></div>
     </div>
   </div>
 
   <!-- 그룹 관리 탭 -->
   <div id="tab-groups" style="display:none;">
+    <div class="ma-intro">{{ mi('layers') }} 종목을 <b>그룹</b>(예: 국내주식·미국주식·채권·금)으로 묶고 각 그룹의 <b>목표 비중</b>을 정하면, 리밸런싱·추가매수가 이 기준으로 계산됩니다. 목표 비중 합계는 <b>100%</b>를 권장합니다.</div>
     <div class="ma-card">
       <div class="ma-card-title">
         <span style="display:inline-flex;gap:7px;align-items:center;">{{ mi('layers') }} 자산 그룹</span>
         <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="openAddGroup()">+ 그룹 추가</button>
       </div>
+      <div id="groupsSum"></div>
       <div id="groupsWrap"></div>
     </div>
   </div>
@@ -481,6 +604,19 @@
     </div>
   </div>
 
+  <!-- 삭제 확인 다이얼로그 -->
+  <div class="modal-overlay" id="modalConfirm">
+    <div class="modal-box confirm-box">
+      <div class="confirm-ic danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"/></svg></div>
+      <div class="confirm-msg" id="confirmMsg">삭제할까요?</div>
+      <div class="confirm-sub" id="confirmSub"></div>
+      <div class="modal-actions" style="justify-content:center;margin-top:18px;">
+        <button class="btn-secondary" onclick="closeModal('modalConfirm')">취소</button>
+        <button class="btn-danger" id="confirmYes">삭제</button>
+      </div>
+    </div>
+  </div>
+
   {% endif %}
 </div>
 {% endblock %}
@@ -501,6 +637,10 @@ const MAICON = {
   pencil: `<svg ${_SS}><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>`,
   trash:  `<svg ${_SS}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"/></svg>`,
   undo:   `<svg ${_SS}><path d="M9 7 4 12l5 5M4 12h11a5 5 0 0 1 0 10"/></svg>`,
+  scale:  `<svg ${_SS}><path d="M12 3v18M7 21h10M5 7h14M5 7 2.5 13a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z"/></svg>`,
+  layers: `<svg ${_SS}><path d="m12 3 9 5-9 5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5"/></svg>`,
+  alert:  `<svg ${_SS}><path d="M12 3 2 20h20zM12 10v4M12 17.5h.01"/></svg>`,
+  check:  `<svg ${_SS}><path d="M20 6 9 17l-5-5"/></svg>`,
 };
 function _cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
@@ -520,6 +660,7 @@ function showTab(name) {
     b.classList.toggle('active', ['overview','rebalance','purchase','groups'][i]===name);
   });
   if (name === 'rebalance') renderRebalance();
+  if (name === 'purchase')  calcPurchase();
   if (name === 'groups')    renderGroups();
 }
 
@@ -534,6 +675,7 @@ async function loadAll() {
   hideAmounts = data.hide_amounts !== false;
   const toggle = document.getElementById('hideAmountToggle');
   if (toggle) toggle.checked = hideAmounts;
+  _syncHideLabel();
   renderHoldings();
   renderSummary();
   renderGroupOptions();
@@ -574,16 +716,9 @@ function maEsc(s) {
 // ── 새로고침 (서버 공유 캐시 15분 floor — 더 자주 눌러도 같은 값) ──
 async function refreshHoldings() {
   const btn = document.getElementById('refreshHoldingsBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
-  try {
-    await loadAll();
-    if (btn) {
-      btn.textContent = '✓';
-      setTimeout(() => { btn.textContent = '🔄'; btn.disabled = false; }, 1200);
-    }
-  } catch (e) {
-    if (btn) { btn.textContent = '🔄'; btn.disabled = false; }
-  }
+  if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
+  try { await loadAll(); } catch (e) {}
+  if (btn) setTimeout(() => { btn.classList.remove('spinning'); btn.disabled = false; }, 700);
 }
 
 // ── 수동 가격 override (인라인 모달) ──
@@ -618,9 +753,15 @@ async function clearManual(id) {
   await loadAll();
 }
 
+function _syncHideLabel() {
+  const lbl = document.getElementById('hideAmountLbl');
+  if (lbl) lbl.textContent = hideAmounts ? '가리는 중' : '표시 중';
+}
+
 async function savePrivacySetting() {
   const toggle = document.getElementById('hideAmountToggle');
   hideAmounts = !!toggle.checked;
+  _syncHideLabel();
   renderHoldings();
   renderSummary();
   if (document.getElementById('tab-rebalance').style.display !== 'none') renderRebalance();
@@ -760,10 +901,13 @@ function syncRebalBand(val) {
   if (!val || isNaN(val) || val < 0.1) return;
   val = Math.min(20, Math.max(0.5, val));
   _rebalBand = val / 100;
-  const slider = document.getElementById('rebalBandSlider');
-  const input  = document.getElementById('rebalBandInput');
-  if (slider) slider.value = val;
-  if (input)  input.value  = val;
+  const slider  = document.getElementById('rebalBandSlider');
+  const display = document.getElementById('rebalBandDisplay');
+  if (slider)  slider.value = val;
+  if (display) display.textContent = (val % 1 === 0) ? val : val.toFixed(1);
+  // 프리셋 칩 활성표시 (정확히 일치할 때만)
+  document.querySelectorAll('.rb-preset').forEach(b =>
+    b.classList.toggle('active', parseFloat(b.dataset.band) === val));
   clearTimeout(_rebalBandTimer);
   _rebalBandTimer = setTimeout(renderRebalance, 120);  // debounce
 }
@@ -781,7 +925,7 @@ function renderRebalance() {
   if (!groupedTotal || !sumTargets) {
     document.getElementById('rebalStatus').innerHTML = '';
     document.getElementById('rebalResult').innerHTML =
-      '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem;">그룹에 종목을 넣고 목표 비중을 설정해주세요</div>';
+      `<div class="ma-empty"><div class="em-ic">${MAICON.scale}</div><div class="em-t">아직 계산할 게 없어요</div><div class="em-d">그룹 관리 탭에서 그룹을 만들고 종목을 넣은 뒤<br>목표 비중을 설정하면 리밸런싱이 표시됩니다.</div></div>`;
     return;
   }
 
@@ -806,46 +950,48 @@ function renderRebalance() {
 
   const alertCount = rows.filter(r => r.outOfBand).length;
   const _bandPct = (_rebalBand * 100 % 1 === 0) ? Math.round(_rebalBand*100) : (_rebalBand*100).toFixed(1);
-  // 기준 안내: 목표비중 합이 100%가 아니면 정규화, 미그룹 종목은 리밸런싱에서 제외됨
-  const notes = [];
-  if (Math.abs(sumTargets - 100) > 0.1)
-    notes.push(`목표 비중 합이 ${(+sumTargets.toFixed(1))}%라 100% 기준으로 정규화해 계산합니다.`);
-  if (ungroupedVal > 0)
-    notes.push(`그룹 미지정 종목 ${fmtKRW(ungroupedVal)}은 리밸런싱 대상에서 제외됩니다.`);
-  const noteBanner = notes.length
-    ? `<div style="font-size:0.76rem;color:var(--text-muted);margin-top:6px;">ℹ ${notes.join(' ')}</div>` : '';
-  const alertBanner = (alertCount > 0
-    ? `<div style="background:var(--gold-pale);border:1px solid #F57C00;border-radius:6px;padding:10px 14px;font-size:0.83rem;color:var(--gold-deep);">
-        <strong>⚠ 리밸런싱 필요</strong> — ${alertCount}개 그룹이 목표 비중 ±${_bandPct}% 밴드를 이탈했습니다.
-       </div>`
-    : `<div style="background:var(--green-pale);border:1px solid #66BB6A;border-radius:6px;padding:10px 14px;font-size:0.83rem;color:var(--green);">
-        ✅ 모든 그룹이 목표 비중 ±${_bandPct}% 이내입니다.
-       </div>`) + noteBanner;
 
-  document.getElementById('rebalStatus').innerHTML = alertBanner;
-  document.getElementById('rebalResult').innerHTML = rows.map(r => {
-    const barColor = r.outOfBand ? '#F57C00' : '#66BB6A';
-    const bandBadge = r.outOfBand
-      ? `<span style="font-size:0.72rem;background:var(--gold-pale);color:var(--gold-deep);padding:2px 6px;border-radius:4px;margin-left:4px;">밴드 이탈 ${(r.absDiff*100).toFixed(1)}%p</span>`
-      : '';
-    const actionCls = r.action === 'buy' ? 'rebal-buy' : r.action === 'sell' ? 'rebal-sell' : 'rebal-ok';
-    const actionText = r.action === 'ok' ? '✅ 적정'
-      : r.action === 'buy' ? '▲ 매수 ' + fmtKRW(r.diffVal)
-      : '▼ 매도 ' + fmtKRW(Math.abs(r.diffVal));
+  document.getElementById('rebalStatus').innerHTML = alertCount > 0
+    ? `<div class="grp-sum warn">${MAICON.alert} ${alertCount}개 그룹이 ±${_bandPct}%p 밴드를 벗어났어요 — 리밸런싱을 검토하세요</div>`
+    : `<div class="grp-sum ok">${MAICON.check} 모든 그룹이 목표 ±${_bandPct}%p 이내예요 — 균형이 잘 잡혀 있어요</div>`;
+
+  const cards = rows.map(r => {
+    const fillW = Math.min(100, r.curPct * 100);
+    const tgtL  = Math.min(100, r.tgtPct * 100);
+    const actCls  = r.action;
+    const actText = r.action === 'ok' ? '적정'
+      : r.action === 'buy' ? '매수 ' + fmtKRW(r.diffVal)
+      : '매도 ' + fmtKRW(Math.abs(r.diffVal));
+    const diffCls = r.diff > 0 ? 'under' : r.diff < 0 ? 'over' : '';
+    const diffTxt = (r.diff >= 0 ? '+' : '') + (r.diff * 100).toFixed(1) + '%p';
     return `
-    <div class="rebal-row" style="${r.outOfBand ? 'background:var(--gold-pale);' : ''}">
-      <span class="group-badge" style="background:${r.g.color}22;color:${r.g.color};min-width:70px;">${r.g.name}</span>
-      <span style="flex:1;">
-        <span style="color:var(--text-muted);">현재 ${fmtPct(r.curPct)} → 목표 ${fmtPct(r.tgtPct)}</span>
-        ${bandBadge}
-        <div style="height:4px;background:#eee;border-radius:2px;margin-top:4px;max-width:120px;">
-          <div style="height:4px;width:${Math.min(100,r.curPct/Math.max(r.tgtPct,0.01)*100)}%;background:${barColor};border-radius:2px;transition:width 0.3s;"></div>
-        </div>
-      </span>
-      <span style="min-width:100px;flex-shrink:0;text-align:right;">${fmtKRW(r.cur)}</span>
-      <span class="rebal-action ${actionCls}">${actionText}</span>
+    <div class="rb-card ${r.outOfBand ? 'warn' : ''}">
+      <div class="rb-card-head">
+        <span class="rb-dot" style="background:${r.g.color}"></span>
+        <span class="rb-name">${maEsc(r.g.name)}</span>
+        <span class="rb-act ${actCls}">${actText}</span>
+      </div>
+      <div class="rb-track">
+        <div class="rb-fill" style="width:${fillW}%;background:${r.g.color}"></div>
+        <div class="rb-target" style="left:${tgtL}%"></div>
+      </div>
+      <div class="rb-nums">
+        <span>현재 <b>${(r.curPct*100).toFixed(1)}%</b></span>
+        <span class="rb-diff ${diffCls}">차이 ${diffTxt}</span>
+        <span>목표 <b>${(r.tgtPct*100).toFixed(1)}%</b></span>
+      </div>
     </div>`;
   }).join('');
+
+  const notes = [];
+  if (Math.abs(sumTargets - 100) > 0.1)
+    notes.push(`목표 비중 합 ${(+sumTargets.toFixed(1))}% → 100% 기준으로 정규화해 계산합니다.`);
+  if (ungroupedVal > 0)
+    notes.push(`그룹 미지정 종목 ${fmtKRW(ungroupedVal)}은 리밸런싱에서 제외됩니다.`);
+  const noteBanner = notes.length
+    ? `<div style="font-size:0.74rem;color:var(--ds-muted);margin-top:8px;line-height:1.5;">ℹ ${notes.join(' ')}</div>` : '';
+
+  document.getElementById('rebalResult').innerHTML = cards + noteBanner;
 }
 
 // 정수(원) 배분: floats를 합이 정확히 round(total)이 되도록 최대잔여법으로 반올림
@@ -858,11 +1004,26 @@ function allocExact(weights, total) {
 }
 
 // ── 추가매수 ──
-function calcPurchase() {
-  const amount = parseFloat(document.getElementById('purchaseAmount').value) || 0;
-  if (!groups.length || !amount) return;
+function setPurchaseAmount(v) {
+  document.getElementById('purchaseAmount').value = v;
+  calcPurchase();
+}
 
-  // 리밸런싱과 동일 기준: 그룹에 속한 종목만 + 목표비중은 합으로 정규화
+function calcPurchase() {
+  const resEl  = document.getElementById('purchaseResult');
+  const amount = parseFloat(document.getElementById('purchaseAmount').value) || 0;
+
+  const tg = groups.filter(g => g.target_pct > 0);
+  const sumTargets = tg.reduce((s, g) => s + g.target_pct, 0);
+  if (!tg.length || !sumTargets) {
+    resEl.innerHTML = `<div class="ma-empty"><div class="em-ic">${MAICON.scale}</div><div class="em-t">목표 비중이 필요해요</div><div class="em-d">그룹 관리 탭에서 그룹 목표 비중을 먼저 설정하면<br>추가매수 배분을 제안해드려요.</div></div>`;
+    return;
+  }
+  if (!amount) {
+    resEl.innerHTML = `<div style="color:var(--ds-muted);font-size:0.85rem;padding:10px 0;">투자 금액을 입력하면 그룹별 배분 제안이 표시됩니다.</div>`;
+    return;
+  }
+
   const groupValues = {};
   let groupedTotal = 0;
   holdings.forEach(h => {
@@ -872,64 +1033,86 @@ function calcPurchase() {
     groupedTotal += v;
   });
 
-  const tg = groups.filter(g => g.target_pct > 0);
-  const sumTargets = tg.reduce((s, g) => s + g.target_pct, 0);
-  if (!sumTargets) {
-    document.getElementById('purchaseResult').innerHTML = '<div style="color:var(--text-muted);">그룹 목표 비중을 설정해주세요</div>';
-    return;
-  }
-
   const newTotal = groupedTotal + amount;
-  // 목표가치 대비 부족분(매수만 가능 → 음수=초과그룹은 0). 부족분 비례로 amount 전액 배분.
+  // 목표가치 대비 부족분(매수만 가능 → 초과그룹은 0). 부족분 비례로 amount 전액 배분.
   const items = tg.map(g => {
     const w = g.target_pct / sumTargets;
     const posDef = Math.max(0, newTotal * w - (groupValues[g.id] || 0));
     return { g, w, posDef };
   });
   const sumPos = items.reduce((s, r) => s + r.posDef, 0);
-  // sumPos>0 → 부족분 비례, 전부 목표 이상이면 정규화 목표비중대로
   const rawBuys = items.map(r => sumPos > 0 ? amount * r.posDef / sumPos : amount * r.w);
-  const buys = allocExact(rawBuys, amount);   // 합 = 정확히 amount(원)
+  const buys = allocExact(rawBuys, amount);
   const rows = items.map((r, i) => ({ g: r.g, buy: buys[i] })).filter(r => r.buy > 0);
+  if (!rows.length) { resEl.innerHTML = `<div style="color:var(--ds-muted);">배분할 그룹이 없습니다.</div>`; return; }
 
-  if (!rows.length) {
-    document.getElementById('purchaseResult').innerHTML = '<div style="color:var(--text-muted);">그룹 목표 비중을 설정해주세요</div>';
-    return;
-  }
-
+  const maxBuy = Math.max(...rows.map(r => r.buy));
   const buyTotal = rows.reduce((s, r) => s + r.buy, 0);
-  document.getElementById('purchaseResult').innerHTML = `
-    <div style="font-size:0.85rem;font-weight:700;margin-bottom:10px;">추가매수 배분 제안</div>
-    ${rows.map(r=>`
-    <div class="rebal-row">
-      <span class="group-badge" style="background:${r.g.color}22;color:${r.g.color};min-width:70px;">${r.g.name}</span>
-      <span style="flex:1;color:var(--text-muted);">목표 비중 ${(r.g.target_pct/sumTargets*100).toFixed(1)}%</span>
-      <span class="rebal-action rebal-buy">▲ ${fmtKRW(r.buy)}</span>
+  resEl.innerHTML = `
+    <div style="font-size:0.82rem;font-weight:700;margin-bottom:4px;">${fmtKRW(amount)} 배분 제안</div>
+    ${rows.map(r => `
+    <div class="pur-row">
+      <span class="rb-dot" style="background:${r.g.color}"></span>
+      <span style="min-width:84px;font-weight:600;font-size:0.86rem;">${maEsc(r.g.name)}</span>
+      <span class="pur-bar"><i style="width:${(r.buy/maxBuy*100).toFixed(0)}%;background:${r.g.color}"></i></span>
+      <span class="pur-buy">+${fmtKRW(r.buy)}</span>
     </div>`).join('')}
-    <div class="rebal-row" style="font-weight:700;border-top:1.5px solid var(--border);">
-      <span style="flex:1;">합계</span>
-      <span class="rebal-action" style="background:var(--bg);color:var(--text);">${fmtKRW(buyTotal)}</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;font-weight:700;padding-top:12px;border-top:1.5px solid var(--ds-hairline);margin-top:4px;">
+      <span>합계</span><span class="pur-buy" style="color:var(--ds-ink)">+${fmtKRW(buyTotal)}</span>
     </div>
-    <div style="margin-top:10px;font-size:0.78rem;color:var(--text-muted);">* 부족분(목표 대비 모자란 그룹)에 비례 배분합니다. 그룹 내 어떤 종목을 살지는 계좌별 세금을 고려해 직접 결정하세요.</div>
+    <div style="margin-top:12px;font-size:0.76rem;color:var(--ds-muted);line-height:1.5;">* 목표 대비 부족한 그룹에 우선 배분(매도 없이 목표에 근접). 그룹 내 종목 선택은 계좌별 세금을 고려해 직접 결정하세요.</div>
   `;
 }
 
 // ── 그룹 관리 ──
 function renderGroups() {
-  const wrap = document.getElementById('groupsWrap');
+  const wrap  = document.getElementById('groupsWrap');
+  const sumEl = document.getElementById('groupsSum');
   if (!groups.length) {
-    wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">그룹이 없습니다</div>';
+    if (sumEl) sumEl.innerHTML = '';
+    wrap.innerHTML = `<div class="ma-empty"><div class="em-ic">${MAICON.layers}</div><div class="em-t">아직 그룹이 없어요</div><div class="em-d">자산을 국내주식·미국주식·채권·금 등으로 묶고<br>목표 비중을 정해 리밸런싱·추가매수에 활용하세요.</div><button class="btn-primary" style="margin-top:16px;" onclick="openAddGroup()">+ 첫 그룹 만들기</button></div>`;
     return;
   }
-  wrap.innerHTML = groups.map(g=>`
-    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
-      <div style="width:14px;height:14px;border-radius:50%;background:${g.color};flex-shrink:0;"></div>
-      <span style="flex:1;font-weight:600;">${g.name}</span>
-      <span style="color:var(--text-muted);font-size:0.82rem;">목표 ${g.target_pct}%</span>
-      <button class="icon-btn" onclick="openEditGroup(${g.id})" title="수정">${MAICON.pencil}</button>
-      <button class="icon-btn danger" onclick="deleteGroup(${g.id})" title="삭제">${MAICON.trash}</button>
-    </div>
-  `).join('');
+
+  // 그룹별 종목 수·평가액
+  const gStat = {};
+  holdings.forEach(h => {
+    if (!h.group_id) return;
+    const v = (prices[h.code] || 0) * h.quantity;
+    if (!gStat[h.group_id]) gStat[h.group_id] = { n: 0, val: 0 };
+    gStat[h.group_id].n++; gStat[h.group_id].val += v;
+  });
+
+  const sumTargets = groups.reduce((s, g) => s + (g.target_pct || 0), 0);
+  const sumOk = Math.abs(sumTargets - 100) < 0.1;
+  if (sumEl) sumEl.innerHTML =
+    `<div class="grp-sum ${sumOk ? 'ok' : 'warn'}">
+      <span>${sumOk ? MAICON.check : MAICON.alert} 목표 비중 합계</span>
+      <span style="font-family:var(--font-mono)">${(+sumTargets.toFixed(1))}%${sumOk ? '' : ' · 100% 권장'}</span>
+    </div>`;
+
+  const maxTgt = Math.max(...groups.map(g => g.target_pct || 0), 1);
+  wrap.innerHTML = groups.map(g => {
+    const st = gStat[g.id] || { n: 0, val: 0 };
+    const initial = (g.name || '?').trim().charAt(0);
+    return `
+    <div class="grp-card">
+      <span class="grp-emblem" style="background:${g.color}">${maEsc(initial)}</span>
+      <div class="grp-main">
+        <div class="grp-name">${maEsc(g.name)}</div>
+        <div class="grp-sub">${st.n}개 종목 · ${fmtKRW(st.val)}</div>
+      </div>
+      <div class="grp-tgt">
+        <div class="grp-tgt-v">${g.target_pct}%</div>
+        <div class="grp-tgt-l">목표 비중</div>
+        <div class="grp-tgt-bar"><i style="width:${(g.target_pct/maxTgt*100).toFixed(0)}%;background:${g.color}"></i></div>
+      </div>
+      <div class="grp-actions">
+        <button class="icon-btn" onclick="openEditGroup(${g.id})" title="수정">${MAICON.pencil}</button>
+        <button class="icon-btn danger" onclick="deleteGroup(${g.id})" title="삭제">${MAICON.trash}</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── 모달 ──
@@ -1004,10 +1187,28 @@ async function quickSetGroup(holdingId, groupId) {
   await loadAll();
 }
 
-async function deleteHolding(id) {
-  if (!confirm('이 종목을 삭제할까요?')) return;
-  await fetch('/api/myassets/holding/'+id, { method: 'DELETE' });
-  await loadAll();
+// ── 확인 다이얼로그 (confirm() 대체) ──
+let _confirmCb = null;
+function mmConfirm(msg, sub, onYes) {
+  document.getElementById('confirmMsg').textContent = msg;
+  document.getElementById('confirmSub').textContent = sub || '';
+  _confirmCb = onYes;
+  openModal('modalConfirm');
+}
+document.getElementById('confirmYes').addEventListener('click', async () => {
+  closeModal('modalConfirm');
+  const cb = _confirmCb; _confirmCb = null;
+  if (cb) await cb();
+});
+
+function deleteHolding(id) {
+  const h = holdings.find(x => x.id === id);
+  mmConfirm('이 종목을 삭제할까요?',
+    h ? `${h.name || h.code} 보유 내역이 삭제됩니다.` : '',
+    async () => {
+      await fetch('/api/myassets/holding/'+id, { method: 'DELETE' });
+      await loadAll();
+    });
 }
 
 function openAddGroup() {
@@ -1047,11 +1248,15 @@ async function saveGroup() {
   renderGroups();
 }
 
-async function deleteGroup(id) {
-  if (!confirm('이 그룹을 삭제할까요? (종목은 유지됩니다)')) return;
-  await fetch('/api/myassets/group/'+id, { method: 'DELETE' });
-  await loadAll();
-  renderGroups();
+function deleteGroup(id) {
+  const g = groups.find(x => x.id === id);
+  mmConfirm('이 그룹을 삭제할까요?',
+    `${g ? '"' + g.name + '" ' : ''}그룹만 삭제되고 종목은 그대로 유지됩니다.`,
+    async () => {
+      await fetch('/api/myassets/group/'+id, { method: 'DELETE' });
+      await loadAll();
+      renderGroups();
+    });
 }
 
 // ── 종목 검색 (모달) ──

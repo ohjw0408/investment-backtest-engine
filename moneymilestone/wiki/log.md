@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-18] design | 디자인 시스템 리팩터 1단계 — 코인베이스 토큰층
+
+오너 방향: 코인베이스 룩(`DESIGN-coinbase.md` 레퍼런스) + 다크 전용 팔레트(흰→검 반전 아님). 쇼케이스-우선, 토큰만 먼저.
+
+- `static/css/style.css`: `:root`·`[data-theme=dark]` 토큰 머티리얼블루 → 코인베이스 팔레트로 리맵(레거시 변수명 유지 → `var(--*)` 쓰는 부분 자동 전환). 라이트=순백 캔버스·#0052ff·near-black ink·단일 소프트 그림자. 다크=elevation 사다리(#0a0b0d→#16181c→#1e2127)·블루 톤업 #4a7dff·등락색 띄움(#27c281/#ff5a5f)·ink #f5f6f8.
+- 신규 토큰 어휘 추가(어디티브, 페이지 패스용): 서피스사다리·시맨틱 up/down·폰트(Inter+JetBrains Mono, 둘 다 OFL 상업무료)·라운드 스케일(xs~pill)·간격 4px·타입 스케일(display 400).
+- `templates/base.html`: Inter+JetBrains Mono 폰트 로드 + 캐시버스터 `?v=20260618tokens`.
+- 페이지 0개 변환(인라인 732곳·`<style>` 20곳은 다음 패스). navbar 구조·body 폰트 룰 미변경.
+- 다음 = 홈 페이지 패스(인라인→토큰, pill 버튼, 모노 숫자, 24px 카드).
+
 ## [2026-06-18] fix | 기여도 후속 — 방어력=포착률, 모바일/MDD 드래그, 표 이동
 
 오너 피드백 4건: SCHD가 QQQM보다 방어 못함(이상)·모바일 드래그 불가·MDD 드래그 불가·용어 비직관.

@@ -84,6 +84,30 @@
   display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; text-decoration: none; }
 .home-band h3 { font-size: 24px; font-weight: 500; letter-spacing: -.5px; line-height: 1.2; }
 .home-band p { font-size: 14px; color: #a8acb3; margin-top: 6px; }
+
+/* ── "다음 할 일" 액션 사다리 (조종석 핵심) ── */
+.action-head { padding: var(--sp-lg) var(--sp-lg) var(--sp-sm); font-size: var(--fs-title); font-weight: 600; color: var(--ds-ink); display:flex; align-items:center; gap:8px; }
+.action-ladder { display: flex; flex-direction: column; }
+.action-row { display: flex; align-items: center; gap: 14px; padding: 16px var(--sp-lg); border-top: 1px solid var(--ds-hairline); cursor: pointer; text-decoration: none; color: inherit; transition: background .12s; }
+.action-row:hover { background: var(--ds-soft); }
+.action-ic { width: 40px; height: 40px; border-radius: var(--r-full); background: var(--brand-tint); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.action-ic.warn { background: var(--down-tint); }
+.action-ic.ok { background: var(--up-tint); }
+.action-main { flex: 1; min-width: 0; }
+.action-t { font-size: var(--fs-sm); font-weight: 600; color: var(--ds-ink); }
+.action-s { font-size: var(--fs-cap); color: var(--ds-muted); margin-top: 2px; }
+.action-arrow { color: var(--ds-muted); font-size: 18px; flex-shrink: 0; }
+.action-loading { padding: 20px var(--sp-lg); color: var(--ds-muted); font-size: var(--fs-sm); }
+/* 온보딩 (자산 없음) */
+.onboard { padding: var(--sp-xl) var(--sp-lg) var(--sp-lg); text-align: center; }
+.onboard h3 { font-size: 22px; font-weight: 600; color: var(--ds-ink); letter-spacing: -.4px; }
+.onboard p { font-size: var(--fs-sm); color: var(--ds-body); margin-top: 8px; line-height: 1.5; }
+.onboard-cta { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+.onboard-steps { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 20px; flex-wrap: wrap; font-size: var(--fs-cap); color: var(--ds-muted); font-weight: 500; }
+.onboard-steps .sep { opacity: .5; }
+/* 금액 peek 토글 */
+.peek-btn { background: none; border: none; cursor: pointer; color: var(--ds-muted); font-size: 16px; padding: 2px 4px; line-height: 1; }
+.peek-btn:hover { color: var(--ds-ink); }
 </style>
 {% endblock %}
 
@@ -98,6 +122,7 @@
         <div class="portfolio-amount">
           <span id="portfolioValue">***,***,***원</span>
           <span class="portfolio-change up" id="portfolioChange">(+1.8%)</span>
+          <button class="peek-btn" id="peekBtn" title="금액 보기" style="display:none;" onclick="togglePeek()">👁</button>
         </div>
       </div>
       <div class="period-selector">
@@ -116,14 +141,13 @@
     </div>
   </div>
 
-  <!-- ===== 다크 에디토리얼 밴드 ===== -->
-  <a href="/backtest" class="home-band">
-    <div>
-      <h3>30년을 백테스트하세요</h3>
-      <p>과거 데이터로 포트폴리오를 검증하고 은퇴까지 시뮬레이션합니다.</p>
+  <!-- ===== "다음 할 일" 액션 사다리 (상태별: 사다리 or 온보딩) ===== -->
+  <div class="card" id="actionCard">
+    <div class="action-head" id="actionHead">📋 다음 할 일</div>
+    <div class="action-ladder" id="actionLadder">
+      <div class="action-loading">불러오는 중…</div>
     </div>
-    <span class="home-btn home-btn-primary" style="white-space:nowrap;">시작하기 ›</span>
-  </a>
+  </div>
 
   <!-- ===== 홈 위젯 (시장지수 / 관심목록) ===== -->
   <div class="card market-card" id="widgetCard">
@@ -164,6 +188,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   loadPortfolio();
+  loadActions();
   loadWidgets();
   loadAssets();
   setInterval(loadWidgets, 5 * 60 * 1000);
@@ -187,7 +212,16 @@ document.addEventListener('DOMContentLoaded', () => {
 let portfolioChart = null;
 let _portfolioData = null;
 let _homeHideAmounts = true;
+let _homePeek = false;   // 로컬 금액 보기 (개인 가림설정 임시 해제, 저장 안 함)
 let _homePortfolioPeriod = '1m';
+
+function togglePeek() {
+  _homePeek = !_homePeek;
+  const b = document.getElementById('peekBtn');
+  if (b) b.textContent = _homePeek ? '🙈' : '👁';
+  loadPortfolio(_homePortfolioPeriod);
+  loadActions();
+}
 
 function fmtMaskedKRW(v) {
   if (_homeHideAmounts) return '***,***,***원';
@@ -200,6 +234,9 @@ async function loadPortfolio(period = '1m') {
   _portfolioData = await res.json();
   const data = _portfolioData;
   _homeHideAmounts = data.hide_amounts !== false;
+  if (_homePeek) _homeHideAmounts = false;
+  const peekBtn = document.getElementById('peekBtn');
+  if (peekBtn) peekBtn.style.display = (data.hide_amounts !== false) ? '' : 'none';
 
   if (data.empty) {
     document.getElementById('portfolioValue').textContent = '—';
@@ -282,6 +319,94 @@ async function loadPortfolio(period = '1m') {
       }
     }
   });
+}
+
+// ── "다음 할 일" 액션 사다리 ──
+function _actionRowHtml(r) {
+  return `<a class="action-row" href="${r.href}">
+    <div class="action-ic ${r.cls || ''}">${r.ic}</div>
+    <div class="action-main"><div class="action-t">${r.t}</div><div class="action-s">${r.s}</div></div>
+    <span class="action-arrow">›</span></a>`;
+}
+
+function _rebalCard(data) {
+  const groups = data.groups || [], holdings = data.holdings || [], prices = data.prices || {};
+  if (!groups.length) return null;
+  const gv = {}; let total = 0;
+  holdings.forEach(h => {
+    const gid = h.group_id; if (!gid) return;
+    const v = (prices[h.code] || 0) * (+h.quantity || 0);
+    gv[gid] = (gv[gid] || 0) + v; total += v;
+  });
+  if (total <= 0) return null;
+  const tt = groups.reduce((s, g) => s + (g.target_pct || 0), 0) || 100;
+  let worst = null;
+  groups.forEach(g => {
+    const cur = (gv[g.id] || 0) / total * 100;
+    const tgt = (g.target_pct || 0) / tt * 100;
+    const d = cur - tgt;
+    if (!worst || Math.abs(d) > Math.abs(worst.d)) worst = { name: g.name, d, cur, tgt };
+  });
+  if (!worst || Math.abs(worst.d) < 5)
+    return { ic: '⚖', cls: 'ok', t: '자산 배분 균형 잡힘', s: '목표 비중과 ±5%p 이내', href: '/myassets' };
+  const sign = worst.d >= 0 ? '+' : '';
+  return { ic: '⚖', cls: 'warn', t: `리밸런싱 필요 — ${_esc(worst.name)}`,
+    s: `목표보다 ${sign}${worst.d.toFixed(0)}%p · 현재 ${worst.cur.toFixed(0)}% / 목표 ${worst.tgt.toFixed(0)}%`, href: '/myassets' };
+}
+
+function _divCard(dv, hide) {
+  if (!dv || dv.error || !dv.events) return null;
+  const now = new Date(), y = dv.current_year || now.getFullYear(), m = now.getMonth() + 1;
+  const todayStr = now.toISOString().slice(0, 10);
+  const evs = dv.events[y] || dv.events[String(y)] || [];
+  let cur = evs.filter(e => e.month === m && e.date >= todayStr), label = '이번 달';
+  if (!cur.length) {
+    const future = evs.filter(e => e.date >= todayStr).sort((a, b) => a.date < b.date ? -1 : 1);
+    if (!future.length) return null;
+    const nm = future[0].month;
+    cur = future.filter(e => e.month === nm); label = nm + '월';
+  }
+  if (!cur.length) return null;
+  const sum = cur.reduce((s, e) => s + (e.krw_post || 0), 0);
+  const amt = hide ? '' : ` ₩${Math.round(sum).toLocaleString()}`;
+  return { ic: '💰', cls: '', t: `${label} 배당${amt} 예정`, s: `${cur.length}건 · 세후 기준`, href: '/myassets' };
+}
+
+async function loadActions() {
+  const head = document.getElementById('actionHead');
+  const ladder = document.getElementById('actionLadder');
+  let data;
+  try { data = await (await fetch('/api/myassets/data', { cache: 'no-store' })).json(); }
+  catch (e) { ladder.innerHTML = ''; return; }
+
+  if (data.error || !(data.holdings || []).length) {
+    head.style.display = 'none';
+    ladder.className = '';
+    ladder.innerHTML = `
+      <div class="onboard">
+        <h3>내 포트폴리오, 30년 과거로 검증해보세요</h3>
+        <p>종목을 담으면 수익률·배당·은퇴까지 한 번에 시뮬레이션해드려요.</p>
+        <div class="onboard-cta">
+          <a href="/myassets" class="home-btn home-btn-primary">➕ 자산 추가하고 시작</a>
+          <a href="/backtest" class="home-btn home-btn-ghost">데모 백테 둘러보기</a>
+        </div>
+        <div class="onboard-steps"><span>① 종목 추가</span><span class="sep">→</span><span>② 분석 실행</span><span class="sep">→</span><span>③ 목표 추적</span></div>
+      </div>`;
+    return;
+  }
+
+  const hide = data.hide_amounts !== false && !_homePeek;
+  const rows = [];
+  try {
+    const dv = await (await fetch('/api/myassets/dividends', { cache: 'no-store' })).json();
+    const c = _divCard(dv, hide); if (c) rows.push(c);
+  } catch (e) { /* 배당 실패 무시 */ }
+  const r = _rebalCard(data); if (r) rows.push(r);
+  rows.push({ ic: '🎯', cls: '', t: '은퇴까지 얼마나 왔을까?', s: '목표 정하고 시뮬레이션 돌려보기', href: '/retirement' });
+
+  head.style.display = '';
+  ladder.className = 'action-ladder';
+  ladder.innerHTML = rows.map(_actionRowHtml).join('');
 }
 
 // ── 홈 위젯 (시장지수 / 관심목록) ──
@@ -417,11 +542,14 @@ async function loadAssets() {
   const items = await res.json();
 
   const list = document.getElementById('assetList');
+  const barWrap = document.querySelector('.asset-bar-wrap');
   if (!items.length) {
-    list.innerHTML = '<div style="color:var(--ds-muted);font-size:13px;padding:8px 0">내 자산 탭에서 그룹을 설정하면 표시됩니다.</div>';
+    list.innerHTML = '<div style="color:var(--ds-muted);font-size:13px;padding:8px 0 4px">내 자산 탭에서 그룹을 설정하면 자산군 구성이 여기 표시됩니다.</div>';
     document.getElementById('stackedBar').innerHTML = '';
+    if (barWrap) barWrap.style.display = 'none';
     return;
   }
+  if (barWrap) barWrap.style.display = '';
 
   list.innerHTML = items.map(a => `
     <div class="asset-item">

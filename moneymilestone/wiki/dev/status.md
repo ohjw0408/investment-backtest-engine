@@ -21,6 +21,8 @@ tags: [dev]
 
 ## 한 줄 요약
 
+> ✅ **2026-06-18 업데이트 90 (UX — 홈 조종석 재설계, "다음 할 일" 액션 사다리):** 오너 "팔레트=여전히 색칠, 직관 UX 원함". 홈을 범용 대시보드→**상태 인식 조종석**으로 구조 재설계(색 아닌 정보순서). 마찰 7건 분석 → ① 다크밴드(백테 중복) 제거→**"다음 할 일" 사다리**(💰배당예정·⚖리밸런싱 drift≥5%p·🎯은퇴넛지, 실데이터=`/api/myassets/data`+`/dividends` 조합, **신규 백엔드 0**, 가짜숫자 0) ② 금액 👁 peek 토글(가림설정 임시해제) ③ 시장위젯 강등 ④ 우측 빈칸 정리 ⑤ 상태별(보유O=사다리/보유X=온보딩 3스텝). 검증 = Playwright 사다리렌더·peek 공개·콘솔에러 0. `templates/index.html`만. 다음 = 조종석 패턴 내자산·계산기 확장.
+
 > ✅ **2026-06-18 업데이트 89 (디자인 통일 — 대규모 팔레트 통일, 전 24페이지 코인베이스 채택, 미배포):** 오너 "싹 다 고쳐라". 두 고레버리지 편집: ① `calculator.css` 전체 ds 토큰화(10템플릿 공유=계산기·배당·은퇴·백테·myassets·symbol·portfolio_detail 등 입력패널·티커·결과/지표 일괄) ② `style.css` **레거시 토큰→ds 별칭 매핑**(`--blue→--brand`·`--card→--ds-canvas`·`--border→--ds-hairline`·`--green→--up`·`--red→--down` 등 — Material 블루 #1565C0 → 코인베이스 #0052ff, 미변환 페이지·인라인 수천곳 자동 채택, 다크/액센트는 ds가 처리하므로 다크 레거시 블록은 gold만 잔존). 캐시 `?v=20260618ds`. 검증 = Playwright 10페이지 스윕 콘솔에러 0 + 다크 정상 + home 회귀 없음. **남은 = 페이지별 레이아웃 폴리시(리스트/분석 아키타입 밀도)·alert/confirm→토스트 — 오너 1:1 지시 예정. 미배포(다음 커밋).**
 
 > ✅ **2026-06-18 업데이트 88 (디자인 통일 — 폼 아키타입 단순군 4종 완료, 미배포):** `디자인통일_plan.md` 진행. 폼 목업(`design-preview-form.html`) 기준 **simple·tax_switch·settings·tax_settings** 진짜 재구성(리스킨❌). 각 `<style>` 레거시 토큰(`--card/--border/--blue*`)·하드코딩 블루(#1976D2)→ds 토큰(`--ds-*`/`--brand*`) 재바인딩. **마크업·ID·클래스·JS 무손상**(simple_tools.js·tax_switch.js DOM 계약 보존). 차트 brand 바인딩(simple 평가액=`--brand`/배당=`--up`, tax_switch A=`--up`/B=`--brand`). 검증 = 로컬 서버+Playwright 라이트/다크 풀스샷·콘솔에러 0(4페이지)·실동작(simple 즉시재계산·탭전환) + settings 로그인 에디터(mint_session, ⚠️ 쿠키=stdout 마지막 줄=import Redis 경고 분리). 진행표·`디자인통일_plan.md`·`log.md` 동기화. **미배포(배치 푸시는 오너 승인 후). 다음 = 폼 무거운군(calculator·dividend_target·retirement·alerts)+alert/confirm→토스트.**

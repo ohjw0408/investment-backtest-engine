@@ -67,6 +67,23 @@
 .asset-bar-label { color: var(--ds-muted); font-weight: 600; }
 .bar-seg { border-radius: var(--r-xs); }
 .bar-col-label { color: var(--ds-muted); }
+
+/* ── 목업 구조: 여백·CTA·다크밴드·배지 ── */
+.dashboard-grid { display: flex; flex-direction: column; gap: var(--sp-lg); }
+.portfolio-amount { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.portfolio-change { background: var(--up-tint); color: var(--up); padding: 3px 11px; border-radius: var(--r-pill); font-size: 14px; font-weight: 600; }
+.portfolio-change.down { background: var(--down-tint); color: var(--down); }
+.chart-wrap { padding: 8px 16px 4px; }
+.home-cta { display: flex; gap: 10px; padding: 4px 24px 24px; }
+.home-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-family: var(--font-sans); font-size: 15px; font-weight: 600; padding: 12px 22px; border-radius: var(--r-pill); border: none; cursor: pointer; text-decoration: none; }
+.home-btn-primary { background: var(--brand); color: var(--on-brand); }
+.home-btn-primary:hover { background: var(--brand-hover); }
+.home-btn-ghost { background: var(--ds-strong); color: var(--ds-ink); }
+.home-btn-ghost:hover { background: var(--ds-hairline); }
+.home-band { background: var(--ds-dark); color: #fff; border-radius: var(--r-xl); padding: 28px 32px;
+  display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; text-decoration: none; }
+.home-band h3 { font-size: 24px; font-weight: 500; letter-spacing: -.5px; line-height: 1.2; }
+.home-band p { font-size: 14px; color: #a8acb3; margin-top: 6px; }
 </style>
 {% endblock %}
 
@@ -93,7 +110,20 @@
     <div class="chart-wrap">
       <canvas id="portfolioChart"></canvas>
     </div>
+    <div class="home-cta">
+      <a href="/backtest" class="home-btn home-btn-primary">백테스트 시작</a>
+      <a href="/myassets" class="home-btn home-btn-ghost">자산 추가</a>
+    </div>
   </div>
+
+  <!-- ===== 다크 에디토리얼 밴드 ===== -->
+  <a href="/backtest" class="home-band">
+    <div>
+      <h3>30년을 백테스트하세요</h3>
+      <p>과거 데이터로 포트폴리오를 검증하고 은퇴까지 시뮬레이션합니다.</p>
+    </div>
+    <span class="home-btn home-btn-primary" style="white-space:nowrap;">시작하기 ›</span>
+  </a>
 
   <!-- ===== 홈 위젯 (시장지수 / 관심목록) ===== -->
   <div class="card market-card" id="widgetCard">

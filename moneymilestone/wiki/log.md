@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-18] UX | 아이콘 시스템 — 이모지 전면 교체(사이드바·시장헤더·검색)
+
+오너 딜레마: 이모지=유치/저렴, 얇은 회색라인=밋밋/차가움. 해법 = **"색이 의미를 갖는 라인 아이콘 시스템"**(둥근 기하 stroke 1.75 + 평소 회색→활성 brand + ★gold 유지 + 새로고침 회전 모션).
+
+- **`base.html` Jinja 매크로 `nicon(name)`** 도입(17종 인라인 SVG, `currentColor`). 사이드바 16항목 이모지(🏠🧮💰…) → 매크로. ⚠️ Jinja 자동이스케이프로 `{{A}}`가 따옴표를 `&#34;`로 깨뜨림 → `{{ A|safe }}` 필수(viewBox 에러 수정).
+- **`components.css`**: `.si-ic` 색 상태연동(평소 `--ds-muted`→hover `--ds-ink`→active `--brand`). 사이드바 flex+gap. nav 검색 아이콘 SVG화(포커스 시 brand).
+- **`index.html` 시장 헤더**: ★→star SVG(gold 유지), 🔄→refresh SVG(+hover 회전·클릭 시 `.spinning` ds-spin 애니, textContent 이모지 스왑 폐기), ⚙→gear SVG. 사다리 아이콘은 직전 커밋서 이미 SVG.
+
+검증 = Playwright 홈/계산기 콘솔에러 0(safe 수정 후). 캐시 `components.css?v=20260618ds3`. **잔여 이모지**: alert_widget 종(별도 JS)·일부 페이지 인라인 — 점진 교체.
+
 ## [2026-06-18] UX | 홈 랜딩 강화 — 비로그인 데모그래프·CTA 장점문구·기능타일·SVG 아이콘
 
 오너 5건 지적 반영(`templates/index.html` {% if user %} 분기 도입):

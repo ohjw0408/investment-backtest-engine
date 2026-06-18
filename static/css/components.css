@@ -179,7 +179,9 @@
 .nav-search-box:focus-within { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-tint); background:var(--ds-canvas); }
 .nav-search-box input { font-family:var(--font-sans); color:var(--ds-ink); }
 .nav-search-box input::placeholder { color:var(--ds-body); }
-.nav-search-icon { color:var(--ds-body); }
+.nav-search-icon { color:var(--ds-body); display:inline-flex; align-items:center; }
+.nav-search-icon .si-ic { width:17px; height:17px; color:var(--ds-body); }
+.nav-search-box:focus-within .nav-search-icon .si-ic { color:var(--brand); }
 
 /* 우측 아이콘 */
 .nav-icon-btn { background:var(--ds-strong); color:var(--ds-ink); border-radius:var(--r-full);
@@ -191,7 +193,12 @@
 .sidebar { background:var(--ds-canvas); border-right:1px solid var(--ds-hairline);
   font-family:var(--font-sans); }
 .sidebar-label { color:var(--ds-muted); font-weight:600; letter-spacing:.06em; }
-.sidebar-item { color:var(--ds-body); border-radius:var(--r-md); margin:1px 8px; padding:9px 12px; }
+.sidebar-item { color:var(--ds-body); border-radius:var(--r-md); margin:1px 8px; padding:9px 12px;
+  display:flex; align-items:center; gap:11px; }
 .sidebar-item:hover { background:var(--ds-soft); color:var(--ds-ink); }
 .sidebar-item.active { background:var(--brand-tint); color:var(--brand-text); font-weight:600; }
 .sidebar-item.active::before { display:none; }
+/* 아이콘 — 색이 상태 따라감(평소 회색→활성 brand), 친근한 라인 */
+.si-ic { width:18px; height:18px; flex-shrink:0; color:var(--ds-muted); transition:color .15s; }
+.sidebar-item:hover .si-ic { color:var(--ds-ink); }
+.sidebar-item.active .si-ic { color:var(--brand); }

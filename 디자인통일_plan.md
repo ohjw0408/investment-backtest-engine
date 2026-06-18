@@ -21,6 +21,11 @@
 
 > ⚠️ 검증 팁(2026-06-18 발견): `mint_session.py` stdout 첫 줄에 import-time Redis 경고가 섞임 → 쿠키는 **마지막 줄만** 취할 것(`... | tail -1`). 서버·mint 둘 다 .env의 FLASK_SECRET_KEY 공유(강제 env 불요).
 
+> ✅ **대규모 팔레트 통일(2026-06-18, "싹 다 고쳐라"):** 두 고레버리지 편집으로 **전 24페이지 코인베이스 팔레트 일괄 채택**.
+> ① `static/css/calculator.css` 전체 ds 토큰화(계산기·배당·은퇴·백테·myassets·symbol·portfolio_detail 등 10템플릿 공유 → 입력패널·티커·결과카드·지표 일괄). ② **`static/css/style.css` 레거시 토큰(`--blue/--card/--border/--text/--bg/--green/--red/--shadow/--radius`)을 ds(`--brand*`/`--ds-*`/`--up`/`--down`) 별칭으로 매핑** — 미변환 페이지·인라인 스타일 수천곳도 자동 전환. 다크/액센트는 ds가 `[data-theme]`/`[data-accent]`로 처리하므로 다크 레거시 블록은 gold만 남김. ③ 캐시버전 `?v=20260618ds`(style·components·calculator + 10템플릿).
+> 검증 = Playwright 10페이지 스윕(home·calculator·dividend·retirement·backtest·myassets·search·macro·risk-return·alerts) 콘솔에러 0 + 다크(calculator·home) 정상 + home 회귀 없음.
+> **남은 = 페이지별 레이아웃 폴리시**(팔레트는 통일됐으나 리스트/분석 페이지 아키타입 밀도·여백·위계는 페이지별 후속 — 오너 1:1 지시 예정). alert()/confirm()→토스트/다이얼로그도 페이지별 후속.
+
 **홈 잔여 폴리시(목업 100% 위해):** 차트(Chart.js→목업 SVG풍?) · 시장카드 티커 서브라인 · 자산패널(원형아이콘 행+가로 스택바) · 마스킹/빈 상태 디자인. = 부품 단위 폴리시 항목.
 
 **다음 세션 첫 작업:** 검증 루프 띄우고(로컬+mint_session) → 홈 부품 폴리시 OR 폼 아키타입 묶음 착수. 오너와 시작 페이지 합의.

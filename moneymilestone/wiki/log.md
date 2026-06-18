@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-18] design | 대규모 팔레트 통일 — 전 24페이지 코인베이스 채택 ("싹 다 고쳐라")
+
+오너 "일단 싹 다 고쳐라" → 두 고레버리지 편집으로 전 페이지 팔레트 일괄 전환(rewrite 아님, 토큰 매핑).
+
+- **`static/css/calculator.css` 전체 ds 토큰화**: 무거운 계산기 3종(calculator·dividend_target·retirement) + 공유 페이지(backtest·myassets·symbol·portfolio_detail·tax_switch·simple·tax_settings) 입력패널·티커리스트·결과/지표 카드 일괄 코인베이스화(헤어라인·brand 섹션번호·모노·pill 실행버튼·brand 포커스링). 클래스명 전부 보존.
+- **`static/css/style.css` 레거시 토큰 → ds 별칭 매핑**: `--blue→--brand`, `--card→--ds-canvas`, `--border→--ds-hairline`, `--text→--ds-ink`, `--bg→--ds-soft`, `--green→--up`, `--red→--down`, `--shadow→--ds-shadow`, `--radius→--r-lg` 등. Phase 0이 안전 위해 남겨둔 레거시 팔레트(Material 블루 #1565C0)를 코인베이스(#0052ff)로 전환 → 미변환 페이지·인라인 스타일 수천곳 자동 채택. 다크/액센트는 ds가 `[data-theme]`/`[data-accent]`로 처리하므로 다크 레거시 블록은 gold·color-scheme만 남김.
+- 캐시버전 `?v=20260618ds`(base.html style/components + calculator.css 링크 10템플릿).
+
+검증 = Playwright 10페이지 스윕(home·calculator·dividend·retirement·backtest·myassets·search·macro·risk-return·alerts) **콘솔에러 0** + 다크(calculator·home) 정상 + **home 회귀 없음**(기존 재구성 무손상). 스샷 `design-shots/sw-*`·`dk-*`.
+
+**남은 = 페이지별 레이아웃 폴리시**(팔레트 통일 완료, 리스트/분석 페이지 아키타입 밀도·여백·위계는 페이지별 후속 — 오너 1:1 지시) + alert/confirm→토스트/다이얼로그.
+
 ## [2026-06-18] design | 폼 아키타입 단순군 완료 — simple·tax_switch·settings·tax_settings
 
 폼 아키타입(`design-preview-form.html`) 기준으로 단순 폼 4종 진짜 재구성(리스킨 아님). 각 페이지 `<style>` 블록의 레거시 토큰(`--card/--border/--blue*/--text-muted/--bg`)·하드코딩 블루(#1976D2) → ds 토큰(`--ds-*`/`--brand*`)으로 재바인딩. 마크업·ID·클래스명·JS 로직 100% 보존(simple_tools.js·tax_switch.js DOM 계약 무손상).

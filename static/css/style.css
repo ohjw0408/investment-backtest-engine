@@ -2,60 +2,44 @@
    DOMINO INVEST — Global Styles
    ============================================= */
 
+/* ── 레거시 토큰 = ds 토큰 별칭 (2026-06-18 디자인 통일) ──
+   기존 --blue/--card/--border 등을 ds(--brand*/--ds-*)로 매핑 →
+   미변환 페이지·인라인 스타일도 코인베이스 팔레트 자동 채택.
+   다크/액센트는 ds 토큰이 [data-theme]/[data-accent]로 처리하므로 자동 따라감.
+   gold(시맨틱)·color-scheme 만 자체 값 유지. */
 :root {
-  --blue:        #1565C0;
-  --blue-dark:   #1565C0;
-  --blue-mid:    #1976D2;
-  --blue-bright: #2196F3;
-  --blue-pale:   #E3F2FD;
-  --blue-soft:   #BBDEFB;
-  --green:       #2E7D32;
-  --green-light: #43A047;
-  --green-pale:  #E8F5E9;
-  --red:         #C62828;
-  --red-light:   #EF5350;
-  --red-pale:    #FFEBEE;
+  --blue:        var(--brand);
+  --blue-dark:   var(--brand-hover);
+  --blue-mid:    var(--brand-hover);
+  --blue-bright: var(--brand);
+  --blue-pale:   var(--brand-tint);
+  --blue-soft:   var(--brand-tint);
+  --green:       var(--up);
+  --green-light: var(--up);
+  --green-pale:  var(--up-tint);
+  --red:         var(--down);
+  --red-light:   var(--down);
+  --red-pale:    var(--down-tint);
   --gold:        #F9A825;
   --gold-pale:   #FFF8E1;
   --gold-deep:   #E65100;
-  --bg:          #EEF2F7;
-  --card:        #FFFFFF;
-  --input-bg:    #FFFFFF;
-  --text:        #1A1A2E;
-  --text-muted:  #78909C;
-  --border:      #E0E8F0;
-  --navbar-bg:   #1565C0;
-  --shadow:      0 2px 12px rgba(21,101,192,0.08);
-  --shadow-lg:   0 8px 32px rgba(21,101,192,0.14);
-  --radius:      14px;
+  --bg:          var(--ds-soft);
+  --card:        var(--ds-canvas);
+  --input-bg:    var(--ds-canvas);
+  --text:        var(--ds-ink);
+  --text-muted:  var(--ds-muted);
+  --border:      var(--ds-hairline);
+  --navbar-bg:   var(--ds-canvas);
+  --shadow:      var(--ds-shadow);
+  --shadow-lg:   var(--ds-shadow-lg);
+  --radius:      var(--r-lg);
   color-scheme: light;
 }
 
 html[data-theme="dark"] {
-  --blue:        #4D9FE8;
-  --blue-dark:   #4D9FE8;
-  --blue-mid:    #5BA8EC;
-  --blue-bright: #64B5F6;
-  --blue-pale:   #1C3550;
-  --blue-soft:   #254766;
-  --green:       #5DBB63;
-  --green-light: #66BB6A;
-  --green-pale:  #1B2F20;
-  --red:         #EF5350;
-  --red-light:   #EF5350;
-  --red-pale:    #3A2024;
   --gold:        #FFCA28;
   --gold-pale:   #33290F;
   --gold-deep:   #FFB74D;
-  --bg:          #0E141C;
-  --card:        #18212E;
-  --input-bg:    #121A26;
-  --text:        #E8EDF4;
-  --text-muted:  #8FA3B8;
-  --border:      #2B3A4D;
-  --navbar-bg:   #12233B;
-  --shadow:      0 2px 12px rgba(0,0,0,0.35);
-  --shadow-lg:   0 8px 32px rgba(0,0,0,0.55);
   color-scheme: dark;
 }
 

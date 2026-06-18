@@ -14,10 +14,17 @@
         t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
       }
       document.documentElement.setAttribute('data-theme', t);
+      // 액센트 색 FOUC 방지: 기본=블루
+      var a = null;
+      try { a = localStorage.getItem('mm-accent'); } catch (e) {}
+      var ACCENTS = ['blue','orange','sky','cyan','teal','indigo','violet','purple','pink','graphite'];
+      if (ACCENTS.indexOf(a) === -1) a = 'blue';
+      document.documentElement.setAttribute('data-accent', a);
     })();
   </script>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260614widget">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260618p0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}?v=20260618p0">
   <style>
   .mm-bell-wrap { position: relative; }
   .mm-bell-badge { position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px;

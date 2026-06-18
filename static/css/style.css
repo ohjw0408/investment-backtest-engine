@@ -59,6 +59,66 @@ html[data-theme="dark"] {
   color-scheme: dark;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN SYSTEM FOUNDATION (코인베이스 룩) — 추가식. 레거시 토큰 위 별도층.
+   components.css + 마이그레이션된 페이지만 --ds-* / --brand* 사용.
+   미변환 페이지는 위 레거시(--blue 등) 그대로 → 시각 변화 없음.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  /* voltage = 블루(기본). 로고만 주황 고정(액센트 무관) */
+  --logo:#ff6a00;
+  --brand:#0052ff; --brand-hover:#003ecc; --brand-bright:#4a7dff;
+  --brand-tint:#eaf0ff; --brand-text:#0052ff; --on-brand:#ffffff;
+  /* surface ladder (light) */
+  --ds-canvas:#ffffff; --ds-soft:#f7f7f7; --ds-strong:#eef0f3; --ds-hairline:#dee1e6;
+  --ds-ink:#0a0b0d; --ds-body:#5b616e; --ds-muted:#7c828a;
+  --ds-dark:#0a0b0d; --ds-dark-el:#16181c;
+  /* semantics */
+  --up:#05b169; --up-tint:#e6f7ef; --down:#cf202f; --down-tint:#fdeaec; --gold-acc:#f4b000;
+  /* elevation */
+  --ds-shadow:0 4px 12px rgba(0,0,0,.04); --ds-shadow-lg:0 8px 32px rgba(0,0,0,.08);
+  /* type */
+  --font-sans:'Inter','Noto Sans KR',-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+  --font-mono:'JetBrains Mono','DM Mono',ui-monospace,SFMono-Regular,monospace;
+  /* radius */
+  --r-xs:4px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --r-pill:100px; --r-full:9999px;
+  /* spacing (4px base) */
+  --sp-xxs:4px; --sp-xs:8px; --sp-sm:12px; --sp-base:16px; --sp-md:20px; --sp-lg:24px; --sp-xl:32px; --sp-xxl:48px; --sp-section:96px;
+  /* type scale (display weight 400 = 코인베이스 시그니처) */
+  --fs-display:44px; --fs-h1:32px; --fs-h2:24px; --fs-title:18px; --fs-body:16px; --fs-sm:14px; --fs-cap:13px; --fs-num:18px;
+}
+[data-theme="dark"] {
+  --brand:#4a7dff; --brand-hover:#6a96ff; --brand-bright:#6a96ff;
+  --brand-tint:#16223d; --brand-text:#4a7dff; --on-brand:#ffffff;
+  --ds-canvas:#0a0b0d; --ds-soft:#0f1115; --ds-strong:#1e2127; --ds-hairline:#2a2d33;
+  --ds-ink:#f5f6f8; --ds-body:#a8acb3; --ds-muted:#7c828a;
+  --up:#27c281; --up-tint:#0f2a20; --down:#ff5a5f; --down-tint:#2e1518; --gold-acc:#ffc94d;
+  --ds-shadow:0 4px 12px rgba(0,0,0,.4); --ds-shadow-lg:0 8px 32px rgba(0,0,0,.6);
+}
+
+/* ── ACCENT PALETTES (10) — data-accent 스왑. 기본(미지정)=블루 ── */
+[data-accent="blue"]   { --brand:#0052ff; --brand-hover:#003ecc; --brand-bright:#4a7dff; --brand-tint:#eaf0ff; --brand-text:#0052ff; --on-brand:#fff; }
+[data-accent="orange"] { --brand:#ff6a00; --brand-hover:#e25400; --brand-bright:#ff8c3a; --brand-tint:#fff1e6; --brand-text:#c2410c; --on-brand:#0a0b0d; }
+[data-accent="sky"]    { --brand:#0ea5e9; --brand-hover:#0284c7; --brand-bright:#38bdf8; --brand-tint:#e0f2fe; --brand-text:#0369a1; --on-brand:#fff; }
+[data-accent="cyan"]   { --brand:#0891b2; --brand-hover:#0e7490; --brand-bright:#22d3ee; --brand-tint:#cffafe; --brand-text:#0e7490; --on-brand:#fff; }
+[data-accent="teal"]   { --brand:#0d9488; --brand-hover:#0f766e; --brand-bright:#2dd4bf; --brand-tint:#ccfbf1; --brand-text:#0f766e; --on-brand:#fff; }
+[data-accent="indigo"] { --brand:#4f46e5; --brand-hover:#4338ca; --brand-bright:#818cf8; --brand-tint:#eef2ff; --brand-text:#4f46e5; --on-brand:#fff; }
+[data-accent="violet"] { --brand:#7c3aed; --brand-hover:#6d28d9; --brand-bright:#a78bfa; --brand-tint:#f3e8ff; --brand-text:#7c3aed; --on-brand:#fff; }
+[data-accent="purple"] { --brand:#9333ea; --brand-hover:#7e22ce; --brand-bright:#c084fc; --brand-tint:#faf5ff; --brand-text:#9333ea; --on-brand:#fff; }
+[data-accent="pink"]   { --brand:#db2777; --brand-hover:#be185d; --brand-bright:#f472b6; --brand-tint:#fce7f3; --brand-text:#be185d; --on-brand:#fff; }
+[data-accent="graphite"]{ --brand:#475569; --brand-hover:#334155; --brand-bright:#94a3b8; --brand-tint:#f1f5f9; --brand-text:#475569; --on-brand:#fff; }
+/* dark variants (fill 밝은 색은 글씨 ink) */
+[data-theme="dark"][data-accent="blue"]   { --brand:#4a7dff; --brand-hover:#6a96ff; --brand-tint:#16223d; --brand-text:#4a7dff; --on-brand:#fff; }
+[data-theme="dark"][data-accent="orange"] { --brand:#ff7d29; --brand-hover:#ff9b5c; --brand-tint:#2a1a0d; --brand-text:#ff9b5c; --on-brand:#0a0b0d; }
+[data-theme="dark"][data-accent="sky"]    { --brand:#38bdf8; --brand-hover:#7dd3fc; --brand-tint:#0c2a3a; --brand-text:#7dd3fc; --on-brand:#0a0b0d; }
+[data-theme="dark"][data-accent="cyan"]   { --brand:#22d3ee; --brand-hover:#67e8f9; --brand-tint:#08323b; --brand-text:#67e8f9; --on-brand:#0a0b0d; }
+[data-theme="dark"][data-accent="teal"]   { --brand:#2dd4bf; --brand-hover:#5eead4; --brand-tint:#0a3a33; --brand-text:#5eead4; --on-brand:#0a0b0d; }
+[data-theme="dark"][data-accent="indigo"] { --brand:#818cf8; --brand-hover:#a5b4fc; --brand-tint:#1e1b4b; --brand-text:#a5b4fc; --on-brand:#0a0b0d; }
+[data-theme="dark"][data-accent="violet"] { --brand:#a78bfa; --brand-hover:#c4b5fd; --brand-tint:#2e1065; --brand-text:#c4b5fd; --on-brand:#0a0b0d; }
+[data-theme="dark"][data-accent="purple"] { --brand:#c084fc; --brand-hover:#d8b4fe; --brand-tint:#3b0764; --brand-text:#d8b4fe; --on-brand:#0a0b0d; }
+[data-theme="dark"][data-accent="pink"]   { --brand:#f472b6; --brand-hover:#f9a8d4; --brand-tint:#4a1733; --brand-text:#f9a8d4; --on-brand:#0a0b0d; }
+[data-theme="dark"][data-accent="graphite"]{ --brand:#94a3b8; --brand-hover:#cbd5e1; --brand-tint:#1e293b; --brand-text:#cbd5e1; --on-brand:#0a0b0d; }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {

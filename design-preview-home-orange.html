@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>홈 — 주황 voltage 목업 (Money Milestone)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ════════════════════════════════════════════════
+   ORANGE-VOLTAGE TOKENS — LIGHT
+   원리: 코인베이스 구조 그대로, voltage만 주황. 주황은 FILL에만 희소하게.
+   ════════════════════════════════════════════════ */
+:root{
+  --brand:#ff6a00;          /* 비비드 브랜드 주황 — FILL 전용(버튼/차트/로고/바/활성) */
+  --brand-hover:#e25400;
+  --brand-bright:#ff8c3a;
+  --brand-tint:#fff1e6;     /* 옅은 주황 틴트(사이드바 활성/배지 배경) */
+  --brand-text:#c2410c;     /* 글씨용 진한 주황(흰 배경서 가독 통과) */
+  --on-brand:#0a0b0d;       /* 주황 버튼 위 글씨 = ink (흰글씨 대비 미달 회피) */
+  --up:#05b169; --up-tint:#e6f7ef; --down:#cf202f; --down-tint:#fdeaec;
+  --gold:#f4b000;
+  --canvas:#ffffff; --surface-soft:#f7f7f7; --surface-strong:#eef0f3; --hairline:#dee1e6;
+  --ink:#0a0b0d; --body:#5b616e; --muted:#7c828a;
+  --surface-dark:#0a0b0d; --surface-dark-el:#16181c;
+  --shadow:0 4px 12px rgba(0,0,0,.04); --shadow-lg:0 8px 32px rgba(0,0,0,.08);
+  --font:'Inter','Noto Sans KR',-apple-system,system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --r-pill:100px; --r-full:9999px;
+}
+/* ════════════════════════════════════════════════
+   DARK (전용 설계 — 반전 아님, 주황은 다크서 살짝 톤업)
+   ════════════════════════════════════════════════ */
+[data-theme="dark"]{
+  --brand:#ff7d29; --brand-hover:#ff9b5c; --brand-bright:#ff9b5c;
+  --brand-tint:#2a1a0d; --brand-text:#ff9b5c; --on-brand:#0a0b0d;
+  --up:#27c281; --up-tint:#0f2a20; --down:#ff5a5f; --down-tint:#2e1518;
+  --gold:#ffc94d;
+  --canvas:#0a0b0d; --surface-soft:#0f1115; --surface-strong:#1e2127; --hairline:#2a2d33;
+  --ink:#f5f6f8; --body:#a8acb3; --muted:#7c828a;
+  --surface-dark:#0a0b0d; --surface-dark-el:#16181c;
+  --shadow:0 4px 12px rgba(0,0,0,.4); --shadow-lg:0 8px 32px rgba(0,0,0,.6);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--canvas);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh}
+a{text-decoration:none;color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ── TOP NAV ── */
+.nav{height:64px;background:var(--canvas);border-bottom:1px solid var(--hairline);
+  display:flex;align-items:center;gap:24px;padding:0 24px;position:sticky;top:0;z-index:50}
+.brand{font-size:19px;font-weight:600;letter-spacing:-.4px;color:var(--ink);display:flex;align-items:center;gap:9px}
+.brand .mark{width:26px;height:26px;border-radius:7px;background:var(--brand);display:flex;align-items:center;justify-content:center;font-size:14px}
+.nav-links{display:flex;gap:4px;margin-left:8px}
+.nav-links a{font-size:14px;font-weight:500;color:var(--body);padding:8px 12px;border-radius:var(--r-pill)}
+.nav-links a:hover{background:var(--surface-strong);color:var(--ink)}
+.nav-links a.active{color:var(--ink);font-weight:600}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface-strong);border-radius:var(--r-pill);padding:9px 16px;width:200px;color:var(--muted);font-size:14px}
+.icon-btn{width:40px;height:40px;border-radius:var(--r-full);border:none;background:var(--surface-strong);color:var(--ink);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+.icon-btn:hover{background:var(--hairline)}
+.avatar{width:36px;height:36px;border-radius:var(--r-full);background:linear-gradient(135deg,var(--brand),var(--brand-bright))}
+
+/* ── SHELL ── */
+.shell{display:flex;max-width:1280px;margin:0 auto}
+.side{width:208px;flex-shrink:0;padding:24px 12px;border-right:1px solid var(--hairline);min-height:calc(100vh - 64px)}
+.side-label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 12px 8px}
+.side a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);font-size:14px;font-weight:500;color:var(--body)}
+.side a:hover{background:var(--surface-soft);color:var(--ink)}
+.side a.active{background:var(--brand-tint);color:var(--brand-text);font-weight:600}
+.main{flex:1;min-width:0;padding:32px;display:grid;grid-template-columns:1fr 320px;gap:24px;align-content:start}
+
+/* ── CARD ── */
+.card{background:var(--canvas);border:1px solid var(--hairline);border-radius:var(--r-xl);overflow:hidden}
+.card:hover{box-shadow:var(--shadow)}
+
+/* ── PORTFOLIO ── */
+.pf{grid-column:1}
+.pf-head{display:flex;justify-content:space-between;align-items:flex-start;padding:28px 28px 0;gap:16px;flex-wrap:wrap}
+.cap{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:6px}
+.pf-val{font-size:40px;font-weight:500;letter-spacing:-1.5px;color:var(--ink);line-height:1}
+.pf-chg{font-size:16px;font-weight:600;color:var(--up);margin-top:10px;display:inline-flex;align-items:center;gap:6px}
+.pf-chg .badge{background:var(--up-tint);color:var(--up);font-size:13px;padding:3px 10px;border-radius:var(--r-pill)}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:transparent;border:1px solid var(--hairline);color:var(--body);font-family:var(--font);font-size:13px;font-weight:600;padding:7px 14px;border-radius:var(--r-pill);cursor:pointer}
+.pill.active{background:var(--ink);color:var(--canvas);border-color:var(--ink)}
+.chart{padding:16px 12px 8px}
+.cta-row{display:flex;gap:10px;padding:0 28px 24px}
+.btn-primary{background:var(--brand);color:var(--on-brand);border:none;font-family:var(--font);font-size:15px;font-weight:700;padding:12px 22px;border-radius:var(--r-pill);cursor:pointer}
+.btn-primary:hover{background:var(--brand-hover);color:#fff}
+.btn-ghost{background:var(--surface-strong);color:var(--ink);border:none;font-family:var(--font);font-size:15px;font-weight:600;padding:12px 22px;border-radius:var(--r-pill);cursor:pointer}
+
+/* ── MARKET GRID ── */
+.mkt{grid-column:1}
+.sec-head{display:flex;align-items:center;justify-content:space-between;padding:22px 28px 14px}
+.sec-title{font-size:18px;font-weight:600;color:var(--ink)}
+.see-all{font-size:14px;font-weight:600;color:var(--brand-text)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--hairline);border-top:1px solid var(--hairline)}
+.mItem{background:var(--canvas);padding:18px 20px}
+.mName{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px}
+.mTick{font-size:12px;color:var(--muted);margin-bottom:10px}
+.mPrice{font-size:18px;font-weight:500;color:var(--ink)}
+.mChg{font-size:14px;font-weight:600;margin-top:3px}
+.mChg.up{color:var(--up)} .mChg.down{color:var(--down)}
+.spark{margin-top:10px}
+
+/* ── RIGHT PANEL ── */
+.right{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;gap:24px}
+.arow{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--hairline)}
+.arow:last-child{border-bottom:none}
+.aIcon{width:36px;height:36px;border-radius:var(--r-full);background:var(--surface-strong);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.aName{font-size:14px;font-weight:600;color:var(--ink)}
+.aSub{font-size:12px;color:var(--muted)}
+.aPct{margin-left:auto;font-size:15px;font-weight:600;color:var(--ink);font-family:var(--mono)}
+.pad{padding:22px 24px}
+.stack{display:flex;height:10px;border-radius:var(--r-pill);overflow:hidden;margin-top:14px}
+.note{font-size:12px;color:var(--muted);padding:14px 28px;border-top:1px solid var(--hairline)}
+
+/* dark editorial mini-band */
+.band{grid-column:1;background:var(--surface-dark);color:#fff;border-radius:var(--r-xl);padding:32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.band h3{font-size:26px;font-weight:500;letter-spacing:-.6px;line-height:1.15}
+.band p{font-size:14px;color:#a8acb3;margin-top:8px}
+
+.toggle-hint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--canvas);font-size:13px;font-weight:500;padding:10px 18px;border-radius:var(--r-pill);box-shadow:var(--shadow-lg)}
+@media(max-width:980px){.side{display:none}.main{grid-template-columns:1fr}.right{grid-column:1;grid-row:auto}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="brand"><span class="mark">📈</span>Money Milestone</div>
+  <div class="nav-links">
+    <a class="active" href="#">홈</a><a href="#">투자 계산기</a><a href="#">포트폴리오 분석</a><a href="#">거시지표</a><a href="#">내 자산</a>
+  </div>
+  <div class="nav-right">
+    <div class="search">🔍 종목, ETF 검색…</div>
+    <button class="icon-btn" id="themeBtn" title="테마 전환">🌙</button>
+    <div class="avatar"></div>
+  </div>
+</nav>
+
+<div class="shell">
+  <aside class="side">
+    <div class="side-label">대시보드</div>
+    <a class="active" href="#">🏠 홈</a>
+    <a href="#">📊 포트폴리오 분석</a>
+    <a href="#">🧮 투자 계산기</a>
+    <a href="#">💰 배당금 계산기</a>
+    <div class="side-label" style="margin-top:20px">자산</div>
+    <a href="#">📁 내 포트폴리오</a>
+    <a href="#">💼 내 자산</a>
+    <a href="#">🔔 알림</a>
+    <div class="side-label" style="margin-top:20px">시장</div>
+    <a href="#">🌐 거시지표</a>
+    <a href="#">📅 캘린더</a>
+  </aside>
+
+  <main class="main">
+    <section class="card pf">
+      <div class="pf-head">
+        <div>
+          <div class="cap">내 포트폴리오</div>
+          <div class="pf-val mono">₩12,480,000</div>
+          <div class="pf-chg">▲ ₩220,400 <span class="badge">+1.80%</span></div>
+        </div>
+        <div class="pills">
+          <button class="pill active">1개월</button><button class="pill">3개월</button><button class="pill">1년</button><button class="pill">전체</button>
+        </div>
+      </div>
+      <div class="chart">
+        <svg viewBox="0 0 600 170" width="100%" height="170" preserveAspectRatio="none">
+          <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--brand)" stop-opacity=".18"/>
+            <stop offset="1" stop-color="var(--brand)" stop-opacity="0"/></linearGradient></defs>
+          <path d="M0,130 C60,120 90,90 150,95 C210,100 240,60 300,70 C360,80 390,40 450,35 C510,30 560,50 600,30 L600,170 L0,170 Z" fill="url(#g)"/>
+          <path d="M0,130 C60,120 90,90 150,95 C210,100 240,60 300,70 C360,80 390,40 450,35 C510,30 560,50 600,30" fill="none" stroke="var(--brand)" stroke-width="2.5"/>
+        </svg>
+      </div>
+      <div class="cta-row">
+        <button class="btn-primary">백테스트 시작</button>
+        <button class="btn-ghost">자산 추가</button>
+      </div>
+    </section>
+
+    <section class="band">
+      <div>
+        <h3>30년을 백테스트하세요</h3>
+        <p>과거 데이터로 포트폴리오를 검증하고 은퇴까지 시뮬레이션합니다.</p>
+      </div>
+      <button class="btn-primary">시작하기</button>
+    </section>
+
+    <section class="card mkt">
+      <div class="sec-head"><span class="sec-title">★ 시장 지수</span><a class="see-all" href="#">전체 보기 ›</a></div>
+      <div class="grid3">
+        <div class="mItem">
+          <div class="mName">S&P 500</div><div class="mTick">SPY</div>
+          <div class="mPrice mono">$594.21</div><div class="mChg up">+0.82%</div>
+          <svg class="spark" viewBox="0 0 100 28" width="100%" height="28"><path d="M0,22 L20,18 L40,20 L60,10 L80,12 L100,4" fill="none" stroke="var(--up)" stroke-width="2"/></svg>
+        </div>
+        <div class="mItem">
+          <div class="mName">나스닥 100</div><div class="mTick">QQQ</div>
+          <div class="mPrice mono">$521.40</div><div class="mChg down">−0.34%</div>
+          <svg class="spark" viewBox="0 0 100 28" width="100%" height="28"><path d="M0,8 L20,12 L40,9 L60,16 L80,14 L100,20" fill="none" stroke="var(--down)" stroke-width="2"/></svg>
+        </div>
+        <div class="mItem">
+          <div class="mName">미국 장기채</div><div class="mTick">TLT</div>
+          <div class="mPrice mono">$88.93</div><div class="mChg up">+1.12%</div>
+          <svg class="spark" viewBox="0 0 100 28" width="100%" height="28"><path d="M0,20 L20,22 L40,15 L60,16 L80,9 L100,6" fill="none" stroke="var(--up)" stroke-width="2"/></svg>
+        </div>
+      </div>
+      <div class="note">⚠ 시세 약 15분 지연 — 새로고침해도 실시간과 다를 수 있습니다</div>
+    </section>
+
+    <aside class="right">
+      <section class="card">
+        <div class="sec-head"><span class="sec-title">자산군별 비교</span><a class="see-all" href="#">›</a></div>
+        <div class="pad" style="padding-top:0">
+          <div class="arow"><div class="aIcon">🇺🇸</div><div><div class="aName">미국 주식</div><div class="aSub">SPY · QQQ</div></div><div class="aPct">48%</div></div>
+          <div class="arow"><div class="aIcon">🏦</div><div><div class="aName">채권</div><div class="aSub">TLT · IEF</div></div><div class="aPct">27%</div></div>
+          <div class="arow"><div class="aIcon">🥇</div><div><div class="aName">금</div><div class="aSub">GLD</div></div><div class="aPct">15%</div></div>
+          <div class="arow"><div class="aIcon">💵</div><div><div class="aName">현금</div><div class="aSub">KRW</div></div><div class="aPct">10%</div></div>
+          <div class="stack">
+            <div style="width:48%;background:var(--brand)"></div>
+            <div style="width:27%;background:var(--up)"></div>
+            <div style="width:15%;background:var(--gold)"></div>
+            <div style="width:10%;background:var(--muted)"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="sec-head"><span class="sec-title">최근 알림</span></div>
+        <div class="pad" style="padding-top:0">
+          <div class="arow"><div class="aIcon" style="background:var(--up-tint);color:var(--up)">▲</div><div><div class="aName">SPY 신고가 경신</div><div class="aSub">2시간 전</div></div></div>
+          <div class="arow"><div class="aIcon" style="background:var(--brand-tint);color:var(--brand-text)">⟳</div><div><div class="aName">리밸런싱 밴드 이탈</div><div class="aSub">어제</div></div></div>
+        </div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<div class="toggle-hint">🟧 주황 voltage 버전 · 우측 상단 🌙로 라이트/다크 전환</div>
+
+<script>
+document.getElementById('themeBtn').onclick=function(){
+  var h=document.documentElement, d=h.getAttribute('data-theme')==='dark';
+  h.setAttribute('data-theme',d?'light':'dark');
+  this.textContent=d?'🌙':'☀️';
+};
+</script>
+</body>
+</html>

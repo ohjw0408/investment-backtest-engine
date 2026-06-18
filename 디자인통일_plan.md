@@ -15,8 +15,11 @@
 
 **현재 상태:**
 - ✅ P0 파운데이션(토큰·components.css·액센트 10색) · 네비 셸(상단 그룹드롭+사이드바) · **홈 재구성(목업 충실: CTA·다크밴드·여백)**
+- ✅ **폼 아키타입 단순군 완료(2026-06-18): simple · tax_switch · settings · tax_settings** — style 블록 ds 토큰 재바인딩, 마크업/ID/JS 무손상, 차트 brand 바인딩, 라이트/다크+실동작 Playwright 검증(콘솔에러 0). simple은 mint_session 불요·나머지 로그인 에디터까지 확인.
 - ⚠️ **재작업 대기(1차 리스킨분)**: calendar·macro·search·alerts → 아키타입 밀도로 다시
-- ❌ 미착수: 폼(calculator·dividend·retirement·tax_switch·simple·settings·tax_settings) · 분석(backtest·risk_return·symbol) · 리스트(myportfolios·myassets·portfolio_detail·share)
+- ❌ 미착수: 폼 무거운군(calculator·dividend_target·retirement·alerts) · 분석(backtest·risk_return·symbol) · 리스트(myportfolios·myassets·portfolio_detail·share)
+
+> ⚠️ 검증 팁(2026-06-18 발견): `mint_session.py` stdout 첫 줄에 import-time Redis 경고가 섞임 → 쿠키는 **마지막 줄만** 취할 것(`... | tail -1`). 서버·mint 둘 다 .env의 FLASK_SECRET_KEY 공유(강제 env 불요).
 
 **홈 잔여 폴리시(목업 100% 위해):** 차트(Chart.js→목업 SVG풍?) · 시장카드 티커 서브라인 · 자산패널(원형아이콘 행+가로 스택바) · 마스킹/빈 상태 디자인. = 부품 단위 폴리시 항목.
 
@@ -325,10 +328,10 @@ JS 파일 10개: `alert_widget · calculator · calendar · charts · limit_guar
 | calendar | ☑ | ☑ | ◐ 재구성 | ◐ | ◐ | ← 특수(달력), 아키타입 밀도로 |
 | macro | ☑ | ☑ | ◐ 재구성 | ◐ | ◐ | ← 분석 아키타입으로 |
 | search | ☑ | ☑ | ◐ 재구성 | ◐ | ◐ | ← 리스트 아키타입으로 |
-| settings | ☐ | ☐ | ☐ | ☐ | ☐ |
-| tax_settings | ☐ | ☐ | ☐ | ☐ | ☐ |
-| tax_switch | ☐ | ☐ | ☐ | ☐ | ☐ |
-| simple | ☐ | ☐ | ☐ | ☐ | ☐ |
+| settings | ☑ | ☑ | ☑ | ☑ | ☑ | ← ds 섹션카드·위젯칩·brand 저장/추가·모달. 로그인 에디터 검증(mint_session) |
+| tax_settings | ☑ | ☑ | ☑ | ☑ | ☑ | ← 토글카드(활성 brand링)·요약 brand-tint·brand 저장·토스트 |
+| tax_switch | ☑ | ☑ | ☑ | ☑ | ☑ | ← 입력카드·결과/판정·차트 brand바인딩(A=up/B=brand). 라이트/다크 |
+| simple | ☑ | ☑ | ☑ | ☑ | ☑ | ← 폼 아키타입(pill탭·헤어라인카드·모노·차트 brand바인딩). 실동작 보존, 라이트/다크 검증
 | calculator | ☐ | ☐ | ☐ | ☐ | ☐ |
 | dividend_target | ☐ | ☐ | ☐ | ☐ | ☐ |
 | retirement | ☐ | ☐ | ☐ | ☐ | ☐ |

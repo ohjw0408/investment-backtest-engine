@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-18] design | 폼 아키타입 단순군 완료 — simple·tax_switch·settings·tax_settings
+
+폼 아키타입(`design-preview-form.html`) 기준으로 단순 폼 4종 진짜 재구성(리스킨 아님). 각 페이지 `<style>` 블록의 레거시 토큰(`--card/--border/--blue*/--text-muted/--bg`)·하드코딩 블루(#1976D2) → ds 토큰(`--ds-*`/`--brand*`)으로 재바인딩. 마크업·ID·클래스명·JS 로직 100% 보존(simple_tools.js·tax_switch.js DOM 계약 무손상).
+
+- **simple**(간편계산기): pill 탭·헤어라인 카드·모노 숫자·입력칸 ds. 차트 평가액 시리즈 `--brand`, 배당 시리즈 `--up` 바인딩(getComputedStyle 헬퍼 `stCssVar`/`stHexA` 추가). 실동작 = 입력변경 즉시재계산(2.9억→4.5억)·탭전환(배당 5억) 확인.
+- **tax_switch**(ISA전환): 입력카드·실행버튼(brand pill)·진행바·판정·결과 sum카드. 차트 A=위탁 `--up`/B=ISA `--brand`(기존 `cssVar` 헬퍼 재사용).
+- **settings**: 섹션카드·위젯 편집칩·모달·brand 저장/추가버튼. 로그인 에디터까지 검증.
+- **tax_settings**: 토글카드(활성=brand 링)·요약카드(brand-tint)·brand 토글/저장·토스트.
+
+검증 = 로컬 서버 + Playwright 라이트/다크 풀스샷 + 콘솔에러 0(4페이지 전부). 로그인 페이지는 `mint_session.py`로 dev 쿠키(⚠️ stdout 마지막 줄만 = import Redis 경고 분리). 스샷 `design-shots/`(gitignored). **다음 = 폼 무거운군(calculator·dividend_target·retirement·alerts) + alert/confirm→토스트/다이얼로그.**
+
 ## [2026-06-18] design | 세션 정리 — 진행방식·검증 확정, 다음 세션 이어감
 
 홈 재구성 후에도 목업과 차이 남(차트·시장카드 티커·자산패널·마스킹 = 부품 미폴리시 + 로컬/라이브 검증 기준 어긋남).

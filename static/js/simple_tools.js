@@ -170,6 +170,12 @@ function stSwitchTab(name) {
 
 const stCharts = {};
 
+function stCssVar(name, fb) { return (getComputedStyle(document.documentElement).getPropertyValue(name) || '').trim() || fb; }
+function stHexA(hex, a) {
+  const h = hex.replace('#', ''); const n = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+  return `rgba(${parseInt(n.slice(0,2),16)},${parseInt(n.slice(2,4),16)},${parseInt(n.slice(4,6),16)},${a})`;
+}
+
 function stDrawChart(canvasId, labels, datasets) {
   if (typeof Chart === 'undefined') return;   // jsdom 등 차트 없는 환경
   const el = document.getElementById(canvasId);
@@ -214,7 +220,7 @@ function stRenderCompound() {
       `<tr><td>${y.year}년</td><td>${stFmtKRW(y.principal)}</td><td>${stFmtKRW(y.value)}</td><td>${stFmtKRW(y.real)}</td></tr>`
     ).join('');
   stDrawChart('stCpChart', r.yearly.map(y => y.year + '년'), [
-    { label: '평가액(명목)', data: r.yearly.map(y => y.value), borderColor: '#1976D2', backgroundColor: 'rgba(25,118,210,0.08)', fill: true, pointRadius: 0, borderWidth: 2 },
+    { label: '평가액(명목)', data: r.yearly.map(y => y.value), borderColor: stCssVar('--brand', '#0052ff'), backgroundColor: stHexA(stCssVar('--brand', '#0052ff'), 0.08), fill: true, pointRadius: 0, borderWidth: 2 },
     { label: '실질가치', data: r.yearly.map(y => y.real), borderColor: '#7B1FA2', borderDash: [5, 4], pointRadius: 0, borderWidth: 2 },
     { label: '납입원금', data: r.yearly.map(y => y.principal), borderColor: '#9E9E9E', borderDash: [2, 3], pointRadius: 0, borderWidth: 1.5 },
   ]);
@@ -274,8 +280,8 @@ function stRenderDividend() {
       `<tr><td>${y.year}년</td><td>${stFmtKRW(y.value)}</td><td>${stFmtKRW(y.annualDiv)}</td><td>${stFmtKRW(y.cumDiv)}</td><td>${stFmtKRW(y.real)}</td></tr>`
     ).join('');
   stDrawChart('stDvChart', r.yearly.map(y => y.year + '년'), [
-    { label: '평가액(명목)', data: r.yearly.map(y => y.value), borderColor: '#1976D2', backgroundColor: 'rgba(25,118,210,0.08)', fill: true, pointRadius: 0, borderWidth: 2 },
-    { label: '누적배당(세후)', data: r.yearly.map(y => y.cumDiv), borderColor: '#2E7D32', pointRadius: 0, borderWidth: 2 },
+    { label: '평가액(명목)', data: r.yearly.map(y => y.value), borderColor: stCssVar('--brand', '#0052ff'), backgroundColor: stHexA(stCssVar('--brand', '#0052ff'), 0.08), fill: true, pointRadius: 0, borderWidth: 2 },
+    { label: '누적배당(세후)', data: r.yearly.map(y => y.cumDiv), borderColor: stCssVar('--up', '#05b169'), pointRadius: 0, borderWidth: 2 },
     { label: '실질가치', data: r.yearly.map(y => y.real), borderColor: '#7B1FA2', borderDash: [5, 4], pointRadius: 0, borderWidth: 2 },
   ]);
 }

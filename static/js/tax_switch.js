@@ -308,12 +308,12 @@
           {
             label: 'A) 위탁 유지 (세후)',
             data: trajectory.map(t => t.a_p50),
-            borderColor: '#2E7D32', backgroundColor: 'transparent', tension: 0.25, pointRadius: 2,
+            borderColor: cssVar('--up', '#05b169'), backgroundColor: 'transparent', tension: 0.25, pointRadius: 2,
           },
           {
             label: 'B) ISA 분할 이전 (세후)',
             data: trajectory.map(t => t.b_p50),
-            borderColor: '#1976D2', backgroundColor: 'transparent', tension: 0.25, pointRadius: 2,
+            borderColor: cssVar('--brand', '#0052ff'), backgroundColor: 'transparent', tension: 0.25, pointRadius: 2,
           },
         ],
       },

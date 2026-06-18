@@ -1990,6 +1990,12 @@ def myassets_data():
             prices[h['code']] = float(mp)
             manual_codes.append(h['code'])
 
+    # NaN/inf 방어: 가격 하나라도 비유한수면 JSON에 NaN 리터럴이 박혀
+    # 프론트 res.json() 파싱이 통째 실패 → 보유종목/자산추이 전멸. None으로 정규화.
+    import math as _math
+    prices = {k: (v if (isinstance(v, (int, float)) and _math.isfinite(v)) else None)
+              for k, v in prices.items()}
+
     return jsonify({
         'holdings': holdings,
         'groups': groups,

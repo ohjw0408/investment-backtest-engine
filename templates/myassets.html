@@ -460,6 +460,27 @@
     </div>
   </div>
 
+  <!-- 현재가 수동 입력 모달 -->
+  <div class="modal-overlay" id="modalManual">
+    <div class="modal-box" style="width:380px;">
+      <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center;"><span>현재가 수동 입력</span> <button onclick="closeModal('modalManual')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);display:inline-flex;">{{ mi('x') }}</button></div>
+      <input type="hidden" id="manualHoldingId">
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5;">원화 ₩ 기준으로 입력하세요. 비우고 저장하면 자동 시세로 복귀합니다.</div>
+      <div class="input-row">
+        <label>현재가</label>
+        <div class="input-group">
+          <input type="number" id="manualPriceInput" class="calc-input" min="0" step="1" placeholder="자동 시세 사용">
+          <span class="unit">원</span>
+        </div>
+      </div>
+      <div id="manualErr" style="color:var(--red);font-size:0.78rem;display:none;margin-top:6px;"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('modalManual')">취소</button>
+        <button class="btn-primary" onclick="saveManual()">저장</button>
+      </div>
+    </div>
+  </div>
+
   {% endif %}
 </div>
 {% endblock %}
@@ -565,17 +586,28 @@ async function refreshHoldings() {
   }
 }
 
-// ── 수동 가격 override ──
-async function setManual(id, curKRW) {
-  const cur = (curKRW && curKRW > 0) ? Math.round(curKRW) : '';
-  const v = window.prompt('수동 현재가 입력 (원화 ₩ 기준).\n비우고 확인하면 자동 시세로 복귀합니다.', cur);
-  if (v === null) return;  // 취소
-  const price = v.trim() === '' ? null : Number(v.replace(/[,\s₩]/g, ''));
-  if (price !== null && (isNaN(price) || price < 0)) { alert('숫자(0 이상)를 입력하세요.'); return; }
+// ── 수동 가격 override (인라인 모달) ──
+function setManual(id, curKRW) {
+  document.getElementById('manualHoldingId').value = id;
+  const inp = document.getElementById('manualPriceInput');
+  inp.value = (curKRW && curKRW > 0) ? Math.round(curKRW) : '';
+  document.getElementById('manualErr').style.display = 'none';
+  openModal('modalManual');
+  setTimeout(() => { inp.focus(); inp.select(); }, 50);
+}
+async function saveManual() {
+  const id  = document.getElementById('manualHoldingId').value;
+  const raw = document.getElementById('manualPriceInput').value.trim();
+  const err = document.getElementById('manualErr');
+  const price = raw === '' ? null : Number(raw.replace(/[,\s₩]/g, ''));
+  if (price !== null && (isNaN(price) || price < 0)) {
+    err.textContent = '숫자(0 이상)를 입력하세요.'; err.style.display = 'block'; return;
+  }
   await fetch('/api/myassets/manual-price', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id, price }),
   });
+  closeModal('modalManual');
   await loadAll();
 }
 async function clearManual(id) {

@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-19] BUGFIX | 내 자산 "버튼/모달 박살" 진짜 원인 = style.css 주석이 `*/`로 조기 종료 (전역 레거시 토큰 증발)
+
+오너: myassets 종목수정 모달·기간버튼·배당 월클릭·보유종목 칸막이 전부 깨짐. **진단(서버+Playwright 실클릭·computed style·cssRules 덤프):**
+- **근본 원인**: `static/css/style.css` 레거시 토큰 별칭 주석 6행에 `ds(--brand*/--ds-*)` — **`--brand*/`의 `*/`가 블록주석을 조기 종료** → 뒤 한글 텍스트 + 직후 `:root{ --card/--bg/--border... }`(레거시 별칭 27선언) 전체가 깨진 룰로 파서에 먹혀 **드롭**. 결과 = `--card/--bg/--border/--text` 등 **전역 미정의**(`getComputedStyle` → 빈값, cssRules에 :root 1개[ds]만 존재). → 레거시 토큰 의존 페이지(myassets·calculator 등) 전부: 모달 `background:var(--card)` 투명, 테이블 `var(--border)` 칸막이 증발, 월상세 테두리 없어 글씨 튐, icon-btn 배경/테두리 소멸. **홈은 ds 토큰 직접 써서 무사 → 그래서 안 들킴.** 내 myassets 디자인 변경이 아니라 06-18 별칭 도입(205a3fe) 때부터 잠복.
+- **수정**: 주석에서 `*/` 제거(`ds 토큰(brand 계열·ds 계열)으로`). 1줄. → `--card #fff·--border #dee1e6·--bg #f7f7f7` 전역 복구 검증(Playwright computed). **전 레거시 페이지 동시 수복.**
+- **버그 #2**(robustness): `/api/myassets/data`가 가격 없는 종목에 `NaN` 리터럴 반환 → 프론트 `res.json()` 통째 실패 → `loadAll` throw → 보유종목 테이블 빈채 + 체인된 `loadPortfolioHistory`(자산추이)까지 사망. 응답 직전 비유한수→None 정규화(`math.isfinite`). 로컬(한국주식 시세캐시 無)서 재현, 라이브도 시세 1개만 빠지면 동일 폭발 방지.
+- **버그 #3**(오너 요청): 현재가 수정이 브라우저 `window.prompt()` 팝업 → **인라인 모달(`#modalManual`)**로 교체(거지같은 네이티브 팝업 제거).
+- 검증(Playwright 실클릭): 수정모달 흰배경·기간버튼 active·배당 월클릭 상세렌더·수동가격 모달(prompt 안 뜸 확인)·그룹탭·라이트+다크 스샷·콘솔에러 0.
+
+
 ## [2026-06-19] UX | 내 자산(myassets) 홈패턴 이식 — 깊이·duotone·pill탭·비로그인 데모
 
 오너 결정: 홈 완성 후 타페이지 확장 시작, **내자산부터**. 홈에서 만족한 5포인트(구조>색칠·duotone·깊이·가짜숫자 데모·기능타일) 이식. `templates/myassets.html` 단일 파일.

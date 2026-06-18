@@ -142,3 +142,53 @@
 .ds-toast-ok { background:var(--up); color:#fff; }
 .ds-toast-err { background:var(--down); color:#fff; }
 @keyframes ds-toast-in { from { opacity:0; transform:translateY(8px); } }
+
+/* ═══════════════════════════════════════════════════════════════
+   NAV / SIDEBAR — 코인베이스 셸 (style.css 레거시 오버라이드, 전역)
+   ID·기존 클래스 보존, 색·구조만 코인베이스로.
+   ═══════════════════════════════════════════════════════════════ */
+.navbar { background:var(--ds-canvas); border-bottom:1px solid var(--ds-hairline);
+  box-shadow:none; height:64px; font-family:var(--font-sans); }
+.nav-hamburger { color:var(--ds-ink); }
+.nav-hamburger:hover { background:var(--ds-soft); }
+.logo { color:var(--ds-ink); }
+.logo span { color:var(--logo); }   /* "Milestone" = 주황 로고 포인트 */
+
+/* 상단 그룹 드롭다운 (5개라 좁은 데스크탑서도 표시 — 레거시 1400 숨김 무력화) */
+.mmnav-groups { align-items:center; }
+@media (min-width:861px) { .nav-links.mmnav-groups { display:flex; } }
+.mmnav-grp { position:relative; }
+.mmnav-link { display:inline-flex; align-items:center; gap:4px; padding:8px 12px;
+  border-radius:var(--r-pill); font-family:var(--font-sans); font-size:var(--fs-sm);
+  font-weight:500; color:var(--ds-body); background:none; border:none; cursor:pointer;
+  white-space:nowrap; text-decoration:none; line-height:1.2; }
+.mmnav-link:hover { background:var(--ds-strong); color:var(--ds-ink); }
+.mmnav-link.active { color:var(--ds-ink); font-weight:600; }
+.mmnav-caret { font-size:10px; opacity:.55; }
+.mmnav-menu { position:absolute; top:calc(100% + 6px); left:0; min-width:204px;
+  background:var(--ds-canvas); border:1px solid var(--ds-hairline); border-radius:var(--r-lg);
+  box-shadow:var(--ds-shadow-lg); padding:6px; display:none; flex-direction:column; z-index:300; }
+.mmnav-grp:hover .mmnav-menu, .mmnav-grp:focus-within .mmnav-menu { display:flex; }
+.mmnav-menu a { padding:10px 12px; border-radius:var(--r-md); font-size:var(--fs-sm);
+  font-weight:500; color:var(--ds-body); white-space:nowrap; text-decoration:none; }
+.mmnav-menu a:hover { background:var(--ds-soft); color:var(--ds-ink); }
+
+/* 검색 pill */
+.nav-search-box { background:var(--ds-strong); border:none; border-radius:var(--r-pill); }
+.nav-search-box input { font-family:var(--font-sans); color:var(--ds-ink); }
+.nav-search-icon { color:var(--ds-muted); }
+
+/* 우측 아이콘 */
+.nav-icon-btn { background:var(--ds-strong); color:var(--ds-ink); border-radius:var(--r-full);
+  width:40px; height:40px; }
+.nav-icon-btn:hover { background:var(--ds-hairline); }
+.user-greeting { color:var(--ds-ink); }
+
+/* 사이드바 */
+.sidebar { background:var(--ds-canvas); border-right:1px solid var(--ds-hairline);
+  font-family:var(--font-sans); }
+.sidebar-label { color:var(--ds-muted); font-weight:600; letter-spacing:.06em; }
+.sidebar-item { color:var(--ds-body); border-radius:var(--r-md); margin:1px 8px; padding:9px 12px; }
+.sidebar-item:hover { background:var(--ds-soft); color:var(--ds-ink); }
+.sidebar-item.active { background:var(--brand-tint); color:var(--brand-text); font-weight:600; }
+.sidebar-item.active::before { display:none; }

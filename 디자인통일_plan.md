@@ -257,11 +257,11 @@ JS 파일 10개: `alert_widget · calculator · calendar · charts · limit_guar
 | 0. style.css 토큰(블루기본) | ☑ | — | ☑ | ☑ | ◐ |
 | 0. components.css | ☑ | ☑ | ☑ | ☑ | ◐ |
 | 0. base.html 폰트/액센트배선 | ☑ | — | ☑ | ☑ | ☑ |
-| 0. base.html 네비 재구조 | ☐ | ☐ | ☐ | ☐ | ☐ |
+| 0. base.html 네비 재구조 | ☑ | ☑ | ☑ | ☑ | ☑ |
 | 0. 액센트 토큰셋 10색(§5.5) | ☑ | — | ☑ | ☑ | ◐ |
 | 0. 액센트 FOUC 스크립트(base) | ☑ | — | ☑ | — | ☑ |
 | 2. 액센트 스와치 UI(settings) | ☐ | ☐ | ☐ | ☐ | ☐ |
-| index (홈) | ◐ | ◐ | ☐ | ☐ | ☐ |
+| index (홈) | ☑ | ☑ | ☑ | ☑ | ☑ |
 | alerts | ☐ | ☐ | ☐ | ☐ | ☐ |
 | calendar | ☐ | ☐ | ☐ | ☐ | ☐ |
 | macro | ☐ | ☐ | ☐ | ☐ | ☐ |

@@ -3,113 +3,60 @@
    ============================================= */
 
 :root {
-  /* ── Coinbase palette — LIGHT (legacy names remapped) ── */
-  --blue:        #0052ff;   /* primary brand voltage */
-  --blue-dark:   #003ecc;   /* primary active/press */
-  --blue-mid:    #0052ff;
-  --blue-bright: #4a7dff;
-  --blue-pale:   #eaf0ff;   /* soft blue tint surface */
-  --blue-soft:   #c9d9ff;
-  --green:       #05b169;   /* semantic up */
-  --green-light: #1fc77f;
-  --green-pale:  #e6f7ef;
-  --red:         #cf202f;   /* semantic down */
-  --red-light:   #e0414f;
-  --red-pale:    #fdeaec;
-  --gold:        #f4b000;   /* accent yellow (illustrative) */
-  --gold-pale:   #fff6e0;
-  --gold-deep:   #c98a00;
-  --bg:          #ffffff;   /* canvas (pure white) */
-  --card:        #ffffff;   /* surface-card */
-  --input-bg:    #ffffff;
-  --text:        #0a0b0d;   /* ink */
-  --text-muted:  #7c828a;
-  --border:      #dee1e6;   /* hairline */
-  --navbar-bg:   #1565C0;   /* TODO page-pass: → canvas/ink Coinbase nav */
-  --shadow:      0 4px 12px rgba(0,0,0,0.04);   /* single soft tier */
-  --shadow-lg:   0 8px 32px rgba(0,0,0,0.08);
+  --blue:        #1565C0;
+  --blue-dark:   #1565C0;
+  --blue-mid:    #1976D2;
+  --blue-bright: #2196F3;
+  --blue-pale:   #E3F2FD;
+  --blue-soft:   #BBDEFB;
+  --green:       #2E7D32;
+  --green-light: #43A047;
+  --green-pale:  #E8F5E9;
+  --red:         #C62828;
+  --red-light:   #EF5350;
+  --red-pale:    #FFEBEE;
+  --gold:        #F9A825;
+  --gold-pale:   #FFF8E1;
+  --gold-deep:   #E65100;
+  --bg:          #EEF2F7;
+  --card:        #FFFFFF;
+  --input-bg:    #FFFFFF;
+  --text:        #1A1A2E;
+  --text-muted:  #78909C;
+  --border:      #E0E8F0;
+  --navbar-bg:   #1565C0;
+  --shadow:      0 2px 12px rgba(21,101,192,0.08);
+  --shadow-lg:   0 8px 32px rgba(21,101,192,0.14);
   --radius:      14px;
   color-scheme: light;
-
-  /* ── NEW: Coinbase token vocabulary (additive, used by page-pass) ── */
-  /* surface ladder */
-  --surface-soft:   #f7f7f7;
-  --surface-strong: #eef0f3;
-  --hairline:       #dee1e6;
-  --hairline-soft:  #eef0f3;
-  --ink:            #0a0b0d;
-  --body-text:      #5b616e;
-  --muted:          #7c828a;
-  --muted-soft:     #a8acb3;
-  --on-primary:     #ffffff;
-  --on-dark:        #ffffff;
-  /* dark editorial band (same in both themes — Coinbase hero canvas) */
-  --surface-dark:          #0a0b0d;
-  --surface-dark-elevated: #16181c;
-  /* trading semantics */
-  --up:   #05b169;
-  --down: #cf202f;
-  --accent-yellow: #f4b000;
-  /* fonts */
-  --font-sans:    'Inter','Noto Sans KR',-apple-system,system-ui,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-  --font-display: 'Inter','Noto Sans KR',-apple-system,system-ui,sans-serif;
-  --font-mono:    'JetBrains Mono','DM Mono',ui-monospace,SFMono-Regular,monospace;
-  /* radius scale */
-  --r-xs: 4px;  --r-sm: 8px;  --r-md: 12px;  --r-lg: 16px;
-  --r-xl: 24px; --r-pill: 100px; --r-full: 9999px;
-  /* spacing scale (4px base) */
-  --sp-xxs: 4px; --sp-xs: 8px; --sp-sm: 12px; --sp-base: 16px; --sp-md: 20px;
-  --sp-lg: 24px; --sp-xl: 32px; --sp-xxl: 48px; --sp-section: 96px;
-  /* type scale (display weight stays 400 — Coinbase signature) */
-  --fs-display-mega: 80px; --fs-display-xl: 64px; --fs-display-lg: 52px;
-  --fs-display-md: 44px; --fs-display-sm: 36px;
-  --fs-title-lg: 32px; --fs-title-md: 18px; --fs-title-sm: 16px;
-  --fs-body: 16px; --fs-body-sm: 14px; --fs-caption: 13px; --fs-caption-strong: 12px;
-  --fs-number: 18px;
 }
 
 html[data-theme="dark"] {
-  /* ── Coinbase palette — DARK (purpose-built, not an inversion) ── */
-  --blue:        #4a7dff;   /* blue toned UP for near-black contrast */
-  --blue-dark:   #6a96ff;   /* dark press LIGHTENS */
-  --blue-mid:    #4a7dff;
-  --blue-bright: #6a96ff;
-  --blue-pale:   #16223d;   /* deep blue tint surface */
-  --blue-soft:   #21345c;
-  --green:       #27c281;   /* up lifted for contrast */
-  --green-light: #3ad693;
-  --green-pale:  #0f2a20;
-  --red:         #ff5a5f;   /* down lifted */
-  --red-light:   #ff7378;
-  --red-pale:    #2e1518;
-  --gold:        #ffc94d;
-  --gold-pale:   #2b220c;
-  --gold-deep:   #ffb74d;
-  --bg:          #0a0b0d;   /* canvas floor */
-  --card:        #16181c;   /* elevated card */
-  --input-bg:    #16181c;
-  --text:        #f5f6f8;   /* near-white, not harsh #fff */
-  --text-muted:  #7c828a;
-  --border:      #2a2d33;   /* tuned hairline */
-  --navbar-bg:   #0a0b0d;
-  --shadow:      0 4px 12px rgba(0,0,0,0.4);
-  --shadow-lg:   0 8px 32px rgba(0,0,0,0.6);
+  --blue:        #4D9FE8;
+  --blue-dark:   #4D9FE8;
+  --blue-mid:    #5BA8EC;
+  --blue-bright: #64B5F6;
+  --blue-pale:   #1C3550;
+  --blue-soft:   #254766;
+  --green:       #5DBB63;
+  --green-light: #66BB6A;
+  --green-pale:  #1B2F20;
+  --red:         #EF5350;
+  --red-light:   #EF5350;
+  --red-pale:    #3A2024;
+  --gold:        #FFCA28;
+  --gold-pale:   #33290F;
+  --gold-deep:   #FFB74D;
+  --bg:          #0E141C;
+  --card:        #18212E;
+  --input-bg:    #121A26;
+  --text:        #E8EDF4;
+  --text-muted:  #8FA3B8;
+  --border:      #2B3A4D;
+  --navbar-bg:   #12233B;
+  --shadow:      0 2px 12px rgba(0,0,0,0.35);
+  --shadow-lg:   0 8px 32px rgba(0,0,0,0.55);
   color-scheme: dark;
-
-  /* surface ladder — elevation by LIGHTENING, not inverting */
-  --surface-soft:   #0f1115;
-  --surface-strong: #1e2127;
-  --hairline:       #2a2d33;
-  --hairline-soft:  #1e2127;
-  --ink:            #f5f6f8;
-  --body-text:      #a8acb3;
-  --muted:          #7c828a;
-  --muted-soft:     #6b7077;
-  --on-primary:     #ffffff;
-  --on-dark:        #ffffff;
-  --up:   #27c281;
-  --down: #ff5a5f;
-  --accent-yellow: #ffc94d;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

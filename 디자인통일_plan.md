@@ -27,7 +27,8 @@
 
 - **backtest(포트폴리오 분석)**: Codex가 전면 리디자인 + 수수료 프리셋 + 레이아웃 핫픽스 완료(업#95~98, 배포·라이브).
 - **calculator(투자 계산기)**: backtest 결로 전면 이식 완료(Claude, 업#99). 전폭 입력↔결과뷰 전환·bt-fcard·히어로·조건요약·bt-switch 수수료(broker JSON 공유)·nicon·ds토큰·mmToast·차트색 바인딩. 기능/ID 100% 보존. **✅ 배포(5ccaf93)·라이브 실시뮬 검증 PASS**(중간값 ₩5,639만·수수료요약·롤링·부채꼴·히스토그램10·뷰전환·라이트/다크·콘솔0·dialog0).
-- **다음 = 오너 육안 피드백 → 반영 → push, 이후 dividend_target·retirement(폼 무거운군) 동일 이식.**
+- **calculator 정리 후속(오너 "조잡함" 피드백)**: 고급 옵션 접기(수수료·세금·가상데이터 격리, 첫화면 비움) + 삐져나옴 봉쇄(min-width:0 + 계좌카드 grid `minmax(0,1fr)` = 4탭 공통) + 종목 줄 backtest결 통일. 데스크톱·모바일 오버플로우 0 검증. 배포.
+- **다음 = dividend_target·retirement(폼 무거운군) 동일 이식.**
 
 ## ▶ 다음 세션 시작점 (2026-06-18 정리)
 

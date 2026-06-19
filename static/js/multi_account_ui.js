@@ -346,14 +346,14 @@ function _mmMoneyField(label, field, val, step, i, title) {
 }
 function _mmAmountFields(acc, i) {
   if (_mmMode() !== 'withdrawal') {
-    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+    return `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-bottom:10px;">
           ${_mmMoneyField('초기 투자금', 'initial_capital', acc.initial_capital, 1000000, i)}
           ${_mmMoneyField('월 적립액', 'monthly_contribution', acc.monthly_contribution, 100000, i)}
         </div>`;
   }
   // 인출 모드: 위탁만 미실현차익(양도세 취득가 = 시작목돈 − 미실현차익).
   if (acc.type === '위탁') {
-    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+    return `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-bottom:10px;">
           ${_mmMoneyField('시작 목돈', 'initial_capital', acc.initial_capital, 1000000, i)}
           ${_mmMoneyField('미실현 차익', 'unrealized_gain', acc.unrealized_gain, 1000000, i, '현재 평가액 중 매수가 대비 이익(양도세 취득가 산정용)')}
         </div>`;

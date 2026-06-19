@@ -1,5 +1,18 @@
 # Log
 
+## [2026-06-19] UX | calculator 입력화면 정리 — 고급옵션 접기 + 삐져나옴 봉쇄 + 종목줄 backtest결
+
+오너 라이브: "이 정보 입력하는 화면 조잡·안 깔끔, 이런저런 거 누르다 보면 칸이 삐져나옴, 불편."
+
+- **A 점진적 공개**: 첫 화면 = 종목·금액·기간·리밸·배당만. **거래수수료·세금·가상데이터를 「고급 옵션 ▾」 접기 카드**로 격리(기본 접힘). `calcToggleAdvanced(force)`/`.adv-body.open`, 세금·수수료 ON 복원 시 `calcExpandAdvanced()` 자동 펼침. 그리드 영역 `synthetic/tax`→`advanced` 통합.
+- **B 삐져나옴 봉쇄**: 입력 grid/flex child `min-width:0`·`box-sizing`·`#taxAccountList` 자식 `max-width:100%` 가드 + **계좌카드 금액 grid `1fr 1fr`→`minmax(0,1fr) minmax(0,1fr)`**(`multi_account_ui.js` `_mmAmountFields`, min-width:auto 오버플로우 정석 픽스 — backtest #97과 동일류, 계산기·은퇴·배당·백테 4탭 공통 개선).
+- **C 종목 줄**: 계산기 옛 마크업(`.ticker-item-code/.weight-input/.ticker-item-slider`, 슬라이더 찌그러짐)→backtest 결(`.ticker-badge`+`.ticker-name`+`.ticker-weight-input`+`%`+`.ticker-weight-slider`+`.ticker-remove-btn`). `renderTickers`/`onWeightChange` 클래스 갱신. CSS 이식.
+- **D**: 옵션 블록 구분선(`.adv-block` border-top)·간격 정리.
+- 캐시 `?v=20260619ds2`(calculator.js·multi_account_ui.js).
+- **검증**(로컬 서버+Playwright 실클릭, 라이트/다크): 고급옵션 기본 접힘(fee/tax DOM 숨김)·`#advToggle` 클릭 펼침·종목줄 신마크업(badge 2·slider 2)·세금ON+수수료ON+계좌2 추가 최대부하서 **가로 오버플로우 0(데스크톱 1280·모바일 390 `scrollWidth==clientWidth`)**·콘솔에러0·네이티브dialog0.
+
+_작성: Claude_
+
 ## [2026-06-19] UX | 투자 계산기(calculator) 디자인을 포트폴리오 분석(backtest) 탭에 통일
 
 오너: "calculator 디자인을 포트폴리오 분석 탭과 일치하게. 수수료 설정·화면 레이아웃 등 거의 모든 디자인적 느낌을 그대로 이식. 결과·데이터 말고 디자인 느낌 통일."

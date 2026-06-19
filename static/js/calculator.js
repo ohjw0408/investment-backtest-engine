@@ -23,6 +23,7 @@ function calcRestoreForm(payload) {
   if (payload.dividend_mode) { const el = document.querySelector(`input[name="dividend"][value="${payload.dividend_mode}"]`); if (el) el.checked = true; }
   if (payload.rebal_mode) { const el = document.querySelector(`input[name="rebal"][value="${payload.rebal_mode}"]`); if (el) el.checked = true; }
   if (payload.accounts?.length > 1) {
+    if (typeof calcExpandAdvanced === 'function') calcExpandAdvanced();
     if (!window.taxEnabled) toggleTax();
     window.taxAccounts = payload.accounts.map((a, i) => ({
       type: a.type || '위탁',
@@ -234,8 +235,10 @@ function onWeightChange(code, val) {
   t.weight = Math.max(0, Math.min(100, Number(val)));
   const item = document.querySelector(`.ticker-item[data-code="${code}"]`);
   if (item) {
-    item.querySelector('.weight-input').value       = t.weight;
-    item.querySelector('.ticker-item-slider').value = t.weight;
+    const ni = item.querySelector('.ticker-weight-input');
+    const sl = item.querySelector('.ticker-weight-slider');
+    if (ni) ni.value = t.weight;
+    if (sl) sl.value = t.weight;
   }
   updateWeightBar();
 }
@@ -250,16 +253,14 @@ function renderTickers() {
   }
   list.innerHTML = tickers.map(t => `
     <div class="ticker-item" data-code="${t.code}">
-      <div class="ticker-item-code">${t.code}</div>
-      <div class="ticker-item-name">${t.name}</div>
-      <div class="ticker-item-weight">
-        <input type="number" class="weight-input" value="${t.weight}" min="0" max="100"
-          oninput="onWeightChange('${t.code}', this.value)">
-        <span class="weight-pct">%</span>
-        <input type="range" class="ticker-item-slider" min="0" max="100" value="${t.weight}"
-          oninput="onWeightChange('${t.code}', this.value)">
-      </div>
-      <button class="ticker-remove" onclick="removeTicker('${t.code}')">✕</button>
+      <span class="ticker-badge">${t.code}</span>
+      <span class="ticker-name">${t.name}</span>
+      <input type="number" class="ticker-weight-input" value="${t.weight}" min="0" max="100"
+        oninput="onWeightChange('${t.code}', this.value)">
+      <span class="ticker-weight-pct">%</span>
+      <input type="range" class="ticker-weight-slider" min="0" max="100" value="${t.weight}"
+        oninput="onWeightChange('${t.code}', this.value)">
+      <button class="ticker-remove-btn" onclick="removeTicker('${t.code}')">×</button>
     </div>
   `).join('');
   updateWeightBar();
@@ -350,6 +351,17 @@ function calcShowInput() {
   document.getElementById('calcInputView').style.display = 'block';
 }
 function calcEditConditions() { calcShowInput(); }
+
+// ── 고급 옵션 접기/펼치기 ──
+function calcToggleAdvanced(force) {
+  const body = document.getElementById('advBody');
+  const tog = document.getElementById('advToggle');
+  if (!body || !tog) return;
+  const open = force === undefined ? !body.classList.contains('open') : !!force;
+  body.classList.toggle('open', open);
+  tog.classList.toggle('open', open);
+}
+function calcExpandAdvanced() { calcToggleAdvanced(true); }
 
 function _ccE(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
@@ -1462,6 +1474,7 @@ function toggleTax() {
   label.style.color     = window.taxEnabled ? 'var(--brand-text)' : 'var(--ds-muted)';
   panel.style.display   = window.taxEnabled ? 'block' : 'none';
   if (window.taxEnabled) {
+    if (typeof calcExpandAdvanced === 'function') calcExpandAdvanced();
     loadTaxProfileForCalculator();
     if (window.taxAccounts.length === 0) addTaxAccount();
   }

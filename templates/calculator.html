@@ -21,8 +21,7 @@
   grid-template-areas:
     "assets assets"
     "money options"
-    "synthetic options"
-    "tax tax";
+    "advanced advanced";
   gap: 16px;
   align-items: start;
   margin-bottom: 16px;
@@ -32,12 +31,10 @@
 .bt-assets-card { grid-area: assets; }
 .bt-money-card { grid-area: money; }
 .bt-options-card { grid-area: options; }
-.bt-synthetic-card { grid-area: synthetic; }
-.bt-tax-card { grid-area: tax; }
 @media (max-width: 900px) {
   .bt-input-grid {
     grid-template-columns: 1fr;
-    grid-template-areas: "assets" "money" "options" "synthetic" "tax";
+    grid-template-areas: "assets" "money" "options" "advanced";
   }
   .bt-full { grid-column: auto; }
 }
@@ -135,6 +132,61 @@
 
 .share-pill { display: inline-flex; align-items: center; gap: 6px; }
 .share-pill .bt-ico, .share-pill .bt-ico svg { width: 15px; height: 15px; }
+
+/* ── 삐져나옴 봉쇄 (B) — grid/flex child 본래 너비 무시 ── */
+.bt-input-grid > .bt-fcard { min-width: 0; }
+.input-group { width: 100%; min-width: 0; box-sizing: border-box; }
+.calc-input { min-width: 0; }
+.input-row { min-width: 0; }
+.calc-slider, .ticker-search-box, .ticker-search-wrap { min-width: 0; box-sizing: border-box; }
+#taxAccountList { min-width: 0; }
+#taxAccountList .calc-input, #taxAccountList .input-group, #taxAccountList input,
+#taxAccountList select, #taxAccountList .ticker-search-box { min-width: 0; box-sizing: border-box; max-width: 100%; }
+
+/* ── 종목 줄 = backtest 결 (C) ── */
+.ticker-list { display: flex; flex-direction: column; gap: 8px; }
+.ticker-item {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 10px 12px; background: var(--ds-soft); border-radius: var(--r-md);
+  border: 1px solid var(--ds-hairline);
+}
+[data-theme="dark"] .ticker-item { background: var(--ds-strong); }
+.ticker-badge {
+  font-size: 0.72rem; font-weight: 700; color: var(--brand-text);
+  background: var(--brand-tint); border-radius: var(--r-sm);
+  padding: 3px 8px; white-space: nowrap; flex-shrink: 0; font-family: var(--font-mono);
+}
+.ticker-name { font-size: var(--fs-cap); color: var(--ds-ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ticker-weight-input {
+  width: 48px; text-align: center; font-size: var(--fs-cap); font-weight: 700;
+  border: 1.5px solid var(--ds-hairline); border-radius: var(--r-sm);
+  padding: 4px; background: var(--ds-canvas); color: var(--ds-ink); outline: none; flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+.ticker-weight-input:focus { border-color: var(--brand); }
+.ticker-weight-pct { font-size: var(--fs-cap); color: var(--ds-muted); flex-shrink: 0; }
+.ticker-weight-slider { flex: 1; min-width: 40px; accent-color: var(--brand); }
+.ticker-remove-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--ds-muted); font-size: 1.15rem; line-height: 1; padding: 0 2px; flex-shrink: 0;
+}
+.ticker-remove-btn:hover { color: var(--down); }
+
+/* ── 고급 옵션 접기 (A) ── */
+.adv-card { grid-area: advanced; }
+.adv-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: none; border: none; cursor: pointer; padding: 0; text-align: left;
+  font-size: var(--fs-title); font-weight: 700; color: var(--ds-ink);
+}
+.adv-toggle .adv-sub { font-size: var(--fs-cap); font-weight: 500; color: var(--ds-muted); margin-left: 6px; }
+.adv-caret { transition: transform .2s; color: var(--ds-muted); font-size: 0.85em; flex-shrink: 0; }
+.adv-toggle.open .adv-caret { transform: rotate(180deg); }
+.adv-body { margin-top: 18px; display: none; }
+.adv-body.open { display: block; }
+.adv-block { padding: 16px 0; border-top: 1px solid var(--ds-hairline); }
+.adv-block:first-child { border-top: none; padding-top: 4px; }
+.adv-block-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin: 0 0 12px; }
 </style>
 {% endblock %}
 
@@ -235,69 +287,79 @@
           <label class="rebal-option"><input type="radio" name="dividend" value="withdraw"><span class="rebal-label">인출</span></label>
         </div>
       </div>
+    </section>
 
-      <!-- 거래수수료 (D4) -->
-      <div class="bt-opt-row">
-        <div class="bt-toggle-head">
-          <label class="bt-opt-label" style="margin:0;">거래수수료</label>
-          <label class="bt-switch">
-            <span class="bt-switch-label" id="feeLabel">OFF</span>
-            <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()">
-            <span class="bt-switch-track"></span>
-          </label>
-        </div>
-        <div id="feePanelBody" class="bt-fee-panel">
-          <div class="bt-fee-grid">
-            <label class="bt-fee-field">증권사 프리셋
-              <select id="feePreset" class="bt-fee-control" onchange="applyFeePreset()">
-                <option value="kiwoom">키움증권</option>
-                <option value="custom">직접입력</option>
-              </select>
+    <!-- 고급 옵션 (접기, 전폭) — 거래수수료 · 가상 데이터 · 세금 -->
+    <section class="bt-fcard bt-full adv-card">
+      <button type="button" class="adv-toggle" id="advToggle" onclick="calcToggleAdvanced()">
+        <span>고급 옵션 <span class="adv-sub">· 거래수수료 · 세금 · 가상 데이터</span></span>
+        <span class="adv-caret">▾</span>
+      </button>
+      <div class="adv-body" id="advBody">
+
+        <!-- 거래수수료 (D4) -->
+        <div class="adv-block">
+          <div class="bt-toggle-head">
+            <label class="adv-block-title" style="margin:0;">거래수수료</label>
+            <label class="bt-switch">
+              <span class="bt-switch-label" id="feeLabel">OFF</span>
+              <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()">
+              <span class="bt-switch-track"></span>
             </label>
-            <div class="bt-fee-field">
-              <span>시장 구분</span>
-              <div class="bt-fee-market">
-                <label><input type="radio" name="feeMarket" value="domestic_stock" checked onchange="applyFeePreset()"><span>국내주식</span></label>
-                <label><input type="radio" name="feeMarket" value="domestic_etf" onchange="applyFeePreset()"><span>국내 ETF</span></label>
-                <label><input type="radio" name="feeMarket" value="us_stock" onchange="applyFeePreset()"><span>미국주식</span></label>
+          </div>
+          <div id="feePanelBody" class="bt-fee-panel">
+            <div class="bt-fee-grid">
+              <label class="bt-fee-field">증권사 프리셋
+                <select id="feePreset" class="bt-fee-control" onchange="applyFeePreset()">
+                  <option value="kiwoom">키움증권</option>
+                  <option value="custom">직접입력</option>
+                </select>
+              </label>
+              <div class="bt-fee-field">
+                <span>시장 구분</span>
+                <div class="bt-fee-market">
+                  <label><input type="radio" name="feeMarket" value="domestic_stock" checked onchange="applyFeePreset()"><span>국내주식</span></label>
+                  <label><input type="radio" name="feeMarket" value="domestic_etf" onchange="applyFeePreset()"><span>국내 ETF</span></label>
+                  <label><input type="radio" name="feeMarket" value="us_stock" onchange="applyFeePreset()"><span>미국주식</span></label>
+                </div>
               </div>
+              <label class="bt-fee-field">수수료율 (%)
+                <input type="number" id="feeRateInput" class="bt-fee-control" value="0.015" min="0" step="0.0001" oninput="markFeePresetCustom()">
+              </label>
             </div>
-            <label class="bt-fee-field">수수료율 (%)
-              <input type="number" id="feeRateInput" class="bt-fee-control" value="0.015" min="0" step="0.0001" oninput="markFeePresetCustom()">
+            <div class="bt-fee-meta" id="feePresetMeta">
+              <b>키움증권 · 국내주식 0.015%</b><br>
+              매수·매도 공통 적용. 국내 개별주식 매도 거래세는 별도 반영됩니다.
+            </div>
+          </div>
+        </div>
+
+        <!-- 가상 데이터 옵트인 -->
+        <div class="adv-block">
+          <section class="bt-synthetic-card" id="syntheticSection" style="margin:0;">
+            <label class="bt-synthetic-label">
+              <input type="checkbox" id="useSyntheticCheck">
+              <div>
+                <span class="bt-synthetic-title">가상 데이터 사용</span>
+                <div class="bt-synthetic-copy">실제 데이터가 부족할 때 통계 추정 데이터로 보완합니다. 결과 정확도가 낮아질 수 있습니다.</div>
+              </div>
+            </label>
+          </section>
+        </div>
+
+        <!-- 세금 적용 -->
+        <div class="adv-block bt-tax-card">
+          <div class="bt-toggle-head">
+            <h3 class="adv-block-title" style="margin:0;">세금 적용</h3>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+              <span id="taxToggleLabel" style="font-size:var(--fs-cap);color:var(--ds-muted);">OFF</span>
+              <div id="taxToggleWrap" onclick="toggleTax()" style="width:44px;height:24px;background:var(--ds-hairline);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+                <div id="taxToggleThumb" style="position:absolute;width:18px;height:18px;background:white;border-radius:50%;top:3px;left:3px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+              </div>
             </label>
           </div>
-          <div class="bt-fee-meta" id="feePresetMeta">
-            <b>키움증권 · 국내주식 0.015%</b><br>
-            매수·매도 공통 적용. 국내 개별주식 매도 거래세는 별도 반영됩니다.
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- 가상 데이터 옵트인 -->
-    <section class="bt-fcard bt-synthetic-card" id="syntheticSection">
-      <label class="bt-synthetic-label">
-        <input type="checkbox" id="useSyntheticCheck">
-        <div>
-          <span class="bt-synthetic-title">가상 데이터 사용</span>
-          <div class="bt-synthetic-copy">실제 데이터가 부족할 때 통계 추정 데이터로 보완합니다. 결과 정확도가 낮아질 수 있습니다.</div>
-        </div>
-      </label>
-    </section>
-
-    <!-- 세금 적용 (전폭) -->
-    <section class="bt-fcard bt-full bt-tax-card">
-      <div class="bt-toggle-head">
-        <h2 class="bt-fcard-title" style="margin:0;">세금 적용</h2>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
-          <span id="taxToggleLabel" style="font-size:var(--fs-cap);color:var(--ds-muted);">OFF</span>
-          <div id="taxToggleWrap" onclick="toggleTax()" style="width:44px;height:24px;background:var(--ds-hairline);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
-            <div id="taxToggleThumb" style="position:absolute;width:18px;height:18px;background:white;border-radius:50%;top:3px;left:3px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
-          </div>
-        </label>
-      </div>
-
-      <div id="taxPanel" style="display:none;margin-top:14px;">
+          <div id="taxPanel" style="display:none;margin-top:14px;">
         <div style="background:var(--ds-soft);border-radius:8px;padding:12px;margin-bottom:12px;">
           <div style="font-size:0.8rem;font-weight:700;margin-bottom:6px;">세금 설정 프로필</div>
           <div id="taxProfileInfo" style="font-size:0.76rem;color:var(--ds-muted);line-height:1.5;">
@@ -344,8 +406,10 @@
         <div style="margin-top:8px;font-size:0.75rem;color:var(--gold-deep);background:var(--gold-pale);padding:8px 10px;border-radius:6px;border:1px solid var(--gold);">
           <span class="bt-ico muted" style="width:14px;height:14px;color:var(--gold-deep);">{{ nicon('warn') }}</span> 직전 연도 금융소득 종합과세 대상자는 ISA 개설이 불가합니다.
         </div>
-      </div>
-    </section>
+          </div><!-- /taxPanel -->
+        </div><!-- /adv-block 세금 -->
+      </div><!-- /adv-body -->
+    </section><!-- /adv-card -->
     </div><!-- /bt-input-grid -->
 
     <div class="bt-run-wrap">
@@ -578,8 +642,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260619ds"></script>
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260619ds2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260619ds"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260619ds"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260619ds2"></script>
 {% endblock %}

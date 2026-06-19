@@ -1,5 +1,21 @@
 # Log
 
+## [2026-06-19] UX | 투자 계산기(calculator) 디자인을 포트폴리오 분석(backtest) 탭에 통일
+
+오너: "calculator 디자인을 포트폴리오 분석 탭과 일치하게. 수수료 설정·화면 레이아웃 등 거의 모든 디자인적 느낌을 그대로 이식. 결과·데이터 말고 디자인 느낌 통일."
+
+- **레이아웃 전환**: `templates/calculator.html`을 좌입력/우결과 2단(`.calc-layout`)에서 backtest와 동일한 **전폭 중앙(`.bt-page`) + 입력뷰↔결과뷰 전환**으로 재구성. `static/js/calculator.js`에 `calcShowResults/calcShowInput/calcEditConditions` 추가, `runCalculator` 성공·복원·계좌제한 에러 경로가 결과뷰로 전환. 결과 상단 `←조건 수정`/`재실행` 바.
+- **입력 카드**: `.bt-fcard`(ds-canvas·hairline·shadow·dark-el) + `.bt-input-grid` grid-areas(종목=전폭 / 투자금액·투자옵션=2열 / 가상데이터·세금=하단). 중앙 히어로 헤더(nicon calc).
+- **수수료**: 기존 인라인 select(키움/삼성/토스 하드코딩)를 backtest와 **동일 컴포넌트**로 — `.bt-switch` ON/OFF + `.bt-fee-panel`(is-open) + `broker_fee_presets.json`(8개사) 프리셋 + `.bt-fee-market` 시장 세그(국내주식/국내ETF/미국주식) + meta. `loadBrokerFeePresets/applyFeePreset/markFeePresetCustom/ccFee*` 이식, `window.MM_BROKER_FEE_PRESETS` 공유.
+- **세금 토글**: ds 토큰(brand/ds-hairline/brand-text/ds-muted)으로. **실행 버튼** `.bt-run` pill + nicon(zap) + 진행 UI ds화(resultEmpty를 run-wrap으로 이동, runBtnSpinner 제거).
+- **결과 히어로**: dist-cards 3개 → `.bt-hero` 중간값 대형 모노숫자(distP50) + 비관(distP10)/낙관(distP90) sub + `.bt-cond` 조건요약 바(`buildCalcCondSummary`).
+- **아이콘/토큰/토스트/차트색**: 이모지 전면 nicon, 레거시토큰→ds, `alert()` 7곳→`mmToast`, 롤링 green/red→`--up/--down`·부채꼴 blue→`--brand` 바인딩(`_ccCss/_ccRgba`).
+- **보존**: 모든 입력 ID·계산 로직·API·multi_account_ui/portfolio_favorites/limit_guard 배선·결과 카드(롤링·부채꼴·기여도·히스토그램10·분할매도·ISA캡·중도해지 배너) 100% 그대로. 캐시 `?v=20260619ds`.
+- **검증**: `node --check` OK + 로컬서버+mint_session+Playwright 실클릭(라이트/다크). ⚠️ Redis 다운으로 실제 시뮬은 못 돌려 **가짜 결과 주입**으로 결과뷰 렌더 확인. 통과: 입력뷰 5카드·검색 20건·2종목 비중100%·밴드토글·수수료 ON+프리셋9옵션+미국주식 0.25%+meta·세금 ON+계좌1·결과뷰 전환·히어로 ₩3억(computed color = `--ds-ink` #0a0b0d)·조건요약·롤링·히스토그램10·뒤로가기·**콘솔에러0·네이티브dialog0**.
+- **미배포** — 오너 육안 승인 후 push. 실 시뮬 라이브 확인(Redis 환경)도 필요. 다음 = 오너 피드백 → dividend_target·retirement 동일 이식.
+
+_작성: Claude_
+
 ## [2026-06-19] UX/DATA | 수수료 프리셋 저장 + backtest 수수료 UI + 내 자산 전체자산 히어로
 
 오너: 거래수수료 버튼도 세금설정 스타일에 맞추고, 주요 증권사 수수료율을 국내/해외로 나눠 저장. 증권사 프리셋 UI를 전체 디자인과 맞추고, 내 자산 탭에는 금액가리기와 보유종목 사이에 홈 화면처럼 전체 자산 숫자와 자산추이 그래프를 합쳐서 표시.

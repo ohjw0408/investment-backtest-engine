@@ -51,6 +51,9 @@ async function cancelCalcTask() {
 // ── 초기화 ──
 document.addEventListener('DOMContentLoaded', () => {
 
+  // 증권사 수수료 프리셋 로드 (broker_fee_presets.json 공유)
+  loadBrokerFeePresets();
+
   // 포트폴리오 즐겨찾기 (B1) — weight는 % (0~100) 그대로
   if (window.MMFav) MMFav.init({
     mount: 'favBar',
@@ -150,6 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
               hideProgressUI();
               renderResult(result, state.payload || {});
               calcRestoreForm(state.payload);
+              buildCalcCondSummary(state.payload || {});
+              calcShowResults();
               localStorage.setItem('mm_result_calculator', JSON.stringify({result, payload: state.payload, ts: Date.now()}));
             }
           } catch(e) {
@@ -158,8 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem('mm_task_calculator');
             _calcTaskId = null;
             document.getElementById('runBtn').disabled = false;
-            document.getElementById('runBtnText').style.display = 'inline';
-            document.getElementById('runBtnSpinner').style.display = 'none';
+            const _t = document.getElementById('runBtnText'); if (_t) _t.textContent = '시뮬레이션 실행';
             hideProgressUI();
           }
           return;
@@ -175,6 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (Date.now() - ts < 7200000) {
           renderResult(result, payload || {});
           calcRestoreForm(payload);
+          buildCalcCondSummary(payload || {});
+          calcShowResults();
         } else {
           localStorage.removeItem('mm_result_calculator');
         }
@@ -202,7 +208,7 @@ function redistributeWeights() {
 // ── 종목 추가 ──
 function addTicker(code, name, badge) {
   if (tickers.find(t => t.code === code)) {
-    alert(`${code}는 이미 추가되어 있어요.`);
+    mmToast(`${code}는 이미 추가되어 있어요.`, 'err');
     return;
   }
   tickers.push({ code, name, badge, weight: 0 });
@@ -270,15 +276,15 @@ function updateWeightBar() {
   fill.style.width  = Math.min(total, 100) + '%';
 
   if (total === 100) {
-    fill.style.background = 'var(--green-light)';
+    fill.style.background = 'var(--up)';
     label.className = 'weight-total-num ok';
     warn.textContent = '';
   } else if (total > 100) {
-    fill.style.background = 'var(--red-light)';
+    fill.style.background = 'var(--down)';
     label.className = 'weight-total-num over';
     warn.textContent = '⚠ 비중 합계가 100%를 초과했어요';
   } else {
-    fill.style.background = 'var(--blue)';
+    fill.style.background = 'var(--brand)';
     label.className = 'weight-total-num';
     warn.textContent = total > 0 ? `나머지 ${100 - total}%는 현금으로 유지됩니다` : '';
   }
@@ -308,12 +314,12 @@ function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
   for (let i = 1; i < accs.length; i++) {
     const accTickers = ensureAccountTickers(i);
     if (accTickers.length === 0) {
-      alert(`계좌 ${i + 1}에 종목을 최소 1개 이상 추가해주세요.`);
+      mmToast(`계좌 ${i + 1}에 종목을 최소 1개 이상 추가해주세요.`, 'err');
       return false;
     }
     const totalWeight = accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0);
     if (totalWeight > 100) {
-      alert(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`);
+      mmToast(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`, 'err');
       return false;
     }
     accounts.push({
@@ -333,18 +339,124 @@ function buildCalculatorAccountsPayload(rebalMode, bandWidth, dividendMode) {
 }
 
 
-// ── 거래수수료 (D4) ──
+// ── 입력 ↔ 결과 뷰 전환 (포트폴리오 분석 탭과 동일 결) ──
+function calcShowResults() {
+  document.getElementById('calcInputView').style.display = 'none';
+  document.getElementById('calcResultView').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+function calcShowInput() {
+  document.getElementById('calcResultView').style.display = 'none';
+  document.getElementById('calcInputView').style.display = 'block';
+}
+function calcEditConditions() { calcShowInput(); }
+
+function _ccE(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+// ── 결과 조건 요약 바 ──
+function buildCalcCondSummary(payload) {
+  const el = document.getElementById('calcCondSummary');
+  if (!el || !payload) return;
+  const rebalMap = { none:'리밸런싱 안함', monthly:'매월 리밸', quarterly:'분기 리밸', yearly:'매년 리밸', band:'밴드 리밸' };
+  const divMap = { reinvest:'배당 재투자', hold:'배당 현금보유', withdraw:'배당 인출' };
+  const parts = [];
+  let tkLabel = '';
+  if (payload.accounts?.length > 1) {
+    tkLabel = `${payload.accounts.length}개 계좌`;
+  } else {
+    tkLabel = (payload.tickers || []).map(t => `${t.code} ${Math.round((t.weight || 0) * 100)}%`).join(' · ');
+  }
+  if (tkLabel) parts.push(`<span class="bt-cond-item"><b>${_ccE(tkLabel)}</b></span>`);
+  parts.push(`<span class="bt-cond-item">${_ccE((payload.years || 0) + '년')}</span>`);
+  const seed = fmtKRW(payload.initial_capital || 0);
+  const mon = (payload.monthly_contribution || 0) > 0 ? ' · 월 ' + fmtKRW(payload.monthly_contribution) : '';
+  parts.push(`<span class="bt-cond-item">${_ccE(seed)}${_ccE(mon)}</span>`);
+  parts.push(`<span class="bt-cond-item">${_ccE(divMap[payload.dividend_mode] || '')} · ${_ccE(rebalMap[payload.rebal_mode] || payload.rebal_mode || '')}</span>`);
+  if (payload.tax_enabled) {
+    const accs = window.taxAccounts || [];
+    const types = accs.length > 1 ? accs.map(a => a.type || '위탁').join('+') : (accs[0]?.type || payload.account_type || '위탁');
+    parts.push(`<span class="bt-cond-item">세금 ON · ${_ccE(types)}</span>`);
+  }
+  if (payload.fee_enabled) {
+    const market = document.querySelector('input[name="feeMarket"]:checked')?.value;
+    const marketLabel = CC_FEE_MARKET_LABELS[market] || '공통';
+    const rate = Number(payload.fee_rate || 0) * 100;
+    parts.push(`<span class="bt-cond-item">수수료 ${_ccE(marketLabel)} · ${rate.toFixed(4).replace(/\.?0+$/, '')}%</span>`);
+  }
+  el.innerHTML = parts.join('<span class="bt-cond-sep"></span>');
+  el.style.display = 'flex';
+}
+
+// ── 거래수수료 (D4) — 증권사 프리셋(broker_fee_presets.json) 공유 ──
+const CC_FEE_PRESETS_URL = "/static/data/broker_fee_presets.json?v=20260619fees";
+const CC_FEE_MARKET_LABELS = { domestic_stock: '국내주식', domestic_etf: '국내 ETF/ETN', us_stock: '미국주식' };
+const CC_FEE_FALLBACK_PRESETS = [
+  { id: 'kiwoom', name: '키움증권', rates: {
+    domestic_stock: { commission_pct: 0.015, display: '0.015%' },
+    domestic_etf: { commission_pct: 0.015, display: '0.015%' },
+    us_stock: { commission_pct: 0.25, display: '0.25%' } },
+    notes: '이벤트, 협의수수료, 제비용과 세금은 실제 계좌 조건에 따라 달라질 수 있습니다.' },
+];
+let ccBrokerFeePresets = [];
+
+function ccFeeMarket() { return document.querySelector('input[name="feeMarket"]:checked')?.value || 'domestic_stock'; }
+function ccFeePreset() { const id = document.getElementById('feePreset')?.value || 'custom'; return ccBrokerFeePresets.find(p => p.id === id) || null; }
+function ccFeeRateFor(preset, market) { const r = preset?.rates?.[market]?.commission_pct; return Number.isFinite(Number(r)) ? Number(r) : null; }
+function ccFeeDisplayFor(preset, market) { return preset?.rates?.[market]?.display || (ccFeeRateFor(preset, market) != null ? ccFeeRateFor(preset, market) + '%' : ''); }
+
+function renderBrokerFeePresetOptions() {
+  const sel = document.getElementById('feePreset');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = ccBrokerFeePresets.map(p => `<option value="${p.id}">${_ccE(p.name)}</option>`).join('') + '<option value="custom">직접입력</option>';
+  sel.value = ccBrokerFeePresets.some(p => p.id === prev) ? prev : (ccBrokerFeePresets[0]?.id || 'custom');
+  applyFeePreset();
+}
+async function loadBrokerFeePresets() {
+  try {
+    const res = await fetch(CC_FEE_PRESETS_URL, { cache: 'no-store' });
+    const data = res.ok ? await res.json() : {};
+    ccBrokerFeePresets = Array.isArray(data.presets) && data.presets.length ? data.presets : CC_FEE_FALLBACK_PRESETS;
+  } catch(e) { ccBrokerFeePresets = CC_FEE_FALLBACK_PRESETS; }
+  window.MM_BROKER_FEE_PRESETS = ccBrokerFeePresets;
+  renderBrokerFeePresetOptions();
+}
 function toggleFeePanel() {
   const on = document.getElementById('feeEnabledChk')?.checked;
   const body = document.getElementById('feePanelBody');
-  if (body) body.style.display = on ? 'block' : 'none';
+  const label = document.getElementById('feeLabel');
+  if (body) body.classList.toggle('is-open', !!on);
+  if (label) { label.textContent = on ? 'ON' : 'OFF'; label.style.color = on ? 'var(--brand-text)' : 'var(--ds-muted)'; }
   // 멀티계좌면 카드별 수수료 입력 노출/숨김 위해 재렌더.
   if (window.taxEnabled && (window.taxAccounts || []).length > 1) renderTaxAccounts();
 }
 function applyFeePreset(v) {
-  if (v === 'custom') return;
-  const inp = document.getElementById('feeRateInput');
-  if (inp) inp.value = v;
+  // 옛 호출(applyFeePreset('0.015'))도 견딘다.
+  if (v && v !== 'custom' && !ccBrokerFeePresets.some(p => p.id === v)) {
+    const legacyRate = Number(v);
+    if (Number.isFinite(legacyRate)) { const inp = document.getElementById('feeRateInput'); if (inp) inp.value = legacyRate; return; }
+  }
+  if (v) { const sel = document.getElementById('feePreset'); if (sel) sel.value = v; }
+  const preset = ccFeePreset(), market = ccFeeMarket();
+  const inp = document.getElementById('feeRateInput'), meta = document.getElementById('feePresetMeta');
+  if (!preset) {
+    if (meta) meta.innerHTML = '<b>직접입력</b><br>매수·매도 공통 적용. 국내 개별주식 매도 거래세는 별도 반영됩니다.';
+    if (window.taxEnabled && (window.taxAccounts || []).length > 1) renderTaxAccounts();
+    return;
+  }
+  const rate = ccFeeRateFor(preset, market);
+  if (inp && rate != null) inp.value = rate;
+  if (meta) {
+    const marketLabel = CC_FEE_MARKET_LABELS[market] || market;
+    meta.innerHTML = `<b>${_ccE(preset.name)} · ${_ccE(marketLabel)} ${_ccE(ccFeeDisplayFor(preset, market))}</b><br>${_ccE(preset.notes || '이벤트, 협의수수료, 제비용과 세금은 실제 계좌 조건에 따라 달라질 수 있습니다.')}`;
+  }
+  if (window.taxEnabled && (window.taxAccounts || []).length > 1) renderTaxAccounts();
+}
+function markFeePresetCustom() {
+  const sel = document.getElementById('feePreset');
+  if (sel) sel.value = 'custom';
+  const meta = document.getElementById('feePresetMeta');
+  if (meta) meta.innerHTML = '<b>직접입력</b><br>매수·매도 공통 적용. 국내 개별주식 매도 거래세는 별도 반영됩니다.';
 }
 // 결과 하단 "총 지불 수수료" 표시 (없으면 제거)
 function renderFeeSummary(containerId, totalFees) {
@@ -355,16 +467,16 @@ function renderFeeSummary(containerId, totalFees) {
   if (!slot) { slot = document.createElement('div'); slot.id = 'mmFeeSummary'; el.appendChild(slot); }
   const won = Math.round(Number(totalFees) || 0).toLocaleString();
   slot.innerHTML = `
-    <div style="margin-top:12px;padding:10px 14px;background:var(--bg,#f5f5f5);border:1px solid var(--border,#ddd);border-radius:9px;font-size:0.84rem;color:var(--text,#222);">
-      💸 총 지불 거래수수료 <b>₩${won}</b> <span style="color:var(--text-muted,#888);font-size:0.78rem;">(중앙값 시나리오, 매수·매도 누적)</span>
+    <div style="margin-top:12px;padding:10px 14px;background:var(--ds-soft);border:1px solid var(--ds-hairline);border-radius:var(--r-md);font-size:0.84rem;color:var(--ds-ink);">
+총 지불 거래수수료 <b>₩${won}</b> <span style="color:var(--ds-muted);font-size:0.78rem;">(중앙값 시나리오, 매수·매도 누적)</span>
     </div>`;
 }
 
 // ── 시뮬레이션 실행 ──
 async function runCalculator(_limitOverride) {
-  if (tickers.length === 0) { alert('종목을 최소 1개 이상 추가해주세요.'); return; }
+  if (tickers.length === 0) { mmToast('종목을 최소 1개 이상 추가해주세요.', 'err'); return; }
   const totalWeight = tickers.reduce((s, t) => s + t.weight, 0);
-  if (totalWeight > 100) { alert('비중 합계가 100%를 초과했어요. 조정해주세요.'); return; }
+  if (totalWeight > 100) { mmToast('비중 합계가 100%를 초과했어요. 조정해주세요.', 'err'); return; }
 
   const btn = document.getElementById('runBtn');
   btn.disabled = true;
@@ -447,9 +559,11 @@ async function runCalculator(_limitOverride) {
     hideProgressUI();
     if (result) {
       renderResult(result, payload);
+      buildCalcCondSummary(payload);
       window.MMLimit?.attach('resultContent', result.limit_warnings);
       renderFeeSummary('resultContent', result.total_fees);
       localStorage.setItem('mm_result_calculator', JSON.stringify({result, payload, ts: Date.now()}));
+      calcShowResults();
     }
   } catch (err) {
     if (err.message !== 'CANCELLED') {
@@ -461,7 +575,6 @@ async function runCalculator(_limitOverride) {
         const _errType = _errData.error;
         if (_errType === 'limit_confirm') {
           _handled = true;
-          document.getElementById('resultEmpty').style.display = 'block';
           if (await window.MMLimit.confirm(_errData.violations || [])) {
             return runCalculator(true);
           }
@@ -472,19 +585,19 @@ async function runCalculator(_limitOverride) {
             detail.innerHTML = (_errData.violations || []).map(v => `<div>• ${v}</div>`).join('');
             if (_errData.disclaimer) detail.innerHTML += `<div style="margin-top:6px;font-style:italic;">${_errData.disclaimer}</div>`;
             banner.style.display = 'block';
-            document.getElementById('resultEmpty').style.display = 'none';
+            document.getElementById('resultContent').style.display = 'none';
+            calcShowResults();
             _handled = true;
           }
         }
       }
-      if (!_handled) alert('오류: ' + err.message);
+      if (!_handled) mmToast('오류: ' + err.message, 'err');
     }
   } finally {
     localStorage.removeItem('mm_task_calculator');
     _calcTaskId = null;
     btn.disabled = false;
-    document.getElementById('runBtnText').style.display    = 'inline';
-    document.getElementById('runBtnSpinner').style.display = 'none';
+    const _t = document.getElementById('runBtnText'); if (_t) _t.textContent = '시뮬레이션 실행';
     hideProgressUI();
   }
 }
@@ -542,11 +655,11 @@ async function pollTask(taskId, maxWait = 600000) {
 
 // ── 진행 상황 UI ────────────────────────────────────────────
 function showProgressUI() {
-  document.getElementById('runBtnText').style.display    = 'none';
-  document.getElementById('runBtnSpinner').style.display = 'inline';
+  const txt = document.getElementById('runBtnText');
+  if (txt) txt.textContent = '계산 중...';
 
   const empty = document.getElementById('resultEmpty');
-  empty.style.display = 'flex';
+  empty.style.display = 'block';
   empty.innerHTML = `
     <style>
       @keyframes mm-indeterminate {
@@ -554,21 +667,21 @@ function showProgressUI() {
         100% { left: 110%; width: 30%; }
       }
     </style>
-    <div style="width:100%;padding:24px;">
-      <div id="progressPhase" style="font-size:0.9rem;color:var(--text-muted);margin-bottom:8px;">
+    <div style="width:100%;padding:18px 4px 4px;">
+      <div id="progressPhase" style="font-size:0.9rem;font-weight:700;color:var(--brand-text);margin-bottom:8px;">
         준비 중...
       </div>
-      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:8px;position:relative;">
+      <div style="background:var(--ds-strong);border-radius:8px;height:8px;overflow:hidden;margin-bottom:8px;position:relative;">
         <div id="progressBar"
-             style="background:var(--blue);height:100%;width:40%;border-radius:8px;position:absolute;top:0;left:0;animation:mm-indeterminate 1.4s ease-in-out infinite;">
+             style="background:var(--brand);height:100%;width:40%;border-radius:8px;position:absolute;top:0;left:0;animation:mm-indeterminate 1.4s ease-in-out infinite;">
         </div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
+      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--ds-muted);">
         <span id="progressDetail">가격 데이터 로딩 중...</span>
         <span id="progressEta"></span>
       </div>
       <div style="text-align:center;margin-top:10px;">
-        <button onclick="cancelCalcTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:var(--card);color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+        <button onclick="cancelCalcTask()" class="ds-btn ds-btn-sm" style="border:1.5px solid var(--down);background:transparent;color:var(--down);">취소</button>
       </div>
     </div>`;
   document.getElementById('resultContent').style.display = 'none';
@@ -1069,8 +1182,8 @@ function _renderRolling() {
       labels,
       datasets: [{
         data: values,
-        backgroundColor: pos.map(p => p ? 'rgba(67,160,71,0.6)' : 'rgba(239,83,80,0.6)'),
-        borderColor:     pos.map(p => p ? '#43A047' : '#EF5350'),
+        backgroundColor: pos.map(p => p ? _ccRgba(ccUp(), 0.6) : _ccRgba(ccDown(), 0.6)),
+        borderColor:     pos.map(p => p ? ccUp() : ccDown()),
         borderWidth: 1, borderRadius: 3,
       }]
     },
@@ -1262,12 +1375,12 @@ function _drawFan() {
     data: {
       labels,
       datasets: [
-        { label: `하단 p${loV}`, data: rowLo, borderColor: 'rgba(25,118,210,0.45)',
+        { label: `하단 p${loV}`, data: rowLo, borderColor: _ccRgba(ccBrand(), 0.45),
           borderWidth: 1, pointRadius: 0, fill: false, tension: 0.2 },
-        { label: `상단 p${hiV}`, data: rowHi, borderColor: 'rgba(25,118,210,0.45)',
+        { label: `상단 p${hiV}`, data: rowHi, borderColor: _ccRgba(ccBrand(), 0.45),
           borderWidth: 1, pointRadius: 0, fill: '-1',
-          backgroundColor: 'rgba(25,118,210,0.18)', tension: 0.2 },
-        { label: '중앙값 p50', data: rowMid, borderColor: '#1976D2',
+          backgroundColor: _ccRgba(ccBrand(), 0.18), tension: 0.2 },
+        { label: '중앙값 p50', data: rowMid, borderColor: ccBrand(),
           borderWidth: 2, pointRadius: 0, fill: false, tension: 0.2 },
       ]
     },
@@ -1317,6 +1430,18 @@ function fmtKRW(v) {
 function fmtPct(v) {
   return (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
 }
+
+// ── 디자인 토큰 → 차트 색 바인딩 (액센트/다크 따라감) ──
+function _ccCss(n, fb) { const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v || fb; }
+function _ccRgba(hex, a) {
+  hex = (hex || '').trim();
+  if (hex[0] !== '#' || hex.length < 7) return hex;
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function ccBrand() { return _ccCss('--brand', '#0052ff'); }
+function ccUp()    { return _ccCss('--up', '#05b169'); }
+function ccDown()  { return _ccCss('--down', '#cf202f'); }
 // ═══════════════════════════════════════════════════════════
 // 세금 토글 + 계좌 설정
 // ═══════════════════════════════════════════════════════════
@@ -1331,10 +1456,10 @@ function toggleTax() {
   const thumb = document.getElementById('taxToggleThumb');
   const label = document.getElementById('taxToggleLabel');
   const panel = document.getElementById('taxPanel');
-  wrap.style.background = window.taxEnabled ? 'var(--blue)' : 'var(--border)';
+  wrap.style.background = window.taxEnabled ? 'var(--brand)' : 'var(--ds-hairline)';
   thumb.style.left      = window.taxEnabled ? '23px' : '3px';
   label.textContent     = window.taxEnabled ? 'ON'  : 'OFF';
-  label.style.color     = window.taxEnabled ? 'var(--blue)' : 'var(--text-muted)';
+  label.style.color     = window.taxEnabled ? 'var(--brand-text)' : 'var(--ds-muted)';
   panel.style.display   = window.taxEnabled ? 'block' : 'none';
   if (window.taxEnabled) {
     loadTaxProfileForCalculator();
@@ -1421,7 +1546,7 @@ async function calcCopyLink() {
   } finally { btn.disabled = false; }
 }
 function calcDownloadImg() {
-  if (typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
+  if (typeof html2canvas === 'undefined') { mmToast('html2canvas 로드 중입니다.', 'err'); return; }
   calcMakeCanvas().then(function(canvas) {
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');

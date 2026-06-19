@@ -23,9 +23,10 @@
     "money options"
     "advanced advanced";
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
   margin-bottom: 16px;
 }
+.bt-input-grid > .bt-fcard { display: flex; flex-direction: column; }
 .bt-input-grid > .bt-fcard { margin-bottom: 0; }
 .bt-full { grid-column: 1 / -1; }
 .bt-assets-card { grid-area: assets; }
@@ -182,8 +183,8 @@
 .adv-toggle .adv-sub { font-size: var(--fs-cap); font-weight: 500; color: var(--ds-muted); margin-left: 6px; }
 .adv-caret { transition: transform .2s; color: var(--ds-muted); font-size: 0.85em; flex-shrink: 0; }
 .adv-toggle.open .adv-caret { transform: rotate(180deg); }
-.adv-body { margin-top: 18px; display: none; }
-.adv-body.open { display: block; }
+.adv-body { max-height: 0; overflow: hidden; opacity: 0; transition: max-height .4s ease, opacity .3s ease, margin-top .3s ease; }
+.adv-body.open { max-height: 8000px; opacity: 1; margin-top: 18px; }
 .adv-block { padding: 16px 0; border-top: 1px solid var(--ds-hairline); }
 .adv-block:first-child { border-top: none; padding-top: 4px; }
 .adv-block-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin: 0 0 12px; }
@@ -645,5 +646,5 @@
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260619ds2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260619ds"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260619ds2"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260619ds3"></script>
 {% endblock %}

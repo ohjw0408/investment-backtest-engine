@@ -55,6 +55,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // 증권사 수수료 프리셋 로드 (broker_fee_presets.json 공유)
   loadBrokerFeePresets();
 
+  // 결과는 sessionStorage(탭 유지·브라우저 종료 시 소멸). 옛 localStorage 잔재 청소.
+  try { localStorage.removeItem('mm_task_calculator'); localStorage.removeItem('mm_result_calculator'); } catch(e) {}
+
   // 포트폴리오 즐겨찾기 (B1) — weight는 % (0~100) 그대로
   if (window.MMFav) MMFav.init({
     mount: 'favBar',
@@ -140,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── 페이지 복원 ──
   (async () => {
-    const taskSaved = localStorage.getItem('mm_task_calculator');
+    const taskSaved = sessionStorage.getItem('mm_task_calculator');
     if (taskSaved) {
       try {
         const state = JSON.parse(taskSaved);
@@ -156,12 +159,12 @@ document.addEventListener('DOMContentLoaded', () => {
               calcRestoreForm(state.payload);
               buildCalcCondSummary(state.payload || {});
               calcShowResults();
-              localStorage.setItem('mm_result_calculator', JSON.stringify({result, payload: state.payload, ts: Date.now()}));
+              sessionStorage.setItem('mm_result_calculator', JSON.stringify({result, payload: state.payload, ts: Date.now()}));
             }
           } catch(e) {
             if (e.message !== 'CANCELLED') hideProgressUI();
           } finally {
-            localStorage.removeItem('mm_task_calculator');
+            sessionStorage.removeItem('mm_task_calculator');
             _calcTaskId = null;
             document.getElementById('runBtn').disabled = false;
             const _t = document.getElementById('runBtnText'); if (_t) _t.textContent = '시뮬레이션 실행';
@@ -170,10 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
       } catch(e) {}
-      localStorage.removeItem('mm_task_calculator');
+      sessionStorage.removeItem('mm_task_calculator');
     }
 
-    const resultSaved = localStorage.getItem('mm_result_calculator');
+    const resultSaved = sessionStorage.getItem('mm_result_calculator');
     if (resultSaved) {
       try {
         const {result, payload, ts} = JSON.parse(resultSaved);
@@ -183,9 +186,9 @@ document.addEventListener('DOMContentLoaded', () => {
           buildCalcCondSummary(payload || {});
           calcShowResults();
         } else {
-          localStorage.removeItem('mm_result_calculator');
+          sessionStorage.removeItem('mm_result_calculator');
         }
-      } catch(e) { localStorage.removeItem('mm_result_calculator'); }
+      } catch(e) { sessionStorage.removeItem('mm_result_calculator'); }
     }
   })();
 });
@@ -563,8 +566,8 @@ async function runCalculator(_limitOverride) {
     if (submitRes.status === 429) throw new Error(submitData.error);
     const { task_id } = submitData;
     _calcTaskId = task_id;
-    localStorage.removeItem('mm_result_calculator');
-    localStorage.setItem('mm_task_calculator', JSON.stringify({task_id, payload, timestamp: Date.now()}));
+    sessionStorage.removeItem('mm_result_calculator');
+    sessionStorage.setItem('mm_task_calculator', JSON.stringify({task_id, payload, timestamp: Date.now()}));
 
     const result = await pollTask(task_id);
 
@@ -574,7 +577,7 @@ async function runCalculator(_limitOverride) {
       buildCalcCondSummary(payload);
       window.MMLimit?.attach('resultContent', result.limit_warnings);
       renderFeeSummary('resultContent', result.total_fees);
-      localStorage.setItem('mm_result_calculator', JSON.stringify({result, payload, ts: Date.now()}));
+      sessionStorage.setItem('mm_result_calculator', JSON.stringify({result, payload, ts: Date.now()}));
       calcShowResults();
     }
   } catch (err) {
@@ -606,7 +609,7 @@ async function runCalculator(_limitOverride) {
       if (!_handled) mmToast('오류: ' + err.message, 'err');
     }
   } finally {
-    localStorage.removeItem('mm_task_calculator');
+    sessionStorage.removeItem('mm_task_calculator');
     _calcTaskId = null;
     btn.disabled = false;
     const _t = document.getElementById('runBtnText'); if (_t) _t.textContent = '시뮬레이션 실행';

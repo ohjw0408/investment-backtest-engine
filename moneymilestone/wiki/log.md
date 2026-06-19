@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-19] FIX | 결과 sessionStorage 전환(전 탭) + 고급옵션 슬라이드 애니 + 카드 높이 맞춤
+
+오너 라이브 3건: ① 브라우저 껐다 켜도 이전 계산 결과가 남음(탭 전환만 기억, 종료 시 소멸 원함) ② 고급 옵션 눌러도 아무것도 안 바뀜(내려오는 느낌 없음) ③ 투자옵션·투자금액 카드 높이 달라 여백.
+
+- **① sessionStorage(전 탭)**: `mm_task_*`/`mm_result_*` 저장소를 `localStorage`→`sessionStorage`로 전환. 탭 이동·새로고침 유지, 브라우저/탭 종료 시 소멸. 대상 = `static/js/calculator.js`·`templates/retirement.html`·`templates/dividend_target.html` (backtest는 2026-06-19 #96서 기완료, sessionStorage). 라인 단위 sed(`/mm_task_\|mm_result_/ s/localStorage/sessionStorage/`)로 설정·즐겨찾기 localStorage는 보존. 각 init에 옛 localStorage 키 `removeItem` 청소(기존에 박혀있던 결과 제거).
+- **② 고급 옵션 슬라이드**: `.adv-body` `display:none/block`→`max-height:0↔8000px`+`opacity`+`margin-top` 트랜지션(0.4s) → 클릭 시 부드럽게 내려옴, 캐럿 180° 회전. (토글 자체는 정상 동작했으나 즉시 표시라 "안 바뀜"으로 보였음 → 애니로 명확화.)
+- **③ 카드 높이**: `.bt-input-grid` `align-items:start`→`stretch` + `.bt-fcard` `display:flex;flex-direction:column` → 투자금액·투자옵션 동일 높이(여백 해소).
+- 캐시 `?v=20260619ds3`(calculator.js).
+- **검증**(로컬 Playwright): 카드높이 383=383·고급옵션 접힘(maxHeight 0·offsetHeight 0)→펼침(8000·208)·캐럿 회전·수수료/세금 reachable·콘솔0. sessionStorage 동작은 라이브 실시뮬(reload 유지·새 컨텍스트 소멸)로 확인 예정.
+
+_작성: Claude_
+
 ## [2026-06-19] UX | calculator 입력화면 정리 — 고급옵션 접기 + 삐져나옴 봉쇄 + 종목줄 backtest결
 
 오너 라이브: "이 정보 입력하는 화면 조잡·안 깔끔, 이런저런 거 누르다 보면 칸이 삐져나옴, 불편."

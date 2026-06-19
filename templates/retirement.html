@@ -1018,14 +1018,14 @@ async function runRetirement(_limitOverride) {
     if (submitRes.status === 429) throw new Error(submitData.error);
     const { task_id } = submitData;
     _retTaskId = task_id;
-    localStorage.removeItem('mm_result_retirement');
-    localStorage.setItem('mm_task_retirement', JSON.stringify({task_id, body, timestamp: Date.now()}));
+    sessionStorage.removeItem('mm_result_retirement');
+    sessionStorage.setItem('mm_task_retirement', JSON.stringify({task_id, body, timestamp: Date.now()}));
     const data = await retPollTask(task_id);
     if (data) {
       renderRetirement(data, body);
       window.MMLimit?.attach('retResultContent', data.limit_warnings);
       renderFeeSummary('retResultContent', data.total_fees);
-      try { localStorage.setItem('mm_result_retirement', JSON.stringify({result: data, body, ts: Date.now()})); } catch(e) {}
+      try { sessionStorage.setItem('mm_result_retirement', JSON.stringify({result: data, body, ts: Date.now()})); } catch(e) {}
     }
   } catch(e) {
     if (e.message !== 'CANCELLED') {
@@ -1054,7 +1054,7 @@ async function runRetirement(_limitOverride) {
       if (!_handled) alert('오류가 발생했습니다: ' + e.message);
     }
   } finally {
-    localStorage.removeItem('mm_task_retirement');
+    sessionStorage.removeItem('mm_task_retirement');
     _retTaskId = null;
     document.getElementById('retRunBtn').disabled       = false;
     document.getElementById('retLoading').style.display = 'none';
@@ -1209,10 +1209,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('wdBandNoteVal').textContent = e.target.value + '%';
   });
 
-  const taskSaved = localStorage.getItem('mm_task_retirement');
+  // 결과는 sessionStorage(탭 유지·브라우저 종료 시 소멸). 옛 localStorage 잔재 청소.
+  try { localStorage.removeItem('mm_task_retirement'); localStorage.removeItem('mm_result_retirement'); } catch(e) {}
+
+  const taskSaved = sessionStorage.getItem('mm_task_retirement');
   if (taskSaved) {
     let state;
-    try { state = JSON.parse(taskSaved); } catch(e) { localStorage.removeItem('mm_task_retirement'); }
+    try { state = JSON.parse(taskSaved); } catch(e) { sessionStorage.removeItem('mm_task_retirement'); }
     if (state && Date.now() - state.timestamp < 3600000) {
       _retTaskId = state.task_id;
       document.getElementById('retRunBtn').disabled = true;
@@ -1223,22 +1226,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         const data = await retPollTask(state.task_id);
         if (data) {
           renderRetirement(data, state.body || {});
-          try { localStorage.setItem('mm_result_retirement', JSON.stringify({result: data, body: state.body, ts: Date.now()})); } catch(e) {}
+          try { sessionStorage.setItem('mm_result_retirement', JSON.stringify({result: data, body: state.body, ts: Date.now()})); } catch(e) {}
         }
       } catch(e) {
         document.getElementById('retResultEmpty').style.display = 'block';
       } finally {
-        localStorage.removeItem('mm_task_retirement');
+        sessionStorage.removeItem('mm_task_retirement');
         _retTaskId = null;
         document.getElementById('retRunBtn').disabled = false;
         document.getElementById('retLoading').style.display = 'none';
       }
       return;
     }
-    localStorage.removeItem('mm_task_retirement');
+    sessionStorage.removeItem('mm_task_retirement');
   }
 
-  const resultSaved = localStorage.getItem('mm_result_retirement');
+  const resultSaved = sessionStorage.getItem('mm_result_retirement');
   if (resultSaved) {
     try {
       const {result, body, ts} = JSON.parse(resultSaved);
@@ -1246,9 +1249,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderRetirement(result, body || {});
         retRestoreForm(body);
       } else {
-        localStorage.removeItem('mm_result_retirement');
+        sessionStorage.removeItem('mm_result_retirement');
       }
-    } catch(e) { localStorage.removeItem('mm_result_retirement'); }
+    } catch(e) { sessionStorage.removeItem('mm_result_retirement'); }
   }
 });
 

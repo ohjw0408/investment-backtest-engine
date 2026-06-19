@@ -767,14 +767,14 @@ async function runDividendTarget(_limitOverride) {
     const { task_id } = resData;
     window._dtLastBody = body;
     _dtTaskId = task_id;
-    localStorage.setItem('mm_task_dividend', JSON.stringify({task_id, body, timestamp: Date.now()}));
+    sessionStorage.setItem('mm_task_dividend', JSON.stringify({task_id, body, timestamp: Date.now()}));
     await dtPollTask(task_id);
   } catch(e) {
     if (e.message !== 'CANCELLED') alert('오류: '+e.message);
     dtHideProgressUI();
     document.getElementById('dtResultEmpty').style.display = 'block';
   } finally {
-    localStorage.removeItem('mm_task_dividend');
+    sessionStorage.removeItem('mm_task_dividend');
     _dtTaskId = null;
     btn.disabled=false; btnText.textContent='시뮬레이션 실행'; spinner.style.display='none';
   }
@@ -825,7 +825,7 @@ async function dtPollTask(taskId, maxWait = 600000) {
         renderResult(result, window._dtLastBody || {});
         window.MMLimit?.attach('dtResultContent', result.limit_warnings);
         renderFeeSummary('dtResultContent', result.total_fees);
-        try { localStorage.setItem('mm_result_dividend', JSON.stringify({result, body: window._dtLastBody, ts: Date.now()})); } catch(e) {}
+        try { sessionStorage.setItem('mm_result_dividend', JSON.stringify({result, body: window._dtLastBody, ts: Date.now()})); } catch(e) {}
         return;
       }
       if (data.status === 'CANCELLED') {
@@ -936,10 +936,13 @@ async function dtCancelTask() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const taskSaved = localStorage.getItem('mm_task_dividend');
+  // 결과는 sessionStorage(탭 유지·브라우저 종료 시 소멸). 옛 localStorage 잔재 청소.
+  try { localStorage.removeItem('mm_task_dividend'); localStorage.removeItem('mm_result_dividend'); } catch(e) {}
+
+  const taskSaved = sessionStorage.getItem('mm_task_dividend');
   if (taskSaved) {
     let state;
-    try { state = JSON.parse(taskSaved); } catch(e) { localStorage.removeItem('mm_task_dividend'); }
+    try { state = JSON.parse(taskSaved); } catch(e) { sessionStorage.removeItem('mm_task_dividend'); }
     if (state && Date.now() - state.timestamp < 3600000) {
       _dtTaskId = state.task_id;
       if (state.body) window._dtLastBody = state.body;
@@ -952,17 +955,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch(e) {
         document.getElementById('dtResultEmpty').style.display = 'block';
       } finally {
-        localStorage.removeItem('mm_task_dividend');
+        sessionStorage.removeItem('mm_task_dividend');
         _dtTaskId = null;
         if (btn) { btn.disabled = false; document.getElementById('dtRunBtnText').textContent = '시뮬레이션 실행'; document.getElementById('dtRunBtnSpinner').style.display = 'none'; }
         dtHideProgressUI();
       }
       return;
     }
-    localStorage.removeItem('mm_task_dividend');
+    sessionStorage.removeItem('mm_task_dividend');
   }
 
-  const resultSaved = localStorage.getItem('mm_result_dividend');
+  const resultSaved = sessionStorage.getItem('mm_result_dividend');
   if (resultSaved) {
     try {
       const {result, body, ts} = JSON.parse(resultSaved);
@@ -972,9 +975,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderFeeSummary('dtResultContent', result.total_fees);
         dtRestoreForm(body);
       } else {
-        localStorage.removeItem('mm_result_dividend');
+        sessionStorage.removeItem('mm_result_dividend');
       }
-    } catch(e) { localStorage.removeItem('mm_result_dividend'); }
+    } catch(e) { sessionStorage.removeItem('mm_result_dividend'); }
   }
 });
 

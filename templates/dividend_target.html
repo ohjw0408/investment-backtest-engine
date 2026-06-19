@@ -5,40 +5,145 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260618ds">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
-.share-pill { background:var(--blue-pale);color:var(--blue-mid);border:none;border-radius:20px;padding:5px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:inherit; }
-.share-pill:hover { background:var(--blue-soft); }
+/* ── 배당금 계산기 — 코인베이스 분석 아키타입 (입력↔결과 뷰 전환, 계산기/포트폴리오 분석 탭과 동일 결) ── */
+.bt-page { grid-column: 1 / -1; width: 100%; max-width: 1180px; box-sizing: border-box; margin: 0 auto; padding: 28px 20px 64px; }
+@media (max-width: 860px) { .bt-page { padding: 16px 12px 48px; } }
+
+.bt-ico, .bt-ico svg { width: 1.05em; height: 1.05em; vertical-align: -0.16em; color: var(--brand); display: inline-block; }
+.bt-ico.muted, .bt-ico.muted svg { color: var(--ds-muted); }
+
+/* ── 입력 뷰 (배당 계산기는 세로 스택) ── */
+.bt-input-view { max-width: 1120px; margin: 0 auto; }
+.bt-input-grid { display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
+.bt-input-grid > .bt-fcard { margin-bottom: 0; }
+.bt-full { width: 100%; }
+.bt-hero-head { text-align: center; margin-bottom: 28px; }
+.bt-h1 { font-size: var(--fs-h1); font-weight: 800; color: var(--ds-ink); letter-spacing: -0.02em; margin: 0 0 6px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.bt-hero-sub { font-size: var(--fs-sm); color: var(--ds-body); margin: 0; }
+
+.bt-fcard {
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-lg); box-shadow: var(--ds-shadow);
+  padding: 22px 24px; margin-bottom: 16px;
+}
+[data-theme="dark"] .bt-fcard { background: var(--ds-dark-el); }
+@media (max-width: 860px) { .bt-fcard { padding: 16px 14px; } }
+.bt-fcard-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.bt-fcard-title { font-size: var(--fs-title); font-weight: 700; color: var(--ds-ink); margin: 0; }
+.bt-fcard-title.gap { margin-bottom: 14px; }
+.bt-fcard-title.tight { margin-bottom: 6px; }
+.bt-fcard-head .bt-fcard-title { margin: 0; }
+.bt-opt-row { padding: 12px 0; border-top: 1px solid var(--ds-hairline); }
+.bt-opt-row:first-child { border-top: none; padding-top: 4px; }
+.bt-opt-row > label.bt-opt-label { display: block; font-size: var(--fs-cap); font-weight: 600; color: var(--ds-body); margin-bottom: 8px; }
+
+/* 토글 스위치 (세금·수수료) */
+.bt-toggle-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bt-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; user-select: none; }
+.bt-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.bt-switch-label { font-size: var(--fs-cap); font-weight: 700; color: var(--ds-muted); min-width: 26px; text-align: right; }
+.bt-switch-track { width: 44px; height: 24px; border-radius: var(--r-pill); background: var(--ds-hairline); position: relative; flex-shrink: 0; transition: background .2s; }
+.bt-switch-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.22); transition: transform .2s; }
+.bt-switch input:checked + .bt-switch-track { background: var(--brand); }
+.bt-switch input:checked + .bt-switch-track::after { transform: translateX(20px); }
+
+.bt-fee-panel { max-height: 0; overflow: hidden; margin-top: 0; padding: 0 12px; background: var(--ds-soft); border: 1px solid transparent; border-radius: var(--r-md); transition: max-height .35s ease, margin-top .3s ease, padding .3s ease, border-color .3s ease; }
+[data-theme="dark"] .bt-fee-panel { background: var(--ds-strong); }
+.bt-fee-panel.is-open { max-height: 1200px; margin-top: 12px; padding: 12px; border-color: var(--ds-hairline); }
+
+/* 실행 버튼 */
+.bt-run-wrap { background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); box-shadow: var(--ds-shadow); margin-top: 8px; padding: 16px; }
+[data-theme="dark"] .bt-run-wrap { background: var(--ds-dark-el); }
+.bt-run-wrap .calc-warning { display: flex; align-items: center; justify-content: center; gap: 7px; background: none; border: none; padding: 0; margin: 0 0 16px; color: var(--ds-muted); font-size: var(--fs-cap); text-align: center; line-height: 1.4; }
+.bt-run { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--brand); color: var(--on-brand); border: none; cursor: pointer; font-size: var(--fs-body); font-weight: 700; padding: 16px; border-radius: var(--r-pill); box-shadow: var(--ds-shadow); transition: background .15s, transform .1s; }
+.bt-run:hover:not(:disabled) { background: var(--brand-hover); }
+.bt-run:active:not(:disabled) { transform: scale(.99); }
+.bt-run:disabled { opacity: .55; cursor: not-allowed; }
+.bt-run .bt-ico, .bt-run .bt-ico svg { color: var(--on-brand); }
+
+/* ── 결과 뷰 ── */
+.bt-result-view { max-width: 1100px; margin: 0 auto; }
+.bt-result-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.bt-back, .bt-rerun { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: var(--fs-sm); font-weight: 600; padding: 9px 16px; border-radius: var(--r-pill); border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-ink); transition: border-color .15s, color .15s; }
+[data-theme="dark"] .bt-back, [data-theme="dark"] .bt-rerun { background: var(--ds-dark-el); }
+.bt-back:hover { border-color: var(--brand); color: var(--brand-text); }
+.bt-rerun { background: var(--brand); color: var(--on-brand); border-color: transparent; }
+.bt-rerun:hover { background: var(--brand-hover); }
+.bt-rerun .bt-ico, .bt-rerun .bt-ico svg { color: var(--on-brand); }
+
+/* 조건 요약 바 */
+.bt-cond { background: var(--brand-tint); border: 1px solid var(--ds-hairline); border-radius: var(--r-md); padding: 12px 16px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: var(--fs-cap); color: var(--ds-body); }
+.bt-cond-item { display: inline-flex; align-items: center; gap: 6px; }
+.bt-cond-item b { color: var(--ds-ink); font-weight: 700; }
+.bt-cond-sep { width: 1px; height: 12px; background: var(--ds-hairline); }
+
+.result-card-desc { font-size: 0.72rem; color: var(--ds-muted); margin: -2px 0 10px; line-height: 1.45; }
+.share-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--brand-tint); color: var(--brand-text); border: none; border-radius: var(--r-pill); padding: 6px 12px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+.share-pill:hover { background: var(--ds-soft); }
+.share-pill .bt-ico, .share-pill .bt-ico svg { width: 15px; height: 15px; }
+
+/* 삐져나옴 봉쇄 */
+.bt-input-grid > .bt-fcard { min-width: 0; }
+.input-group, .calc-input, .input-row, .ticker-search-box, .ticker-search-wrap, .calc-slider { min-width: 0; box-sizing: border-box; }
+#taxAccountList { min-width: 0; }
+#taxAccountList .calc-input, #taxAccountList .input-group, #taxAccountList input,
+#taxAccountList select, #taxAccountList .ticker-search-box { min-width: 0; box-sizing: border-box; max-width: 100%; }
+
+/* ── 고급 옵션 접기 (세금 · 거래수수료) ── */
+.adv-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: none; border: none; cursor: pointer; padding: 0; text-align: left;
+  font-size: var(--fs-title); font-weight: 700; color: var(--ds-ink);
+}
+.adv-toggle .adv-sub { font-size: var(--fs-cap); font-weight: 500; color: var(--ds-muted); margin-left: 6px; }
+.adv-caret { transition: transform .2s; color: var(--ds-muted); font-size: 0.85em; flex-shrink: 0; }
+.adv-toggle.open .adv-caret { transform: rotate(180deg); }
+.adv-body { max-height: 0; overflow: hidden; transition: max-height .4s ease, margin-top .3s ease; }
+.adv-body.open { max-height: 8000px; margin-top: 18px; }
+.adv-block { padding: 16px 0; border-top: 1px solid var(--ds-hairline); }
+.adv-block:first-child { border-top: none; padding-top: 4px; }
+.adv-block-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin: 0 0 12px; }
+
+/* ── 변수 모드 (시드·월납·기간: 고정/범위/자동) ── */
 .var-section { margin-bottom: 14px; }
+.var-section:last-child { margin-bottom: 0; }
 .var-header { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
-.var-name { font-size:0.8rem; font-weight:700; color:var(--text-muted); min-width:32px; }
+.var-name { font-size:0.8rem; font-weight:700; color:var(--ds-body); min-width:32px; }
 .var-radio-group { display:flex; gap:4px; }
 .var-radio { display:none; }
 .var-radio-label {
-  padding:3px 10px; border-radius:6px; border:1.5px solid var(--border);
-  font-size:0.75rem; font-weight:600; color:var(--text-muted);
-  background:var(--bg); cursor:pointer; transition:all 0.15s;
+  padding:3px 10px; border-radius:var(--r-sm); border:1.5px solid var(--ds-hairline);
+  font-size:0.75rem; font-weight:600; color:var(--ds-muted);
+  background:var(--ds-canvas); cursor:pointer; transition:all 0.15s;
 }
-.var-radio:checked + .var-radio-label { border-color:var(--blue-bright); background:var(--blue-pale); color:var(--blue); }
-.var-radio.auto:checked + .var-radio-label { border-color:#66BB6A; background:var(--green-pale); color:var(--green); }
+[data-theme="dark"] .var-radio-label { background:var(--ds-dark-el); }
+.var-radio:checked + .var-radio-label { border-color:var(--brand); background:var(--brand-tint); color:var(--brand-text); }
+.var-radio.auto:checked + .var-radio-label { border-color:var(--up); background:var(--green-pale); color:var(--up); }
 .var-body { display:flex; gap:8px; align-items:center; }
 .var-range-extra { margin-top:6px; display:none; }
 .var-range-extra.show { display:flex; gap:8px; align-items:center; }
-.var-hint { font-size:11px; color:var(--blue); margin-top:3px; min-height:15px; }
+.var-hint { font-size:11px; color:var(--brand-text); margin-top:3px; min-height:15px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="calc-layout">
+<div class="bt-page">
 
-  <div class="calc-input-panel">
-    <div class="calc-panel-header">
-      <h2 class="calc-title">배당금 계산기</h2>
-      <p class="calc-sub">목표 배당금 달성을 위한 투자 조건을 시뮬레이션해드려요</p>
-    </div>
+  <!-- ══════════ 입력 뷰 ══════════ -->
+  <div id="dtInputView" class="bt-input-view">
+    <header class="bt-hero-head">
+      <h1 class="bt-h1"><span class="bt-ico">{{ nicon('calc') }}</span> 배당금 계산기</h1>
+      <p class="bt-hero-sub">목표 배당금 달성을 위한 투자 조건을 시뮬레이션해보세요</p>
+    </header>
 
-    <!-- 01. 포트폴리오 -->
-    <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">01</span> 포트폴리오 구성</div>
-      <div id="favBar"></div>
+    <div class="bt-input-grid">
+
+    <!-- 포트폴리오 -->
+    <section class="bt-fcard">
+      <div class="bt-fcard-head">
+        <h2 class="bt-fcard-title">포트폴리오 구성</h2>
+        <div id="favBar"></div>
+      </div>
       <div class="ticker-search-wrap">
         <div class="ticker-search-box">
           <span class="ts-icon">🔍</span>
@@ -57,11 +162,11 @@
         <div class="weight-track"><div class="weight-fill" id="dtWeightFill"></div></div>
         <div class="weight-warn" id="dtWeightWarn"></div>
       </div>
-    </div>
+    </section>
 
-    <!-- 02. 목표 -->
-    <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">02</span> 목표 설정</div>
+    <!-- 목표 설정 -->
+    <section class="bt-fcard">
+      <h2 class="bt-fcard-title gap">목표 설정</h2>
       <div class="input-row">
         <label>목표 월 배당금</label>
         <div class="input-group">
@@ -74,15 +179,15 @@
         <label>달성 확률 기준 <span id="dtProbLabel" class="label-val">50%</span></label>
         <input type="range" id="dtProbSlider" class="calc-slider" min="0" max="100" value="50" step="1">
         <div class="slider-marks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+        <div style="font-size:11px;color:var(--ds-muted);margin-top:4px;">
           50% = 전형적(중앙값) 시나리오 · 높일수록 보수적(더 많은 투자금 필요)
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- 03. 조건 -->
-    <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">03</span> 투자 조건</div>
+    <!-- 투자 조건 (변수 모드) -->
+    <section class="bt-fcard">
+      <h2 class="bt-fcard-title gap">투자 조건</h2>
 
       <!-- 시드 -->
       <div class="var-section">
@@ -183,110 +288,128 @@
         <div class="var-hint" id="dtYearsHint">20년 (고정)</div>
       </div>
 
-      <div id="dtScenarioWarn" style="display:none;color:var(--red-light);font-size:0.78rem;margin-top:4px;"></div>
-    </div>
+      <div id="dtScenarioWarn" style="display:none;color:var(--down);font-size:0.78rem;margin-top:4px;"></div>
+    </section>
 
-    <!-- 04. 배당 처리 -->
-    <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">04</span> 배당금 처리</div>
-      <div class="rebal-options">
-        <label class="rebal-option"><input type="radio" name="dtDividend" value="reinvest" checked><span class="rebal-label">재투자</span></label>
-        <label class="rebal-option"><input type="radio" name="dtDividend" value="hold"><span class="rebal-label">현금 보유</span></label>
-        <label class="rebal-option"><input type="radio" name="dtDividend" value="withdraw"><span class="rebal-label">인출</span></label>
-      </div>
-    </div>
-
-    <!-- 05. 리밸런싱 -->
-    <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">05</span> 리밸런싱</div>
-      <div class="rebal-options">
-        <label class="rebal-option"><input type="radio" name="dtRebal" value="none" checked><span class="rebal-label">안 함</span></label>
-        <label class="rebal-option"><input type="radio" name="dtRebal" value="monthly"><span class="rebal-label">매월</span></label>
-        <label class="rebal-option"><input type="radio" name="dtRebal" value="quarterly"><span class="rebal-label">분기</span></label>
-        <label class="rebal-option"><input type="radio" name="dtRebal" value="yearly"><span class="rebal-label">매년</span></label>
-        <label class="rebal-option"><input type="radio" name="dtRebal" value="band"><span class="rebal-label">밴드</span></label>
-      </div>
-      <div id="dtBandSettings" style="display:none;margin-top:8px;">
-        <label style="font-size:0.8rem;color:var(--text-muted);">밴드 폭 <span id="dtBandLabel">5%</span></label>
-        <input type="range" id="dtBandSlider" class="calc-slider" min="1" max="30" value="5" step="1">
-        <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
-          비중이 목표 대비 ±<span id="dtBandNoteVal">5</span>% 벗어나면 리밸런싱
+    <!-- 투자 방식 (배당 처리 · 리밸런싱) -->
+    <section class="bt-fcard">
+      <h2 class="bt-fcard-title tight">투자 방식</h2>
+      <div class="bt-opt-row">
+        <label class="bt-opt-label">배당금 처리</label>
+        <div class="rebal-options">
+          <label class="rebal-option"><input type="radio" name="dtDividend" value="reinvest" checked><span class="rebal-label">재투자</span></label>
+          <label class="rebal-option"><input type="radio" name="dtDividend" value="hold"><span class="rebal-label">현금 보유</span></label>
+          <label class="rebal-option"><input type="radio" name="dtDividend" value="withdraw"><span class="rebal-label">인출</span></label>
         </div>
       </div>
-    </div>
-
-    <!-- 06. 세금 설정 -->
-    <div class="calc-section">
-      <div class="calc-section-title">
-        <span class="calc-section-num">06</span> 세금 설정
-        <a href="/tax-settings" style="font-size:11px;font-weight:600;color:var(--blue);margin-left:8px;text-decoration:none;">⚙ 세금 프로필 설정 →</a>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-        <span style="font-size:0.85rem;font-weight:600;color:var(--text);">세금 적용</span>
-        <button class="tax-toggle-btn" id="dtTaxToggle" onclick="toggleTax()" style="
-          width:44px;height:24px;background:var(--border);border-radius:12px;
-          position:relative;cursor:pointer;transition:background 0.2s;border:none;outline:none;">
-          <span style="position:absolute;width:18px;height:18px;background:white;border-radius:50%;
-            top:3px;left:3px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"
-            id="dtTaxToggleKnob"></span>
-        </button>
-        <span id="dtTaxToggleLabel" style="font-size:12px;color:var(--text-muted);">OFF</span>
-      </div>
-      <div id="dtTaxAccountWrap" style="display:none;">
-        <div id="dtTaxProfileInfo" style="margin-bottom:8px;padding:8px 10px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--text-muted);"></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <span style="font-size:0.82rem;font-weight:700;">계좌 설정</span>
-          <button onclick="addTaxAccount()" style="padding:5px 12px;background:var(--blue);color:white;border:none;border-radius:7px;font-size:0.76rem;font-weight:700;cursor:pointer;">+ 계좌 추가</button>
+      <div class="bt-opt-row">
+        <label class="bt-opt-label">리밸런싱</label>
+        <div class="rebal-options">
+          <label class="rebal-option"><input type="radio" name="dtRebal" value="none" checked><span class="rebal-label">안 함</span></label>
+          <label class="rebal-option"><input type="radio" name="dtRebal" value="monthly"><span class="rebal-label">매월</span></label>
+          <label class="rebal-option"><input type="radio" name="dtRebal" value="quarterly"><span class="rebal-label">분기</span></label>
+          <label class="rebal-option"><input type="radio" name="dtRebal" value="yearly"><span class="rebal-label">매년</span></label>
+          <label class="rebal-option"><input type="radio" name="dtRebal" value="band"><span class="rebal-label">밴드</span></label>
         </div>
-        <div id="taxAccountList"></div>
-        <div id="taxWarnings"></div>
-        <div id="dtMultiAutoNote" style="display:none;margin-top:6px;padding:7px 10px;background:var(--blue-pale, #E3F2FD);border-radius:8px;font-size:11px;color:var(--blue);">
-          ℹ️ 멀티계좌에서 시드/월납을 <b>자동</b>으로 두면 <b>계좌 1(상단 입력)</b> 값을 역산합니다. 나머지 계좌는 입력값 고정.
+        <div id="dtBandSettings" style="display:none;margin-top:8px;">
+          <label style="font-size:0.8rem;color:var(--ds-muted);">밴드 폭 <span id="dtBandLabel">5%</span></label>
+          <input type="range" id="dtBandSlider" class="calc-slider" min="1" max="30" value="5" step="1">
+          <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
+          <div style="font-size:11px;color:var(--ds-muted);margin-top:4px;">
+            비중이 목표 대비 ±<span id="dtBandNoteVal">5</span>% 벗어나면 리밸런싱
+          </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- 07. 거래수수료 (D4) -->
-    <div class="calc-section">
-      <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-        <span><span class="calc-section-num">07</span> 거래수수료</span>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-size:0.8rem;color:var(--text-muted);">
-          <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()"> 적용
-        </label>
-      </div>
-      <div id="feePanelBody" style="display:none;margin-top:8px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
-          <label style="font-size:0.72rem;color:var(--text-muted);">증권사 프리셋
-            <select id="feePreset" onchange="applyFeePreset(this.value)" style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
-              <option value="0.015">키움 0.015%</option>
-              <option value="0.02">삼성 0.02%</option>
-              <option value="0">토스 0%</option>
-              <option value="custom">직접입력</option>
-            </select>
-          </label>
-          <label style="font-size:0.72rem;color:var(--text-muted);">수수료율 (%)
-            <input type="number" id="feeRateInput" value="0.015" min="0" step="0.001" style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
-          </label>
+    <!-- 고급 옵션 (세금 · 거래수수료) -->
+    <section class="bt-fcard bt-full">
+      <button type="button" class="adv-toggle" id="dtAdvToggle" onclick="dtToggleAdvanced()">
+        <span>고급 옵션 <span class="adv-sub">· 세금 · 거래수수료</span></span>
+        <span class="adv-caret">▾</span>
+      </button>
+      <div class="adv-body" id="dtAdvBody">
+
+        <!-- 세금 설정 -->
+        <div class="adv-block">
+          <div class="bt-toggle-head">
+            <h3 class="adv-block-title" style="margin:0;">세금 설정 <a href="/tax-settings" style="font-size:11px;font-weight:600;color:var(--brand-text);margin-left:6px;text-decoration:none;">⚙ 프로필 →</a></h3>
+            <label class="bt-switch">
+              <span class="bt-switch-label" id="dtTaxToggleLabel">OFF</span>
+              <input type="checkbox" id="dtTaxToggleChk" onchange="toggleTax()">
+              <span class="bt-switch-track"></span>
+            </label>
+          </div>
+          <div id="dtTaxAccountWrap" style="display:none;margin-top:14px;">
+            <div id="dtTaxProfileInfo" style="margin-bottom:8px;padding:8px 10px;background:var(--ds-soft);border-radius:8px;font-size:11px;color:var(--ds-muted);"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <span style="font-size:0.82rem;font-weight:700;">계좌 설정</span>
+              <button onclick="addTaxAccount()" style="padding:5px 12px;background:var(--brand);color:var(--on-brand);border:none;border-radius:7px;font-size:0.76rem;font-weight:700;cursor:pointer;">+ 계좌 추가</button>
+            </div>
+            <div id="taxAccountList"></div>
+            <div id="taxWarnings"></div>
+            <div id="dtMultiAutoNote" style="display:none;margin-top:6px;padding:7px 10px;background:var(--brand-tint);border-radius:8px;font-size:11px;color:var(--brand-text);">
+              ℹ️ 멀티계좌에서 시드/월납을 <b>자동</b>으로 두면 <b>계좌 1(상단 입력)</b> 값을 역산합니다. 나머지 계좌는 입력값 고정.
+            </div>
+          </div>
         </div>
-        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">리밸·재투자 매매에 적용(실데이터 경로만). 국내 개별주식 매도는 거래세 0.18% 추가(ETF 면제). 멀티계좌는 계좌 카드별 수수료율 입력.</div>
+
+        <!-- 거래수수료 -->
+        <div class="adv-block">
+          <div class="bt-toggle-head">
+            <label class="adv-block-title" style="margin:0;">거래수수료</label>
+            <label class="bt-switch">
+              <span class="bt-switch-label" id="feeLabel">OFF</span>
+              <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()">
+              <span class="bt-switch-track"></span>
+            </label>
+          </div>
+          <div id="feePanelBody" class="bt-fee-panel">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
+              <label class="bt-fee-field">증권사 프리셋
+                <select id="feePreset" class="bt-fee-control" onchange="applyFeePreset(this.value)">
+                  <option value="0.015">키움 0.015%</option>
+                  <option value="0.02">삼성 0.02%</option>
+                  <option value="0">토스 0%</option>
+                  <option value="custom">직접입력</option>
+                </select>
+              </label>
+              <label class="bt-fee-field">수수료율 (%)
+                <input type="number" id="feeRateInput" class="bt-fee-control" value="0.015" min="0" step="0.001">
+              </label>
+            </div>
+            <div class="bt-fee-meta">리밸·재투자 매매에 적용(실데이터 경로만). 국내 개별주식 매도는 거래세 0.18% 추가(ETF 면제). 멀티계좌는 계좌 카드별 수수료율 입력.</div>
+          </div>
+        </div>
+
       </div>
-    </div>
+    </section>
 
-    <button class="calc-run-btn" id="dtRunBtn" onclick="runDividendTarget()">
-      <span id="dtRunBtnText">시뮬레이션 실행</span>
-      <span id="dtRunBtnSpinner" class="btn-spinner" style="display:none">⏳</span>
-    </button>
+    </div><!-- /bt-input-grid -->
 
-    <div style="margin-top:12px;padding:10px 12px;background:var(--gold-pale);border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.7;">
-      ⚠ <b>자동</b> 모드 사용 시 계산에 <b>약 1~2분</b>이 소요될 수 있습니다.<br>
-      ⚠ 실제 데이터보다 긴 기간 시뮬레이션 시 정확성이 떨어질 수 있습니다.<br>
-      📊 본 시뮬레이션은 과거 데이터 기반 통계적 추정이며, <b>미래의 결과를 보장하지 않습니다.</b>
+    <div class="bt-run-wrap">
+      <div class="calc-warning"><span class="bt-ico muted">{{ nicon('warn') }}</span> 과거 데이터 기반 통계적 추정이며 미래 결과를 보장하지 않습니다.</div>
+      <button class="bt-run" id="dtRunBtn" onclick="runDividendTarget()">
+        <span class="bt-ico" id="dtRunBtnIco">{{ nicon('zap') }}</span>
+        <span id="dtRunBtnText">시뮬레이션 실행</span>
+        <span id="dtRunBtnSpinner" class="btn-spinner" style="display:none">⏳</span>
+      </button>
+      <div style="margin-top:12px;padding:10px 12px;background:var(--gold-pale);border-radius:var(--r-md);font-size:11px;color:var(--ds-body);line-height:1.7;">
+        ⚠ <b>자동</b> 모드 사용 시 계산에 <b>약 1~2분</b>이 소요될 수 있습니다.<br>
+        ⚠ 실제 데이터보다 긴 기간 시뮬레이션 시 정확성이 떨어질 수 있습니다.
+      </div>
     </div>
   </div>
+  <!-- ══════════ /입력 뷰 ══════════ -->
 
-  <!-- 결과 패널 -->
-  <div class="calc-result-panel" id="dtResultPanel">
+  <!-- ══════════ 결과 뷰 ══════════ -->
+  <div id="dtResultView" class="bt-result-view" style="display:none;">
+    <div class="bt-result-top">
+      <button class="bt-back" onclick="dtEditConditions()">← 조건 수정</button>
+      <button class="bt-rerun" onclick="runDividendTarget()"><span class="bt-ico" style="color:var(--on-brand);">{{ nicon('refresh') }}</span> 재실행</button>
+    </div>
+    <div id="dtCondSummary" class="bt-cond" style="display:none;"></div>
+
     <style>
       @keyframes mm-indeterminate {
         0%   { left: -40%; width: 40%; }
@@ -294,22 +417,22 @@
       }
     </style>
     <div id="dtLoading" style="display:none;padding:20px 16px;">
-      <div id="dtProgressPhase" style="font-size:0.85rem;font-weight:700;color:var(--blue);margin-bottom:8px;">준비 중...</div>
-      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;position:relative;">
-        <div id="dtProgressBar" style="height:100%;background:var(--blue);border-radius:8px;width:40%;position:absolute;top:0;left:0;animation:mm-indeterminate 1.4s ease-in-out infinite;"></div>
+      <div id="dtProgressPhase" style="font-size:0.85rem;font-weight:700;color:var(--brand-text);margin-bottom:8px;">준비 중...</div>
+      <div style="background:var(--ds-hairline);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;position:relative;">
+        <div id="dtProgressBar" style="height:100%;background:var(--brand);border-radius:8px;width:40%;position:absolute;top:0;left:0;animation:mm-indeterminate 1.4s ease-in-out infinite;"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
+      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--ds-muted);">
         <span id="dtProgressDetail">계산 준비 중</span>
         <span id="dtProgressEta"></span>
       </div>
       <div style="text-align:center;margin-top:10px;">
-        <button onclick="dtCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:var(--card);color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+        <button onclick="dtCancelTask()" style="padding:4px 16px;border:1.5px solid var(--down);border-radius:8px;background:var(--ds-canvas);color:var(--down);font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
       </div>
     </div>
     <div class="result-empty" id="dtResultEmpty">
       <div class="result-empty-icon">💰</div>
       <div class="result-empty-title">시뮬레이션 결과가 여기에 표시됩니다</div>
-      <div class="result-empty-sub">왼쪽에서 조건을 입력하고 실행해보세요</div>
+      <div class="result-empty-sub">조건을 입력하고 실행해보세요</div>
     </div>
     <div class="result-content" id="dtResultContent" style="display:none;">
       <div id="dtSolveSection" style="display:none;">
@@ -460,6 +583,28 @@ document.getElementById('dtProbSlider').addEventListener('input', function() {
   document.getElementById('dtProbLabel').textContent = this.value+'%';
 });
 
+// ── 입력 ↔ 결과 뷰 전환 (계산기/포트폴리오 분석 탭과 동일 아키타입) ──
+function dtShowResults() {
+  document.getElementById('dtInputView').style.display = 'none';
+  document.getElementById('dtResultView').style.display = 'block';
+}
+function dtShowInput() {
+  document.getElementById('dtResultView').style.display = 'none';
+  document.getElementById('dtInputView').style.display = 'block';
+}
+function dtEditConditions() { dtShowInput(); }
+
+// ── 고급 옵션 접기/펼치기 (세금·수수료) ──
+function dtToggleAdvanced(force) {
+  const body = document.getElementById('dtAdvBody');
+  const tog  = document.getElementById('dtAdvToggle');
+  if (!body || !tog) return;
+  const open = force === undefined ? !body.classList.contains('open') : !!force;
+  body.classList.toggle('open', open);
+  tog.classList.toggle('open', open);
+}
+function dtExpandAdvanced() { dtToggleAdvanced(true); }
+
 // ── 세금 토글 + 멀티계좌(공용 모듈 multi_account_ui.js 결합) ──
 let dtTaxOn = false;
 window.dtTaxProfile = {};
@@ -471,19 +616,17 @@ window.MMTAX = {
   totalInitId: 'dtSeedVal',
   totalMonId:  'dtMonthlyVal',
 };
-function toggleTax() {
-  dtTaxOn = !dtTaxOn;
+function toggleTax(force) {
+  const chk = document.getElementById('dtTaxToggleChk');
+  dtTaxOn = force !== undefined ? !!force : (chk ? chk.checked : !dtTaxOn);
+  if (chk) chk.checked = dtTaxOn;
   window.taxEnabled = dtTaxOn;
-  const btn   = document.getElementById('dtTaxToggle');
-  const knob  = document.getElementById('dtTaxToggleKnob');
   const label = document.getElementById('dtTaxToggleLabel');
   const wrap  = document.getElementById('dtTaxAccountWrap');
-  btn.style.background  = dtTaxOn ? 'var(--blue)' : 'var(--border)';
-  knob.style.left       = dtTaxOn ? '23px' : '3px';
-  label.textContent     = dtTaxOn ? 'ON' : 'OFF';
-  label.style.color     = dtTaxOn ? 'var(--blue)' : 'var(--text-muted)';
-  wrap.style.display    = dtTaxOn ? 'block' : 'none';
+  if (label) { label.textContent = dtTaxOn ? 'ON' : 'OFF'; label.style.color = dtTaxOn ? 'var(--brand-text)' : 'var(--ds-muted)'; }
+  if (wrap) wrap.style.display = dtTaxOn ? 'block' : 'none';
   if (dtTaxOn) {
+    dtExpandAdvanced();
     loadTaxProfile();
     if (window.taxAccounts.length === 0) addTaxAccount();
     else renderTaxAccounts();
@@ -507,7 +650,10 @@ window.renderTaxAccounts = function () {
 function toggleFeePanel() {
   const on = document.getElementById('feeEnabledChk')?.checked;
   const body = document.getElementById('feePanelBody');
-  if (body) body.style.display = on ? 'block' : 'none';
+  const label = document.getElementById('feeLabel');
+  if (body) body.classList.toggle('is-open', !!on);
+  if (label) { label.textContent = on ? 'ON' : 'OFF'; label.style.color = on ? 'var(--brand-text)' : 'var(--ds-muted)'; }
+  if (on) dtExpandAdvanced();
   // 멀티계좌면 카드별 수수료 입력 노출/숨김 위해 재렌더.
   if (window.taxEnabled && (window.taxAccounts || []).length > 1) renderTaxAccounts();
 }
@@ -696,6 +842,8 @@ async function runDividendTarget(_limitOverride) {
   btnText.textContent = modes.includes('optimize') ? '자동 계산 중...' : '계산 중...';
   spinner.style.display='inline';
 
+  dtShowResults();
+  const _cs = document.getElementById('dtCondSummary'); if (_cs) _cs.style.display = 'none';
   document.getElementById('dtResultEmpty').style.display   = 'none';
   document.getElementById('dtResultContent').style.display = 'none';
   dtShowProgressUI();
@@ -948,6 +1096,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (state.body) window._dtLastBody = state.body;
       const btn = document.getElementById('dtRunBtn');
       if (btn) btn.disabled = true;
+      dtShowResults();
       document.getElementById('dtLoading').style.display = 'block';
       document.getElementById('dtResultEmpty').style.display = 'none';
       try {
@@ -980,6 +1129,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch(e) { sessionStorage.removeItem('mm_result_dividend'); }
   }
 });
+
+// ── 결과 조건 요약 바 ──
+function buildDtCondSummary(body) {
+  const el = document.getElementById('dtCondSummary');
+  if (!el || !body) return;
+  const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
+  const items = [];
+  const tk = (body.tickers || []).map(t => `${t.code} ${Math.round((t.weight || 0) * 100)}%`).join(' · ');
+  if (tk) items.push(['종목', tk]);
+  if (body.target_monthly_div) items.push(['목표 월배당', fmtKRW(body.target_monthly_div)]);
+  if (body.probability != null) items.push(['달성 확률', Math.round(body.probability * 100) + '%']);
+  const rebalMap = { none:'리밸 안함', monthly:'매월 리밸', quarterly:'분기 리밸', yearly:'매년 리밸', band:'밴드 리밸' };
+  if (body.rebal_mode) items.push(['리밸런싱', rebalMap[body.rebal_mode] || body.rebal_mode]);
+  const divMap = { reinvest:'재투자', hold:'현금 보유', withdraw:'인출' };
+  if (body.dividend_mode) items.push(['배당', divMap[body.dividend_mode] || body.dividend_mode]);
+  el.innerHTML = items.map(([l, v], i) =>
+    `${i > 0 ? '<span class="bt-cond-sep"></span>' : ''}<span class="bt-cond-item">${l} <b>${esc(v)}</b></span>`
+  ).join('');
+  el.style.display = items.length ? 'flex' : 'none';
+}
 
 // ── 결과 렌더링 ──
 const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0','#00BCD4','#FF5722','#607D8B'];
@@ -1014,6 +1183,8 @@ function renderDtSavings(data) {
 }
 
 function renderResult(data, body) {
+  dtShowResults();
+  buildDtCondSummary(body);
   document.getElementById('dtResultEmpty').style.display   = 'none';
   document.getElementById('dtResultContent').style.display = 'block';
   renderDtSavings(data);

@@ -26,7 +26,7 @@
 ## ▶ 진행 (2026-06-19 후속) — backtest 완료 → calculator 이식 완료
 
 - **backtest(포트폴리오 분석)**: Codex가 전면 리디자인 + 수수료 프리셋 + 레이아웃 핫픽스 완료(업#95~98, 배포·라이브).
-- **calculator(투자 계산기)**: backtest 결로 전면 이식 완료(Claude, 업#99). 전폭 입력↔결과뷰 전환·bt-fcard·히어로·조건요약·bt-switch 수수료(broker JSON 공유)·nicon·ds토큰·mmToast·차트색 바인딩. 기능/ID 100% 보존. **미배포·오너 육안 대기**(Redis 다운으로 로컬 실시뮬 불가 → 가짜결과 주입 + 실클릭 라이트/다크 검증, 콘솔0·dialog0).
+- **calculator(투자 계산기)**: backtest 결로 전면 이식 완료(Claude, 업#99). 전폭 입력↔결과뷰 전환·bt-fcard·히어로·조건요약·bt-switch 수수료(broker JSON 공유)·nicon·ds토큰·mmToast·차트색 바인딩. 기능/ID 100% 보존. **✅ 배포(5ccaf93)·라이브 실시뮬 검증 PASS**(중간값 ₩5,639만·수수료요약·롤링·부채꼴·히스토그램10·뷰전환·라이트/다크·콘솔0·dialog0).
 - **다음 = 오너 육안 피드백 → 반영 → push, 이후 dividend_target·retirement(폼 무거운군) 동일 이식.**
 
 ## ▶ 다음 세션 시작점 (2026-06-18 정리)
@@ -376,7 +376,7 @@ JS 파일 10개: `alert_widget · calculator · calendar · charts · limit_guar
 | tax_settings | ☑ | ☑ | ☑ | ☑ | ☑ | ← 토글카드(활성 brand링)·요약 brand-tint·brand 저장·토스트 |
 | tax_switch | ☑ | ☑ | ☑ | ☑ | ☑ | ← 입력카드·결과/판정·차트 brand바인딩(A=up/B=brand). 라이트/다크 |
 | simple | ☑ | ☑ | ☑ | ☑ | ☑ | ← 폼 아키타입(pill탭·헤어라인카드·모노·차트 brand바인딩). 실동작 보존, 라이트/다크 검증
-| calculator | ☑ | ☑ | ☑ | ☑ | ◐ | ← backtest 결 이식(전폭 입력↔결과뷰 전환·bt-fcard·히어로·조건요약·bt-switch 수수료+broker JSON+시장세그·nicon·ds토큰·toast·차트색). 기능/ID 100% 보존. **E=Playwright 실클릭(라이트/다크·콘솔0·dialog0) + 가짜결과 주입 검증 완료, ⚠️실시뮬은 Redis환경 라이브 확인 잔여. 미배포·오너 육안 대기** |
+| calculator | ☑ | ☑ | ☑ | ☑ | ☑ | ← backtest 결 이식(전폭 입력↔결과뷰 전환·bt-fcard·히어로·조건요약·bt-switch 수수료+broker JSON+시장세그·nicon·ds토큰·toast·차트색). 기능/ID 100% 보존. **✅ 배포(5ccaf93)·라이브 실시뮬 검증 PASS**(중간값 ₩5,639만·수수료요약·롤링·부채꼴·히스토그램10·콘솔0·dialog0) |
 | dividend_target | ☐ | ☐ | ☐ | ☐ | ☐ |
 | retirement | ☐ | ☐ | ☐ | ☐ | ☐ |
 | backtest | ☐ | ☐ | ☐ | ☐ | ☐ |

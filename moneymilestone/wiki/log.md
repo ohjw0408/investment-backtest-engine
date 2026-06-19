@@ -12,7 +12,7 @@
 - **아이콘/토큰/토스트/차트색**: 이모지 전면 nicon, 레거시토큰→ds, `alert()` 7곳→`mmToast`, 롤링 green/red→`--up/--down`·부채꼴 blue→`--brand` 바인딩(`_ccCss/_ccRgba`).
 - **보존**: 모든 입력 ID·계산 로직·API·multi_account_ui/portfolio_favorites/limit_guard 배선·결과 카드(롤링·부채꼴·기여도·히스토그램10·분할매도·ISA캡·중도해지 배너) 100% 그대로. 캐시 `?v=20260619ds`.
 - **검증**: `node --check` OK + 로컬서버+mint_session+Playwright 실클릭(라이트/다크). ⚠️ Redis 다운으로 실제 시뮬은 못 돌려 **가짜 결과 주입**으로 결과뷰 렌더 확인. 통과: 입력뷰 5카드·검색 20건·2종목 비중100%·밴드토글·수수료 ON+프리셋9옵션+미국주식 0.25%+meta·세금 ON+계좌1·결과뷰 전환·히어로 ₩3억(computed color = `--ds-ink` #0a0b0d)·조건요약·롤링·히스토그램10·뒤로가기·**콘솔에러0·네이티브dialog0**.
-- **미배포** — 오너 육안 승인 후 push. 실 시뮬 라이브 확인(Redis 환경)도 필요. 다음 = 오너 피드백 → dividend_target·retirement 동일 이식.
+- **✅ 배포(5ccaf93)·푸시·라이브 실시뮬 검증 완료** — moneymilestone.duckdns.org/calculator 실 시뮬(SPY/TLT 50:50·5년·수수료 ON): 히어로 중간값 ₩5,639만·비관 4,365만·낙관 8,251만, 조건요약(수수료 국내주식 0.015%), 롤링·부채꼴·기여도·히스토그램10·총수수료 요약, 입력↔결과 전환·뒤로가기·라이트/다크, 콘솔에러0·네이티브dialog0. (로컬은 Redis 다운으로 가짜주입만 했으나 라이브서 실 celery 흐름 확인.) 다음 = dividend_target·retirement 동일 이식.
 
 _작성: Claude_
 

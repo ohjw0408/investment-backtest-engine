@@ -212,7 +212,10 @@
 
     <!-- 투자 조건 (변수 모드) -->
     <section class="bt-fcard dt-cond-card">
-      <h2 class="bt-fcard-title gap">투자 조건</h2>
+      <h2 class="bt-fcard-title">투자 조건</h2>
+      <div style="font-size:11px;color:var(--ds-muted);line-height:1.7;margin:6px 0 16px;">
+        <b style="color:var(--brand-text);">단일</b> 값 하나로 계산 · <b style="color:var(--brand-text);">다중</b> 여러 값을 펼쳐 비교 · <b style="color:var(--up);">역산</b> 목표 달성에 필요한 최소값 자동 계산
+      </div>
 
       <!-- 시드 -->
       <div class="var-section">
@@ -220,11 +223,11 @@
           <span class="var-name">시드</span>
           <div class="var-radio-group">
             <input class="var-radio" type="radio" name="seedMode" id="seedFixed"  value="fixed"   checked>
-            <label class="var-radio-label" for="seedFixed">고정</label>
+            <label class="var-radio-label" for="seedFixed">단일</label>
             <input class="var-radio" type="radio" name="seedMode" id="seedRange"  value="explore">
-            <label class="var-radio-label" for="seedRange">범위</label>
+            <label class="var-radio-label" for="seedRange">다중</label>
             <input class="var-radio auto" type="radio" name="seedMode" id="seedAuto" value="optimize">
-            <label class="var-radio-label" for="seedAuto">자동</label>
+            <label class="var-radio-label" for="seedAuto">역산</label>
           </div>
         </div>
         <div class="var-body">
@@ -253,11 +256,11 @@
           <span class="var-name">월납</span>
           <div class="var-radio-group">
             <input class="var-radio" type="radio" name="monthlyMode" id="monthlyFixed"  value="fixed" checked>
-            <label class="var-radio-label" for="monthlyFixed">고정</label>
+            <label class="var-radio-label" for="monthlyFixed">단일</label>
             <input class="var-radio" type="radio" name="monthlyMode" id="monthlyRange"  value="explore">
-            <label class="var-radio-label" for="monthlyRange">범위</label>
+            <label class="var-radio-label" for="monthlyRange">다중</label>
             <input class="var-radio auto" type="radio" name="monthlyMode" id="monthlyAuto" value="optimize">
-            <label class="var-radio-label" for="monthlyAuto">자동</label>
+            <label class="var-radio-label" for="monthlyAuto">역산</label>
           </div>
         </div>
         <div class="var-body">
@@ -286,11 +289,11 @@
           <span class="var-name">기간</span>
           <div class="var-radio-group">
             <input class="var-radio" type="radio" name="yearsMode" id="yearsFixed"  value="fixed" checked>
-            <label class="var-radio-label" for="yearsFixed">고정</label>
+            <label class="var-radio-label" for="yearsFixed">단일</label>
             <input class="var-radio" type="radio" name="yearsMode" id="yearsRange"  value="explore">
-            <label class="var-radio-label" for="yearsRange">범위</label>
+            <label class="var-radio-label" for="yearsRange">다중</label>
             <input class="var-radio auto" type="radio" name="yearsMode" id="yearsAuto" value="optimize">
-            <label class="var-radio-label" for="yearsAuto">자동</label>
+            <label class="var-radio-label" for="yearsAuto">역산</label>
           </div>
         </div>
         <div class="var-body">
@@ -374,7 +377,7 @@
             <div id="taxAccountList"></div>
             <div id="taxWarnings"></div>
             <div id="dtMultiAutoNote" style="display:none;margin-top:6px;padding:7px 10px;background:var(--brand-tint);border-radius:8px;font-size:11px;color:var(--brand-text);">
-              ℹ️ 멀티계좌에서 시드/월납을 <b>자동</b>으로 두면 <b>계좌 1(상단 입력)</b> 값을 역산합니다. 나머지 계좌는 입력값 고정.
+              ℹ️ 멀티계좌에서 시드/월납을 <b>역산</b>으로 두면 <b>계좌 1(상단 입력)</b> 값을 역산합니다. 나머지 계좌는 입력값 고정.
             </div>
           </div>
         </div>
@@ -802,7 +805,7 @@ function updateHint(v) {
 
   const center = parseFloat(document.getElementById(`dt${cap}Val`).value)||0;
   if (mode === 'fixed') {
-    hint.textContent = '→ ' + (unit==='년' ? center+'년' : fmtKRW(center)) + ' (고정)';
+    hint.textContent = '→ ' + (unit==='년' ? center+'년' : fmtKRW(center)) + ' (단일)';
   } else {
     const step = parseFloat(document.getElementById(`dt${cap}Step`).value)||0;
     const n    = parseInt(document.getElementById(`dt${cap}N`).value)||0;
@@ -832,8 +835,8 @@ function validateModes() {
   const rangeCnt = modes.filter(m=>m==='explore').length;
   const autoCnt  = modes.filter(m=>m==='optimize').length;
   const warn = document.getElementById('dtScenarioWarn');
-  if (rangeCnt > 2) { warn.style.display='block'; warn.textContent='⚠ 범위 변수는 최대 2개입니다.'; }
-  else if (autoCnt > 1) { warn.style.display='block'; warn.textContent='⚠ 자동 변수는 최대 1개입니다.'; }
+  if (rangeCnt > 2) { warn.style.display='block'; warn.textContent='⚠ 다중 변수는 최대 2개입니다.'; }
+  else if (autoCnt > 1) { warn.style.display='block'; warn.textContent='⚠ 역산 변수는 최대 1개입니다.'; }
   else warn.style.display='none';
 }
 
@@ -857,8 +860,8 @@ async function runDividendTarget(_limitOverride) {
   if (dtTickers.reduce((s,t)=>s+t.weight,0) !== 100) { alert('비중 합계가 100%여야 해요.'); return; }
 
   const modes = ['seed','monthly','years'].map(getMode);
-  if (modes.filter(m=>m==='explore').length > 2) { alert('범위 변수는 최대 2개입니다.'); return; }
-  if (modes.filter(m=>m==='optimize').length > 1) { alert('자동 변수는 최대 1개입니다.'); return; }
+  if (modes.filter(m=>m==='explore').length > 2) { alert('다중 변수는 최대 2개입니다.'); return; }
+  if (modes.filter(m=>m==='optimize').length > 1) { alert('역산 변수는 최대 1개입니다.'); return; }
 
   const btn=document.getElementById('dtRunBtn');
   const btnText=document.getElementById('dtRunBtnText');

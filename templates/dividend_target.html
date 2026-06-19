@@ -12,11 +12,36 @@
 .bt-ico, .bt-ico svg { width: 1.05em; height: 1.05em; vertical-align: -0.16em; color: var(--brand); display: inline-block; }
 .bt-ico.muted, .bt-ico.muted svg { color: var(--ds-muted); }
 
-/* ── 입력 뷰 (배당 계산기는 세로 스택) ── */
+/* ── 입력 뷰 (계산기 탭과 동일 2열 블록 그리드) ── */
 .bt-input-view { max-width: 1120px; margin: 0 auto; }
-.bt-input-grid { display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
-.bt-input-grid > .bt-fcard { margin-bottom: 0; }
-.bt-full { width: 100%; }
+.bt-input-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "assets assets"
+    "goal method"
+    "cond cond"
+    "advanced advanced";
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+/* 2열 카드만 동일높이 stretch (adv는 제외 — max-height 슬라이드와 flex 충돌 방지) */
+.dt-goal-card, .dt-method-card { display: flex; flex-direction: column; }
+.bt-input-grid > .bt-fcard { margin-bottom: 0; min-width: 0; }
+.bt-full { grid-column: 1 / -1; }
+.dt-assets-card { grid-area: assets; }
+.dt-goal-card { grid-area: goal; }
+.dt-method-card { grid-area: method; }
+.dt-cond-card { grid-area: cond; }
+.dt-adv-card { grid-area: advanced; }
+@media (max-width: 900px) {
+  .bt-input-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: "assets" "goal" "method" "cond" "advanced";
+  }
+  .bt-full { grid-column: auto; }
+}
 .bt-hero-head { text-align: center; margin-bottom: 28px; }
 .bt-h1 { font-size: var(--fs-h1); font-weight: 800; color: var(--ds-ink); letter-spacing: -0.02em; margin: 0 0 6px; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .bt-hero-sub { font-size: var(--fs-sm); color: var(--ds-body); margin: 0; }
@@ -139,7 +164,7 @@
     <div class="bt-input-grid">
 
     <!-- 포트폴리오 -->
-    <section class="bt-fcard">
+    <section class="bt-fcard dt-assets-card">
       <div class="bt-fcard-head">
         <h2 class="bt-fcard-title">포트폴리오 구성</h2>
         <div id="favBar"></div>
@@ -165,7 +190,7 @@
     </section>
 
     <!-- 목표 설정 -->
-    <section class="bt-fcard">
+    <section class="bt-fcard dt-goal-card">
       <h2 class="bt-fcard-title gap">목표 설정</h2>
       <div class="input-row">
         <label>목표 월 배당금</label>
@@ -186,7 +211,7 @@
     </section>
 
     <!-- 투자 조건 (변수 모드) -->
-    <section class="bt-fcard">
+    <section class="bt-fcard dt-cond-card">
       <h2 class="bt-fcard-title gap">투자 조건</h2>
 
       <!-- 시드 -->
@@ -292,7 +317,7 @@
     </section>
 
     <!-- 투자 방식 (배당 처리 · 리밸런싱) -->
-    <section class="bt-fcard">
+    <section class="bt-fcard dt-method-card">
       <h2 class="bt-fcard-title tight">투자 방식</h2>
       <div class="bt-opt-row">
         <label class="bt-opt-label">배당금 처리</label>
@@ -323,7 +348,7 @@
     </section>
 
     <!-- 고급 옵션 (세금 · 거래수수료) -->
-    <section class="bt-fcard bt-full">
+    <section class="bt-fcard bt-full dt-adv-card">
       <button type="button" class="adv-toggle" id="dtAdvToggle" onclick="dtToggleAdvanced()">
         <span>고급 옵션 <span class="adv-sub">· 세금 · 거래수수료</span></span>
         <span class="adv-caret">▾</span>

@@ -76,9 +76,9 @@
 .bt-switch input:checked + .bt-switch-track { background: var(--brand); }
 .bt-switch input:checked + .bt-switch-track::after { transform: translateX(20px); }
 
-.bt-fee-panel { display: none; margin-top: 12px; padding: 12px; background: var(--ds-soft); border: 1px solid var(--ds-hairline); border-radius: var(--r-md); }
+.bt-fee-panel { max-height: 0; overflow: hidden; margin-top: 0; padding: 0 12px; background: var(--ds-soft); border: 1px solid transparent; border-radius: var(--r-md); transition: max-height .35s ease, margin-top .3s ease, padding .3s ease, border-color .3s ease; }
 [data-theme="dark"] .bt-fee-panel { background: var(--ds-strong); }
-.bt-fee-panel.is-open { display: block; }
+.bt-fee-panel.is-open { max-height: 1200px; margin-top: 12px; padding: 12px; border-color: var(--ds-hairline); }
 .bt-fee-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: end; }
 .bt-fee-field { min-width: 0; display: block; font-size: var(--fs-cap); font-weight: 600; color: var(--ds-muted); }
 .bt-fee-field > span { display: block; margin-bottom: 6px; }
@@ -361,7 +361,7 @@
             </label>
           </div>
 
-          <div id="taxPanel" style="display:none;margin-top:14px;">
+          <div id="taxPanel" style="max-height:0;overflow:hidden;margin-top:0;transition:max-height .35s ease, margin-top .3s ease;">
         <div style="background:var(--ds-soft);border-radius:8px;padding:12px;margin-bottom:12px;">
           <div style="font-size:0.8rem;font-weight:700;margin-bottom:6px;">세금 설정 프로필</div>
           <div id="taxProfileInfo" style="font-size:0.76rem;color:var(--ds-muted);line-height:1.5;">
@@ -647,5 +647,5 @@
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260619ds2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260619ds"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260619ds3"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260620ds1"></script>
 {% endblock %}

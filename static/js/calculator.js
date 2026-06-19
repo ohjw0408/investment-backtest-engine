@@ -1475,7 +1475,8 @@ function toggleTax() {
   thumb.style.left      = window.taxEnabled ? '23px' : '3px';
   label.textContent     = window.taxEnabled ? 'ON'  : 'OFF';
   label.style.color     = window.taxEnabled ? 'var(--brand-text)' : 'var(--ds-muted)';
-  panel.style.display   = window.taxEnabled ? 'block' : 'none';
+  panel.style.maxHeight = window.taxEnabled ? '4000px' : '0';
+  panel.style.marginTop = window.taxEnabled ? '14px' : '0';
   if (window.taxEnabled) {
     if (typeof calcExpandAdvanced === 'function') calcExpandAdvanced();
     loadTaxProfileForCalculator();

@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-19] HOTFIX | backtest 입력창 오버플로우/빈 공간 회귀 수습
+
+오너 스샷: `월 적립금` 입력이 카드 밖으로 삐져나오고, 입력 블록 좌측 빈 공간이 크게 생김. 나머지 상태저장/가격 이상치 수정은 유지.
+
+- **원인 1**: `.main-content`가 grid인데 `.bt-page`가 `grid-column: 1 / -1`을 받지 않아 첫 grid column 폭에 갇힘(로컬 1280px에서 main 1069px인데 bt-page 699px). 내부 2열 카드가 322px까지 쪼그라들어 UI가 터짐.
+- **원인 2**: 금액 입력 2열 `.bt-grid2`가 `1fr 1fr` + grid child 기본 `min-width:auto`라 number input의 intrinsic width가 좁은 카드 밖으로 밀림.
+- **수정**: `.bt-page`를 전폭 grid span으로 고정(`grid-column:1/-1; width:100%; box-sizing:border-box`). 입력 grid는 전폭 종목 구성 → 조건 2열(`money/options`) → 가상 데이터/옵션 → 세금 전폭으로 재배치. 금액 grid는 `minmax(0,1fr)` + `.bt-field/input-group/calc-input min-width:0` 방어.
+- **검증**: Playwright 1280/2048/390px 스샷, DOM 좌표 overflow 0, 모바일 `scrollWidth == clientWidth`, 콘솔에러 0. 기존 `tests/test_price_loader_spikes.py` 2 PASS.
+
+_작성: Codex_
+
 ## [2026-06-19] BUGFIX/UX | backtest 입력 블록 정리 + 결과 저장 수명 축소 + SPY/TLT 급등 방어
 
 오너: 포트폴리오 분석 탭 초기조건 입력 블록이 엉성하고, 브라우저를 닫았다 다시 열어도 이전 결과가 남으며, SPY 50%/TLT 50% 가치추이 그래프가 2026-06-17 부근 6천만원대에서 500억 이상으로 급등.

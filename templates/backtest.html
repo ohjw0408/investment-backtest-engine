@@ -5,26 +5,136 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260618ds">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
-.bt-layout {
-  display: flex; gap: 24px; align-items: flex-start; padding: 24px;
-}
-.bt-left {
-  width: 380px; min-width: 340px; flex-shrink: 0;
-  background: var(--card); border-radius: 16px;
-  border: 1.5px solid var(--border);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  padding: 20px;
-}
-.bt-right { flex: 1; min-width: 0; }
+/* ── 포트폴리오 분석 — 코인베이스 분석 아키타입 (입력↔결과 뷰 전환) ── */
+.bt-page { max-width: 1100px; margin: 0 auto; padding: 28px 20px 64px; }
+@media (max-width: 860px) { .bt-page { padding: 16px 12px 48px; } }
 
-@media (max-width: 860px) {
-  .bt-layout { flex-direction: column; padding: 14px 12px; }
-  .bt-left { width: 100%; min-width: 0; max-width: 100%; }
-  .bt-right { width: 100%; }
+/* 인라인 nicon 아이콘 사이징 */
+.bt-ico, .bt-ico svg { width: 1.05em; height: 1.05em; vertical-align: -0.16em; color: var(--brand); display: inline-block; }
+.bt-ico.muted, .bt-ico.muted svg { color: var(--ds-muted); }
+
+/* ── 입력 뷰 ── */
+.bt-input-view { max-width: 760px; margin: 0 auto; }
+.bt-hero-head { text-align: center; margin-bottom: 28px; }
+.bt-h1 { font-size: var(--fs-h1); font-weight: 800; color: var(--ds-ink); letter-spacing: -0.02em; margin: 0 0 6px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.bt-hero-sub { font-size: var(--fs-sm); color: var(--ds-body); margin: 0; }
+
+/* 입력 카드 = 결과 카드와 동일 컴포넌트 (.bt-fcard) */
+.bt-fcard {
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-lg); box-shadow: var(--ds-shadow);
+  padding: 22px 24px; margin-bottom: 16px;
 }
+[data-theme="dark"] .bt-fcard { background: var(--ds-dark-el); }
+@media (max-width: 860px) { .bt-fcard { padding: 16px 14px; } }
+.bt-fcard-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.bt-fcard-title { font-size: var(--fs-title); font-weight: 700; color: var(--ds-ink); margin: 0; }
+.bt-fcard-head .bt-fcard-title { margin: 0; }
+
+.bt-field { margin-bottom: 4px; }
+.bt-field > label { display: block; font-size: var(--fs-cap); font-weight: 600; color: var(--ds-body); margin-bottom: 7px; }
+.bt-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 8px; }
+@media (max-width: 560px) { .bt-grid2 { grid-template-columns: 1fr; } }
+
+/* 종목 검색 박스 */
+.bt-search { margin-top: 10px; }
+.bt-search-box {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--ds-soft); border: 1.5px solid var(--ds-hairline);
+  border-radius: var(--r-md); padding: 11px 14px; transition: border-color .15s;
+}
+.bt-search-box:focus-within { border-color: var(--brand); }
+.bt-search-ic, .bt-search-ic svg { width: 18px; height: 18px; color: var(--ds-muted); flex-shrink: 0; }
+.bt-search-box input { border: none; outline: none; background: transparent; font-size: var(--fs-sm); width: 100%; color: var(--ds-ink); }
+
+.bt-ph { font-size: var(--fs-sm); color: var(--ds-muted); padding: 14px 4px 4px; }
+.bt-ticker-list { display: flex; flex-direction: column; gap: 8px; }
+
+.bt-weight-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: var(--fs-sm); color: var(--ds-body); }
+.bt-weight-row #btWeightTotal { font-weight: 800; font-family: var(--font-mono); }
+
+.date-row { display: flex; gap: 10px; align-items: center; }
+.date-row input[type=date] {
+  flex: 1; min-width: 0; padding: 10px 12px;
+  border: 1.5px solid var(--ds-hairline); border-radius: var(--r-md);
+  font-size: var(--fs-sm); color: var(--ds-ink); background: var(--ds-soft); outline: none;
+}
+.date-row input[type=date]:focus { border-color: var(--brand); }
+.date-sep { color: var(--ds-muted); font-size: var(--fs-sm); flex-shrink: 0; }
+
+/* 옵션 행 */
+.bt-opt-row { padding: 12px 0; border-top: 1px solid var(--ds-hairline); }
+.bt-opt-row:first-child { border-top: none; padding-top: 4px; }
+.bt-opt-row > label.bt-opt-label { display: block; font-size: var(--fs-cap); font-weight: 600; color: var(--ds-body); margin-bottom: 8px; }
+
+/* 토글 스위치 (세금·수수료) */
+.bt-toggle-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* 실행 버튼 */
+.bt-run-wrap { margin-top: 8px; }
+.bt-run {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--brand); color: var(--on-brand); border: none; cursor: pointer;
+  font-size: var(--fs-body); font-weight: 700; padding: 16px; border-radius: var(--r-pill);
+  box-shadow: var(--ds-shadow); transition: background .15s, transform .1s;
+}
+.bt-run:hover:not(:disabled) { background: var(--brand-hover); }
+.bt-run:active:not(:disabled) { transform: scale(.99); }
+.bt-run:disabled { opacity: .55; cursor: not-allowed; }
+.bt-run .bt-ico, .bt-run .bt-ico svg { color: var(--on-brand); }
+
+/* ── 결과 뷰 ── */
+.bt-result-view { max-width: 980px; margin: 0 auto; }
+.bt-result-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.bt-back, .bt-rerun {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: var(--fs-sm); font-weight: 600; padding: 9px 16px; border-radius: var(--r-pill);
+  border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-ink);
+  transition: border-color .15s, color .15s;
+}
+[data-theme="dark"] .bt-back, [data-theme="dark"] .bt-rerun { background: var(--ds-dark-el); }
+.bt-back:hover { border-color: var(--brand); color: var(--brand-text); }
+.bt-rerun { background: var(--brand); color: var(--on-brand); border-color: transparent; }
+.bt-rerun:hover { background: var(--brand-hover); }
+
+/* 조건 요약 바 */
+.bt-cond {
+  background: var(--brand-tint); border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-md); padding: 12px 16px; margin-bottom: 16px;
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  font-size: var(--fs-cap); color: var(--ds-body);
+}
+.bt-cond-item { display: inline-flex; align-items: center; gap: 6px; }
+.bt-cond-item b { color: var(--ds-ink); font-weight: 700; }
+.bt-cond-sep { width: 1px; height: 12px; background: var(--ds-hairline); }
+
+/* 히어로 지표 */
+.bt-hero {
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-lg); box-shadow: var(--ds-shadow);
+  padding: 24px; margin-bottom: 16px;
+}
+[data-theme="dark"] .bt-hero { background: var(--ds-dark-el); }
+.bt-hero-label { font-size: var(--fs-cap); font-weight: 600; color: var(--ds-muted); margin-bottom: 6px; }
+.bt-hero-value { font-size: var(--fs-display); font-weight: 800; color: var(--ds-ink); font-family: var(--font-mono); letter-spacing: -0.02em; line-height: 1.05; }
+@media (max-width: 560px) { .bt-hero-value { font-size: 34px; } }
+.bt-hero-sub2 { margin-top: 8px; font-size: var(--fs-body); font-weight: 600; color: var(--ds-body); display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.bt-hero-sub2 .up { color: var(--up); } .bt-hero-sub2 .down { color: var(--down); }
+
+/* 결과 카드 */
+.bt-card {
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-lg); box-shadow: var(--ds-shadow);
+  padding: 22px 24px; margin-bottom: 16px;
+}
+[data-theme="dark"] .bt-card { background: var(--ds-dark-el); }
+@media (max-width: 860px) { .bt-card { padding: 16px 14px; } }
+.bt-card-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.bt-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px) { .bt-grid-2 { grid-template-columns: 1fr; } }
 
 /* 결과 차트 — 고정 높이 래퍼 (Chart.js maintainAspectRatio:false) */
-.bt-chart-wrap { position: relative; height: 280px; }
+.bt-chart-wrap { position: relative; height: 300px; }
 .bt-chart-wrap.annual { height: 220px; }
 .bt-chart-wrap.drawdown { height: 180px; }
 @media (max-width: 860px) {
@@ -33,170 +143,124 @@
   .bt-chart-wrap.drawdown { height: 160px; }
 }
 
-.bt-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 2px; }
-.bt-sub   { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px; }
+/* 보조 지표 칩 그리드 */
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 10px; }
+.metric-item { padding: 12px 14px; background: var(--ds-soft); border-radius: var(--r-md); }
+[data-theme="dark"] .metric-item { background: var(--ds-strong); }
+.metric-label { font-size: var(--fs-cap); color: var(--ds-muted); margin-bottom: 4px; }
+.metric-value { font-size: 1.05rem; font-weight: 800; color: var(--ds-ink); font-family: var(--font-mono); }
+.metric-value.up   { color: var(--up); }
+.metric-value.down { color: var(--down); }
 
-.bt-left .calc-section {
-  border: none; border-bottom: 1px solid var(--border);
-  border-radius: 0; padding: 16px 0; margin-bottom: 0;
-}
-.bt-left .calc-section:last-of-type { border-bottom: none; }
-
-.date-row { display: flex; gap: 10px; align-items: center; }
-.date-row input[type=date] {
-  flex: 1; min-width: 0; padding: 9px 12px;
-  border: 1.5px solid var(--border); border-radius: 10px;
-  font-size: 0.875rem; color: var(--text); background: var(--bg);
-  outline: none;
-}
-.date-row input[type=date]:focus { border-color: var(--blue); background: var(--card); }
-.date-sep { color: var(--text-muted); font-size: 0.85rem; flex-shrink: 0; }
-
-/* 결과 카드 */
-.bt-card {
-  background: var(--card); border-radius: 14px;
-  border: 1.5px solid var(--border); padding: 20px;
-  margin-bottom: 16px;
-}
-.bt-card-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 14px; }
-
-/* 지표 그리드 */
-.metrics-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 10px; margin-bottom: 4px;
-}
-.metric-item { padding: 12px 14px; background: var(--bg); border-radius: 10px; }
-.metric-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
-.metric-value { font-size: 1.05rem; font-weight: 800; color: var(--text); }
-.metric-value.up   { color: var(--green); }
-.metric-value.down { color: var(--red); }
-
-.bt-empty {
-  display: flex; align-items: center; justify-content: center;
-  height: 240px; color: var(--text-muted); font-size: 0.9rem;
-  border: 2px dashed var(--border); border-radius: 12px;
-}
-
-/* 연도 비교 테이블 */
-.year-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-.year-table th {
-  background: var(--bg); padding: 7px 10px;
-  color: var(--text-muted); font-weight: 600;
-  text-align: left; border-bottom: 1.5px solid var(--border);
-}
-.year-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
-.year-table tr:last-child td { border-bottom: none; }
-
-/* 종목 아이템 */
+/* 종목 아이템 (JS 렌더 — 클래스 유지) */
 .ticker-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; margin-bottom: 6px;
-  background: var(--bg); border-radius: 10px;
-  border: 1.5px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--ds-soft); border-radius: var(--r-md);
+  border: 1px solid var(--ds-hairline);
 }
+[data-theme="dark"] .ticker-item { background: var(--ds-strong); }
 .ticker-badge {
-  font-size: 0.72rem; font-weight: 700; color: var(--blue-mid);
-  background: var(--blue-pale); border-radius: 6px;
-  padding: 2px 7px; white-space: nowrap; flex-shrink: 0;
+  font-size: 0.72rem; font-weight: 700; color: var(--brand-text);
+  background: var(--brand-tint); border-radius: var(--r-sm);
+  padding: 3px 8px; white-space: nowrap; flex-shrink: 0;
 }
-.ticker-name {
-  font-size: 0.82rem; color: var(--text); flex: 1;
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
+.ticker-name { font-size: var(--fs-cap); color: var(--ds-ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ticker-weight-input {
-  width: 46px; text-align: center; font-size: 0.82rem; font-weight: 700;
-  border: 1.5px solid var(--border); border-radius: 6px;
-  padding: 3px 4px; background: var(--input-bg); color: var(--text);
-  outline: none; flex-shrink: 0;
+  width: 48px; text-align: center; font-size: var(--fs-cap); font-weight: 700;
+  border: 1.5px solid var(--ds-hairline); border-radius: var(--r-sm);
+  padding: 4px; background: var(--ds-canvas); color: var(--ds-ink); outline: none; flex-shrink: 0;
+  font-family: var(--font-mono);
 }
-.ticker-weight-input:focus { border-color: var(--blue); }
-.ticker-weight-slider {
-  flex: 1; min-width: 40px; accent-color: var(--blue-mid);
-}
+.ticker-weight-input:focus { border-color: var(--brand); }
+.ticker-weight-slider { flex: 1; min-width: 40px; accent-color: var(--brand); }
 .ticker-remove-btn {
   background: none; border: none; cursor: pointer;
-  color: var(--text-muted); font-size: 1.1rem; line-height: 1;
-  padding: 0 2px; flex-shrink: 0;
+  color: var(--ds-muted); font-size: 1.15rem; line-height: 1; padding: 0 2px; flex-shrink: 0;
 }
-.ticker-remove-btn:hover { color: var(--red); }
+.ticker-remove-btn:hover { color: var(--down); }
 
-/* 모바일 카드 패딩 축소 — base .bt-card보다 뒤에 둬야 적용됨 */
-@media (max-width: 860px) {
-  .bt-card { padding: 14px 12px; }
-}
+.share-pill { display: inline-flex; align-items: center; gap: 6px; }
+.share-pill .bt-ico, .share-pill .bt-ico svg { width: 15px; height: 15px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="bt-layout">
+<div class="bt-page">
 
-  <!-- 왼쪽 입력 -->
-  <div class="bt-left">
-    <div class="bt-title">📊 포트폴리오 분석</div>
-    <div class="bt-sub">과거 특정 기간의 포트폴리오 성과를 시뮬레이션합니다</div>
+  <!-- ══════════ 입력 뷰 ══════════ -->
+  <div id="btInputView" class="bt-input-view">
+    <header class="bt-hero-head">
+      <h1 class="bt-h1"><span class="bt-ico">{{ nicon('chart') }}</span> 포트폴리오 분석</h1>
+      <p class="bt-hero-sub">과거 특정 기간의 포트폴리오 성과를 시뮬레이션합니다</p>
+    </header>
 
-    <!-- 포트폴리오 -->
-    <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">01</span> 포트폴리오</div>
-      <div id="favBar"></div>
-      <div id="btTickerList"></div>
-      <div id="btTickerPlaceholder" class="ticker-placeholder">종목을 검색해서 추가해보세요</div>
-      <div class="ticker-search-wrap" style="margin-top:8px;">
-        <div class="ret-search-box" style="display:flex;align-items:center;gap:8px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;">
-          <span style="font-size:1rem;color:var(--text-muted);">🔍</span>
-          <input type="text" id="btTickerSearch" placeholder="종목 또는 ETF 검색" style="border:none;outline:none;background:transparent;font-size:0.875rem;width:100%;">
+    <!-- 종목 구성 -->
+    <section class="bt-fcard">
+      <div class="bt-fcard-head">
+        <h2 class="bt-fcard-title">종목 구성</h2>
+        <div id="favBar"></div>
+      </div>
+      <div id="btTickerList" class="bt-ticker-list"></div>
+      <div id="btTickerPlaceholder" class="bt-ph">종목을 검색해서 추가해보세요</div>
+      <div class="ticker-search-wrap bt-search">
+        <div class="bt-search-box">
+          <span class="bt-search-ic">{{ nicon('search') }}</span>
+          <input type="text" id="btTickerSearch" placeholder="종목 또는 ETF 검색">
         </div>
         <div class="ticker-search-dropdown" id="btTickerDropdown"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
-        <span style="font-size:0.85rem;color:var(--text-muted);">비중 합계</span>
-        <span id="btWeightTotal" style="font-weight:700;">0%</span>
+      <div class="bt-weight-row">
+        <span>비중 합계</span>
+        <span id="btWeightTotal">0%</span>
       </div>
-      <div class="weight-bar-bg" style="margin-top:4px;"><div class="weight-bar-fill" id="btWeightBar" style="width:0%"></div></div>
-    </div>
+      <div class="weight-bar-bg" style="margin-top:6px;"><div class="weight-bar-fill" id="btWeightBar" style="width:0%"></div></div>
+    </section>
 
-    <!-- 기간 -->
-    <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">02</span> 분석 기간</div>
-      <div class="date-row">
-        <input type="date" id="btStartDate" value="2010-01-01">
-        <span class="date-sep">~</span>
-        <input type="date" id="btEndDate">
-      </div>
-    </div>
-
-    <!-- 투자 설정 -->
-    <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">03</span> 투자 설정</div>
-
-      <div class="input-row">
-        <label>초기 투자금</label>
-        <div class="input-group">
-          <input type="number" id="btSeed" class="calc-input" value="10000000" min="0" step="1000000">
-          <span class="unit">원</span>
+    <!-- 기간 · 투자금 -->
+    <section class="bt-fcard">
+      <h2 class="bt-fcard-title" style="margin-bottom:14px;">기간 · 투자금</h2>
+      <div class="bt-field" style="margin-bottom:14px;">
+        <label>분석 기간</label>
+        <div class="date-row">
+          <input type="date" id="btStartDate" value="2010-01-01">
+          <span class="date-sep">~</span>
+          <input type="date" id="btEndDate">
         </div>
-        <div class="input-hint" id="btSeedHint">₩10,000,000</div>
       </div>
-
-      <div class="input-row">
-        <label>월 적립금</label>
-        <div class="input-group">
-          <input type="number" id="btMonthly" class="calc-input" value="0" min="0" step="100000">
-          <span class="unit">원</span>
+      <div class="bt-grid2">
+        <div class="bt-field">
+          <label>초기 투자금</label>
+          <div class="input-group">
+            <input type="number" id="btSeed" class="calc-input" value="10000000" min="0" step="1000000">
+            <span class="unit">원</span>
+          </div>
+          <div class="input-hint" id="btSeedHint">₩10,000,000</div>
         </div>
-        <div class="input-hint" id="btMonthlyHint">₩0</div>
+        <div class="bt-field">
+          <label>월 적립금</label>
+          <div class="input-group">
+            <input type="number" id="btMonthly" class="calc-input" value="0" min="0" step="100000">
+            <span class="unit">원</span>
+          </div>
+          <div class="input-hint" id="btMonthlyHint">₩0</div>
+        </div>
       </div>
+    </section>
 
-      <div class="input-row">
-        <label>배당 처리</label>
+    <!-- 투자 옵션 -->
+    <section class="bt-fcard">
+      <h2 class="bt-fcard-title" style="margin-bottom:6px;">투자 옵션</h2>
+
+      <div class="bt-opt-row">
+        <label class="bt-opt-label">배당 처리</label>
         <div class="rebal-options">
           <label class="rebal-option"><input type="radio" name="btDividend" value="reinvest" checked><span class="rebal-label">재투자</span></label>
           <label class="rebal-option"><input type="radio" name="btDividend" value="hold"><span class="rebal-label">현금 보유</span></label>
         </div>
       </div>
 
-      <div class="input-row">
-        <label>리밸런싱</label>
+      <div class="bt-opt-row">
+        <label class="bt-opt-label">리밸런싱</label>
         <div class="rebal-options">
           <label class="rebal-option"><input type="radio" name="btRebal" value="none" checked><span class="rebal-label">안 함</span></label>
           <label class="rebal-option"><input type="radio" name="btRebal" value="monthly"><span class="rebal-label">매월</span></label>
@@ -213,53 +277,53 @@
           <div class="band-note">비중이 목표에서 <strong id="btBandNoteVal">5%</strong> 이상 벗어나면 리밸런싱</div>
         </div>
       </div>
-    </div>
 
-    <!-- 거래수수료 섹션 (D4) -->
-    <div class="calc-section">
-      <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-        <span><span class="calc-section-num">04</span> 거래수수료</span>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-size:0.8rem;color:var(--text-muted);">
-          <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()"> 적용
-        </label>
-      </div>
-      <div id="feePanelBody" style="display:none;margin-top:8px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
-          <label style="font-size:0.72rem;color:var(--text-muted);">증권사 프리셋
-            <select id="feePreset" onchange="applyFeePreset(this.value)" style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
-              <option value="0.015">키움 0.015%</option>
-              <option value="0.02">삼성 0.02%</option>
-              <option value="0">토스 0%</option>
-              <option value="custom">직접입력</option>
-            </select>
-          </label>
-          <label style="font-size:0.72rem;color:var(--text-muted);">수수료율 (%)
-            <input type="number" id="feeRateInput" value="0.015" min="0" step="0.001" style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
+      <!-- 거래수수료 (D4) -->
+      <div class="bt-opt-row">
+        <div class="bt-toggle-head">
+          <label class="bt-opt-label" style="margin:0;">거래수수료</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-size:var(--fs-cap);color:var(--ds-muted);">
+            <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()"> 적용
           </label>
         </div>
-        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">매수·매도에 적용. 국내 개별주식 매도는 거래세 0.18% 추가(ETF 면제).</div>
+        <div id="feePanelBody" style="display:none;margin-top:10px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
+            <label style="font-size:0.72rem;color:var(--ds-muted);">증권사 프리셋
+              <select id="feePreset" onchange="applyFeePreset(this.value)" style="width:100%;margin-top:3px;border:1.5px solid var(--ds-hairline);border-radius:var(--r-sm);padding:7px 9px;font-size:0.82rem;background:var(--ds-soft);color:var(--ds-ink);">
+                <option value="0.015">키움 0.015%</option>
+                <option value="0.02">삼성 0.02%</option>
+                <option value="0">토스 0%</option>
+                <option value="custom">직접입력</option>
+              </select>
+            </label>
+            <label style="font-size:0.72rem;color:var(--ds-muted);">수수료율 (%)
+              <input type="number" id="feeRateInput" value="0.015" min="0" step="0.001" style="width:100%;margin-top:3px;border:1.5px solid var(--ds-hairline);border-radius:var(--r-sm);padding:7px 9px;font-size:0.82rem;background:var(--ds-soft);color:var(--ds-ink);">
+            </label>
+          </div>
+          <div style="font-size:0.7rem;color:var(--ds-muted);margin-top:6px;">매수·매도에 적용. 국내 개별주식 매도는 거래세 0.18% 추가(ETF 면제).</div>
+        </div>
       </div>
-    </div>
+    </section>
 
     <!-- 세금 적용 섹션 -->
-    <div class="calc-section">
-      <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-        <span><span class="calc-section-num">05</span> 세금 적용</span>
+    <section class="bt-fcard">
+      <div class="bt-toggle-head">
+        <h2 class="bt-fcard-title" style="margin:0;">세금 적용</h2>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
-          <span id="btTaxLabel" style="font-size:0.8rem;color:var(--text-muted);">OFF</span>
-          <div id="btTaxWrap" onclick="toggleBtTax()" style="width:44px;height:24px;background:var(--border);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+          <span id="btTaxLabel" style="font-size:var(--fs-cap);color:var(--ds-muted);">OFF</span>
+          <div id="btTaxWrap" onclick="toggleBtTax()" style="width:44px;height:24px;background:var(--ds-hairline);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
             <div id="btTaxThumb" style="position:absolute;width:18px;height:18px;background:white;border-radius:50%;top:3px;left:3px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
           </div>
         </label>
       </div>
-      <div id="btTaxPanel" style="display:none;margin-top:10px;">
+      <div id="btTaxPanel" style="display:none;margin-top:14px;">
         <div style="background:var(--bg);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:0.76rem;color:var(--text-muted);line-height:1.5;">
           <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:4px;">세금 설정 프로필</div>
           <div id="btTaxProfileInfo">세금 설정에서 불러옵니다.</div>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <span style="font-size:0.82rem;font-weight:700;">계좌 설정</span>
-          <button onclick="addTaxAccount()" style="font-size:0.75rem;padding:4px 10px;background:var(--blue);color:white;border:none;border-radius:6px;cursor:pointer;">+ 계좌 추가</button>
+          <button onclick="addTaxAccount()" style="display:inline-flex;align-items:center;gap:4px;font-size:0.75rem;padding:6px 12px;background:var(--brand);color:var(--on-brand);border:none;border-radius:var(--r-pill);cursor:pointer;font-weight:600;"><span class="bt-ico" style="width:14px;height:14px;color:var(--on-brand);">{{ nicon('plus') }}</span> 계좌 추가</button>
         </div>
         <div id="taxAccountList"></div>
         <div id="taxWarnings" style="margin-top:4px;"></div>
@@ -269,7 +333,7 @@
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="isaRenewalCheck" style="width:14px;height:14px;">
             <div>
-              <span style="font-weight:700;color:var(--green);">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
+              <span style="font-weight:700;color:var(--green);"><span class="bt-ico" style="width:14px;height:14px;color:var(--green);">{{ nicon('repeat') }}</span> ISA 풍차돌리기 (3년마다 해지·재가입)</span>
               <div style="color:var(--green);font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 200만원 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다.</div>
             </div>
           </label>
@@ -287,84 +351,92 @@
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="gainHarvestingCheck" style="width:14px;height:14px;">
             <div>
-              <span style="font-weight:700;color:var(--blue);">📉 절세 매도 (연 250만 공제 소진)</span>
+              <span style="font-weight:700;color:var(--blue);"><span class="bt-ico" style="width:14px;height:14px;color:var(--blue);">{{ nicon('trend-down') }}</span> 절세 매도 (연 250만 공제 소진)</span>
               <div style="color:var(--blue-mid);font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
             </div>
           </label>
         </div>
-        <div style="margin-top:8px;font-size:0.75rem;color:var(--text-muted);background:var(--bg);padding:7px 10px;border-radius:6px;">
+        <div style="margin-top:8px;font-size:0.75rem;color:var(--ds-muted);background:var(--ds-soft);padding:8px 12px;border-radius:var(--r-sm);">
           세금 적용 시 최종 자산에 청산세 반영 (배당세·리밸런싱 CG세 포함)
         </div>
       </div>
-    </div>
-
-    <div class="calc-warning">⚠ 과거 데이터 기반 시뮬레이션입니다. 미래 수익을 보장하지 않습니다.</div>
+    </section>
 
     <!-- 가상 데이터 옵트인 -->
-    <div class="calc-section" id="btSyntheticSection" style="background:var(--gold-pale);border:1px solid var(--gold);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+    <section class="bt-fcard" id="btSyntheticSection" style="background:var(--gold-pale);border-color:var(--gold);">
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
         <input type="checkbox" id="btUseSyntheticCheck" style="margin-top:3px;flex-shrink:0;">
         <div>
-          <span style="font-weight:700;font-size:0.87rem;">가상 데이터 사용</span>
-          <div style="font-size:0.77rem;color:var(--text-muted);margin-top:2px;">실제 데이터가 부족할 때 통계 추정 데이터로 보완합니다. 결과 정확도가 낮아질 수 있습니다.</div>
+          <span style="font-weight:700;font-size:0.9rem;color:var(--ds-ink);">가상 데이터 사용</span>
+          <div style="font-size:0.78rem;color:var(--ds-body);margin-top:3px;">실제 데이터가 부족할 때 통계 추정 데이터로 보완합니다. 결과 정확도가 낮아질 수 있습니다.</div>
         </div>
       </label>
-    </div>
+    </section>
 
-    <button class="calc-run-btn" id="btRunBtn" onclick="runBacktest()">📊 분석 실행</button>
-    <style>
-      @keyframes mm-indeterminate {
-        0%   { left: -40%; width: 40%; }
-        100% { left: 110%; width: 30%; }
-      }
-    </style>
-    <div id="btLoading" style="display:none;padding:16px 12px;">
-      <div id="btProgressPhase" style="font-size:0.85rem;font-weight:700;color:var(--blue);margin-bottom:8px;">준비 중...</div>
-      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;position:relative;">
-        <div id="btProgressBar" style="height:100%;background:var(--blue);border-radius:8px;width:40%;position:absolute;top:0;left:0;animation:mm-indeterminate 1.4s ease-in-out infinite;"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
-        <span id="btProgressDetail">계산 준비 중</span>
-        <span id="btProgressEta"></span>
-      </div>
-      <div style="text-align:center;margin-top:10px;">
-        <button onclick="btCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:var(--card);color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+    <div class="bt-run-wrap">
+      <div class="calc-warning"><span class="bt-ico muted">{{ nicon('warn') }}</span> 과거 데이터 기반 시뮬레이션입니다. 미래 수익을 보장하지 않습니다.</div>
+      <button class="bt-run" id="btRunBtn" onclick="runBacktest()"><span class="bt-ico">{{ nicon('zap') }}</span> 분석 실행</button>
+      <style>
+        @keyframes mm-indeterminate { 0% { left: -40%; width: 40%; } 100% { left: 110%; width: 30%; } }
+      </style>
+      <div id="btLoading" style="display:none;padding:18px 4px;">
+        <div id="btProgressPhase" style="font-size:0.9rem;font-weight:700;color:var(--brand-text);margin-bottom:8px;">준비 중...</div>
+        <div style="background:var(--ds-strong);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;position:relative;">
+          <div id="btProgressBar" style="height:100%;background:var(--brand);border-radius:8px;width:40%;position:absolute;top:0;left:0;animation:mm-indeterminate 1.4s ease-in-out infinite;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--ds-muted);">
+          <span id="btProgressDetail">계산 준비 중</span>
+          <span id="btProgressEta"></span>
+        </div>
+        <div style="text-align:center;margin-top:12px;">
+          <button onclick="btCancelTask()" class="ds-btn ds-btn-sm" style="border:1.5px solid var(--down);background:transparent;color:var(--down);">취소</button>
+        </div>
       </div>
     </div>
   </div>
+  <!-- ══════════ /입력 뷰 ══════════ -->
 
-  <!-- 오른쪽 결과 -->
-  <div class="bt-right">
-    <div id="btResultEmpty" class="bt-empty">포트폴리오를 구성하고 분석을 실행하세요</div>
+  <!-- ══════════ 결과 뷰 ══════════ -->
+  <div id="btResultView" class="bt-result-view" style="display:none;">
+    <div class="bt-result-top">
+      <button class="bt-back" onclick="btEditConditions()">← 조건 수정</button>
+      <button class="bt-rerun" onclick="runBacktest()"><span class="bt-ico" style="color:var(--on-brand);">{{ nicon('refresh') }}</span> 재실행</button>
+    </div>
+    <div id="btCondSummary" class="bt-cond" style="display:none;"></div>
 
+    <div id="btResultEmpty" style="display:none;"></div>
     <div id="btResultContent" style="display:none;">
 
       <!-- 가상 데이터 경고 배너 -->
-      <div id="btSynthWarningBanner" style="display:none;background:var(--gold-pale);border:1px solid var(--gold);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;color:var(--text-muted);">
-        <strong>⚠ 가상 데이터 포함</strong> — 통계적으로 추정된 가격이 포함됩니다. 참고용으로만 사용하세요.
+      <div id="btSynthWarningBanner" style="display:none;background:var(--gold-pale);border:1px solid var(--gold);border-radius:var(--r-md);padding:12px 16px;margin-bottom:12px;font-size:0.83rem;color:var(--ds-body);">
+        <strong style="display:inline-flex;align-items:center;gap:6px;"><span class="bt-ico muted" style="width:15px;height:15px;">{{ nicon('warn') }}</span> 가상 데이터 포함</strong> — 통계적으로 추정된 가격이 포함됩니다. 참고용으로만 사용하세요.
         <div id="btSynthWarningDetail" style="margin-top:5px;line-height:1.6;"></div>
       </div>
 
-      <!-- 핵심 지표 -->
-      <div class="bt-card">
-        <div class="bt-card-title" style="display:flex;align-items:center;justify-content:space-between;">
-          <span>📈 분석 결과</span>
-          <div id="btShareBtns" style="display:none;flex-direction:column;gap:4px;">
+      <!-- 히어로 지표 -->
+      <div class="bt-hero">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+          <div>
+            <div class="bt-hero-label">최종 자산</div>
+            <div class="bt-hero-value" id="btHeroValue">—</div>
+            <div class="bt-hero-sub2" id="btHeroSub"></div>
+          </div>
+          <div id="btShareBtns" style="display:none;flex-direction:column;gap:6px;align-items:flex-end;">
             <div style="display:flex;gap:8px;">
-              <button onclick="btCopyLink()" class="share-pill">🔗 링크 복사</button>
-              <button onclick="btDownloadImg()" class="share-pill">📷 이미지 저장</button>
+              <button onclick="btCopyLink(event)" class="ds-btn ds-btn-secondary ds-btn-sm share-pill"><span class="bt-ico">{{ nicon('link') }}</span> 링크 복사</button>
+              <button onclick="btDownloadImg()" class="ds-btn ds-btn-secondary ds-btn-sm share-pill"><span class="bt-ico">{{ nicon('image') }}</span> 이미지 저장</button>
             </div>
             <div class="share-url-box" id="btShareUrlBox"></div>
           </div>
         </div>
-        <div class="metrics-grid" id="btMetrics"></div>
+        <div class="metrics-grid" id="btMetrics" style="margin-top:20px;"></div>
         <div id="btMultiAccountSummary" style="margin-top:14px;"></div>
       </div>
 
       <!-- 포트폴리오 가치 차트 -->
       <div class="bt-card">
-        <div class="bt-card-title">💹 포트폴리오 가치 추이
-          <span style="font-weight:400;color:var(--text-muted);font-size:0.74rem;">· 그래프를 가로로 드래그하면 그 구간 종목 기여 지분</span>
+        <div class="bt-card-title"><span class="bt-ico">{{ nicon('trend-up') }}</span> 포트폴리오 가치 추이
+          <span style="font-weight:400;color:var(--ds-muted);font-size:0.74rem;">· 그래프를 가로로 드래그하면 그 구간 종목 기여 지분</span>
         </div>
         <div class="bt-chart-wrap"><canvas id="btValueChart"></canvas></div>
       </div>
@@ -372,49 +444,49 @@
       <!-- 구간 기여 분석 -->
       <div class="bt-card" id="btAttrCard" style="display:none;">
         <div class="bt-card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-          <span>🧩 구간 기여 지분 <span id="btAttrRange" style="font-weight:400;color:var(--text-muted);font-size:0.76rem;"></span></span>
-          <button onclick="btAttrReset()" style="padding:4px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text-muted);font-size:0.76rem;font-weight:700;cursor:pointer;">구간 해제</button>
+          <span style="display:inline-flex;align-items:center;gap:8px;"><span class="bt-ico">{{ nicon('puzzle') }}</span> 구간 기여 지분 <span id="btAttrRange" style="font-weight:400;color:var(--ds-muted);font-size:0.76rem;"></span></span>
+          <button onclick="btAttrReset()" class="ds-btn ds-btn-secondary ds-btn-sm">구간 해제</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
-          <input type="date" id="btAttrStart" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:0.82rem;">
-          <span style="color:var(--text-muted);">~</span>
-          <input type="date" id="btAttrEnd" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:0.82rem;">
-          <button onclick="btAttrManual()" style="padding:7px 14px;border:none;border-radius:8px;background:var(--blue);color:#fff;font-size:0.82rem;font-weight:700;cursor:pointer;">이 구간 분석</button>
-          <span style="font-size:0.74rem;color:var(--text-muted);">· 또는 위 그래프를 드래그</span>
+          <input type="date" id="btAttrStart" style="padding:8px 11px;border:1.5px solid var(--ds-hairline);border-radius:var(--r-sm);background:var(--ds-soft);color:var(--ds-ink);font-size:0.82rem;">
+          <span style="color:var(--ds-muted);">~</span>
+          <input type="date" id="btAttrEnd" style="padding:8px 11px;border:1.5px solid var(--ds-hairline);border-radius:var(--r-sm);background:var(--ds-soft);color:var(--ds-ink);font-size:0.82rem;">
+          <button onclick="btAttrManual()" class="ds-btn ds-btn-primary ds-btn-sm">이 구간 분석</button>
+          <span style="font-size:0.74rem;color:var(--ds-muted);">· 또는 위 그래프를 드래그</span>
         </div>
         <div id="btAttrBody"></div>
       </div>
 
-      <!-- 연간 수익률 -->
-      <div class="bt-card">
-        <div class="bt-card-title">📅 연간 수익률</div>
-        <div class="bt-chart-wrap annual"><canvas id="btAnnualChart"></canvas></div>
-      </div>
-
-      <!-- 낙폭 차트 -->
-      <div class="bt-card">
-        <div class="bt-card-title">📉 낙폭 (Drawdown)</div>
-        <div class="bt-chart-wrap drawdown"><canvas id="btDrawdownChart"></canvas></div>
+      <!-- 연간 수익률 · 낙폭 (2단) -->
+      <div class="bt-grid-2">
+        <div class="bt-card">
+          <div class="bt-card-title"><span class="bt-ico">{{ nicon('calendar') }}</span> 연간 수익률</div>
+          <div class="bt-chart-wrap annual"><canvas id="btAnnualChart"></canvas></div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-title"><span class="bt-ico">{{ nicon('trend-down') }}</span> 낙폭 (Drawdown)</div>
+          <div class="bt-chart-wrap drawdown"><canvas id="btDrawdownChart"></canvas></div>
+        </div>
       </div>
 
       <!-- 연간 배당금 -->
       <div class="bt-card" id="btDivCard" style="display:none;">
-        <div class="bt-card-title">💵 연간 배당금 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 그 해 수령한 배당(세전, 재투자 전 기준)</span></div>
+        <div class="bt-card-title"><span class="bt-ico">{{ nicon('cash') }}</span> 연간 배당금 <span style="font-weight:400;color:var(--ds-muted);font-size:0.76rem;">· 그 해 수령한 배당(세전, 재투자 전 기준)</span></div>
         <div class="bt-chart-wrap annual"><canvas id="btDivChart"></canvas></div>
-        <div id="btDivNote" style="font-size:0.74rem;color:var(--text-muted);margin-top:8px;"></div>
+        <div id="btDivNote" style="font-size:0.74rem;color:var(--ds-muted);margin-top:8px;"></div>
       </div>
 
       <!-- 배당 성장률 -->
       <div class="bt-card" id="btDivGrowthCard" style="display:none;">
-        <div class="bt-card-title">📈 배당 성장률 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 전년 대비 배당금 증가율</span></div>
+        <div class="bt-card-title"><span class="bt-ico">{{ nicon('trend-up') }}</span> 배당 성장률 <span style="font-weight:400;color:var(--ds-muted);font-size:0.76rem;">· 전년 대비 배당금 증가율</span></div>
         <div class="bt-chart-wrap annual"><canvas id="btDivGrowthChart"></canvas></div>
-        <div id="btDivGrowthNote" style="font-size:0.74rem;color:var(--text-muted);margin-top:8px;"></div>
+        <div id="btDivGrowthNote" style="font-size:0.74rem;color:var(--ds-muted);margin-top:8px;"></div>
       </div>
 
       <!-- 종합과세 경고 + 분할매도 절세 패널 (Phase 2e) -->
       <div id="btSplitSalePanel" style="display:none;" class="bt-card">
-        <div class="bt-card-title" style="color:var(--red);">⚠ 금융소득 종합과세 주의</div>
-        <div style="font-size:0.83rem;color:#555;margin-bottom:12px;">
+        <div class="bt-card-title" style="color:var(--down);"><span class="bt-ico" style="color:var(--down);">{{ nicon('warn') }}</span> 금융소득 종합과세 주의</div>
+        <div style="font-size:0.83rem;color:var(--ds-body);margin-bottom:12px;">
           시뮬레이션 종료 시점 KR_FOREIGN(국내상장 해외 ETF) 미실현 이익이 2천만원을 초과합니다.
           <strong>최종 자산은 일괄 청산 기준으로 그 해 배당과 합산한 금융소득 종합과세를 이미 반영합니다.</strong>
           아래에서 분할 매도 시 절세 효과를 확인하세요(소득 구간에 따라 효과가 다릅니다).
@@ -441,8 +513,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260613feecard2"></script>
-<script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260612fav"></script>
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260619ds"></script>
+<script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260619ds"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
 <script>
 // 오늘 날짜 기본값
@@ -469,14 +541,66 @@ function fmtPct(v) {
 }
 function fmtPctClass(v) { return v >= 0 ? 'up' : 'down'; }
 
+// ── 디자인 토큰 → 차트 색 바인딩 (액센트/다크 따라감) ──
+function _btCss(n, fb) { const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v || fb; }
+function _btRgba(hex, a) {
+  hex = (hex || '').trim();
+  if (hex[0] !== '#' || hex.length < 7) return hex;
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+// 차트 색 — 렌더 직전 토큰값으로 갱신(액센트/다크 반영)
+let _btMuted = '#90A4AE', _btBrand = '#0052ff', _btUp = '#05b169', _btDown = '#cf202f';
+function _btRefreshChartColors() {
+  _btMuted = _btCss('--ds-muted', '#90A4AE');
+  _btBrand = _btCss('--brand', '#0052ff');
+  _btUp    = _btCss('--up', '#05b169');
+  _btDown  = _btCss('--down', '#cf202f');
+}
+
+// ── 입력 ↔ 결과 뷰 전환 ──
+function btShowResults() {
+  document.getElementById('btInputView').style.display = 'none';
+  document.getElementById('btResultView').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+function btShowInput() {
+  document.getElementById('btResultView').style.display = 'none';
+  document.getElementById('btInputView').style.display = 'block';
+}
+function btEditConditions() { btShowInput(); }
+
+// ── 결과 조건 요약 바 ──
+function btBuildCondSummary(body) {
+  const el = document.getElementById('btCondSummary');
+  if (!el || !body) return;
+  const tk = (body.tickers || []).map(t => `${t.code} ${Math.round((t.weight||0)*100)}%`).join(' · ');
+  const period = (body.start_date || '') + ' ~ ' + (body.end_date || '');
+  const seed = fmtKRW(body.initial_capital || 0);
+  const mon = (body.monthly_contribution || 0) > 0 ? ' · 월 ' + fmtKRW(body.monthly_contribution) : '';
+  const rebalMap = { none:'리밸런싱 안함', monthly:'매월 리밸', quarterly:'분기 리밸', yearly:'매년 리밸', band:'밴드 리밸' };
+  const parts = [];
+  if (tk) parts.push(`<span class="bt-cond-item"><b>${btE(tk)}</b></span>`);
+  parts.push(`<span class="bt-cond-item">${btE(period)}</span>`);
+  parts.push(`<span class="bt-cond-item">${btE(seed)}${btE(mon)}</span>`);
+  parts.push(`<span class="bt-cond-item">${btE(body.dividend_mode === 'hold' ? '배당 현금보유' : '배당 재투자')} · ${btE(rebalMap[body.rebal_mode] || body.rebal_mode || '')}</span>`);
+  if (window.btTaxEnabled) {
+    const accs = window.taxAccounts || [];
+    const types = accs.length > 1 ? accs.map(a => a.type || '위탁').join('+') : (accs[0]?.type || '위탁');
+    parts.push(`<span class="bt-cond-item">세금 ON · ${btE(types)}</span>`);
+  }
+  el.innerHTML = parts.join('<span class="bt-cond-sep"></span>');
+  el.style.display = 'flex';
+}
+
 // ── 종목 관리 ──
 function updateBtWeightUI() {
   const total = btTickers.reduce((s, t) => s + t.weight, 0);
   const pct   = Math.round(total * 100);
   document.getElementById('btWeightTotal').textContent = pct + '%';
-  document.getElementById('btWeightTotal').style.color = pct === 100 ? '#2E7D32' : '#C62828';
+  document.getElementById('btWeightTotal').style.color = pct === 100 ? 'var(--up)' : 'var(--down)';
   document.getElementById('btWeightBar').style.width      = Math.min(pct, 100) + '%';
-  document.getElementById('btWeightBar').style.background = pct === 100 ? '#4CAF50' : '#F44336';
+  document.getElementById('btWeightBar').style.background = pct === 100 ? 'var(--up)' : 'var(--down)';
 
   const ph = document.getElementById('btTickerPlaceholder');
   if (ph) ph.style.display = btTickers.length ? 'none' : 'block';
@@ -582,10 +706,10 @@ function toggleBtTax() {
   window.btTaxEnabled = !window.btTaxEnabled;
   window.taxEnabled   = window.btTaxEnabled;  // 모듈이 참조
   const on = window.btTaxEnabled;
-  document.getElementById('btTaxWrap').style.background = on ? 'var(--blue)' : 'var(--border)';
+  document.getElementById('btTaxWrap').style.background = on ? 'var(--brand)' : 'var(--ds-hairline)';
   document.getElementById('btTaxThumb').style.left      = on ? '23px' : '3px';
   document.getElementById('btTaxLabel').textContent     = on ? 'ON' : 'OFF';
-  document.getElementById('btTaxLabel').style.color     = on ? 'var(--blue)' : 'var(--text-muted)';
+  document.getElementById('btTaxLabel').style.color     = on ? 'var(--brand-text)' : 'var(--ds-muted)';
   document.getElementById('btTaxPanel').style.display   = on ? 'block' : 'none';
   if (on) {
     if (window.taxAccounts.length === 0) addTaxAccount();
@@ -636,9 +760,9 @@ function buildBtAccountsPayload(rebalMode, bandWidth, dividendMode) {
   const accounts = [primary];
   for (let i = 1; i < accs.length; i++) {
     const accTickers = ensureAccountTickers(i);
-    if (accTickers.length === 0) { alert(`계좌 ${i + 1}에 종목을 최소 1개 추가해주세요.`); return false; }
+    if (accTickers.length === 0) { mmToast(`계좌 ${i + 1}에 종목을 최소 1개 추가해주세요.`, 'err'); return false; }
     if (accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0) > 100) {
-      alert(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`); return false;
+      mmToast(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`, 'err'); return false;
     }
     accounts.push({
       type: accs[i].type || '위탁',
@@ -746,16 +870,16 @@ function renderFeeSummary(containerId, totalFees) {
 // ── 실행 ──
 async function runBacktest(_limitOverride) {
   const total = Math.round(btTickers.reduce((s,t) => s+t.weight, 0) * 100);
-  if (!btTickers.length) { alert('종목을 추가해주세요.'); return; }
-  if (total !== 100)     { alert(`비중 합계가 ${total}%입니다.`); return; }
+  if (!btTickers.length) { mmToast('종목을 추가해주세요.', 'err'); return; }
+  if (total !== 100)     { mmToast(`비중 합계가 ${total}%입니다. 100%로 맞춰주세요.`, 'err'); return; }
 
   const startDate = document.getElementById('btStartDate').value;
   const endDate   = document.getElementById('btEndDate').value;
-  if (!startDate || !endDate || startDate >= endDate) { alert('기간을 올바르게 설정해주세요.'); return; }
+  if (!startDate || !endDate || startDate >= endDate) { mmToast('기간을 올바르게 설정해주세요.', 'err'); return; }
 
-  document.getElementById('btRunBtn').disabled             = true;
-  document.getElementById('btResultEmpty').style.display   = 'none';
-  document.getElementById('btResultContent').style.display = 'none';
+  // 재실행(결과 뷰)에서도 진행바가 보이도록 입력 뷰로 전환 후 진행 표시
+  btShowInput();
+  document.getElementById('btRunBtn').disabled = true;
   btShowProgressUI();
 
   try {
@@ -779,7 +903,7 @@ async function runBacktest(_limitOverride) {
     const accountsPayload = window.btTaxEnabled
       ? buildBtAccountsPayload(window._btLastBody.rebal_mode, window._btLastBody.band_width, window._btLastBody.dividend_mode)
       : null;
-    if (accountsPayload === false) { btHideProgressUI(); document.getElementById('btRunBtn').disabled = false; document.getElementById('btResultEmpty').style.display = 'flex'; return; }
+    if (accountsPayload === false) { btHideProgressUI(); document.getElementById('btRunBtn').disabled = false; return; }
 
     const submitBody = {
       ...window._btLastBody,
@@ -823,10 +947,9 @@ async function runBacktest(_limitOverride) {
     await btPollTask(task_id);
   } catch(e) {
     if (e.message !== 'CANCELLED') {
-      alert('오류: ' + e.message);
+      mmToast('오류: ' + e.message, 'err');
     }
-    document.getElementById('btResultEmpty').style.display = 'flex';
-    document.getElementById('btResultContent').style.display = 'none';
+    btShowInput();
   } finally {
     localStorage.removeItem('mm_task_backtest');
     _btTaskId = null;
@@ -880,32 +1003,31 @@ async function btPollTask(taskId, maxWait = 600000) {
       }
       if (data.status === 'CANCELLED') {
         btHideProgressUI();
-        document.getElementById('btResultEmpty').style.display = 'flex';
-        document.getElementById('btResultContent').style.display = 'none';
+        btShowInput();
         return;
       }
       if (data.status === 'FAILURE') {
         btHideProgressUI();
-        document.getElementById('btResultEmpty').style.display = 'flex';
+        btShowInput();
         const _lc = window.MMLimit?.parseError(data.error);
         if (_lc) {
           if (await window.MMLimit.confirm(_lc.violations)) runBacktest(true);
           return;
         }
-        alert('오류: ' + (data.error || '알 수 없는 오류'));
+        mmToast('오류: ' + (data.error || '알 수 없는 오류'), 'err');
         return;
       }
     } catch(e) {
-      if (e.message === 'CANCELLED') { btHideProgressUI(); document.getElementById('btResultEmpty').style.display = 'flex'; return; }
+      if (e.message === 'CANCELLED') { btHideProgressUI(); btShowInput(); return; }
       btHideProgressUI();
-      document.getElementById('btResultEmpty').style.display = 'flex';
-      alert('폴링 오류: ' + e.message);
+      btShowInput();
+      mmToast('폴링 오류: ' + e.message, 'err');
       return;
     }
   }
   btHideProgressUI();
-  document.getElementById('btResultEmpty').style.display = 'flex';
-  alert('시간 초과: 분석이 너무 오래 걸립니다.');
+  btShowInput();
+  mmToast('시간 초과: 분석이 너무 오래 걸립니다.', 'err');
 }
 
 function btShowProgressUI() {
@@ -1006,8 +1128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         await btPollTask(state.task_id);
       } catch(e) {
-        document.getElementById('btResultEmpty').style.display = 'flex';
-        document.getElementById('btResultContent').style.display = 'none';
+        btShowInput();
       } finally {
         localStorage.removeItem('mm_task_backtest');
         _btTaskId = null;
@@ -1036,8 +1157,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ── 렌더링 ──
 function renderBacktest(data) {
-  document.getElementById('btResultEmpty').style.display   = 'none';
+  btShowResults();
+  _btRefreshChartColors();
   document.getElementById('btResultContent').style.display = 'block';
+  btBuildCondSummary(window._btLastBody);
 
   // 가상 데이터 경고 배너
   const btSynthBanner = document.getElementById('btSynthWarningBanner');
@@ -1072,16 +1195,19 @@ function renderBacktest(data) {
 
   const m = data.metrics;
 
-  // 핵심 지표
+  // 히어로: 최종 자산 + 총수익률·CAGR
+  document.getElementById('btHeroValue').textContent = fmtKRW(m.end_value);
+  document.getElementById('btHeroSub').innerHTML =
+    `<span class="${fmtPctClass(m.total_return)}">총 수익률 ${fmtPct(m.total_return)}</span>` +
+    `<span class="${fmtPctClass(m.cagr)}">CAGR ${fmtPct(m.cagr)}</span>`;
+
+  // 보조 지표
   document.getElementById('btMetrics').innerHTML = [
-    { label: '최종 자산',    value: fmtKRW(m.end_value),       cls: '', desc: '시뮬레이션 종료 시점의 평가금액(세금 ON이면 청산세 반영).' },
-    { label: '총 납입금',    value: fmtKRW(m.total_invested),  cls: '', desc: '초기 투자금 + 월 적립금을 모두 더한 원금.' },
-    { label: '총 수익률',    value: fmtPct(m.total_return),    cls: fmtPctClass(m.total_return), desc: '납입한 원금 대비 전체 손익률.' },
-    { label: 'CAGR',        value: fmtPct(m.cagr),            cls: fmtPctClass(m.cagr), desc: '연평균 복리 성장률 — 매년 평균 몇 % 불었는지.' },
-    { label: 'MDD',         value: fmtPct(m.mdd),             cls: 'down', desc: '최대 낙폭 — 고점 대비 가장 크게 떨어진 폭. 0에 가까울수록 방어적.' },
-    { label: 'Sharpe',      value: m.sharpe ? m.sharpe.toFixed(2) : '—', cls: '', desc: '위험(변동성) 1단위당 수익. 높을수록 위험 대비 효율적.' },
-    { label: '총 배당금',   value: fmtKRW(m.total_dividend),  cls: '', desc: '시뮬레이션 기간 동안 받은 배당금 합계.' },
-    { label: '분석 기간',   value: m.years ? m.years.toFixed(1) + '년' : '—', cls: '', desc: '시뮬레이션이 다룬 총 기간.' },
+    { label: '총 납입금',  value: fmtKRW(m.total_invested),  cls: '', desc: '초기 투자금 + 월 적립금을 모두 더한 원금.' },
+    { label: 'MDD',       value: fmtPct(m.mdd),             cls: 'down', desc: '최대 낙폭 — 고점 대비 가장 크게 떨어진 폭. 0에 가까울수록 방어적.' },
+    { label: 'Sharpe',    value: m.sharpe ? m.sharpe.toFixed(2) : '—', cls: '', desc: '위험(변동성) 1단위당 수익. 높을수록 위험 대비 효율적.' },
+    { label: '총 배당금', value: fmtKRW(m.total_dividend),  cls: '', desc: '시뮬레이션 기간 동안 받은 배당금 합계.' },
+    { label: '분석 기간', value: m.years ? m.years.toFixed(1) + '년' : '—', cls: '', desc: '시뮬레이션이 다룬 총 기간.' },
   ].map(item => `
     <div class="metric-item">
       <div class="metric-label" title="${item.desc}">${item.label} <span style="opacity:0.45;font-weight:400;">ⓘ</span></div>
@@ -1147,14 +1273,14 @@ function renderAnnualDividendChart(annualDiv, totalDiv) {
   const values = rows.map(a => a.dividend);
   btCharts.annualDiv = new Chart(document.getElementById('btDivChart').getContext('2d'), {
     type: 'bar',
-    data: { labels, datasets: [{ data: values, backgroundColor: 'rgba(25,118,210,0.8)', borderRadius: 4 }] },
+    data: { labels, datasets: [{ data: values, backgroundColor: _btRgba(_btBrand, 0.85), borderRadius: 4 }] },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false },
         tooltip: { callbacks: { label: ctx => fmtKRW(ctx.parsed.y) } } },
       scales: {
-        x: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => fmtKRW(v) }, grid: { color: MM_CHART_GRID } }
+        x: { ticks: { font: { size: 10 }, color: _btMuted }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 }, color: _btMuted, callback: v => fmtKRW(v) }, grid: { color: MM_CHART_GRID } }
       }
     }
   });
@@ -1178,7 +1304,7 @@ function renderDividendGrowthChart(annualDiv) {
     labels.push(rows[i].year + '년');
     values.push(prev > 0 ? +((cur / prev - 1) * 100).toFixed(1) : 0);
   }
-  const colors = values.map(v => v >= 0 ? 'rgba(46,125,50,0.8)' : 'rgba(198,40,40,0.8)');
+  const colors = values.map(v => v >= 0 ? _btRgba(_btUp, 0.85) : _btRgba(_btDown, 0.85));
 
   btCharts.divGrowth = new Chart(document.getElementById('btDivGrowthChart').getContext('2d'), {
     type: 'bar',
@@ -1188,8 +1314,8 @@ function renderDividendGrowthChart(annualDiv) {
       plugins: { legend: { display: false },
         tooltip: { callbacks: { label: ctx => (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y.toFixed(1) + '%' } } },
       scales: {
-        x: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
+        x: { ticks: { font: { size: 10 }, color: _btMuted }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: _btMuted, callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
       }
     }
   });
@@ -1230,14 +1356,14 @@ function renderValueChart(history) {
         {
           label: '포트폴리오',
           data: values,
-          borderColor: '#1976D2', borderWidth: 2,
-          backgroundColor: 'rgba(25,118,210,0.08)',
+          borderColor: _btBrand, borderWidth: 2,
+          backgroundColor: _btRgba(_btBrand, 0.08),
           fill: true, pointRadius: 0, tension: 0.2,
         },
         {
           label: '납입금',
           data: invested,
-          borderColor: '#90A4AE', borderWidth: 1.5,
+          borderColor: _btMuted, borderWidth: 1.5,
           borderDash: [5, 4],
           fill: false, pointRadius: 0, tension: 0,
         },
@@ -1254,7 +1380,7 @@ function renderValueChart(history) {
         }},
         zoom: {
           zoom: {
-            drag: { enabled: true, backgroundColor: 'rgba(25,118,210,0.15)' },
+            drag: { enabled: true, backgroundColor: _btRgba(_btBrand, 0.15) },
             mode: 'x',
             onZoomComplete: ({ chart }) => {
               const x = chart.scales.x;
@@ -1266,8 +1392,8 @@ function renderValueChart(history) {
         }
       },
       scales: {
-        x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => fmtKRW(v) }, grid: { color: MM_CHART_GRID } }
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: _btMuted }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: _btMuted, callback: v => fmtKRW(v) }, grid: { color: MM_CHART_GRID } }
       }
     }
   });
@@ -1329,7 +1455,7 @@ function renderAnnualChart(annualReturns) {
   if (!annualReturns || !annualReturns.length) return;
   const labels = annualReturns.map(a => a.year + '년');
   const values = annualReturns.map(a => a.return * 100);
-  const colors = values.map(v => v >= 0 ? 'rgba(46,125,50,0.8)' : 'rgba(198,40,40,0.8)');
+  const colors = values.map(v => v >= 0 ? _btRgba(_btUp, 0.85) : _btRgba(_btDown, 0.85));
 
   btCharts.annual = new Chart(document.getElementById('btAnnualChart').getContext('2d'), {
     type: 'bar',
@@ -1348,8 +1474,8 @@ function renderAnnualChart(annualReturns) {
         callbacks: { label: ctx => (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y.toFixed(2) + '%' }
       }},
       scales: {
-        x: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
+        x: { ticks: { font: { size: 10 }, color: _btMuted }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: _btMuted, callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
       }
     }
   });
@@ -1432,10 +1558,11 @@ async function btMakeCanvas() {
   return out;
 }
 
-async function btCopyLink() {
-  const btn = event.target; const orig = btn.textContent;
-  if (!window._btShareData) { btn.textContent = '⚠️ 먼저 분석하세요'; setTimeout(() => btn.textContent = orig, 2000); return; }
-  btn.textContent = '⏳ 생성 중...'; btn.disabled = true;
+async function btCopyLink(ev) {
+  const btn = ev && ev.currentTarget;
+  if (!window._btShareData) { mmToast('먼저 분석을 실행하세요', 'err'); return; }
+  if (btn) btn.disabled = true;
+  mmToast('공유 이미지 생성 중…');
   try {
     const canvas = await btMakeCanvas();
     const b64 = canvas.toDataURL('image/png');
@@ -1446,17 +1573,16 @@ async function btCopyLink() {
     const { id } = await res.json();
     const url = location.origin + '/share/img/' + id;
     const box = document.getElementById('btShareUrlBox');
-    if (box) { box.style.display = 'block'; box.innerHTML = '🔗 공유 링크: <a href="' + url + '" target="_blank">' + url + '</a>'; }
+    if (box) { box.style.display = 'block'; box.innerHTML = '공유 링크: <a href="' + url + '" target="_blank">' + url + '</a>'; }
     await mmCopyText(url);
-    btn.textContent = '✅ 복사됨!';
-    setTimeout(() => btn.textContent = orig, 2000);
+    mmToast('링크가 복사됐어요!', 'ok');
   } catch(e) {
-    btn.textContent = '⚠️ 오류'; setTimeout(() => btn.textContent = orig, 2000);
-  } finally { btn.disabled = false; }
+    mmToast('오류가 발생했어요', 'err');
+  } finally { if (btn) btn.disabled = false; }
 }
 
 function btDownloadImg() {
-  if (typeof html2canvas === 'undefined') { alert('이미지 저장 기능을 불러오는 중입니다.'); return; }
+  if (typeof html2canvas === 'undefined') { mmToast('이미지 저장 기능을 불러오는 중입니다.', 'err'); return; }
   btMakeCanvas().then(function(canvas) {
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
@@ -1476,8 +1602,8 @@ function renderDrawdownChart(history) {
       labels,
       datasets: [{
         data: values,
-        borderColor: '#C62828', borderWidth: 1.5,
-        backgroundColor: 'rgba(198,40,40,0.1)',
+        borderColor: _btDown, borderWidth: 1.5,
+        backgroundColor: _btRgba(_btDown, 0.1),
         fill: true, pointRadius: 0, tension: 0.2,
       }]
     },
@@ -1489,7 +1615,7 @@ function renderDrawdownChart(history) {
       },
       zoom: {
         zoom: {
-          drag: { enabled: true, backgroundColor: 'rgba(198,40,40,0.15)' },
+          drag: { enabled: true, backgroundColor: _btRgba(_btDown, 0.15) },
           mode: 'x',
           onZoomComplete: ({ chart }) => {
             const x = chart.scales.x;
@@ -1500,8 +1626,8 @@ function renderDrawdownChart(history) {
         }
       }},
       scales: {
-        x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: _btMuted }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: _btMuted, callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
       }
     }
   });
@@ -1510,7 +1636,7 @@ function renderDrawdownChart(history) {
 function btAttrManual() {
   const s = document.getElementById('btAttrStart').value;
   const e = document.getElementById('btAttrEnd').value;
-  if (!s || !e || s >= e) { alert('시작일이 종료일보다 앞서야 해요.'); return; }
+  if (!s || !e || s >= e) { mmToast('시작일이 종료일보다 앞서야 해요.', 'err'); return; }
   btAttrAnalyze(s, e);
 }
 

@@ -273,23 +273,32 @@ function accountWeightWarnHtml(idx) {
   return '';
 }
 
+// 계좌 비중 변경 — 같은 행의 number↔slider 동기(재렌더 없이 커서 보존, BUG-G1-2).
+function _mmAcctW(el, idx, code) {
+  const v = Math.max(0, Math.min(100, Number(el.value) || 0));
+  const row = el.closest('.ticker-item');
+  if (row) row.querySelectorAll('.ticker-weight-input, .ticker-weight-slider').forEach(x => { if (x !== el) x.value = v; });
+  onAccountTickerWeightChange(idx, code, v);
+}
+
+// 계좌 종목 리스트 — 메인 입력창과 동일 .ticker-item 컴포넌트로 대칭.
 function renderAccountTickerList(idx) {
   const accTickers = ensureAccountTickers(idx);
   if (accTickers.length === 0) {
-    return '<div style="font-size:0.76rem;color:var(--text-muted);padding:8px 0;">종목을 추가하세요</div>';
+    return '<div style="font-size:var(--fs-cap,13px);color:var(--ds-muted);padding:8px 0;">종목을 추가하세요</div>';
   }
-  const warn = `<div id="acctWeightWarn${idx}" style="margin-top:4px;">${accountWeightWarnHtml(idx)}</div>`;
-  return accTickers.map(t => `
-    <div style="display:grid;grid-template-columns:70px 1fr 64px 24px;gap:6px;align-items:center;margin-top:6px;">
-      <div style="font-weight:800;font-size:0.78rem;color:var(--text);">${t.code}</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.name || t.code}</div>
-      <input type="number" value="${t.weight}" min="0" max="100" step="1"
-        oninput="onAccountTickerWeightChange(${idx}, '${t.code}', this.value)"
-        style="width:64px;border:1.5px solid var(--border);border-radius:6px;padding:4px;font-size:0.78rem;text-align:right;">
-      <button onclick="removeAccountTicker(${idx}, '${t.code}')"
-        style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.9rem;">✕</button>
+  const warn = `<div id="acctWeightWarn${idx}" style="margin-top:6px;">${accountWeightWarnHtml(idx)}</div>`;
+  return '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">' + accTickers.map(t => `
+    <div class="ticker-item">
+      <span class="ticker-badge">${t.code}</span>
+      <span class="ticker-name">${_mmEsc((t.name || t.code).substring(0, 12))}</span>
+      <input type="number" class="ticker-weight-input" value="${t.weight}" min="0" max="100" step="1"
+        oninput="_mmAcctW(this, ${idx}, '${t.code}')"> %
+      <input type="range" class="ticker-weight-slider" value="${t.weight}" min="0" max="100"
+        oninput="_mmAcctW(this, ${idx}, '${t.code}')">
+      <button class="ticker-remove-btn" onclick="removeAccountTicker(${idx}, '${t.code}')">×</button>
     </div>
-  `).join('') + warn;
+  `).join('') + '</div>' + warn;
 }
 
 function fmtTaxKRW(v) {
@@ -304,41 +313,35 @@ function fmtTaxKRW(v) {
   return sign + '₩' + Math.round(abs).toLocaleString();
 }
 
-// 계좌 카드 금액 입력칸 — 모드별. 적립=초기+월적립 / 인출=시작목돈(+위탁 미실현차익).
+// 계좌 카드 금액 입력칸 — 메인 입력창과 동일 컴포넌트(.calc-input/.input-group/.unit)로 대칭.
+// 모드별: 적립=초기+월적립 / 인출=시작목돈(+위탁 미실현차익).
+const _MM_LBL = 'display:block;font-size:var(--fs-cap,13px);font-weight:600;color:var(--ds-body);margin-bottom:7px;';
+function _mmMoneyField(label, field, val, step, i, title) {
+  return `
+        <div style="margin-bottom:0;">
+          <label style="${_MM_LBL}"${title ? ` title="${title}"` : ''}>${label}</label>
+          <div class="input-group">
+            <input type="number" class="calc-input" value="${Number(val || 0)}" min="0" step="${step}"
+              oninput="updateTaxAccountAmount(${i}, '${field}', this.value)">
+            <span class="unit">원</span>
+          </div>
+        </div>`;
+}
 function _mmAmountFields(acc, i) {
-  const initInput = (label) => `
-          <label style="font-size:0.72rem;color:var(--text-muted);">${label}
-            <input type="number" value="${Number(acc.initial_capital || 0)}" min="0" step="1000000"
-              oninput="updateTaxAccountAmount(${i}, 'initial_capital', this.value)"
-              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
-          </label>`;
   if (_mmMode() !== 'withdrawal') {
-    return `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-          ${initInput('초기 투자금')}
-          <label style="font-size:0.72rem;color:var(--text-muted);">월 적립액
-            <input type="number" value="${Number(acc.monthly_contribution || 0)}" min="0" step="100000"
-              oninput="updateTaxAccountAmount(${i}, 'monthly_contribution', this.value)"
-              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
-          </label>
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+          ${_mmMoneyField('초기 투자금', 'initial_capital', acc.initial_capital, 1000000, i)}
+          ${_mmMoneyField('월 적립액', 'monthly_contribution', acc.monthly_contribution, 100000, i)}
         </div>`;
   }
   // 인출 모드: 위탁만 미실현차익(양도세 취득가 = 시작목돈 − 미실현차익).
   if (acc.type === '위탁') {
-    return `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-          ${initInput('시작 목돈')}
-          <label style="font-size:0.72rem;color:var(--text-muted);" title="현재 평가액 중 매수가 대비 이익(양도세 취득가 산정용)">미실현 차익
-            <input type="number" value="${Number(acc.unrealized_gain || 0)}" min="0" step="1000000"
-              oninput="updateTaxAccountAmount(${i}, 'unrealized_gain', this.value)"
-              style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
-          </label>
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+          ${_mmMoneyField('시작 목돈', 'initial_capital', acc.initial_capital, 1000000, i)}
+          ${_mmMoneyField('미실현 차익', 'unrealized_gain', acc.unrealized_gain, 1000000, i, '현재 평가액 중 매수가 대비 이익(양도세 취득가 산정용)')}
         </div>`;
   }
-  return `
-        <div style="margin-bottom:8px;">
-          ${initInput('시작 목돈')}
-        </div>`;
+  return `<div style="margin-bottom:10px;">${_mmMoneyField('시작 목돈', 'initial_capital', acc.initial_capital, 1000000, i)}</div>`;
 }
 
 function renderTaxAccounts() {
@@ -421,7 +424,7 @@ function renderTaxAccounts() {
         <div style="position:relative;margin-top:6px;">
           <input type="text" id="accountTickerSearch${i}" placeholder="이 계좌 종목 검색"
             oninput="onAccountTickerSearch(${i}, this.value)"
-            style="width:100%;border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;font-size:0.8rem;background:var(--input-bg);">
+            style="width:100%;box-sizing:border-box;border:1.5px solid var(--ds-hairline);border-radius:var(--r-md,12px);padding:11px 14px;font-size:var(--fs-sm,14px);background:var(--ds-soft);color:var(--ds-ink);outline:none;">
           <div class="ticker-dropdown" id="accountTickerDropdown${i}" style="left:0;right:0;"></div>
         </div>
         ${renderAccountTickerList(i)}

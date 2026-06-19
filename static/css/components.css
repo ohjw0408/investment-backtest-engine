@@ -22,6 +22,8 @@
 .ds-btn-ghost { background:transparent; color:var(--ds-ink); border-color:var(--ds-hairline); }
 .ds-btn-ghost:hover:not(:disabled) { border-color:var(--brand); color:var(--brand-text); }
 .ds-btn-text { background:transparent; color:var(--brand-text); padding:8px 10px; }
+.ds-btn-danger { background:var(--down); color:#fff; }
+.ds-btn-danger:hover:not(:disabled) { filter:brightness(.92); }
 .ds-btn-lg { padding:16px 28px; font-size:var(--fs-body); }
 .ds-btn-sm { padding:8px 14px; font-size:var(--fs-cap); }
 .ds-btn-icon { width:40px; height:40px; padding:0; border-radius:var(--r-full);
@@ -142,6 +144,10 @@
 .ds-toast-ok { background:var(--up); color:#fff; }
 .ds-toast-err { background:var(--down); color:#fff; }
 @keyframes ds-toast-in { from { opacity:0; transform:translateY(8px); } }
+/* 상단 중앙 슬라이드다운 변형 (mmToast 기본) */
+.ds-toast-wrap.top { top:74px; bottom:auto; }
+.ds-toast.top { animation:ds-toast-in-top .22s ease; }
+@keyframes ds-toast-in-top { from { opacity:0; transform:translateY(-10px); } }
 
 /* ═══════════════════════════════════════════════════════════════
    NAV / SIDEBAR — 코인베이스 셸 (style.css 레거시 오버라이드, 전역)

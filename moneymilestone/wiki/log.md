@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-19] UX | 포트폴리오 분석(backtest) 전면 리디자인 + 브랜드 다이얼로그 공용화
+
+오너: 좌/우 분할 폐기 → **전체폭 입력 화면 → [분석 실행] 시 입력이 사라지고 결과가 그 자리 대체**, 결과 맨 위 조건 요약. **다중계좌 입력칸을 메인 입력칸과 크기·디자인 동일(대칭)하게.** 처음부터 새로 짜듯 리디자인. 구현→푸시→Playwright 엄밀 검증.
+
+- **`base.html` 전역 브랜드 다이얼로그(단일 진실원천)**: `mmToast`(상단중앙 슬라이드다운, ok/err) · `mmConfirm`(Promise<bool>, danger옵션) · `mmPrompt`(Promise<string>) — DOM 동적생성+ds 컴포넌트. native `alert/confirm/prompt` 대체 기반. `nicon` 매크로 +12종(trend-up/down·percent·cash·puzzle·wallet·warn·info·link·image·plus·sliders). `components.css`(→ds5): `.ds-btn-danger`, 토스트 상단변형(navbar 아래 74px).
+- **`backtest.html` 재구성**: 입력 뷰(중앙 760px, 카드= 종목구성/기간·투자금/투자옵션[배당·리밸·수수료]/세금/가상데이터 + 큰 pill 실행) ↔ 결과 뷰(조건요약 바 + **히어로**[최종자산 큰 모노숫자 +수익률·CAGR] + 보조칩 + 차트). `btShowInput/btShowResults/btEditConditions/btBuildCondSummary`. 깊이(ds-canvas+그림자/다크 dark-el). **차트색 ds 바인딩**(`_btCss`/`_btRgba` → --brand/--up/--down/--ds-muted, 액센트·다크 따라감). 이모지 전면 nicon. alert 11곳→mmToast. 공유버튼 텍스트변형→토스트(아이콘 보존).
+- **`multi_account_ui.js`(공용, 계산기·은퇴·배당 공유) 계좌 카드 = 메인과 동일 컴포넌트**: 금액=`.calc-input`/`.input-group`/`.unit`, 종목=`.ticker-item`(배지·이름·비중 input+**슬라이더**+× , `_mmAcctW`로 number↔slider 동기), 검색박스 메인 크기. IDs/핸들러 100% 보존. `portfolio_favorites.js` native→mmToast/mmConfirm/mmPrompt. 공용 JS 캐시 `?v=20260619ds`(5템플릿).
+- **검증(Playwright 실클릭, 라이트+다크)**: 입력↔결과 전환·검색드롭다운(실백엔드)·밴드슬라이더·수수료패널·세금ON·계좌2 추가. **대칭 측정: 메인 입력높이 21=계좌 21, 칩높이 49=49, 계좌 슬라이더 有.** 히어로/조건요약/4차트 렌더. 빈실행→**브랜드 토스트(네이티브 dialog 0)**. **콘솔에러 0**. 계산기·은퇴 공용모듈 스모크(계좌카드 ticker-item+calc-input 렌더, 에러0). 상세 → [[디자인통일_plan]].
+
 ## [2026-06-19] PROCESS | 프론트/디자인 변경 검증 규칙 명문화 (오너 지시)
 
 오너: "모든 버튼 다 눌러보고 확인" 원칙을 확실히 이행되게 위키 정리.

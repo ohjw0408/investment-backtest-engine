@@ -71,7 +71,7 @@ window.MMFav = (function () {
 
     function requireLogin() {
       if (state.loggedIn) return true;
-      alert('즐겨찾기는 로그인 후 사용할 수 있어요.');
+      mmToast('즐겨찾기는 로그인 후 사용할 수 있어요.', 'err');
       return false;
     }
 
@@ -86,14 +86,14 @@ window.MMFav = (function () {
       if (!requireLogin()) return;
       const tickers = opts.getTickers();
       if (!tickers || !tickers.length) {
-        alert('저장할 종목이 없어요. 먼저 종목을 추가해주세요.');
+        mmToast('저장할 종목이 없어요. 먼저 종목을 추가해주세요.', 'err');
         return;
       }
       const selected = state.items.find(p => p.id === Number(select.value));
-      const name = (prompt('포트폴리오 이름', selected ? selected.name : '') || '').trim();
+      const name = ((await mmPrompt('포트폴리오 이름', { value: selected ? selected.name : '', placeholder: '예: 안정형 60/40', ok: '저장' })) || '').trim();
       if (!name) return;
       const existing = state.items.find(p => p.name === name);
-      if (existing && !confirm(`"${name}" 즐겨찾기를 덮어쓸까요?`)) return;
+      if (existing && !(await mmConfirm(`"${name}" 즐겨찾기를 덮어쓸까요?`, { ok: '덮어쓰기' }))) return;
       try {
         const res = await fetch('/api/portfolio/save', {
           method: 'POST',
@@ -101,24 +101,26 @@ window.MMFav = (function () {
           body: JSON.stringify({ id: existing ? existing.id : null, name, tickers }),
         });
         const data = await res.json();
-        if (!res.ok) { alert(data.error || '저장에 실패했어요.'); return; }
+        if (!res.ok) { mmToast(data.error || '저장에 실패했어요.', 'err'); return; }
         await refresh();
         const saved = state.items.find(p => p.name === name);
         if (saved) select.value = String(saved.id);
-      } catch (e) { alert('저장에 실패했어요. 네트워크를 확인해주세요.'); }
+        mmToast('즐겨찾기에 저장됐어요.', 'ok');
+      } catch (e) { mmToast('저장에 실패했어요. 네트워크를 확인해주세요.', 'err'); }
     });
 
     delBtn.addEventListener('click', async () => {
       if (!requireLogin()) return;
       const id = Number(select.value);
       const item = state.items.find(p => p.id === id);
-      if (!item) { alert('삭제할 즐겨찾기를 먼저 선택해주세요.'); return; }
-      if (!confirm(`"${item.name}" 즐겨찾기를 삭제할까요?`)) return;
+      if (!item) { mmToast('삭제할 즐겨찾기를 먼저 선택해주세요.', 'err'); return; }
+      if (!(await mmConfirm(`"${item.name}" 즐겨찾기를 삭제할까요?`, { ok: '삭제', danger: true }))) return;
       try {
         const res = await fetch(`/api/portfolio/${id}`, { method: 'DELETE' });
-        if (!res.ok) { alert('삭제에 실패했어요.'); return; }
+        if (!res.ok) { mmToast('삭제에 실패했어요.', 'err'); return; }
         await refresh();
-      } catch (e) { alert('삭제에 실패했어요. 네트워크를 확인해주세요.'); }
+        mmToast('삭제됐어요.', 'ok');
+      } catch (e) { mmToast('삭제에 실패했어요. 네트워크를 확인해주세요.', 'err'); }
     });
 
     renderOptions();

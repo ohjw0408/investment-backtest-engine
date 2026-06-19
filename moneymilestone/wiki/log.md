@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-19] UX/DATA | 수수료 프리셋 저장 + backtest 수수료 UI + 내 자산 전체자산 히어로
+
+오너: 거래수수료 버튼도 세금설정 스타일에 맞추고, 주요 증권사 수수료율을 국내/해외로 나눠 저장. 증권사 프리셋 UI를 전체 디자인과 맞추고, 내 자산 탭에는 금액가리기와 보유종목 사이에 홈 화면처럼 전체 자산 숫자와 자산추이 그래프를 합쳐서 표시.
+
+- **수수료 데이터**: `static/data/broker_fee_presets.json` 신규 저장. 키움/미래에셋/한국투자/삼성/KB/신한/토스/NH나무 8개 프리셋, 시장 구분 `domestic_stock`/`domestic_etf`/`us_stock`, 대표 온라인 수수료율과 원문 URL/주의문구 포함. 이벤트·협의수수료·제비용·세금은 계좌별로 달라질 수 있어 프리셋은 계산 기본값으로만 둠.
+- **backtest 수수료 UI**: `templates/backtest.html`의 거래수수료 체크박스를 세금설정과 같은 ON/OFF 스위치로 변경. 패널은 증권사 프리셋, 국내주식/국내 ETF/미국주식 세그먼트, 수수료율 입력, 근거 메타문구 순서로 정리. 프리셋은 static JSON을 fetch하고 실패 시 최소 fallback 사용. 실행 조건 요약과 submit body에는 `fee_market`/`fee_preset`도 포함.
+- **다중계좌 카드**: `static/js/multi_account_ui.js` 계좌별 수수료 프리셋도 같은 JSON(`window.MM_BROKER_FEE_PRESETS`)을 사용하도록 변경. 현재 선택한 시장 구분에 맞춰 카드 프리셋 문구가 바뀜.
+- **내 자산**: `templates/myassets.html`에서 기존 하단 `자산 추이` 카드를 제거하고, 금액가리기와 보유종목 사이에 `전체 자산` 숫자+기간 수익률 배지+자산추이 Chart.js 캔버스를 통합한 홈 결 카드 추가. 금액가리기 토글 시 숫자/그래프 재렌더, 기간 버튼은 1개월/3개월/1년/전체 유지.
+- **검증**: JSON parse, `node --check static/js/multi_account_ui.js`, `python -m compileall app.py modules`, Flask test-client `/myassets` 로그인 DOM 순서(`hideAmountToggle < maAssetHero < holdingsTableWrap`) 및 static JSON 200, 브라우저 backtest 데스크톱/모바일 overflow 0, 프리셋 토스+미국주식 전환 수수료 0.1%, 콘솔에러 0.
+
+_작성: Codex_
+
 ## [2026-06-19] HOTFIX | backtest 입력창 오버플로우/빈 공간 회귀 수습
 
 오너 스샷: `월 적립금` 입력이 카드 밖으로 삐져나오고, 입력 블록 좌측 빈 공간이 크게 생김. 나머지 상태저장/가격 이상치 수정은 유지.

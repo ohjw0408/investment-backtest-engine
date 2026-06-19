@@ -1,0 +1,135 @@
+{
+  "as_of": "2026-06-19",
+  "unit": "percent",
+  "scope": "Representative online brokerage commissions for Korean domestic listed products and US stocks. Promotions, negotiated rates, exchange/SEC fees, taxes, minimum commissions, and account-specific discounts can differ.",
+  "markets": [
+    { "id": "domestic_stock", "label": "국내주식" },
+    { "id": "domestic_etf", "label": "국내 ETF/ETN" },
+    { "id": "us_stock", "label": "미국주식" }
+  ],
+  "presets": [
+    {
+      "id": "kiwoom",
+      "name": "키움증권",
+      "default_market": "domestic_stock",
+      "rates": {
+        "domestic_stock": { "commission_pct": 0.015, "display": "0.015%" },
+        "domestic_etf": { "commission_pct": 0.015, "display": "0.015%" },
+        "us_stock": { "commission_pct": 0.25, "display": "0.25%" }
+      },
+      "notes": "국내는 온라인/증권플러스 등 대표 0.015%, 미국은 온라인 0.25% 기준. 미국 SEC Fee 등 제비용 별도.",
+      "source_urls": [
+        "https://www.kiwoom.com/h/help/fee/VHelpStockFeeView",
+        "https://www.kiwoom.com/h/help/fee/VHelpFoFeeView"
+      ]
+    },
+    {
+      "id": "mirae",
+      "name": "미래에셋증권",
+      "default_market": "domestic_stock",
+      "rates": {
+        "domestic_stock": { "commission_pct": 0.014, "display": "0.014% 대표" },
+        "domestic_etf": { "commission_pct": 0.014, "display": "0.014% 대표" },
+        "us_stock": { "commission_pct": 0.25, "display": "0.25%" }
+      },
+      "notes": "다이렉트/비대면 우대 이벤트는 0.0036396% 등 별도 조건이 있을 수 있음. 미국은 온라인 0.25% 기준.",
+      "source_urls": [
+        "https://securities.miraeasset.com/public/mw/guide/html/20191119095045.html",
+        "https://securities.miraeasset.com/imf/600/imf301.do",
+        "https://securities.miraeasset.com/imf/600/imf102.do"
+      ]
+    },
+    {
+      "id": "koreainvest",
+      "name": "한국투자증권",
+      "default_market": "domestic_stock",
+      "rates": {
+        "domestic_stock": { "commission_pct": 0.0140527, "display": "0.0140527% KRX" },
+        "domestic_etf": { "commission_pct": 0.0146527, "display": "0.0146527%" },
+        "us_stock": { "commission_pct": 0.25, "display": "0.25%" }
+      },
+      "notes": "BanKIS HTS/홈페이지/모바일 KRX 기준. NXT 국내주식은 0.0130527%. 미국 온라인 0.25%, SEC Fee 별도.",
+      "source_urls": [
+        "https://securities.koreainvestment.com/main/customer/guide/_static/TF04ae010000.jsp",
+        "https://securities.koreainvestment.com/main/bond/research/_static/TF03ca050000.jsp"
+      ]
+    },
+    {
+      "id": "samsung",
+      "name": "삼성증권",
+      "default_market": "domestic_stock",
+      "rates": {
+        "domestic_stock": { "commission_pct": 0.077, "display": "0.077%~0.5%" },
+        "domestic_etf": { "commission_pct": 0.077, "display": "0.077%~0.5%" },
+        "us_stock": { "commission_pct": 0.25, "display": "0.25%" }
+      },
+      "notes": "국내 표준 수수료는 구간/매체별 범위로 고지되어 하한값을 프리셋 계산값으로 사용. 미국 온라인 0.25%, 최소수수료/기타거래세 별도.",
+      "source_urls": [
+        "https://www.samsungpop.com/?MENU_CODE=M1454053949864&MENU_OPTION=%2Fux%2Fkor%2Fcustomer%2Fguide%2Fworkproductguide%2FdomesticStock.do",
+        "https://www.samsungpop.com/ux/kor/customer/guide/workproductguide/overseasStockTab2.do"
+      ]
+    },
+    {
+      "id": "kb",
+      "name": "KB증권",
+      "default_market": "domestic_stock",
+      "rates": {
+        "domestic_stock": { "commission_pct": 0.015, "display": "0.014%~0.015% HTS/WTS" },
+        "domestic_etf": { "commission_pct": 0.015, "display": "0.014%~0.015% HTS/WTS" },
+        "us_stock": { "commission_pct": 0.25, "display": "0.25%" }
+      },
+      "notes": "비대면/은행연계 국내 HTS/WTS 대표 범위 기준. 모바일 표준은 별도 범위가 있을 수 있음. 미국 HTS/MTS/WTS 0.25%.",
+      "source_urls": [
+        "https://www.kbsec.com/go.able?linkcd=m06030007",
+        "https://www.kbsec.com/go.able?linkcd=s060307010002",
+        "https://www.kbsec.com/go.able?linkcd=s06030701P100"
+      ]
+    },
+    {
+      "id": "shinhan",
+      "name": "신한투자증권",
+      "default_market": "domestic_stock",
+      "rates": {
+        "domestic_stock": { "commission_pct": 0.1891639, "display": "0.1882276%~0.1891639%" },
+        "domestic_etf": { "commission_pct": 0.1891639, "display": "구간별/매체별" },
+        "us_stock": { "commission_pct": 0.25, "display": "0.25%" }
+      },
+      "notes": "국내 모바일 표준 범위와 미국 온라인 0.25% 기준. 이벤트/우대계좌는 별도.",
+      "source_urls": [
+        "https://www.shinhansec.com/siw/customer-center/guide/business_guide_charge_tab1/contents.do",
+        "https://m.shinhansec.com/mweb/svif/feif/sfeif0001"
+      ]
+    },
+    {
+      "id": "toss",
+      "name": "토스증권",
+      "default_market": "domestic_stock",
+      "rates": {
+        "domestic_stock": { "commission_pct": 0.015, "display": "KRX 0.015% / NXT 0.014%" },
+        "domestic_etf": { "commission_pct": 0.015, "display": "KRX 0.015% / NXT 0.014%" },
+        "us_stock": { "commission_pct": 0.1, "display": "0.1%" }
+      },
+      "notes": "국내는 KRX/NXT별 상이. 2026년 6월 국내 무료 이벤트 등 조건부 혜택은 계산 프리셋에 기본 반영하지 않음.",
+      "source_urls": [
+        "https://support.toss.im/faq/3669",
+        "https://corp.tossinvest.com/en/business?tab=commission"
+      ]
+    },
+    {
+      "id": "namuh",
+      "name": "NH투자증권 나무",
+      "default_market": "domestic_stock",
+      "rates": {
+        "domestic_stock": { "commission_pct": 0.01, "display": "0.01%~0.50%" },
+        "domestic_etf": { "commission_pct": 0.01, "display": "0.01%~0.50%" },
+        "us_stock": { "commission_pct": 0.25, "display": "0.25%" }
+      },
+      "notes": "나무증권 온라인 국내 범위 하한과 미국 온라인 0.25% 기준. 계좌/채널/이벤트별 실제율은 다를 수 있음.",
+      "source_urls": [
+        "https://www.mynamuhbegin.com/",
+        "https://www.mynamuhbegin.com/stock",
+        "https://wts.mynamuh.com/wtsInfo/overseas/wts8015.nh"
+      ]
+    }
+  ]
+}

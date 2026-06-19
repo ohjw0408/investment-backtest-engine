@@ -83,11 +83,27 @@ function updateTaxAccountPriority(idx, val) {
 // 증권사가 계좌마다 다르므로 카드별 수수료율 지정. feeEnabledChk(계산기·백테만 존재)
 // 켜진 경우에만 카드에 노출 → 미배선 탭(은퇴·배당)은 _mmFeeField가 ''로 자동 미표시.
 // 상태 = acc.fee_rate_pct(%). 미지정이면 탭레벨 입력(feeRateInput)을 기본 시드로 사용.
-const _MM_FEE_PRESETS = [
+const _MM_FEE_PRESET_FALLBACK = [
   { v: '0.015', label: '키움 0.015%' },
-  { v: '0.02',  label: '삼성 0.02%' },
-  { v: '0',     label: '토스 0%' },
+  { v: '0.0140527', label: '한국투자 0.0140527%' },
+  { v: '0.1', label: '토스 미국 0.1%' },
 ];
+
+function _mmBrokerFeeMarket() {
+  return document.querySelector('input[name="feeMarket"]:checked')?.value || 'domestic_stock';
+}
+
+function _mmFeePresets() {
+  const market = _mmBrokerFeeMarket();
+  const brokerPresets = Array.isArray(window.MM_BROKER_FEE_PRESETS) ? window.MM_BROKER_FEE_PRESETS : [];
+  const mapped = brokerPresets.map(p => {
+    const rate = Number(p?.rates?.[market]?.commission_pct);
+    if (!Number.isFinite(rate)) return null;
+    const display = p?.rates?.[market]?.display || (rate + '%');
+    return { v: String(rate), label: `${p.name} ${display}` };
+  }).filter(Boolean);
+  return mapped.length ? mapped : _MM_FEE_PRESET_FALLBACK;
+}
 
 function _mmFeeOn() {
   return document.getElementById('feeEnabledChk')?.checked ?? false;
@@ -105,22 +121,23 @@ function _mmAccountFeePct(acc) {
 function _mmFeeField(acc, i) {
   if (!_mmFeeOn()) return '';
   const pct = _mmAccountFeePct(acc);
-  const isPreset = _MM_FEE_PRESETS.some(p => Number(p.v) === pct);
-  const opts = _MM_FEE_PRESETS.map(p =>
+  const feePresets = _mmFeePresets();
+  const isPreset = feePresets.some(p => Number(p.v) === pct);
+  const opts = feePresets.map(p =>
       `<option value="${p.v}" ${Number(p.v) === pct ? 'selected' : ''}>${p.label}</option>`).join('')
     + `<option value="custom" ${isPreset ? '' : 'selected'}>직접입력</option>`;
   return `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;align-items:end;">
-      <label style="font-size:0.68rem;color:var(--text-muted);">증권사 수수료
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px;align-items:end;">
+      <label style="min-width:0;font-size:0.7rem;font-weight:600;color:var(--ds-muted,var(--text-muted));">증권사 프리셋
         <select id="accountFeePreset${i}" onchange="updateAccountFeePreset(${i}, this.value)"
-          style="width:100%;margin-top:2px;border:1.5px solid var(--border);border-radius:6px;padding:5px 7px;font-size:0.78rem;background:var(--input-bg);">
+          style="width:100%;min-width:0;box-sizing:border-box;margin-top:4px;border:1.5px solid var(--ds-hairline,var(--border));border-radius:var(--r-sm,7px);padding:7px 9px;font-size:0.78rem;background:var(--ds-canvas,var(--input-bg));color:var(--ds-ink,var(--text));">
           ${opts}
         </select>
       </label>
-      <label style="font-size:0.68rem;color:var(--text-muted);">수수료율 (%)
+      <label style="min-width:0;font-size:0.7rem;font-weight:600;color:var(--ds-muted,var(--text-muted));">수수료율 (%)
         <input type="number" id="accountFeeRate${i}" value="${pct}" min="0" step="0.001"
           oninput="updateAccountFeeRate(${i}, this.value)"
-          style="width:100%;margin-top:2px;border:1.5px solid var(--border);border-radius:6px;padding:5px 7px;font-size:0.78rem;background:var(--input-bg);">
+          style="width:100%;min-width:0;box-sizing:border-box;margin-top:4px;border:1.5px solid var(--ds-hairline,var(--border));border-radius:var(--r-sm,7px);padding:7px 9px;font-size:0.78rem;background:var(--ds-canvas,var(--input-bg));color:var(--ds-ink,var(--text));">
       </label>
     </div>`;
 }
@@ -139,7 +156,7 @@ function updateAccountFeeRate(idx, v) {
   const pct = Math.max(0, Number(v) || 0);
   if (window.taxAccounts[idx]) window.taxAccounts[idx].fee_rate_pct = pct;
   const sel = document.getElementById(`accountFeePreset${idx}`);
-  if (sel) sel.value = _MM_FEE_PRESETS.some(p => Number(p.v) === pct) ? String(pct) : 'custom';
+  if (sel) sel.value = _mmFeePresets().some(p => Number(p.v) === pct) ? String(pct) : 'custom';
 }
 
 function ensureAccountTickers(idx) {

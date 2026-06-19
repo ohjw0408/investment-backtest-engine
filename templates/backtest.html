@@ -111,6 +111,49 @@
 
 /* 토글 스위치 (세금·수수료) */
 .bt-toggle-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bt-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; user-select: none; }
+.bt-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.bt-switch-label { font-size: var(--fs-cap); font-weight: 700; color: var(--ds-muted); min-width: 26px; text-align: right; }
+.bt-switch-track { width: 44px; height: 24px; border-radius: var(--r-pill); background: var(--ds-hairline); position: relative; flex-shrink: 0; transition: background .2s; }
+.bt-switch-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.22); transition: transform .2s; }
+.bt-switch input:checked + .bt-switch-track { background: var(--brand); }
+.bt-switch input:checked + .bt-switch-track::after { transform: translateX(20px); }
+
+.bt-fee-panel {
+  display: none; margin-top: 12px; padding: 12px;
+  background: var(--ds-soft); border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-md);
+}
+[data-theme="dark"] .bt-fee-panel { background: var(--ds-strong); }
+.bt-fee-panel.is-open { display: block; }
+.bt-fee-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px; align-items: end;
+}
+.bt-fee-field { min-width: 0; display: block; font-size: var(--fs-cap); font-weight: 600; color: var(--ds-muted); }
+.bt-fee-field > span { display: block; margin-bottom: 6px; }
+.bt-fee-control {
+  width: 100%; min-width: 0; box-sizing: border-box; margin-top: 6px;
+  border: 1.5px solid var(--ds-hairline); border-radius: var(--r-sm);
+  padding: 8px 10px; font-size: 0.82rem; background: var(--ds-canvas);
+  color: var(--ds-ink); outline: none; font-family: inherit;
+}
+[data-theme="dark"] .bt-fee-control { background: var(--ds-dark-el); }
+.bt-fee-control:focus { border-color: var(--brand); }
+.bt-fee-market { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.bt-fee-market label { min-width: 0; margin: 0; }
+.bt-fee-market input { position: absolute; opacity: 0; width: 0; height: 0; }
+.bt-fee-market span {
+  display: flex; align-items: center; justify-content: center; min-height: 34px;
+  padding: 7px 8px; border: 1px solid var(--ds-hairline); border-radius: var(--r-pill);
+  color: var(--ds-body); background: var(--ds-canvas); font-size: 0.76rem;
+  font-weight: 700; white-space: nowrap;
+}
+[data-theme="dark"] .bt-fee-market span { background: var(--ds-dark-el); }
+.bt-fee-market input:checked + span { background: var(--brand-tint); color: var(--brand-text); border-color: var(--brand); }
+.bt-fee-meta { margin-top: 10px; font-size: 0.72rem; color: var(--ds-muted); line-height: 1.45; }
+.bt-fee-meta b { color: var(--ds-ink); }
 
 /* 실행 버튼 */
 .bt-run-wrap {
@@ -338,25 +381,36 @@
       <div class="bt-opt-row">
         <div class="bt-toggle-head">
           <label class="bt-opt-label" style="margin:0;">거래수수료</label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-size:var(--fs-cap);color:var(--ds-muted);">
-            <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()"> 적용
+          <label class="bt-switch">
+            <span class="bt-switch-label" id="btFeeLabel">OFF</span>
+            <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()">
+            <span class="bt-switch-track"></span>
           </label>
         </div>
-        <div id="feePanelBody" style="display:none;margin-top:10px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
-            <label style="font-size:0.72rem;color:var(--ds-muted);">증권사 프리셋
-              <select id="feePreset" onchange="applyFeePreset(this.value)" style="width:100%;margin-top:3px;border:1.5px solid var(--ds-hairline);border-radius:var(--r-sm);padding:7px 9px;font-size:0.82rem;background:var(--ds-soft);color:var(--ds-ink);">
-                <option value="0.015">키움 0.015%</option>
-                <option value="0.02">삼성 0.02%</option>
-                <option value="0">토스 0%</option>
+        <div id="feePanelBody" class="bt-fee-panel">
+          <div class="bt-fee-grid">
+            <label class="bt-fee-field">증권사 프리셋
+              <select id="feePreset" class="bt-fee-control" onchange="applyFeePreset()">
+                <option value="kiwoom">키움증권</option>
                 <option value="custom">직접입력</option>
               </select>
             </label>
-            <label style="font-size:0.72rem;color:var(--ds-muted);">수수료율 (%)
-              <input type="number" id="feeRateInput" value="0.015" min="0" step="0.001" style="width:100%;margin-top:3px;border:1.5px solid var(--ds-hairline);border-radius:var(--r-sm);padding:7px 9px;font-size:0.82rem;background:var(--ds-soft);color:var(--ds-ink);">
+            <div class="bt-fee-field">
+              <span>시장 구분</span>
+              <div class="bt-fee-market">
+                <label><input type="radio" name="feeMarket" value="domestic_stock" checked onchange="applyFeePreset()"><span>국내주식</span></label>
+                <label><input type="radio" name="feeMarket" value="domestic_etf" onchange="applyFeePreset()"><span>국내 ETF</span></label>
+                <label><input type="radio" name="feeMarket" value="us_stock" onchange="applyFeePreset()"><span>미국주식</span></label>
+              </div>
+            </div>
+            <label class="bt-fee-field">수수료율 (%)
+              <input type="number" id="feeRateInput" class="bt-fee-control" value="0.015" min="0" step="0.0001" oninput="markFeePresetCustom()">
             </label>
           </div>
-          <div style="font-size:0.7rem;color:var(--ds-muted);margin-top:6px;">매수·매도에 적용. 국내 개별주식 매도는 거래세 0.18% 추가(ETF 면제).</div>
+          <div class="bt-fee-meta" id="feePresetMeta">
+            <b>키움증권 · 국내주식 0.015%</b><br>
+            매수·매도 공통 적용. 국내 개별주식 매도 거래세는 별도 반영됩니다.
+          </div>
         </div>
       </div>
     </section>
@@ -585,6 +639,35 @@ let btCharts  = {};
 const BT_TASK_KEY = 'mm_task_backtest';
 const BT_RESULT_KEY = 'mm_result_backtest';
 const btStateStore = window.sessionStorage;
+const BT_FEE_PRESETS_URL = "{{ url_for('static', filename='data/broker_fee_presets.json') }}?v=20260619fees";
+const BT_FEE_MARKET_LABELS = {
+  domestic_stock: '국내주식',
+  domestic_etf: '국내 ETF/ETN',
+  us_stock: '미국주식',
+};
+const BT_FEE_FALLBACK_PRESETS = [
+  {
+    id: 'kiwoom',
+    name: '키움증권',
+    rates: {
+      domestic_stock: { commission_pct: 0.015, display: '0.015%' },
+      domestic_etf: { commission_pct: 0.015, display: '0.015%' },
+      us_stock: { commission_pct: 0.25, display: '0.25%' },
+    },
+    notes: '대표 온라인 수수료 기준. 제비용과 세금은 별도.',
+  },
+  {
+    id: 'toss',
+    name: '토스증권',
+    rates: {
+      domestic_stock: { commission_pct: 0.015, display: 'KRX 0.015% / NXT 0.014%' },
+      domestic_etf: { commission_pct: 0.015, display: 'KRX 0.015% / NXT 0.014%' },
+      us_stock: { commission_pct: 0.1, display: '0.1%' },
+    },
+    notes: '조건부 이벤트와 제비용은 계좌별로 다를 수 있습니다.',
+  },
+];
+let btBrokerFeePresets = [];
 
 function btClearLegacyPersistentState() {
   try {
@@ -657,6 +740,11 @@ function btBuildCondSummary(body) {
     const accs = window.taxAccounts || [];
     const types = accs.length > 1 ? accs.map(a => a.type || '위탁').join('+') : (accs[0]?.type || '위탁');
     parts.push(`<span class="bt-cond-item">세금 ON · ${btE(types)}</span>`);
+  }
+  if (body.fee_enabled) {
+    const marketLabel = BT_FEE_MARKET_LABELS[body.fee_market] || '공통';
+    const rate = Number(body.fee_rate || 0) * 100;
+    parts.push(`<span class="bt-cond-item">수수료 ${btE(marketLabel)} · ${rate.toFixed(4).replace(/\.?0+$/, '')}%</span>`);
   }
   el.innerHTML = parts.join('<span class="bt-cond-sep"></span>');
   el.style.display = 'flex';
@@ -924,17 +1012,88 @@ function btRenderMultiAccount(data) {
 }
 
 // ── 거래수수료 (D4) ──
+function btFeeMarket() {
+  return document.querySelector('input[name="feeMarket"]:checked')?.value || 'domestic_stock';
+}
+function btFeePreset() {
+  const id = document.getElementById('feePreset')?.value || 'custom';
+  return btBrokerFeePresets.find(p => p.id === id) || null;
+}
+function btFeeRateFor(preset, market) {
+  const rate = preset?.rates?.[market]?.commission_pct;
+  return Number.isFinite(Number(rate)) ? Number(rate) : null;
+}
+function btFeeDisplayFor(preset, market) {
+  return preset?.rates?.[market]?.display || (btFeeRateFor(preset, market) != null ? btFeeRateFor(preset, market) + '%' : '');
+}
+function renderBrokerFeePresetOptions() {
+  const sel = document.getElementById('feePreset');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = btBrokerFeePresets.map(p => `<option value="${p.id}">${btE(p.name)}</option>`).join('') +
+    '<option value="custom">직접입력</option>';
+  sel.value = btBrokerFeePresets.some(p => p.id === prev) ? prev : (btBrokerFeePresets[0]?.id || 'custom');
+  applyFeePreset();
+}
+async function loadBrokerFeePresets() {
+  try {
+    const res = await fetch(BT_FEE_PRESETS_URL, { cache: 'no-store' });
+    const data = res.ok ? await res.json() : {};
+    btBrokerFeePresets = Array.isArray(data.presets) && data.presets.length ? data.presets : BT_FEE_FALLBACK_PRESETS;
+  } catch(e) {
+    btBrokerFeePresets = BT_FEE_FALLBACK_PRESETS;
+  }
+  window.MM_BROKER_FEE_PRESETS = btBrokerFeePresets;
+  renderBrokerFeePresetOptions();
+}
 function toggleFeePanel() {
   const on = document.getElementById('feeEnabledChk')?.checked;
   const body = document.getElementById('feePanelBody');
-  if (body) body.style.display = on ? 'block' : 'none';
+  const label = document.getElementById('btFeeLabel');
+  if (body) body.classList.toggle('is-open', !!on);
+  if (label) {
+    label.textContent = on ? 'ON' : 'OFF';
+    label.style.color = on ? 'var(--brand-text)' : 'var(--ds-muted)';
+  }
   // 멀티계좌면 카드별 수수료 입력 노출/숨김 위해 재렌더.
   if (window.taxEnabled && (window.taxAccounts || []).length > 1) renderTaxAccounts();
 }
 function applyFeePreset(v) {
-  if (v === 'custom') return;
+  // 옛 onchange="applyFeePreset('0.015')" 호출도 견딘다.
+  if (v && v !== 'custom' && !btBrokerFeePresets.some(p => p.id === v)) {
+    const legacyRate = Number(v);
+    if (Number.isFinite(legacyRate)) {
+      const legacyInp = document.getElementById('feeRateInput');
+      if (legacyInp) legacyInp.value = legacyRate;
+      return;
+    }
+  }
+  if (v) {
+    const sel = document.getElementById('feePreset');
+    if (sel) sel.value = v;
+  }
+  const preset = btFeePreset();
+  const market = btFeeMarket();
   const inp = document.getElementById('feeRateInput');
-  if (inp) inp.value = v;
+  const meta = document.getElementById('feePresetMeta');
+  if (!preset) {
+    if (meta) meta.innerHTML = '<b>직접입력</b><br>매수·매도 공통 적용. 국내 개별주식 매도 거래세는 별도 반영됩니다.';
+    return;
+  }
+  const rate = btFeeRateFor(preset, market);
+  if (inp && rate != null) inp.value = rate;
+  if (meta) {
+    const marketLabel = BT_FEE_MARKET_LABELS[market] || market;
+    const display = btFeeDisplayFor(preset, market);
+    meta.innerHTML = `<b>${btE(preset.name)} · ${btE(marketLabel)} ${btE(display)}</b><br>${btE(preset.notes || '이벤트, 협의수수료, 제비용과 세금은 실제 계좌 조건에 따라 달라질 수 있습니다.')}`;
+  }
+  if (window.taxEnabled && (window.taxAccounts || []).length > 1) renderTaxAccounts();
+}
+function markFeePresetCustom() {
+  const sel = document.getElementById('feePreset');
+  if (sel) sel.value = 'custom';
+  const meta = document.getElementById('feePresetMeta');
+  if (meta) meta.innerHTML = '<b>직접입력</b><br>매수·매도 공통 적용. 국내 개별주식 매도 거래세는 별도 반영됩니다.';
 }
 function renderFeeSummary(containerId, totalFees) {
   const el = document.getElementById(containerId);
@@ -1014,6 +1173,8 @@ async function runBacktest(_limitOverride) {
     if (document.getElementById('feeEnabledChk')?.checked) {
       submitBody.fee_enabled = true;
       submitBody.fee_rate = (Number(document.getElementById('feeRateInput').value) || 0) / 100;
+      submitBody.fee_market = btFeeMarket();
+      submitBody.fee_preset = document.getElementById('feePreset')?.value || 'custom';
     }
     const res = await fetch('/api/backtest/submit', {
       method: 'POST',
@@ -1178,6 +1339,20 @@ function btRestoreForm(body) {
     document.getElementById('btBandLabel').textContent = pct + '%';
     document.getElementById('btBandNoteVal').textContent = pct + '%';
   }
+  if (body.fee_enabled) {
+    const chk = document.getElementById('feeEnabledChk');
+    if (chk) chk.checked = true;
+    if (body.fee_market) {
+      const market = document.querySelector(`input[name="feeMarket"][value="${body.fee_market}"]`);
+      if (market) market.checked = true;
+    }
+    const preset = document.getElementById('feePreset');
+    if (preset && body.fee_preset) preset.value = body.fee_preset;
+    toggleFeePanel();
+    applyFeePreset();
+    const inp = document.getElementById('feeRateInput');
+    if (inp && body.fee_rate != null) inp.value = (Number(body.fee_rate) * 100).toFixed(4).replace(/\.?0+$/, '');
+  }
 }
 
 async function btCancelTask() {
@@ -1190,6 +1365,8 @@ async function btCancelTask() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   btClearLegacyPersistentState();
+  await loadBrokerFeePresets();
+  toggleFeePanel();
 
   document.querySelectorAll('input[name="btRebal"]').forEach(r => {
     r.addEventListener('change', () => {

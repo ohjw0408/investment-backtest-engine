@@ -1,5 +1,5 @@
 ---
-updated: 2026-05-29
+updated: 2026-06-19
 tags: [dev, bug]
 ---
 
@@ -13,10 +13,11 @@ tags: [dev, bug]
 
 ## 활성 버그 목록
 
-> updated: 2026-06-10
+> updated: 2026-06-19
 
 | # | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|---|
+| BUG-BACKTEST-SPY-SPIKE | 포트폴리오 분석 SPY 50%/TLT 50% 가치 추이 그래프가 2026-06-17 부근 6천만원대→500억 이상으로 급등 (오너 발견 2026-06-19) | 로컬 `price_daily`에 SPY `2026-06-17 close=346500` 단일일 오염값이 들어감. 전후일은 750달러대라 FX 적용 후 백테스트/리밸런싱에 비현실 가격이 주입됨. 특히 밴드 리밸런싱은 해당 가격에서 매도한 것으로 계산되어 이익이 고정될 수 있음 | `modules/price_loader.py`, `tests/test_price_loader_spikes.py` | ✅ 수정 (2026-06-19): `PriceLoader.get_price()`에서 전후일이 같은 스케일인데 하루만 25배 이상 튀었다 즉시 복귀하는 고립 이상치를 FX 적용 전 제거. 회귀 테스트 2 PASS, SPY/TLT band 서버 API end≈5,369만·max≈5,398만 확인 (Codex) |
 | BUG-DOT-TICKER | 버크셔(BRK.B) 등 점 포함 US 티커 — 검색엔 뜨나 클릭 시 "데이터 없음" (오너 발견 2026-06-15) | `get_symbol_data` 입구 `code.split(".")[0]`이 `BRK.B`→`BRK`로 잘라버림(원래 `.KS` 떼려던 것). + yfinance는 클래스주에 하이픈 표기(`BRK-B`) 필요한데 점 그대로 넘김 → 다운로드 실패 | `modules/price_loader.py` | ✅ 수정 (2026-06-15): 입구 split 제거→`.KS`/`.KQ` 접미사만 제거(US 점 보존) + 신규 `_yf_dl_ticker`(US 점→하이픈, KR/지수/선물 보존)를 `fetch_from_api`·get_symbol_data fallback·메타 `yf.Ticker` 3곳 적용. 검증 = BRK.B 1256 prices·last 493.91, AAPL/005930/^GSPC 회귀 0 (Claude) |
 | BUG-SAVEDPF-ROUNDTRIP | `test_saved_portfolios.py::test_save_list_update_delete_roundtrip` 실패 — 저장 포폴 round-trip이 입력 TICKERS와 불일치 (성능최적화 회귀검증 중 발견 2026-06-16) | `portfolio_save`(API)가 저장 전 종목 정규화하며 `quantity:0.0` 필드 추가 + weight를 float화 → 테스트 `TICKERS` 픽스처(quantity 없음·int weight)와 `==` 불일치. `quantity` 필드는 **2026-06-14 update 77(총투자금액→비중)** 의도 추가인데 테스트 동기화 누락 = **테스트 부채**. **사용자 영향 0**(quantity:0.0 합당). pre-perf 91806c7서도 동일 실패 = perf 무관 | `tests/test_saved_portfolios.py`(픽스처), `app.py portfolio_save` | ⏳ 미수정 (오너 보류 결정 2026-06-16, update 77 의도 확인 후) (Claude) |
 | TECH-CELERY-CONCURRENCY | Celery worker concurrency 설정이 repo 밖(서버 systemd `domino-celery.service`만) → 코드 리뷰로 동시성/코어 토폴로지 안 보임. 성능 P1-1 초기 오판(1 vCPU 가정) 원인 | 서버 = 2 vCPU + concurrency=2(`worker_prefetch_multiplier=1`). service 파일 git 미추적 | 서버 systemd (repo 미포함) | ⏳ 기술부채 — 권장: service 파일 repo 커밋 (Claude, 2026-06-16) |

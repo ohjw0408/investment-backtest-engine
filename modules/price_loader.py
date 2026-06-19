@@ -27,6 +27,27 @@ def _yf_dl_ticker(code) -> str:
     return c.replace(".", "-") if "." in c else c
 
 
+def _drop_isolated_price_spikes(df: pd.DataFrame, ratio_threshold: float = 25.0) -> pd.DataFrame:
+    """Drop one-day price outliers that immediately return to the prior scale."""
+    if df is None or df.empty or len(df) < 3 or "close" not in df.columns:
+        return df
+
+    out = df.sort_values("date").copy()
+    close = pd.to_numeric(out["close"], errors="coerce")
+    prev = close.shift(1)
+    nxt = close.shift(-1)
+
+    valid = (close > 0) & (prev > 0) & (nxt > 0)
+    neighbors_same_scale = (prev / nxt).between(0.5, 2.0)
+    isolated_high = valid & neighbors_same_scale & (close / prev > ratio_threshold) & (close / nxt > ratio_threshold)
+    isolated_low = valid & neighbors_same_scale & (prev / close > ratio_threshold) & (nxt / close > ratio_threshold)
+    bad = isolated_high | isolated_low
+
+    if not bool(bad.any()):
+        return df
+    return out.loc[~bad].copy()
+
+
 def _load_us_tickers() -> set:
     us_etf_path = META_DIR / "us_etf_list.csv"
     tickers = set()
@@ -561,6 +582,7 @@ class PriceLoader:
         df = df.dropna(subset=["close"])
         for col in ["open", "high", "low"]:
             df[col] = df[col].fillna(df["close"])
+        df = _drop_isolated_price_spikes(df)
 
         # ── USD/KRW 환율 적용 (미국 자산만) ──────────────────
         if apply_fx and self.is_us_asset(code) and not df.empty:

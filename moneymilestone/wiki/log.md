@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-19] BUGFIX/UX | backtest 입력 블록 정리 + 결과 저장 수명 축소 + SPY/TLT 급등 방어
+
+오너: 포트폴리오 분석 탭 초기조건 입력 블록이 엉성하고, 브라우저를 닫았다 다시 열어도 이전 결과가 남으며, SPY 50%/TLT 50% 가치추이 그래프가 2026-06-17 부근 6천만원대에서 500억 이상으로 급등.
+
+- **입력 화면**: `templates/backtest.html`의 `.bt-input-grid`를 `grid-template-areas` 기반으로 재정렬. 종목 구성=좌측 큰 블록, 기간·투자금/투자옵션/가상 데이터=우측 스택, 세금=하단 전폭. 가상 데이터 카드는 전용 클래스화, 실행 버튼 영역도 카드 결로 정리. 모바일 390px에서는 1열 순서(`assets → money → options → synthetic → tax`) 확인.
+- **결과 기억 수명**: `mm_task_backtest`/`mm_result_backtest` 저장소를 `localStorage`에서 `sessionStorage`로 변경. 같은 탭 이동·새로고침은 유지하되 브라우저/탭 재시작 후 복원되지 않음. 기존 localStorage stale 키는 페이지 진입 시 제거.
+- **급등 원인**: `data/price_cache/price_daily.db`의 SPY `2026-06-17 close=346500` 단일일 오염값 확인(전후일은 750달러대). FX 적용 후 비현실 가격이 백테스트에 들어가고, 밴드 리밸런싱은 해당 가격에서 매도한 것으로 계산되어 수십억 이익이 고정될 수 있었음.
+- **수정**: `modules/price_loader.py`에 `_drop_isolated_price_spikes()` 추가. 전후일이 같은 스케일인데 하루만 25배 이상 튀었다 즉시 복귀하는 isolated high/low를 FX 적용 전 제거. 지속적인 레벨 변화는 유지.
+- **검증**: `pytest tests/test_price_loader_spikes.py -q` 2 PASS. 직접 `run_backtest_logic` SPY/TLT 50:50 none/band 정상(밴드 end≈5,369만, max≈5,398만). 서버 `/api/backtest/run` band도 동일. Playwright: stale localStorage 제거 PASS, 브라우저 검색으로 SPY/TLT 추가 및 50/50 확인, 라이트/다크+모바일 스샷, 콘솔에러 0.
+
+_작성: Codex_
+
 ## [2026-06-19] FIX | backtest 리디자인 후속 (오너 피드백 9건)
 
 - **입력 2열화**(`.bt-input-grid` 2×2 + 세금·실행 전폭), 뷰 폭 확대, 결과 배당 2단 — "세로로만 길다" 해소.

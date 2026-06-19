@@ -102,6 +102,16 @@
 .bt-cond-item b { color: var(--ds-ink); font-weight: 700; }
 .bt-cond-sep { width: 1px; height: 12px; background: var(--ds-hairline); }
 
+/* 히어로 지표 */
+.bt-hero { background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); box-shadow: var(--ds-shadow); padding: 24px; margin-bottom: 16px; }
+[data-theme="dark"] .bt-hero { background: var(--ds-dark-el); }
+.bt-hero-label { font-size: var(--fs-cap); font-weight: 600; color: var(--ds-muted); margin-bottom: 6px; }
+.bt-hero-value { font-size: var(--fs-display); font-weight: 800; color: var(--ds-ink); font-family: var(--font-mono); letter-spacing: -0.02em; line-height: 1.05; }
+@media (max-width: 560px) { .bt-hero-value { font-size: 34px; } }
+.bt-hero-sub2 { margin-top: 10px; font-size: var(--fs-body); font-weight: 600; color: var(--ds-body); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.bt-hero-sub2 .pess { color: var(--down); } .bt-hero-sub2 .opt { color: var(--up); }
+.bt-hero-sub2 b { font-family: var(--font-mono); }
+
 .result-card-desc { font-size: 0.72rem; color: var(--ds-muted); margin: -2px 0 10px; line-height: 1.45; }
 .share-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--brand-tint); color: var(--brand-text); border: none; border-radius: var(--r-pill); padding: 6px 12px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: inherit; }
 .share-pill:hover { background: var(--ds-soft); }
@@ -464,24 +474,40 @@
     </div>
     <div class="result-content" id="dtResultContent" style="display:none;">
       <div id="dtSolveSection" style="display:none;">
-        <div class="result-header">
-          <div class="result-title-row"><h3 class="result-title" id="dtSolveTitle">결과</h3></div>
-          <div id="divShareBtns" style="display:none;flex-direction:column;gap:4px;margin-top:8px;">
-            <div style="display:flex;gap:8px;">
-              <button onclick="divCopyLink()" class="share-pill">🔗 링크 복사</button>
-              <button onclick="divDownloadImg()" class="share-pill">📷 이미지 저장</button>
+        <!-- 히어로: 핵심 결과 (달성 확률 / 필요 투자값) -->
+        <div class="bt-hero">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+            <div>
+              <div class="bt-hero-label" id="dtHeroLabel">목표 달성 확률</div>
+              <div class="bt-hero-value" id="dtHeroValue">—</div>
+              <div class="bt-hero-sub2" id="dtHeroSub"></div>
             </div>
-            <div class="share-url-box" id="divShareUrlBox"></div>
+            <div id="divShareBtns" style="display:none;flex-direction:column;gap:6px;align-items:flex-end;">
+              <div style="display:flex;gap:8px;">
+                <button onclick="divCopyLink()" class="ds-btn ds-btn-secondary ds-btn-sm">🔗 링크 복사</button>
+                <button onclick="divDownloadImg()" class="ds-btn ds-btn-secondary ds-btn-sm">📷 이미지 저장</button>
+              </div>
+              <div class="share-url-box" id="divShareUrlBox"></div>
+            </div>
           </div>
         </div>
+        <!-- 예상 배당 분포 (숫자 카드 그리드) -->
         <div class="dist-cards" id="dtSolveCards"></div>
+        <!-- 예상 배당 분포 (막대 차트) -->
+        <div class="result-card" id="dtDistChartCard" style="display:none;">
+          <div class="result-card-title">예상 월 배당금 분포</div>
+          <div class="result-card-desc">시작 시점을 바꿔가며 시뮬레이션한 마지막 해 월 배당금의 분포예요. 보수적(하위 10%)부터 낙관(상위 10%)까지.</div>
+          <div style="height:260px;position:relative;"><canvas id="dtDistChart"></canvas></div>
+        </div>
       </div>
       <div class="result-card" id="dtProbCurveCard" style="display:none;">
         <div class="result-card-title" id="dtChartTitle">달성 확률 곡선</div>
-        <div id="divScenShareBtns" style="display:none;flex-direction:column;gap:4px;margin-bottom:8px;">
+        <div class="result-card-desc">변수를 바꿔가며 목표 배당 달성 확률이 어떻게 변하는지 보여줘요. 선이 위로 갈수록 달성 가능성이 높아요.</div>
+        <div id="dtScenSummary" style="display:none;margin-bottom:14px;"></div>
+        <div id="divScenShareBtns" style="display:none;flex-direction:column;gap:6px;margin-bottom:10px;">
           <div style="display:flex;gap:8px;">
-            <button onclick="divCopyLink()" class="share-pill">🔗 링크 복사</button>
-            <button onclick="divDownloadImg()" class="share-pill">📷 이미지 저장</button>
+            <button onclick="divCopyLink()" class="ds-btn ds-btn-secondary ds-btn-sm">🔗 링크 복사</button>
+            <button onclick="divDownloadImg()" class="ds-btn ds-btn-secondary ds-btn-sm">📷 이미지 저장</button>
           </div>
           <div class="share-url-box" id="divScenShareUrlBox"></div>
         </div>
@@ -489,10 +515,12 @@
       </div>
       <div class="result-card" id="dtIsocurveCard" style="display:none;">
         <div class="result-card-title" id="dtIsocurveTitle">등위선</div>
-        <div id="divIsoShareBtns" style="display:none;flex-direction:column;gap:4px;margin-bottom:8px;">
+        <div class="result-card-desc">같은 목표를 달성하는 두 변수의 조합이에요. 곡선 위 어느 점이든 달성 확률이 같아서, 돈을 더 넣으면 기간이 줄어드는 식의 맞교환을 볼 수 있어요.</div>
+        <div id="dtIsoSummary" style="display:none;margin-bottom:14px;"></div>
+        <div id="divIsoShareBtns" style="display:none;flex-direction:column;gap:6px;margin-bottom:10px;">
           <div style="display:flex;gap:8px;">
-            <button onclick="divCopyLink()" class="share-pill">🔗 링크 복사</button>
-            <button onclick="divDownloadImg()" class="share-pill">📷 이미지 저장</button>
+            <button onclick="divCopyLink()" class="ds-btn ds-btn-secondary ds-btn-sm">🔗 링크 복사</button>
+            <button onclick="divDownloadImg()" class="ds-btn ds-btn-secondary ds-btn-sm">📷 이미지 저장</button>
           </div>
           <div class="share-url-box" id="divIsoShareUrlBox"></div>
         </div>
@@ -1179,7 +1207,40 @@ function buildDtCondSummary(body) {
 }
 
 // ── 결과 렌더링 ──
-const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0','#00BCD4','#FF5722','#607D8B'];
+// 차트색 ds 토큰 바인딩
+function _dtCss(v, fb) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || fb; }
+function _dtRgba(v, a, fb) {
+  const hex = _dtCss(v, fb).replace('#', '');
+  if (hex.length < 6) return fb || 'rgba(0,82,255,' + a + ')';
+  return `rgba(${parseInt(hex.slice(0,2),16)},${parseInt(hex.slice(2,4),16)},${parseInt(hex.slice(4,6),16)},${a})`;
+}
+const palette = [ _dtCss('--brand','#0052ff'), _dtCss('--down','#e5484d'), _dtCss('--up','#30a46c'), _dtCss('--gold-deep','#9a6700'), '#9C27B0', '#00BCD4', '#FF5722', '#607D8B' ];
+
+// 예상 월 배당금 분포 막대 차트 (p10~p90)
+function drawDistChart(dist) {
+  const card = document.getElementById('dtDistChartCard');
+  const canvas = document.getElementById('dtDistChart');
+  if (!card || !canvas) return;
+  if (!dist || dist.p50 == null || dist.p50 <= 0) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const brand = _dtCss('--brand', '#0052ff');
+  const soft  = _dtRgba('--brand', '0.3', 'rgba(0,82,255,0.3)');
+  const labels = ['하위 10%', '25%', '중앙값', '75%', '상위 10%'];
+  const vals = [dist.p10, dist.p25, dist.p50, dist.p75, dist.p90].map(v => Math.round((v || 0) / 12));
+  if (dtCharts['dist']) dtCharts['dist'].destroy();
+  dtCharts['dist'] = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: vals, backgroundColor: vals.map((_, i) => i === 2 ? brand : soft), borderRadius: 6, borderSkipped: false, maxBarThickness: 64 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtKRW(c.raw) + ' / 월' } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' }, color: '#90A4AE' } },
+        y: { ticks: { callback: v => fmtKRW(v), font: { size: 10 }, color: '#90A4AE', maxTicksLimit: 6 }, grid: { color: 'rgba(0,0,0,0.06)' } }
+      }
+    }
+  });
+}
 
 // 절세액 3종 패널 (P4) — 대표 콤보(역산이면 solved 값) 윈도우 p50. 합성-only면 미표시.
 function renderDtSavings(data) {
@@ -1210,6 +1271,55 @@ function renderDtSavings(data) {
   el.style.display = 'block';
 }
 
+// 시나리오 곡선 핵심 요약 (단선)
+function buildScenSummary(data, body) {
+  const el = document.getElementById('dtScenSummary');
+  if (!el) return;
+  const xKey = data.x_key;
+  const lines = data.lines || [];
+  const pts = (lines[0] || {}).points || [];
+  if (lines.length !== 1 || pts.length < 2) { el.style.display = 'none'; return; }
+  const xLabel = xKey === 'seed' ? '초기 투자금' : xKey === 'monthly' ? '월 적립금' : '투자 기간';
+  const fmtX = v => xKey === 'years' ? Math.round(v) + '년' : fmtKRW(Math.round(v / 1e4) * 1e4);
+  const lo = pts[0], hi = pts[pts.length - 1];
+  const tgtP = body && body.probability != null ? body.probability : 0.5;
+  let crossX = null;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    if ((a.probability - tgtP) * (b.probability - tgtP) <= 0 && a.probability !== b.probability) {
+      const r = (tgtP - a.probability) / (b.probability - a.probability);
+      crossX = a[xKey] + (b[xKey] - a[xKey]) * r;
+      break;
+    }
+  }
+  const items = [
+    ['범위', `${fmtX(lo[xKey])} ~ ${fmtX(hi[xKey])}`],
+    ['달성 확률', `${Math.round((lo.probability || 0) * 100)}% → ${Math.round((hi.probability || 0) * 100)}%`],
+  ];
+  if (crossX != null) items.push([`확률 ${Math.round(tgtP * 100)}% 도달`, `${xLabel} ${fmtX(crossX)}`]);
+  el.className = 'bt-cond';
+  el.innerHTML = items.map(([l, v], i) => `${i > 0 ? '<span class="bt-cond-sep"></span>' : ''}<span class="bt-cond-item">${l} <b>${v}</b></span>`).join('');
+  el.style.display = 'flex';
+}
+
+// 등위선 핵심 요약 (양 끝 맞교환)
+function buildIsoSummary(data) {
+  const el = document.getElementById('dtIsoSummary');
+  if (!el) return;
+  const lines = data.lines || [{ points: data.points || [] }];
+  const pts = (lines[0] || {}).points || [];
+  if (lines.length !== 1 || pts.length < 2) { el.style.display = 'none'; return; }
+  const xKey = data.x_key, optKey = data.opt_key;
+  const fmtV = (k, v) => k === 'years' ? Math.round(v) + '년' : fmtKRW(v);
+  const lo = pts[0], hi = pts[pts.length - 1];
+  el.className = 'bt-cond';
+  el.innerHTML =
+    `<span class="bt-cond-item">${data.x_label} <b>${fmtV(xKey, lo[xKey])}</b> 이면 ${data.opt_label} <b>${fmtV(optKey, lo[optKey])}</b></span>` +
+    `<span class="bt-cond-sep"></span>` +
+    `<span class="bt-cond-item">${data.x_label} <b>${fmtV(xKey, hi[xKey])}</b> 이면 ${data.opt_label} <b>${fmtV(optKey, hi[optKey])}</b></span>`;
+  el.style.display = 'flex';
+}
+
 function renderResult(data, body) {
   dtShowResults();
   buildDtCondSummary(body);
@@ -1232,50 +1342,73 @@ function renderResult(data, body) {
 
   const mode = data.mode;
 
-  // 단일 결과 (확률 또는 자동 계산)
+  // 단일 결과 (확률 또는 역산)
   if (mode === 'probability') {
     document.getElementById('dtSolveSection').style.display = 'block';
-    const res = data.result || {};
-    const p   = res.probability ? Math.round(res.probability*100) : 0;
-
-    // 자동 계산 결과 (solved_years / solved_seed / solved_monthly)
-    let solvedLabel = '', solvedValue = '';
-    if (res.solved_years   !== undefined) { solvedLabel='필요 투자 기간';  solvedValue = res.solved_years ? res.solved_years+'년' : '—'; }
-    if (res.solved_seed    !== undefined) { solvedLabel='필요 초기 투자금'; solvedValue = res.solved_seed > 0 ? fmtKRW(res.solved_seed) : '투자금 불필요'; }
-    if (res.solved_monthly !== undefined) { solvedLabel='필요 월 적립금';  solvedValue = res.solved_monthly > 0 ? fmtKRW(res.solved_monthly) : '적립금 불필요'; }
-
-    document.getElementById('dtSolveTitle').textContent = solvedLabel || '달성 확률';
-
-    // 예상 월 배당금 분포 (최종연도 기준, 롤링 윈도우 p25~p75) — 상단 핵심 노출
+    const res  = data.result || {};
+    const p    = res.probability ? Math.round(res.probability * 100) : 0;
     const dist = res.distribution || {};
     const hasDist = dist.p50 != null && dist.p50 > 0;
-    const distCards = hasDist ? `
+
+    // 역산 결과 (solved_seed / solved_monthly / solved_years)
+    let solvedLabel = '', solvedValue = '';
+    if (res.solved_years   !== undefined) { solvedLabel = '필요 투자 기간';   solvedValue = res.solved_years ? res.solved_years + '년' : '—'; }
+    if (res.solved_seed    !== undefined) { solvedLabel = '필요 초기 투자금'; solvedValue = res.solved_seed > 0 ? fmtKRW(res.solved_seed) : '투자금 불필요'; }
+    if (res.solved_monthly !== undefined) { solvedLabel = '필요 월 적립금';   solvedValue = res.solved_monthly > 0 ? fmtKRW(res.solved_monthly) : '적립금 불필요'; }
+
+    // 히어로
+    const tgt = body.target_monthly_div ? fmtKRW(body.target_monthly_div) : '—';
+    document.getElementById('dtHeroLabel').textContent = solvedLabel || '목표 달성 확률';
+    document.getElementById('dtHeroValue').textContent = solvedLabel ? solvedValue : (p + '%');
+    let subHtml = `<span>목표 월 배당 <b>${tgt}</b></span>`;
+    if (solvedLabel) {
+      subHtml += `<span>달성 확률 기준 <b>${p}%</b></span>`;
+    } else if (res.cases_count) {
+      const nHit = Math.round((res.probability || 0) * res.cases_count);
+      subHtml += `<span class="${p >= 50 ? 'opt' : 'pess'}">${res.cases_count}개 시나리오 중 <b>${nHit}개</b> 달성</span>`;
+    }
+    document.getElementById('dtHeroSub').innerHTML = subHtml;
+
+    // 예상 배당 분포 카드 그리드 (월 배당 기준)
+    const monthly50 = hasDist ? Math.round(dist.p50 / 12) : 0;
+    const targetPct = (hasDist && body.target_monthly_div > 0) ? Math.round(monthly50 / body.target_monthly_div * 100) : null;
+    document.getElementById('dtSolveCards').innerHTML = hasDist ? `
       <div class="dist-card median">
         <div class="dist-card-label">예상 월 배당금 (중앙값)</div>
-        <div class="dist-card-value">${fmtKRW(Math.round(dist.p50/12))}</div>
+        <div class="dist-card-value">${fmtKRW(monthly50)}</div>
+      </div>
+      <div class="dist-card pessimistic">
+        <div class="dist-card-label">보수적 (하위 10%)</div>
+        <div class="dist-card-value">${fmtKRW(Math.round(dist.p10 / 12))}</div>
+      </div>
+      <div class="dist-card optimistic">
+        <div class="dist-card-label">낙관적 (상위 10%)</div>
+        <div class="dist-card-value">${fmtKRW(Math.round(dist.p90 / 12))}</div>
       </div>
       <div class="dist-card">
-        <div class="dist-card-label">월 배당금 범위 (전체 결과의 50% · p25~p75)</div>
-        <div class="dist-card-value" style="font-size:0.95rem;">${fmtKRW(Math.round(dist.p25/12))} ~ ${fmtKRW(Math.round(dist.p75/12))}</div>
-      </div>` : '';
+        <div class="dist-card-label">중간 50% 구간 (p25~p75)</div>
+        <div class="dist-card-value" style="font-size:0.95rem;">${fmtKRW(Math.round(dist.p25 / 12))} ~ ${fmtKRW(Math.round(dist.p75 / 12))}</div>
+      </div>
+      <div class="dist-card">
+        <div class="dist-card-label">연 배당금 (중앙값)</div>
+        <div class="dist-card-value">${fmtKRW(dist.p50)}</div>
+      </div>
+      <div class="dist-card">
+        <div class="dist-card-label">목표 대비 (중앙값)</div>
+        <div class="dist-card-value">${targetPct != null ? targetPct + '%' : '—'}</div>
+      </div>` : '<div class="dist-card"><div class="dist-card-label">분포 데이터 없음</div><div class="dist-card-value">—</div></div>';
 
-    // 자동: 필요 투자금/적립/기간만 / 고정: 달성 확률만. 목표월배당·기준확률 중복표기 제거.
-    const primaryCard = solvedLabel
-      ? `<div class="dist-card optimistic"><div class="dist-card-label">${solvedLabel}</div><div class="dist-card-value">${solvedValue}</div></div>`
-      : `<div class="dist-card optimistic"><div class="dist-card-label">달성 확률</div><div class="dist-card-value">${p}%</div></div>`;
-
-    document.getElementById('dtSolveCards').innerHTML = primaryCard + distCards;
+    drawDistChart(dist);
 
     // 공유 데이터
     try {
-      const tickers = (body.tickers||[]).map(t=>`${t.code} ${Math.round(t.weight*100)}%`).join('+');
+      const tickers = (body.tickers || []).map(t => `${t.code} ${Math.round(t.weight * 100)}%`).join('+');
       window._divShareData = {
         label: tickers,
         cond_rows: [
           ['종목', tickers],
           ['목표 월배당', fmtKRW(body.target_monthly_div)],
-          ['달성 확률', p + '%'],
-          ['기간', (body.years||0) + '년'],
+          [solvedLabel || '달성 확률', solvedLabel ? solvedValue : p + '%'],
         ],
       };
       window._divUrlBoxId = 'divShareUrlBox';
@@ -1289,6 +1422,7 @@ function renderResult(data, body) {
   if (mode === 'isocurve') {
     document.getElementById('dtIsocurveCard').style.display = 'block';
     renderIsocurve(data);
+    buildIsoSummary(data);
     try {
       const tkrs = (body.tickers||[]).map(t=>`${t.code} ${Math.round(t.weight*100)}%`).join('+');
       window._divShareData = {
@@ -1309,6 +1443,7 @@ function renderResult(data, body) {
   // 시나리오 곡선
   document.getElementById('dtProbCurveCard').style.display = 'block';
   drawScenarioChart(data, false);
+  buildScenSummary(data, body);
   try {
     const tkrs2 = (body.tickers||[]).map(t=>`${t.code} ${Math.round(t.weight*100)}%`).join('+');
     window._divShareData = {
@@ -1331,7 +1466,8 @@ function renderResult(data, body) {
     const btn = document.createElement('button');
     btn.id = 'dtSwapBtn';
     btn.textContent = '⇄ X축 / 선 전환';
-    btn.style.cssText = 'margin-top:10px;padding:6px 14px;border:1.5px solid var(--blue-bright);border-radius:8px;background:var(--card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;';
+    btn.className = 'ds-btn ds-btn-ghost ds-btn-sm';
+    btn.style.marginTop = '10px';
     btn.onclick = () => { window._scenarioFlipped=!window._scenarioFlipped; drawScenarioChart(window._scenarioData, window._scenarioFlipped); };
     document.getElementById('dtProbCurveCard').appendChild(btn);
   }
@@ -1418,8 +1554,6 @@ function drawIsocurveChart(data) {
       ? `등위선 — ${xLabel} vs ${optLabel} (${data.line_label}별)`
       : `등위선 — ${xLabel} vs ${optLabel}`;
 
-  const palette = ['#1976D2','#E53935','#43A047','#FB8C00','#9C27B0','#00BCD4','#FF5722','#607D8B'];
-
   // Y축 여백 계산
   const allOptVals = lines.flatMap(l => l.points.map(p => p[optKey])).filter(v => v != null);
   const optMin = allOptVals.length ? Math.min(...allOptVals) : 0;
@@ -1448,7 +1582,8 @@ function drawIsocurveChart(data) {
     const swapBtn = document.createElement('button');
     swapBtn.id = 'dtIsoSwapBtn';
     swapBtn.textContent = '⇄ X축 / 선 전환';
-    swapBtn.style.cssText = 'margin-bottom:10px;padding:6px 14px;border:1.5px solid var(--blue-bright);border-radius:8px;background:var(--card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;display:block;';
+    swapBtn.className = 'ds-btn ds-btn-ghost ds-btn-sm';
+    swapBtn.style.cssText = 'margin-bottom:10px;display:block;';
     swapBtn.onclick = () => {
       const d = window._isoOrigData;
       const isNormal = swapBtn.dataset.flipped !== '1';

@@ -441,11 +441,14 @@ class WithdrawalAnalyzer:
         # 배당 반영(실측 케이스 평균 배당수익률 div_yield). 기본 재투자 가정 — 자산에 합산.
         monthly_yield  = max(float(div_yield or 0.0), 0.0) / 12.0
         total_dividend = 0.0
+        first_year_div = 0.0
 
         for i, r in enumerate(rets):
             asset = asset * (1.0 + r)
             div   = asset * monthly_yield
             total_dividend += div
+            if i < 12:
+                first_year_div += div
             asset = asset + div - withdrawal
             if self.inflation > 0 and (i + 1) % 12 == 0:
                 withdrawal *= (1.0 + self.inflation)
@@ -477,8 +480,8 @@ class WithdrawalAnalyzer:
             for y in range(1, self.withdrawal_years + 1)
         ]
 
-        total_withdrawal    = self.monthly_withdrawal * self.withdrawal_years * 12
-        withdrawal_coverage = (total_dividend / total_withdrawal) if total_withdrawal > 0 and total_dividend > 0 else 0.0
+        first_year_withdrawal = self.monthly_withdrawal * 12
+        withdrawal_coverage = (first_year_div / first_year_withdrawal) if first_year_withdrawal > 0 else 0.0
 
         return {
             "success": success, "end_value": end_value,
@@ -536,8 +539,15 @@ class WithdrawalAnalyzer:
         div_col        = "dividend_income"
         total_dividend = float(history[div_col].sum()) if div_col in history.columns else 0.0
         sustainable_months  = int(years_to_depletion * 12)
-        total_withdrawal    = self.monthly_withdrawal * years * 12
-        withdrawal_coverage = (total_dividend / total_withdrawal) if total_withdrawal > 0 and total_dividend > 0 else 0.0
+
+        # 배당 커버리지 = 은퇴 1년차 배당수입 / 1년차 인출액.
+        # "월 인출 중 배당으로 충당되는 비율"의 직관적 정의(평생 합산은 재투자 성장으로 100% 초과·왜곡).
+        first_year_div = 0.0
+        if div_col in history.columns and not history.empty:
+            _d = pd.to_datetime(history["date"])
+            first_year_div = float(history.loc[_d < (start_date + pd.DateOffset(years=1)), div_col].sum())
+        first_year_withdrawal = self.monthly_withdrawal * 12
+        withdrawal_coverage = (first_year_div / first_year_withdrawal) if first_year_withdrawal > 0 else 0.0
 
         dividend_mdd = 0.0
         if div_col in history.columns:

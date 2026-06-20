@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-20] BUGFIX | 배당커버리지 정의 재정의(1년차 기준) + prod 0%는 celery worker 미재시작
+
+오너: SCHD50/QQQ20/GLD30으로 둘 다 0%, 인출기는 자산성장도 미반영으로 보임.
+
+- **진단**: prod는 b55ef9c까지 배포됨(표닫기 마커 확인). 그런데 로컬 동기 probe는 정상값 — WD 커버리지·SIM 커버리지·연차 자산성장 모두 정상. **같은 코드 다른 결과 = prod celery worker가 옛 코드를 메모리에 보유**(git pull로 파일·web(Flask)은 새것이라 HTML/카드는 보이지만, 계산은 worker가 처리하는데 worker 미재시작 → 옛 로직 = insights 0/성장없음). **코드론 해결 불가 — 배포 시 `systemctl restart`로 celery worker도 반드시 재시작해야 함.**
+- **추가 진짜 버그(정의 결함)**: `withdrawal_coverage = total_dividend/total_withdrawal`이 평생 재투자 누적배당 ÷ 인플레 미반영 인출합이라 SIM서 **337%**(>100%, 무의미). → **은퇴 1년차 배당수입 / 1년차 인출액**으로 재정의(`_calc_metrics`·`_simulate_synthetic_case` 둘 다). "월 인출 중 배당 충당분"의 직관적·유계 정의.
+- **검증**: ast OK, `pytest tests/test_g5_retirement_withdrawal.py` 5 passed. 동기 probe(SCHD50/QQQ20/GLD30): WD 커버리지 23.4%·자산 538M→5254M 성장, SIM 커버리지 27.3%(337%→해소)·609M→8663M 성장. 양쪽 모드 정상.
+- ⚠️ **오너 액션**: prod 재배포 시 web뿐 아니라 **celery worker 재시작** 필수. 안 하면 계속 0%.
+
+_작성: Claude_
+
 ## [2026-06-20] BUGFIX | 배당커버리지 0% 진짜원인 = ticker_stats_cache 스키마 마이그레이션 누락 + 표 기본열기
 
 오너: 이전 합성배당 수정 후에도 커버리지 여전히 0%. (+ 연차 표 기본으로 열기.)

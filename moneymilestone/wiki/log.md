@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-20] BUGFIX | 배당커버리지 0% 진짜원인 = ticker_stats_cache 스키마 마이그레이션 누락 + 표 기본열기
+
+오너: 이전 합성배당 수정 후에도 커버리지 여전히 0%. (+ 연차 표 기본으로 열기.)
+
+- **진짜 원인**: `modules/retirement/ticker_stats_cache.py` `_DDL`이 `CREATE TABLE IF NOT EXISTS` — 디스크의 기존(구 스키마) `ticker_return_stats` 테이블에 `div_yield_mu`/`div_yield_sigma` 컬럼이 안 생김. → `SELECT div_yield_mu` = `no such column: div_yield_mu` 크래시(한국종목 경로). `data_preparer`가 이 캐시의 배당통계로 합성 구간 배당을 주입하는데, 캐시가 깨지거나 NULL이면 합성 배당 0 → 커버리지 0. (직전 합성 수정은 div_yield 전파 경로를 만들었지만, 캐시가 div_yield를 못 줘서 무력화됐던 것.) 동기 probe로 확인: SCHD(US 장기데이터)는 n_real=61·커버리지 37% 정상, 069500은 `no such column` 크래시.
+- **수정**: ① `_migrate_dividend_columns()` 추가 — `PRAGMA table_info`로 컬럼 확인 후 없으면 `ALTER TABLE ADD COLUMN`, 마이그레이션 시 구 행 `DELETE`(재계산 유도). ② `compute_and_save` 무배당 시 `div_yield_mu/sigma`를 NULL→`0.0`("계산했으나 배당없음" vs "미계산" 구분). ③ `get_or_compute`가 `div_yield_mu IS NULL`인 구 캐시 행은 1회 재계산. → prod의 "컬럼은 있으나 구 행 NULL" 상태도 자가복구.
+- **표 기본 열기**: 연차별 잔여자산 표 `display:none`→`block`, 버튼 기본 라벨 "표 닫기".
+- **검증**: ast 컴파일·jinja OK, `pytest tests/test_g5_retirement_withdrawal.py` 5 passed. 동기 probe — 069500 마이그레이션 후 커버리지 2.4%(KODEX200 저배당, 현실적)·크래시 해소, SCHD 37%. 프론트 Playwright — 표 기본 열림(버튼 "표 닫기")·7행·커버리지 표시·토글 동작·콘솔0. ⚠️ 133690은 corporate_actions 배당 0행(실 데이터 갭, 별개). 실 celery 라이브는 배포 후.
+
+_작성: Claude_
+
 ## [2026-06-20] BUGFIX/UX | 인출 배당커버리지 0% 수정(합성 배당 반영) + 연차 부채꼴 밴드 슬라이더(기본 25/75)
 
 오너: ① 배당 커버리지 0%로 나옴 — 가상데이터(합성) 생성 시 배당 미반영 의심. ② 연차별 잔여자산 부채꼴 기본 10%(p10/p90)는 과격 → 기본 25/75 + 폭 슬라이더.

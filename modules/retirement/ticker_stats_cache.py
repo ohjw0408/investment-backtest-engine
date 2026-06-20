@@ -44,7 +44,25 @@ class TickerStatsCache:
         self.db_path = Path(price_db_path)
         self._conn   = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self._conn.execute(_DDL)
+        self._migrate_dividend_columns()
         self._conn.commit()
+
+    def _migrate_dividend_columns(self):
+        """구 스키마(배당 컬럼 없음) 테이블 보강. CREATE TABLE IF NOT EXISTS는
+        기존 테이블을 갱신하지 않아 SELECT div_yield_mu가 'no such column'으로 깨짐.
+        컬럼이 없으면 추가하고, 배당 통계가 비어 있는 구 캐시 행은 비워 재계산을 유도한다."""
+        cols = {r[1] for r in self._conn.execute(
+            "PRAGMA table_info(ticker_return_stats)").fetchall()}
+        migrated = False
+        if "div_yield_mu" not in cols:
+            self._conn.execute("ALTER TABLE ticker_return_stats ADD COLUMN div_yield_mu REAL")
+            migrated = True
+        if "div_yield_sigma" not in cols:
+            self._conn.execute("ALTER TABLE ticker_return_stats ADD COLUMN div_yield_sigma REAL")
+            migrated = True
+        if migrated:
+            # 배당 컬럼이 막 생긴 구 행 → 배당 통계 없음 → 재계산 유도(get miss).
+            self._conn.execute("DELETE FROM ticker_return_stats")
 
     def get(self, code: str) -> dict | None:
         """캐시에서 읽기. TTL 초과 시 None 반환."""
@@ -115,8 +133,9 @@ class TickerStatsCache:
         computed_at = datetime.now().isoformat()
 
         # 배당수익률 통계: corporate_actions JOIN price_daily
-        div_yield_mu    = None
-        div_yield_sigma = None
+        # 0.0 = "계산했으나 배당 없음"(NULL=미계산과 구분 → 구 캐시 재계산 트리거용).
+        div_yield_mu    = 0.0
+        div_yield_sigma = 0.0
         try:
             div_data = self._conn.execute("""
                 SELECT strftime('%Y', ca.date) yr,
@@ -160,11 +179,12 @@ class TickerStatsCache:
         }
 
     def get_or_compute(self, code: str) -> dict | None:
-        """캐시 hit → 반환, miss → 계산 후 저장 후 반환."""
+        """캐시 hit → 반환, miss → 계산 후 저장 후 반환.
+        배당 통계 없는(div_yield_mu IS NULL) 구 캐시 행은 1회 재계산해 배당을 채운다."""
         cached = self.get(code)
-        if cached:
+        if cached and cached.get("div_yield_mu") is not None:
             return cached
-        return self.compute_and_save(code)
+        return self.compute_and_save(code) or cached
 
     def close(self):
         try: self._conn.close()

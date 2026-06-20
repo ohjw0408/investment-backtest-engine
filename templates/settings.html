@@ -12,6 +12,20 @@
   .settings-wrap { max-width: 760px; }
   #weList { grid-template-columns: 1fr; }
 }
+/* 카테고리 세그먼트 nav */
+.set-nav { display: flex; gap: 6px; background: var(--ds-soft); border: 1px solid var(--ds-hairline); border-radius: var(--r-pill); padding: 5px; margin-bottom: 20px; max-width: 460px; }
+[data-theme="dark"] .set-nav { background: var(--ds-strong); }
+.set-nav-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 12px; background: none; border: none; cursor: pointer; font-size: var(--fs-sm); font-weight: 700; color: var(--ds-muted); border-radius: var(--r-pill); transition: background .15s, color .15s; font-family: var(--font-sans); }
+.set-nav-btn.active { background: var(--brand); color: var(--on-brand); }
+.set-panel { display: none; }
+.set-panel.active { display: block; }
+/* 세금 요약/링크 카드 */
+.set-tax-summary { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-bottom: 16px; }
+.set-tax-item { display: flex; flex-direction: column; gap: 2px; }
+.set-tax-item .lbl { font-size: var(--fs-cap); color: var(--ds-muted); }
+.set-tax-item .val { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); }
+.set-edit-btn { display: inline-flex; align-items: center; gap: 7px; background: var(--brand); color: var(--on-brand); border: none; border-radius: var(--r-pill); padding: 11px 20px; font-weight: 700; font-size: var(--fs-sm); cursor: pointer; text-decoration: none; font-family: var(--font-sans); }
+.set-edit-btn:hover { background: var(--brand-hover); }
 .settings-section { background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-xl); margin-bottom: 18px; overflow: hidden; }
 .settings-section-head { padding: 16px 20px; border-bottom: 1px solid var(--ds-hairline); font-weight: 600; font-size: var(--fs-title); color: var(--ds-ink); display: flex; align-items: center; gap: 8px; }
 .settings-section-body { padding: 18px 20px; }
@@ -60,6 +74,32 @@
 <h1 class="page-title">설정</h1>
 
 <div class="settings-wrap">
+  <div class="set-nav">
+    <button class="set-nav-btn active" data-spanel="tax"  onclick="setPanel('tax')">{{ nicon('receipt') }} 세금</button>
+    <button class="set-nav-btn"        data-spanel="home" onclick="setPanel('home')">{{ nicon('home') }} 홈 화면</button>
+    <button class="set-nav-btn"        data-spanel="cal"  onclick="setPanel('cal')">{{ nicon('calendar') }} 캘린더</button>
+  </div>
+
+  <!-- 세금 패널 -->
+  <div class="set-panel active" data-spanel="tax">
+    <div class="settings-section">
+      <div class="settings-section-head"><span>{{ nicon('receipt') }}</span> 세금 설정</div>
+      <div class="settings-section-body">
+        <div class="settings-hint">배당금 계산기·포트폴리오·은퇴 시뮬레이션의 세후 계산에 사용됩니다. 소득·ISA·연금·절세매매를 설정하세요.</div>
+        <div class="set-tax-summary" id="setTaxSummary">
+          <div class="set-tax-item"><span class="lbl">나이</span><span class="val" id="setTaxAge">—</span></div>
+          <div class="set-tax-item"><span class="lbl">연소득</span><span class="val" id="setTaxIncome">—</span></div>
+          <div class="set-tax-item"><span class="lbl">ISA</span><span class="val" id="setTaxIsa">—</span></div>
+          <div class="set-tax-item"><span class="lbl">연금계좌</span><span class="val" id="setTaxPension">—</span></div>
+          <div class="set-tax-item"><span class="lbl">절세매매</span><span class="val" id="setTaxHarvest">—</span></div>
+        </div>
+        <a class="set-edit-btn" href="/tax-settings"><span class="bt-ico" style="width:15px;height:15px;color:var(--on-brand);">{{ nicon('gear') }}</span> 세금 설정 편집</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 홈 화면 패널 -->
+  <div class="set-panel" data-spanel="home">
   <div class="settings-section">
     <div class="settings-section-head"><span>🏠</span> 홈 화면 설정</div>
     <div class="settings-section-body">
@@ -78,6 +118,10 @@
     </div>
   </div>
 
+  </div><!-- /홈 패널 -->
+
+  <!-- 캘린더 패널 -->
+  <div class="set-panel" data-spanel="cal">
   <div class="settings-section">
     <div class="settings-section-head"><span>📅</span> 캘린더 설정</div>
     <div class="settings-section-body">
@@ -100,7 +144,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </div><!-- /캘린더 패널 -->
 </div>
 
 <div class="we-modal-bg" id="weModal">
@@ -117,6 +161,37 @@
 
 {% block scripts %}
 <script>
+// ── 설정 카테고리 패널 전환 ──
+function setPanel(name) {
+  document.querySelectorAll('.set-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.spanel === name));
+  document.querySelectorAll('.set-panel').forEach(p => p.classList.toggle('active', p.dataset.spanel === name));
+}
+
+// ── 세금 설정 요약 (편집은 /tax-settings) ──
+(async function loadTaxSummary() {
+  const ISA = { none: '미가입', general: '일반형', preferential: '서민형' };
+  const fmtKRW = v => {
+    if (!v || isNaN(v)) return '미입력';
+    const uk = Math.floor(v/1e8), man = Math.floor((v%1e8)/1e4);
+    if (uk>0 && man>0) return '₩'+uk+'억 '+man.toLocaleString()+'만';
+    if (uk>0) return '₩'+uk+'억';
+    if (v>=1e4) return '₩'+Math.floor(v/1e4).toLocaleString()+'만';
+    return '₩'+Math.round(v).toLocaleString();
+  };
+  let s = {};
+  try {
+    const me = await fetch('/api/me').then(r=>r.json());
+    if (me.logged_in) { const r = await fetch('/api/settings/tax'); if (r.ok) s = await r.json() || {}; }
+  } catch(e) {}
+  if (!s || !Object.keys(s).length) { try { s = JSON.parse(localStorage.getItem('domino_tax_settings')||'{}'); } catch(e){ s={}; } }
+  const set = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  set('setTaxAge', s.age ? s.age+'세' : '미입력');
+  set('setTaxIncome', s.earned_income ? fmtKRW(s.earned_income) : '미입력');
+  set('setTaxIsa', ISA[s.isa_type] || '미가입');
+  set('setTaxPension', (s.accounts && s.accounts.pension) ? '사용' : '미사용');
+  set('setTaxHarvest', (s.accounts && s.accounts.harvest) ? '사용' : '미사용');
+})();
+
 let _weWidgets = [];
 let _weTarget = -1;
 let _weSearchTimer = null;

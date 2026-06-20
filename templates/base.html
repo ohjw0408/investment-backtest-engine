@@ -60,7 +60,7 @@
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260618ds">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}?v=20260621nav">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}?v=20260621nav2">
   <style>
   .mm-bell-wrap { position: relative; }
   .mm-bell-badge { position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px;
@@ -525,6 +525,19 @@ function mmPrompt(title, opts) {
 
   refreshCount();
   setInterval(refreshCount, 60000);
+})();
+
+// ── 상단 nav 드롭다운 hover-intent (트리거→메뉴 갭 이동 시 닫힘 방지) ──
+(function () {
+  document.querySelectorAll('.mmnav-grp').forEach(grp => {
+    let t = null;
+    const open  = () => { clearTimeout(t); grp.classList.add('mmnav-open'); };
+    const close = () => { clearTimeout(t); t = setTimeout(() => grp.classList.remove('mmnav-open'), 220); };
+    grp.addEventListener('mouseenter', open);
+    grp.addEventListener('mouseleave', close);
+    // 메뉴 항목 클릭 시 즉시 닫기(네비게이션)
+    grp.querySelectorAll('.mmnav-menu a').forEach(a => a.addEventListener('click', () => grp.classList.remove('mmnav-open')));
+  });
 })();
 </script>
 </body>

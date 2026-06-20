@@ -176,7 +176,10 @@
 .mmnav-menu { position:absolute; top:calc(100% + 6px); left:0; min-width:204px;
   background:var(--ds-canvas); border:1px solid var(--ds-hairline); border-radius:var(--r-lg);
   box-shadow:var(--ds-shadow-lg); padding:6px; display:none; flex-direction:column; z-index:300; }
-.mmnav-grp:hover .mmnav-menu, .mmnav-grp:focus-within .mmnav-menu { display:flex; }
+/* 트리거↔메뉴 6px 갭을 메뉴 폭 전체로 덮는 투명 브릿지 — 대각선 이동에도 hover 유지. */
+.mmnav-menu::before { content:""; position:absolute; left:0; right:0; top:-10px; height:10px; }
+.mmnav-grp:hover .mmnav-menu, .mmnav-grp:focus-within .mmnav-menu,
+.mmnav-grp.mmnav-open .mmnav-menu { display:flex; }
 .mmnav-menu a { padding:10px 12px; border-radius:var(--r-md); font-size:var(--fs-sm);
   font-weight:500; color:var(--ds-body); white-space:nowrap; text-decoration:none; }
 .mmnav-menu a:hover { background:var(--ds-soft); color:var(--ds-ink); }

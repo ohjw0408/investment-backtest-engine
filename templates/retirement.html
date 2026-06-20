@@ -76,6 +76,11 @@
 .year-slider-wrap { margin-top: 6px; }
 .year-slider-wrap input[type=range] { width: 100%; accent-color: var(--brand); height: 4px; cursor: pointer; }
 .year-slider-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--ds-muted); margin-top: 2px; }
+/* 슬라이더 값 위치에 정렬된 눈금(절대 위치 — 비선형 라벨 오정렬 방지) */
+.year-marks { position: relative; height: 14px; margin-top: 2px; }
+.year-marks span { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--ds-muted); white-space: nowrap; }
+.year-marks span:first-child { transform: none; }
+.year-marks span:last-child { transform: translateX(-100%); }
 
 /* 토글 스위치 (세금·수수료) */
 .bt-toggle-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -265,7 +270,7 @@
               <div class="year-slider-wrap">
                 <input type="range" id="simAccYearsSlider" min="1" max="50" value="20" step="1"
                   class="calc-slider" oninput="retSyncYears('simAccYears','slider',1,50)">
-                <div class="year-slider-labels"><span>1년</span><span>50년</span></div>
+                <div class="year-marks"><span style="left:0%">1년</span><span style="left:18.4%">10</span><span style="left:38.8%">20</span><span style="left:59.2%">30</span><span style="left:79.6%">40</span><span style="left:100%">50년</span></div>
               </div>
               <input type="hidden" id="simAccYears" value="20">
               <span id="simAccYearsLabel" style="display:none;">20년</span>
@@ -290,7 +295,7 @@
               <div class="year-slider-wrap">
                 <input type="range" id="simWdYearsSlider" min="5" max="50" value="30" step="1"
                   class="calc-slider" oninput="retSyncYears('simWdYears','slider',5,50)">
-                <div class="year-slider-labels"><span>5년</span><span>50년</span></div>
+                <div class="year-marks"><span style="left:0%">5년</span><span style="left:33.3%">20</span><span style="left:66.7%">35</span><span style="left:100%">50년</span></div>
               </div>
               <input type="hidden" id="simWdYears" value="30">
               <span id="simWdYearsLabel" style="display:none;">30년</span>
@@ -380,7 +385,7 @@
               <div class="year-slider-wrap">
                 <input type="range" id="wdYearsSlider" min="5" max="50" value="30" step="1"
                   class="calc-slider" oninput="retSyncYears('wdYears','slider',5,50)">
-                <div class="year-slider-labels"><span>5년</span><span>50년</span></div>
+                <div class="year-marks"><span style="left:0%">5년</span><span style="left:33.3%">20</span><span style="left:66.7%">35</span><span style="left:100%">50년</span></div>
               </div>
               <input type="hidden" id="wdYears" value="30">
               <span id="wdYearsLabel" style="display:none;">30년</span>

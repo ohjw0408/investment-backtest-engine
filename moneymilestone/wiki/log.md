@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-21] UX/FIX | 은퇴 인출 결과 차트·초기금 기본값·연도 슬라이더 키보드입력·수수료 프리셋 확대·nav 드롭다운 (오너 6건)
+
+- **A 인출기 종료자산 분포 차트 누락**: wd 모드가 else 분기서 dist 숫자만 채우고 histogram 미렌더 → `data.wd_values`로 차트 렌더(ee4e136).
+- **C 은퇴시뮬 초기투자금 기본값 오류**: `retRestoreForm`이 `_mode==='withdrawal'`만 체크하는데 프론트 wd body는 `_withdrawal_only`만 있음 → else(sim) 분기서 인출기 5억을 simSeed에 주입(힌트 1천만 stale). `_withdrawal_only`도 인식, 복원 후 힌트·라벨·연도입력 동기(ee4e136).
+- **B 슬라이더↔값 불일치 + 키보드입력**: 연도 슬라이더(투자기간·인출기간 sim/wd) 눈금(1/10/20/30/50)이 균등배치인데 값은 비선형 → 썸≠라벨. number 입력칸 추가(`retSyncYears` 양방향·클램프), 눈금 양끝만(f2de493). 목표생존확률은 이미 적용됨.
+- **E nav 드롭다운 클릭 전 사라짐**: `.mmnav-menu` top:calc(100%+6px) 갭에서 hover 단절 → `.mmnav-grp` padding-bottom:8px/margin-bottom:-8px로 히트영역 확장(71188ee, components.css ?v=20260621nav).
+- **D 증권사 수수료 프리셋 은퇴·배당금 확대**: 두 탭이 옛 하드코딩 select(키움/삼성/토스)만 → 공용 `static/js/broker_fee.js` 신규(broker_fee_presets.json 8개사 + 시장세그 국내주식/ETF/미국 + meta, 표준 ID). 인라인 단순 applyFeePreset 제거, 패널·CSS·script 추가, body에 fee_market/fee_preset(c2a96e6). 계산기/백테와 동일 결.
+- **검증**(로컬 Playwright, 각 항목): 인출기 차트 렌더·simSeed 기본1천만·연도 입력↔슬라이더 동기·클램프·nav 갭통과 클릭·프리셋9개 시장연동(미국 0.25%)·콘솔0. prod 배포는 GitHub Actions 자동.
+
+_작성: Claude_
+
 ## [2026-06-21] BUGFIX | KRX_GOLD 등 특수종목이 인출 MC 깨뜨려 중앙값 폭발(46억) — get_price 기반 피팅으로 수정
 
 오너: 로그인 일반창선 인출 중앙값 46억(말도 안 됨), 시크릿선 2300만(정상). "로그인 차이"로 보였으나 실은 **저장 포폴 종목 차이** — 로그인 자동로드=SCHD/QQQM/KRX_GOLD, 시크릿 수동=SCHD/QQQ/GLD.

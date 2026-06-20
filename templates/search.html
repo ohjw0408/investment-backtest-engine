@@ -4,8 +4,8 @@
 {% block head %}
 <style>
 /* ═══ 종목 검색 — 코인베이스 분석 아키타입(ds 토큰, 타 탭과 결 통일) ═══ */
-.main-content { background: var(--ds-canvas); }
-.sp-page { max-width: 1040px; margin: 0 auto; padding: 32px 20px 64px; font-family: var(--font-sans); color: var(--ds-ink); }
+.main-content { background: var(--ds-canvas); scrollbar-gutter: stable; }
+.sp-page { grid-column: 1 / -1; width: 100%; max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; box-sizing: border-box; font-family: var(--font-sans); color: var(--ds-ink); }
 @media (max-width: 860px) { .sp-page { padding: 18px 12px 48px; } }
 
 .sp-hero { text-align: center; margin-bottom: 22px; }
@@ -13,7 +13,7 @@
 .sp-sub { font-size: var(--fs-sm); color: var(--ds-body); margin: 0; }
 
 /* 큰 검색바 — 타 탭 입력 카드와 결 맞춤(넓고 또렷) */
-.sp-searchwrap { width: 100%; max-width: 720px; margin: 0 auto 14px; position: relative; box-sizing: border-box; }
+.sp-searchwrap { width: 100%; max-width: 900px; margin: 0 auto 14px; position: relative; box-sizing: border-box; }
 .sp-bar {
   display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box;
   background: var(--ds-canvas); border: 1.5px solid var(--ds-hairline);
@@ -197,7 +197,7 @@ function spCategory(badge) {
 const input      = document.getElementById('searchInput');
 const resultsDiv = document.getElementById('searchResults');
 const defaultDiv = document.getElementById('spDefault');
-let timer = null, lastCodes = [], lastData = [];
+let timer = null, lastCodes = [], lastData = [], spSeq = 0;
 const spActive = new Set();   // 다중선택 필터
 
 // ── 최근 검색 (localStorage) ──
@@ -304,7 +304,7 @@ input.addEventListener('input', () => {
   const q = input.value.trim();
   document.getElementById('spClear').style.display = q ? 'block' : 'none';
   if (!q) {
-    clearTimeout(timer);   // 대기 중인 이전 검색이 빈칸 후 늦게 떠 도배되던 버그 방지
+    clearTimeout(timer); ++spSeq;   // 대기 타이머 취소 + in-flight 응답 무효화(도배 방지)
     resultsDiv.innerHTML = '';
     defaultDiv.style.display = 'block';
     document.getElementById('searchControls').style.display = 'none';
@@ -315,10 +315,13 @@ input.addEventListener('input', () => {
   defaultDiv.style.display = 'none';
   clearTimeout(timer);
   resultsDiv.innerHTML = '<div class="search-hint">검색 중...</div>';
+  const seq = ++spSeq;                                  // 요청 순번(stale 결과 폐기용)
   timer = setTimeout(async () => {
     try {
-      const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=40`);
       const data = await res.json();
+      // 도배 방지: 응답 도착 시 입력이 바뀌었거나 비었으면 폐기(in-flight stale)
+      if (seq !== spSeq || input.value.trim() === '') return;
       if (!data.length) {
         resultsDiv.innerHTML = '<div class="search-hint">검색 결과가 없습니다</div>';
         document.getElementById('searchControls').style.display = 'none';
@@ -329,7 +332,7 @@ input.addEventListener('input', () => {
       document.getElementById('searchControls').style.display = 'flex';
       renderResults();
     } catch(e) {
-      resultsDiv.innerHTML = '<div class="search-hint">오류가 발생했습니다</div>';
+      if (seq === spSeq) resultsDiv.innerHTML = '<div class="search-hint">오류가 발생했습니다</div>';
     }
   }, 250);
 });

@@ -50,9 +50,11 @@ class InfoEngine:
 
     def _search_like(self, kw: str, limit: int) -> pd.DataFrame:
         conn = self._connect()
-        like   = f"%{kw}%"
-        exact  = kw.upper()
-        prefix = f"{kw.upper()}%"
+        like     = f"%{kw}%"
+        exact    = kw.upper()
+        nprefix  = f"{kw}%"          # 이름 prefix(대소문자 무관 — 한글)
+        cprefix  = f"{kw.upper()}%"  # 코드 prefix
+        wordmid  = f"% {kw}%"        # 단어 시작(공백 뒤) — "KODEX 삼성그룹" 등 ETF
         query = f"""
         SELECT {_COLS} FROM symbols
         WHERE code LIKE ? OR name LIKE ?
@@ -60,15 +62,16 @@ class InfoEngine:
             CASE
                 WHEN code = ?       THEN 1
                 WHEN name = ?       THEN 2
-                WHEN code LIKE ?    THEN 3
-                WHEN name LIKE ?    THEN 4
-                ELSE 5
+                WHEN name LIKE ?    THEN 3   -- 이름 prefix (삼성전자)
+                WHEN code LIKE ?    THEN 4   -- 코드 prefix
+                WHEN name LIKE ?    THEN 5   -- 단어 시작 (KODEX 삼성그룹)
+                ELSE 6                       -- 중간 포함
             END,
             length(name)
         LIMIT ?
         """
         df = pd.read_sql(query, conn,
-                         params=(like, like, exact, kw, prefix, like, limit))
+                         params=(like, like, exact, kw, nprefix, cprefix, wordmid, limit))
         conn.close()
         return df
 

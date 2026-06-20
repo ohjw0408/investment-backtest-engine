@@ -348,6 +348,10 @@ def search():
     if not q:
         return jsonify([])
     try:
+        try:
+            _limit = max(1, min(int(request.args.get('limit', 20)), 50))
+        except (TypeError, ValueError):
+            _limit = 20
         results = []
 
         # KRX 금현물 특별 처리
@@ -358,7 +362,7 @@ def search():
                 'country': 'KR', 'is_etf': False,
             })
 
-        df = info_engine.search_fuzzy(q, limit=20)
+        df = info_engine.search_fuzzy(q, limit=_limit)
         if not df.empty:
             for _, row in df.iterrows():
                 if row.get('is_etf'):
@@ -422,7 +426,7 @@ def search():
             except Exception as e:
                 print(f"[search price] {e}")
 
-        return jsonify(results[:20])
+        return jsonify(results[:_limit])
     except Exception as e:
         print(f"[search] 오류: {e}")
         return jsonify([])

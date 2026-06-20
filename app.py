@@ -53,6 +53,23 @@ import datetime as _dt_mod
 app.config['PERMANENT_SESSION_LIFETIME'] = _dt_mod.timedelta(days=30)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
+
+@app.after_request
+def _no_cache_html(resp):
+    """동적 HTML은 브라우저가 매번 재검증하도록 한다.
+
+    캐시 헤더가 없으면 브라우저가 휴리스틱 캐싱으로 옛 HTML을 재사용해
+    배포 후에도 변경이 안 보이는 문제가 생긴다(시크릿 창에서만 최신으로 보임).
+    static 자산은 `?v=` 버전 쿼리로 캐시 버스팅하므로 건드리지 않는다.
+    응답이 이미 Cache-Control을 지정했으면(공유 이미지 등) 존중한다.
+    """
+    ctype = resp.headers.get('Content-Type', '')
+    if ctype.startswith('text/html') and 'Cache-Control' not in resp.headers:
+        resp.headers['Cache-Control'] = 'no-cache, must-revalidate'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+    return resp
+
 INDEX_DB_PATH  = Path(__file__).parent / "data" / "meta" / "index_master.db"
 PRICE_DB_PATH  = Path(__file__).parent / "data" / "price_cache" / "price_daily.db"
 SHARE_IMG_DIR  = Path(__file__).parent / "share_images"

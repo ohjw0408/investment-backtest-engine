@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-20] BUGFIX | 배포 후 변경이 일반 브라우저에서 안 보임(시크릿만 보임) — HTML 휴리스틱 캐싱
+
+오너 제보: retirement 배포됐는데 일반 브라우저선 옛 화면, 시크릿 창에선 새 화면.
+
+- **원인**: 동적 HTML 응답에 `Cache-Control`/`ETag`/`Last-Modified`가 전혀 없음(nginx·Flask 둘 다 미설정). 캐시 헤더가 없으면 브라우저가 **휴리스틱 캐싱**으로 옛 HTML을 재사용 → 일반 창은 stale, 시크릿은 캐시 없어 fresh. 서버/CDN 캐시였다면 둘 다 동일했을 것 → 클라이언트 캐시 확정. service worker·서버측 캐시 아님.
+- **수정**: `app.py`에 `@app.after_request _no_cache_html` 추가 — `Content-Type: text/html` 응답에만 `Cache-Control: no-cache, must-revalidate` + `Pragma`/`Expires` 설정(매 요청 재검증). static 자산은 `?v=` 버전 버스팅이 있으므로 제외(text/html만 타겟), 이미 Cache-Control 지정된 응답(공유 이미지 max-age=86400)은 존중.
+- **검증**: `test_client` `/retirement` → `Cache-Control: no-cache, must-revalidate`·`Pragma: no-cache` 확인, after_request 등록 확인. static(text/css)은 훅 미적용(Flask debug 기본 no-cache는 별개).
+- ⚠️ 배포 후 응답부터 적용. 이미 stale 캐시된 브라우저는 **1회 하드리프레시(Ctrl+Shift+R)** 필요. 이후 배포부터는 자동 최신.
+
+_작성: Claude_
+
 ## [2026-06-20] UX | 은퇴 설계(retirement) 디자인을 계산기/포트폴리오 분석 탭 아키타입으로 전면 이식
 
 오너: "느낌만 비슷하게 만들지 말고, 결과창이나 기타등등 세부 디테일까지 포트폴리오 분석탭·투자계산기 탭 참고해서 세밀·꼼꼼히 이식." (dividend_target에 이어 retirement 동일 이식)

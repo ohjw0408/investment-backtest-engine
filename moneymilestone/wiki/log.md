@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-21] UX | 세금 설정 편입·검색 다중필터·캘린더 칩토글 (오너 후속)
+
+- **세금 설정 → 설정 편입**(settings.html·base.html·app.py): 세금 폼(소득·ISA·연금·절세) 전체를 settings 세금 패널로 이식(toggleAccount/saveTaxSettings/loadTaxSettings, ID·`/api/settings/tax` 보존). nav·사이드바 '세금 설정' 제거. `/tax-settings`→`/settings` 302(옛 링크 호환). (61cb781)
+- **검색 다중선택 필터 + 버그**(search.html, 555a181): 단일→다중선택 필터(국내주식/국내ETF/해외주식/해외ETF/크립토, OR, 해제, 필터 아이콘 라벨). 타이핑 중 검색바 폭 변동 버그(width 고정), 빈칸 시 이전 debounce 도배 버그(clearTimeout) 수정.
+- **캘린더 설정 칩 토글**(settings.html, e228cee): raw 체크박스→set-chk 칩(체크 시 brand-tint), set-chk-grid 정렬, 소스 카드화.
+- **⚠️ 섹터 스크리너(시총/거래량/수익률 랭킹) 보류**: 데이터 부재 — symbol_master에 **시가총액 컬럼 없음**, 국내종목 **섹터분류 None**(category는 US ETF만), price_daily는 **on-demand ~수십~수백 종목만**(전 종목 시세 없음). 증권사식 스크리너는 별도 데이터 파이프라인(시총·섹터·전종목 시세 수집) 선행 필요. 오너 합의로 가능범위(다중필터)만 구현.
+- **인기 종목 = 임의 큐레이션**(SP_POPULAR 9개, 데이터 근거 없는 placeholder). 추후 조회수/협찬 동적화 자리.
+- 검증: 각 Playwright(test_client redirect 302·검색 바폭/필터/빈칸·캘린더 칩·세금폼 토글저장)·콘솔0·스샷.
+
+_작성: Claude_
+
 ## [2026-06-21] UX | 검색·설정·세금설정 리디자인 + 내자산 종목클릭 (오너)
 
 - **내 자산 종목 클릭 → 상세**: holdings 종목명에 onclick `/symbol/<code>`(myportfolios 패턴)(e7e7c3f).

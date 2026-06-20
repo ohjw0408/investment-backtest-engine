@@ -13,13 +13,14 @@
 .sp-sub { font-size: var(--fs-sm); color: var(--ds-body); margin: 0; }
 
 /* 큰 검색바 — 타 탭 입력 카드와 결 맞춤(넓고 또렷) */
-.sp-searchwrap { max-width: 720px; margin: 0 auto 14px; position: relative; }
+.sp-searchwrap { width: 100%; max-width: 720px; margin: 0 auto 14px; position: relative; box-sizing: border-box; }
 .sp-bar {
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box;
   background: var(--ds-canvas); border: 1.5px solid var(--ds-hairline);
   border-radius: var(--r-pill); padding: 15px 22px; box-shadow: var(--ds-shadow);
   transition: border-color .15s, box-shadow .15s;
 }
+.sp-bar input { min-width: 0; }
 .sp-bar:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px var(--brand-tint); }
 .sp-bar .sp-ico, .sp-bar .sp-ico svg { width: 20px; height: 20px; color: var(--ds-muted); flex-shrink: 0; }
 .sp-bar input { border: none; outline: none; flex: 1; min-width: 0; font-size: 1.05rem; font-family: var(--font-sans); color: var(--ds-ink); background: transparent; }
@@ -27,8 +28,12 @@
 .sp-clear { background: none; border: none; cursor: pointer; color: var(--ds-muted); font-size: 1.2rem; line-height: 1; padding: 0 4px; display: none; }
 .sp-clear:hover { color: var(--ds-ink); }
 
-/* 필터 칩 */
-.sp-filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 22px; }
+/* 필터 칩 (다중선택) */
+.sp-filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; margin-bottom: 22px; }
+.sp-filter-label { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 700; color: var(--ds-muted); margin-right: 2px; }
+.sp-filter-label .sp-ico, .sp-filter-label .sp-ico svg { width: 15px; height: 15px; color: var(--ds-muted); }
+.sp-chip-reset { color: var(--down); border-color: var(--red-light); }
+.sp-chip-reset:hover { background: var(--red-pale); color: var(--down); border-color: var(--down); }
 .sp-chip {
   font-size: 0.8rem; font-weight: 700; padding: 7px 14px; border-radius: var(--r-pill);
   border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body);
@@ -100,13 +105,15 @@
     </div>
   </div>
 
-  <!-- 필터 칩 -->
+  <!-- 다중선택 필터 -->
   <div class="sp-filters" id="spFilters">
-    <button class="sp-chip active" data-filter="all" onclick="spSetFilter('all')">전체</button>
-    <button class="sp-chip" data-filter="kr" onclick="spSetFilter('kr')">국내</button>
-    <button class="sp-chip" data-filter="us" onclick="spSetFilter('us')">해외</button>
-    <button class="sp-chip" data-filter="etf" onclick="spSetFilter('etf')">ETF</button>
-    <button class="sp-chip" data-filter="crypto" onclick="spSetFilter('crypto')">크립토</button>
+    <span class="sp-filter-label"><span class="sp-ico">{{ nicon('sliders') }}</span> 필터</span>
+    <button class="sp-chip" data-cat="kr_stock" onclick="spToggle('kr_stock')">국내주식</button>
+    <button class="sp-chip" data-cat="kr_etf"   onclick="spToggle('kr_etf')">국내 ETF</button>
+    <button class="sp-chip" data-cat="us_stock" onclick="spToggle('us_stock')">해외주식</button>
+    <button class="sp-chip" data-cat="us_etf"   onclick="spToggle('us_etf')">해외 ETF</button>
+    <button class="sp-chip" data-cat="crypto"   onclick="spToggle('crypto')">크립토</button>
+    <button class="sp-chip sp-chip-reset" id="spReset" onclick="spResetFilter()" style="display:none;">✕ 해제</button>
   </div>
 
   <!-- 검색 결과 시세 안내 -->
@@ -177,18 +184,21 @@ function fmtChange(pct) {
 }
 function spEsc(s) { return String(s ?? '').replace(/'/g, "\\'"); }
 
-// 필터: badge → 카테고리 매핑
+// 필터: badge → 단일 카테고리 키
 function spCategory(badge) {
-  if (['KOSPI','KOSDAQ','KR ETF'].includes(badge)) return badge === 'KR ETF' ? ['kr','etf'] : ['kr'];
-  if (['NASDAQ','NYSE','US ETF'].includes(badge))  return badge === 'US ETF' ? ['us','etf'] : ['us'];
-  if (badge === 'CRYPTO') return ['crypto'];
-  return [];
+  if (badge === 'KR ETF') return 'kr_etf';
+  if (badge === 'KOSPI' || badge === 'KOSDAQ' || badge === 'KRX') return 'kr_stock';
+  if (badge === 'US ETF') return 'us_etf';
+  if (badge === 'NASDAQ' || badge === 'NYSE') return 'us_stock';
+  if (badge === 'CRYPTO') return 'crypto';
+  return '';
 }
 
 const input      = document.getElementById('searchInput');
 const resultsDiv = document.getElementById('searchResults');
 const defaultDiv = document.getElementById('spDefault');
-let timer = null, lastCodes = [], lastData = [], spFilter = 'all';
+let timer = null, lastCodes = [], lastData = [];
+const spActive = new Set();   // 다중선택 필터
 
 // ── 최근 검색 (localStorage) ──
 function spGetRecent() { try { return JSON.parse(localStorage.getItem(SP_RECENT_KEY) || '[]'); } catch(e) { return []; } }
@@ -230,14 +240,21 @@ function renderPopular() {
 
 function spClearInput() { input.value = ''; input.dispatchEvent(new Event('input')); input.focus(); }
 
-function spSetFilter(f) {
-  spFilter = f;
-  document.querySelectorAll('.sp-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+function spToggle(cat) {
+  if (spActive.has(cat)) spActive.delete(cat); else spActive.add(cat);
+  document.querySelectorAll('.sp-chip[data-cat]').forEach(c => c.classList.toggle('active', spActive.has(c.dataset.cat)));
+  document.getElementById('spReset').style.display = spActive.size ? 'inline-flex' : 'none';
+  if (lastData.length) renderResults();
+}
+function spResetFilter() {
+  spActive.clear();
+  document.querySelectorAll('.sp-chip[data-cat]').forEach(c => c.classList.remove('active'));
+  document.getElementById('spReset').style.display = 'none';
   if (lastData.length) renderResults();
 }
 
 function renderResults() {
-  const data = spFilter === 'all' ? lastData : lastData.filter(d => spCategory(d.badge).includes(spFilter));
+  const data = spActive.size ? lastData.filter(d => spActive.has(spCategory(d.badge))) : lastData;
   if (!data.length) {
     resultsDiv.innerHTML = '<div class="search-hint">이 필터에 맞는 결과가 없습니다</div>';
     return;
@@ -287,6 +304,7 @@ input.addEventListener('input', () => {
   const q = input.value.trim();
   document.getElementById('spClear').style.display = q ? 'block' : 'none';
   if (!q) {
+    clearTimeout(timer);   // 대기 중인 이전 검색이 빈칸 후 늦게 떠 도배되던 버그 방지
     resultsDiv.innerHTML = '';
     defaultDiv.style.display = 'block';
     document.getElementById('searchControls').style.display = 'none';

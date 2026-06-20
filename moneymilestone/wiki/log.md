@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-20] FEAT | 은퇴 인출 결과창 정보 보강 — 건전성 지표 + 연차별 잔여자산
+
+오너: 은퇴 시뮬 결과창 인출 파트가 빈약. ① 인플레 반영 월 명목 생활비 ② 연차별 남은 자산 ③ 4% 룰 ④ 월 인출금/배당금 비율 추가 요청.
+
+- **백엔드 — 연차 궤적 신규 집계**(`modules/retirement/withdrawal_analyzer.py`): `_calc_metrics`·`_simulate_synthetic_case`에 `yearly_ratios`(연말 자산/초기자본, 길이=인출연수) 추가. `run()`에 `_aggregate_trajectory`로 윈도우 가로질러 연차별 p10/p50/p90 집계 → `yearly_trajectory`. (배당커버리지·고갈시점·MDD·총배당은 이미 `distribution`에 있던 것 — 신규 계산 아님.)
+- **백엔드 — threading**(`retirement_logic.py`): `_build_withdrawal_insights(wd_result, start_asset)` 신규 — `withdrawal_coverage_p50`·`depletion_p10/p50`·`mdd_p50`·`total_dividend_p50`·`trajectory`(원화 환산)·`start_asset`. sim 모드=p50 축적 샘플의 wd_result에서, wd(인출기) 모드=단일 result에서 추출해 응답에 `withdrawal_insights` 추가. (멀티계좌 경로는 미포함 → 프론트 graceful 처리.)
+- **프론트**(`retirement.html`): 결과 히어로 아래 **인출 건전성 카드**(은퇴시작자산·은퇴시점 월필요액[인플레반영]·4%룰 안전인출+내인출 배수/공격성·인출률·배당커버리지·예상고갈·MDD) + **연차별 잔여자산 라인차트**(p10/50/90 밴드, Chart.js)+desc(고갈 안내)+**표 토글**(연차·나이·월필요생활비·잔여자산 중앙, 1·5·10…년차+마지막). 4%룰·인출률·인플레 생활비·나이는 `start_asset`+입력값으로 프론트 계산. `renderWdInsights`/`retToggleWdTable` 신규, `renderRetirement` 말미서 호출. `withdrawal_insights` 없으면 카드 숨김.
+- **검증**: 백엔드 `ast` 컴파일 OK, `pytest tests/test_g5_retirement_withdrawal.py` 5 passed. 프론트 Playwright 가짜주입 — 건전성 7카드 값 정확(월필요 ₩445만=300만×1.02²⁰·4%룰 ₩166만·내인출 2.67배 공격적·인출률 10.7%·커버리지 27%·고갈 하위10% 23년차·MDD 35%), 궤적 차트 렌더·표 7행(1년차 60세)·라이트/다크·모바일390 오버플로우0·콘솔0. (Redis 다운으로 실 celery는 미실행 → 라이브 실시뮬은 배포 후.)
+
+_작성: Claude_
+
 ## [2026-06-20] BUGFIX | 고급 옵션이 광고차단기(AdGuard)에 막혀 안 펼쳐짐 — adv- 클래스명 리네임
 
 오너 제보: 일반 브라우저(Edge)서 고급 옵션 클릭하면 화살표만 회전하고 내용 안 나옴. 시크릿(InPrivate)·다른 브라우저선 정상. calculator·retirement 등 고급옵션 있는 탭 전부.

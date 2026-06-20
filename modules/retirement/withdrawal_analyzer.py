@@ -224,11 +224,32 @@ class WithdrawalAnalyzer:
             "n_synthetic":  n_synthetic,
             # D4 인출 거래수수료(중앙값 — 적립 total_fees와 합산해 표시).
             "total_fees":   float(np.median([c.get("total_fees", 0.0) for c in cases])) if cases else 0.0,
+            # 연차별 자산 궤적(윈도우 가로질러 p10/p50/p90, 비율) — 인출 결과창 연도별 잔여자산.
+            "yearly_trajectory": self._aggregate_trajectory(cases),
         }
         # 연금 세금 정보 (연금저축/IRP)
         if self.tax_engine and self.account_type in ("연금저축", "IRP"):
             result["pension_tax_info"] = self._calc_pension_tax_by_age()
         return result
+
+    def _aggregate_trajectory(self, cases: List[dict]) -> list:
+        """케이스별 yearly_ratios를 연차별 p10/p50/p90(비율)로 집계."""
+        n = self.withdrawal_years
+        mat = [c.get("yearly_ratios") or [] for c in cases]
+        mat = [r for r in mat if len(r) == n]
+        if not mat:
+            return []
+        arr = np.array(mat)
+        out = []
+        for y in range(n):
+            col = arr[:, y]
+            out.append({
+                "year": y + 1,
+                "p10": float(np.percentile(col, 10)),
+                "p50": float(np.percentile(col, 50)),
+                "p90": float(np.percentile(col, 90)),
+            })
+        return out
 
     # ════════════════════════════════════════════════════════
     # 병렬 롤링
@@ -442,6 +463,13 @@ class WithdrawalAnalyzer:
         mid = n_months // 2
         sequence_risk = float(np.mean(rets[:mid])) - float(np.mean(rets[mid:]))
 
+        # 연차별 자산비율(연말 시점) — 실측 경로와 동일 포맷.
+        _ic = self.initial_capital if self.initial_capital > 0 else 1.0
+        yearly_ratios = [
+            float(pv_arr[min(y * 12, n_months)]) / _ic
+            for y in range(1, self.withdrawal_years + 1)
+        ]
+
         return {
             "success": success, "end_value": end_value,
             "end_value_ratio": end_value_ratio,
@@ -451,6 +479,7 @@ class WithdrawalAnalyzer:
             "withdrawal_coverage": 0.0, "sequence_risk": sequence_risk,
             "dividend_mdd": 0.0, "is_synthetic": True,
             "total_fees": 0.0,   # D4: 합성 경로는 거래 없음 → 수수료 0
+            "yearly_ratios": yearly_ratios,
         }
 
     def _run_synthetic_cases(self, n_needed, mu, sigma, start_id=9000):
@@ -509,6 +538,18 @@ class WithdrawalAnalyzer:
 
         sequence_risk = _half_cagr(pv.iloc[:mid]) - _half_cagr(pv.iloc[mid:])
 
+        # 연차별 자산비율(연말 시점, 길이 = years) — 인출기 결과창 연도별 잔여자산 차트/표용.
+        # 고갈 이후·데이터 부족 구간은 0. 비율은 initial_capital 기준(다운스트림서 원화 환산).
+        yearly_ratios = []
+        if self.initial_capital > 0:
+            _h = history[["date", "portfolio_value"]].copy()
+            _h["date"] = pd.to_datetime(_h["date"])
+            for y in range(1, years + 1):
+                _tgt = start_date + pd.DateOffset(years=y)
+                _sub = _h[_h["date"] <= _tgt]
+                _val = float(_sub["portfolio_value"].iloc[-1]) if not _sub.empty else 0.0
+                yearly_ratios.append(max(_val, 0.0) / self.initial_capital)
+
         return {
             "success": success, "end_value": end_value,
             "end_value_ratio": end_value_ratio,
@@ -518,6 +559,7 @@ class WithdrawalAnalyzer:
             "withdrawal_coverage": withdrawal_coverage,
             "sequence_risk": sequence_risk,
             "dividend_mdd": dividend_mdd,
+            "yearly_ratios": yearly_ratios,
         }
 
     def _fit_distribution(self, cases: List[dict]) -> dict:

@@ -627,6 +627,26 @@
         <div class="ret-msg-box" id="retMsgBox"></div>
       </div>
 
+      <!-- 인출 건전성 지표 -->
+      <div class="result-card" id="retWdHealthCard" style="display:none;">
+        <div class="result-card-title">인출 건전성</div>
+        <div class="result-card-desc">인플레이션 반영 은퇴 시점 기준. 4% 룰·인출률·배당 커버리지로 인출 강도를 점검해요.</div>
+        <div class="dist-cards" id="retWdHealthGrid"></div>
+      </div>
+
+      <!-- 연차별 잔여 자산 -->
+      <div class="result-card" id="retWdTrajCard" style="display:none;">
+        <div class="result-card-title">연차별 잔여 자산 <span style="font-weight:400;color:var(--ds-muted);">(중앙값 시나리오, 명목)</span></div>
+        <div class="result-card-desc" id="retWdTrajDesc"></div>
+        <canvas id="retWdTrajChart" height="150"></canvas>
+        <div style="text-align:right;margin-top:8px;">
+          <button type="button" class="share-pill" id="retWdTableToggle" onclick="retToggleWdTable()">표로 보기</button>
+        </div>
+        <div id="retWdTableWrap" style="display:none;margin-top:12px;overflow-x:auto;">
+          <table class="sample-table" id="retWdTable"></table>
+        </div>
+      </div>
+
       <!-- 축적 결과 (은퇴 시뮬레이션 모드만) -->
       <div class="result-card" id="retAccCard">
         <div class="result-card-title">축적기 종료 자산 분포</div>
@@ -1676,6 +1696,122 @@ function renderRetirement(data, body) {
       document.getElementById('retWdP90').textContent = fmtKRW(wdDist.p90);
     }
   }
+
+  // 인출 직관 지표 (건전성 + 연차별 잔여자산)
+  renderWdInsights(data, body);
+}
+
+// ── 인출 건전성 + 연차별 잔여 자산 (백엔드 withdrawal_insights) ──
+function renderWdInsights(data, body) {
+  const ins        = data.withdrawal_insights;
+  const healthCard = document.getElementById('retWdHealthCard');
+  const trajCard   = document.getElementById('retWdTrajCard');
+  if (!ins || !ins.start_asset) {
+    if (healthCard) healthCard.style.display = 'none';
+    if (trajCard)   trajCard.style.display = 'none';
+    return;
+  }
+
+  const startAsset = ins.start_asset;
+  const monthly    = body.monthly_withdrawal || 0;
+  const infl       = body.inflation || 0;
+  const accYears   = body.accumulation_years || 0;
+  const wdYears    = body.withdrawal_years || 0;
+
+  // 인플레 반영 은퇴 시점(적립 종료) 월 필요액
+  const retireMonthly = monthly * Math.pow(1 + infl, accYears);
+  const annualRetWd   = retireMonthly * 12;
+  const safe4Monthly  = startAsset * 0.04 / 12;
+  const ratio4 = (startAsset * 0.04) > 0 ? annualRetWd / (startAsset * 0.04) : 0;
+  const wdRate = startAsset > 0 ? annualRetWd / startAsset : 0;
+  const cov    = ins.withdrawal_coverage_p50 || 0;
+
+  const pct = v => (v * 100).toFixed(1) + '%';
+  const ratioTag = r => r <= 1 ? '<span style="color:var(--up);">보수적</span>'
+                      : r <= 1.2 ? '<span style="color:var(--gold-deep);">적정</span>'
+                      : '<span style="color:var(--down);">공격적</span>';
+
+  const depP10 = ins.depletion_p10, depP50 = ins.depletion_p50;
+  const depleted10 = depP10 && depP10 < wdYears;
+  const depleted50 = depP50 && depP50 < wdYears;
+  const depletionTxt   = depleted10 ? `하위10% ${depP10}년차` : depleted50 ? `중앙값 ${depP50}년차` : `${wdYears}년 유지`;
+  const depletionColor = depleted10 ? 'var(--down)' : depleted50 ? 'var(--gold-deep)' : 'var(--up)';
+
+  const cards = [
+    { l: '은퇴 시작 자산',       v: fmtKRW(startAsset) },
+    { l: '은퇴 시점 월 필요액',  v: fmtKRW(Math.round(retireMonthly)) },
+    { l: '4% 룰 안전 인출(월)',  v: fmtKRW(Math.round(safe4Monthly)), sub: `내 인출 ${ratio4.toFixed(2)}배 · ${ratioTag(ratio4)}` },
+    { l: '인출률 (연)',          v: pct(wdRate) },
+    { l: '배당 커버리지',        v: pct(cov), sub: '월 인출 중 배당 충당분' },
+    { l: '예상 고갈',            v: `<span style="color:${depletionColor};">${depletionTxt}</span>` },
+  ];
+  if (ins.mdd_p50) cards.push({ l: '최대 낙폭 (MDD)', v: pct(Math.abs(ins.mdd_p50)) });
+
+  document.getElementById('retWdHealthGrid').innerHTML = cards.map(c => `
+    <div class="dist-card">
+      <div class="dist-card-label">${c.l}</div>
+      <div class="dist-card-value">${c.v}</div>
+      ${c.sub ? `<div style="font-size:0.68rem;color:var(--ds-muted);margin-top:4px;">${c.sub}</div>` : ''}
+    </div>`).join('');
+  healthCard.style.display = 'block';
+
+  // 연차별 잔여 자산
+  const traj = ins.trajectory || [];
+  if (!traj.length) { trajCard.style.display = 'none'; return; }
+
+  const baseAge   = (body.user_settings && body.user_settings.age)
+                 || (window.retTaxProfile && window.retTaxProfile.age) || 40;
+  const retireAge = baseAge + accYears;
+
+  document.getElementById('retWdTrajDesc').innerHTML = depleted10
+    ? `하위 10% 시나리오에서 약 <b>${depP10}년차</b> 자산 고갈 가능.`
+    : `중앙값·하위10% 모두 <b>${wdYears}년</b> 자산 유지.`;
+
+  if (retCharts['retWdTrajChart']) retCharts['retWdTrajChart'].destroy();
+  const brand = (getComputedStyle(document.documentElement).getPropertyValue('--brand') || '#0052ff').trim();
+  retCharts['retWdTrajChart'] = new Chart(document.getElementById('retWdTrajChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: traj.map(t => t.year + '년'),
+      datasets: [
+        { label: '상위10%', data: traj.map(t => t.p90), borderColor: brand + '55', backgroundColor: 'transparent', borderWidth: 1, pointRadius: 0, fill: false },
+        { label: '중앙값',  data: traj.map(t => t.p50), borderColor: brand, backgroundColor: brand + '22', borderWidth: 2, pointRadius: 0, fill: '-1', tension: 0.2 },
+        { label: '하위10%', data: traj.map(t => t.p10), borderColor: brand + '55', backgroundColor: brand + '14', borderWidth: 1, pointRadius: 0, fill: '-1' },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, labels: { font: { size: 10 }, boxWidth: 12, color: '#90A4AE' } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtKRW(c.parsed.y) } },
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: '#90A4AE', callback: v => fmtKRW(v) }, grid: { color: 'rgba(0,0,0,0.05)' } },
+      },
+    },
+  });
+  trajCard.style.display = 'block';
+
+  // 표 (1·5·10…년차 + 마지막)
+  const ymarks = [];
+  for (let y = 1; y <= wdYears; y++) { if (y === 1 || y % 5 === 0 || y === wdYears) ymarks.push(y); }
+  const rows = ymarks.map(y => {
+    const t = traj[y - 1]; if (!t) return '';
+    const life = retireMonthly * Math.pow(1 + infl, y - 1);
+    return `<tr><td>${y}년차</td><td>${retireAge + y - 1}세</td><td>${fmtKRW(Math.round(life))}</td><td>${fmtKRW(t.p50)}</td></tr>`;
+  }).join('');
+  document.getElementById('retWdTable').innerHTML =
+    `<thead><tr><th>연차</th><th>나이</th><th>월 필요생활비</th><th>잔여자산(중앙)</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+function retToggleWdTable() {
+  const wrap = document.getElementById('retWdTableWrap');
+  const btn  = document.getElementById('retWdTableToggle');
+  const show = wrap.style.display === 'none';
+  wrap.style.display = show ? 'block' : 'none';
+  if (btn) btn.textContent = show ? '표 닫기' : '표로 보기';
 }
 
 function renderHistogram(canvasId, values, color) {

@@ -413,6 +413,34 @@ def _run_multi_account_retirement_logic(body: dict, progress_callback=None) -> d
     }
 
 
+def _build_withdrawal_insights(wd_result: dict, start_asset: float) -> dict:
+    """인출 결과창 직관 지표 — 배당커버리지·고갈시점·MDD·연차별 자산 궤적(원화).
+
+    프론트에서 4%룰·인출률·인플레 생활비는 start_asset과 입력값으로 직접 계산한다.
+    """
+    dist = (wd_result or {}).get('distribution', {}) or {}
+
+    def _p(key, p='p50', d=0.0):
+        return (dist.get(key) or {}).get(p, d)
+
+    traj = (wd_result or {}).get('yearly_trajectory') or []
+    return {
+        "start_asset":             round(start_asset),
+        "withdrawal_coverage_p50": round(_p('withdrawal_coverage'), 4),
+        "total_dividend_p50":      round(_p('total_dividend')),
+        "depletion_p10":           round(_p('years_to_depletion', 'p10'), 1),
+        "depletion_p50":           round(_p('years_to_depletion', 'p50'), 1),
+        "mdd_p50":                 round(_p('mdd'), 4),
+        "trajectory": [
+            {"year": t["year"],
+             "p10": round(t["p10"] * start_asset),
+             "p50": round(t["p50"] * start_asset),
+             "p90": round(t["p90"] * start_asset)}
+            for t in traj
+        ],
+    }
+
+
 def run_retirement_logic(body: dict, progress_callback=None) -> dict:
     # 멀티계좌(accounts 2개 이상) → 적립단계 멀티경로(인출투영은 G5-C). 단일계좌 → 기존 경로.
     if len(body.get('accounts') or []) > 1:
@@ -667,11 +695,18 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
                     other_financial_income = recurring_financial_income(_fin_years),
                 )
 
+    # 인출 결과창 직관 지표 — 중앙값(p50) 축적 시나리오의 인출 분포 기준.
+    _p50_sample = next((s for s in report["sample_results"] if s["percentile"] == 50), None)
+    _wd_insights = _build_withdrawal_insights(
+        _p50_sample["wd_result"], _p50_sample["initial_capital"]
+    ) if _p50_sample else None
+
     return {
         "split_sale_plan":       _split_sale_plan,
         "comprehensive_flag":    _comprehensive_flag,
         "limit_warnings":        _limit_warnings or None,
         "accumulation_summary": report["accumulation_summary"],
+        "withdrawal_insights":  _wd_insights,
         "sample_results": [
             {
                 "percentile":      s["percentile"],
@@ -918,6 +953,7 @@ def run_withdrawal_logic(body: dict, progress_callback=None) -> dict:
                 "p90":  round(dist['end_value_ratio']['p90'] * initial_capital),
             },
         },
+        "withdrawal_insights": _build_withdrawal_insights(result, initial_capital),
         "wd_values":        end_vals,
         "data_start":       data_start,
         "n_real":           result.get("n_real"),

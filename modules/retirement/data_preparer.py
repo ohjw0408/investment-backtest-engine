@@ -165,6 +165,11 @@ class DataPreparer:
                     ).fetchone()
                     if _r:
                         _used_synth = True
+                        # 자가복구: pre-existing 합성에 배당 없으면 주입(배당주는 종목 한정).
+                        try:
+                            self._ensure_synthetic_dividends(_code)
+                        except Exception:
+                            pass
                         if _code not in synthetic_info:
                             _row = self.price_conn.execute(
                                 "SELECT MIN(date), MAX(date), COUNT(*) FROM price_daily_synthetic WHERE code=?",
@@ -438,6 +443,63 @@ class DataPreparer:
             "used_synthetic": bool(synthetic_info),
             "warnings":       warnings,
         }
+
+    def _ensure_synthetic_dividends(self, code: str) -> int:
+        """pre-existing 합성 가격 구간에 배당이 없으면 주입(자가복구).
+
+        배당주는 종목인데 옛 합성(배당 지원 전·div_yield 캐시 깨졌을 때 생성)이
+        무배당으로 굳은 경우를 복구한다. 실 배당수익률(stats_cache, 실데이터·프록시
+        기반)로 분기배당을 corporate_actions_synthetic에 주입.
+        멱등: 합성 배당이 이미 있으면 스킵, 무배당 종목(div_yield=0)도 스킵(주입 불필요).
+        """
+        row = self.price_conn.execute(
+            "SELECT MIN(date), MAX(date) FROM price_daily_synthetic WHERE code=?", (code,)
+        ).fetchone()
+        if not row or not row[0]:
+            return 0
+        syn_from, syn_to = row[0], row[1]
+
+        self.price_conn.execute("""
+            CREATE TABLE IF NOT EXISTS corporate_actions_synthetic (
+                code TEXT, date TEXT, dividend REAL, split REAL, PRIMARY KEY (code, date))
+        """)
+        existing = self.price_conn.execute(
+            "SELECT COUNT(*) FROM corporate_actions_synthetic "
+            "WHERE code=? AND dividend>0 AND date BETWEEN ? AND ?",
+            (code, syn_from, syn_to)
+        ).fetchone()[0]
+        if existing > 0:
+            return 0  # 이미 합성 배당 있음
+
+        stats = self.stats_cache.get_or_compute(code)
+        dy_mu    = (stats or {}).get("div_yield_mu") or 0.0
+        dy_sigma = (stats or {}).get("div_yield_sigma") or 0.0
+        if dy_mu <= 0:
+            return 0  # 무배당 종목 → 주입 불필요
+
+        px = pd.read_sql(
+            "SELECT date, close FROM price_daily_synthetic "
+            "WHERE code=? AND date BETWEEN ? AND ? ORDER BY date",
+            self.price_conn, params=(code, syn_from, syn_to),
+        )
+        if px.empty:
+            return 0
+        px["date"] = pd.to_datetime(px["date"])
+        series = px.set_index("date")["close"]
+
+        from modules.backfill_engine import inject_quarterly_dividends
+        n, _dates = inject_quarterly_dividends(
+            price_conn       = self.price_conn,
+            code             = code,
+            price_series     = series,
+            annual_yield_src = ("musigma", dy_mu, dy_sigma),
+            seed             = abs(hash(code)) % 2**31,
+            table_name       = "corporate_actions_synthetic",
+        )
+        self.price_conn.commit()
+        if self.verbose and n:
+            print(f"  [{code}] 자가복구: 합성 배당 {n}건 주입(yield μ={dy_mu:.4f})")
+        return n
 
     def close(self):
         self.stats_cache.close()

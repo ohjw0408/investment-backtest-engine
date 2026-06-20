@@ -557,25 +557,54 @@ class WithdrawalAnalyzer:
             SYNTHETIC_DF, T_SCALE, MAX_SYNTH_MU_MONTHLY, TRADING_DAYS_PER_MONTH,
         )
         raw_loader = self.portfolio_engine.price_loader.loader
-        try:
-            from modules.retirement.synthetic_mvn import estimate_joint_stats
-            js = estimate_joint_stats(self.tickers, raw_loader)
-        except Exception:
-            js = {"ok": False}
-        if not (js and js.get("ok")):
-            return []
+        k = len(self.tickers)
 
-        order = js["order"]                                  # 종목 순서
-        if not all(t in order for t in self.tickers):
+        # ── 종목별 mu/sigma + 상관 피팅 (get_price 기반 → KRX_GOLD·금현물 등 특수종목 포함) ──
+        # estimate_joint_stats는 price_daily 직접쿼리라 KRX_GOLD(합성 연속 시계열) 등을 못 잡아
+        # MVN이 통째 실패 → 단일종목 폴백(과대 mu·배당0). get_price는 모든 종목을 처리한다.
+        _look_from = (self.data_end - relativedelta(years=25)).strftime("%Y-%m-%d")
+        _end_str   = self.data_end.strftime("%Y-%m-%d")
+        rets = {}
+        for code in self.tickers:
+            try:
+                df = raw_loader.get_price(code, _look_from, _end_str, allow_synthetic=False)
+                if df is None or len(df) == 0:
+                    continue
+                df = df.copy(); df["date"] = pd.to_datetime(df["date"])
+                s = df.set_index("date")["close"].astype(float).sort_index()
+                r = s.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
+                r = r[r.abs() < 0.5]
+                if len(r) >= 60:
+                    rets[code] = r
+            except Exception:
+                pass
+        if len(rets) < k:
+            return []   # 통계 못 얻은 종목 존재 → 호출부 단일종목 폴백
+
+        mu_raw = np.array([rets[c].mean()      for c in self.tickers], float)
+        sig    = np.array([rets[c].std(ddof=1) for c in self.tickers], float)
+        if not (np.all(np.isfinite(mu_raw)) and np.all(sig > 0)):
             return []
-        idx   = [order.index(t) for t in self.tickers]
-        mu_d  = np.minimum(np.asarray(js["mu"], float)[idx],
-                           MAX_SYNTH_MU_MONTHLY / TRADING_DAYS_PER_MONTH)   # 일일 drift 상한
-        cov_d = np.asarray(js["cov"], float)[np.ix_(idx, idx)]
+        mu_d = np.minimum(mu_raw, MAX_SYNTH_MU_MONTHLY / TRADING_DAYS_PER_MONTH)  # 일일 drift 상한
+
+        aligned = pd.DataFrame({c: rets[c] for c in self.tickers}).dropna()
+        if len(aligned) >= 120:
+            corr = np.corrcoef(aligned.values, rowvar=False)
+            corr = np.nan_to_num(corr, nan=0.0)
+            np.fill_diagonal(corr, 1.0)
+        else:
+            corr = np.eye(k)                                  # 겹침 부족 → 독립 가정
+        cov_d = np.outer(sig, sig) * corr
         try:
-            chol = np.linalg.cholesky(cov_d + np.eye(len(idx)) * 1e-12)
+            chol = np.linalg.cholesky(cov_d + np.eye(k) * 1e-12)
         except Exception:
-            chol = np.diag(np.sqrt(np.clip(np.diag(cov_d), 1e-12, None)))
+            # nearest-PSD: 고유값 클리핑 후 재시도
+            w, V = np.linalg.eigh((cov_d + cov_d.T) / 2)
+            cov_d = V @ np.diag(np.clip(w, 1e-12, None)) @ V.T
+            try:
+                chol = np.linalg.cholesky(cov_d + np.eye(k) * 1e-12)
+            except Exception:
+                chol = np.diag(sig)
 
         # 종목별 연 배당수익률(실데이터 기반) — 합성 가격에 분기배당 주입용.
         div_yield = self._per_ticker_div_yields()
@@ -588,7 +617,6 @@ class WithdrawalAnalyzer:
         n_days = len(dates)
         if n_days < 60:
             return []
-        k       = len(self.tickers)
         t_scale = float(T_SCALE)
         start_str, end_str = dates[0].strftime("%Y-%m-%d"), dates[-1].strftime("%Y-%m-%d")
         # 각 분기(3·6·9·12월) 마지막 영업일 위치 — 배당 지급일.

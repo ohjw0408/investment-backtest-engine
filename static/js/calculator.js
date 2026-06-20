@@ -357,8 +357,8 @@ function calcEditConditions() { calcShowInput(); }
 
 // ── 고급 옵션 접기/펼치기 ──
 function calcToggleAdvanced(force) {
-  const body = document.getElementById('advBody');
-  const tog = document.getElementById('advToggle');
+  const body = document.getElementById('moreoptBody');
+  const tog = document.getElementById('moreoptToggle');
   if (!body || !tog) return;
   const open = force === undefined ? !body.classList.contains('open') : !!force;
   body.classList.toggle('open', open);

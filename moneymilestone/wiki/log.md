@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-20] BUGFIX | 고급 옵션이 광고차단기(AdGuard)에 막혀 안 펼쳐짐 — adv- 클래스명 리네임
+
+오너 제보: 일반 브라우저(Edge)서 고급 옵션 클릭하면 화살표만 회전하고 내용 안 나옴. 시크릿(InPrivate)·다른 브라우저선 정상. calculator·retirement 등 고급옵션 있는 탭 전부.
+
+- **원인**: collapse 클래스명 `adv-toggle`/`adv-body`/`adv-block`/`adv-caret`/`adv-card` 등의 `adv`(advertisement 명명관습)를 **AdGuard cosmetic 필터가 광고로 오인**해 `max-height:0 !important`로 죽임. inline 강제값(`el.style.maxHeight`)조차 `!important`에 짓밟힘. InPrivate=확장 OFF라 정상 → 확장 확정. 진단: 오너 콘솔서 `class규칙 0px`·`inline강제 0px`, calculator도 동일 증상, 범인 = AdGuard. (서버/캐시/코드 문제 아님 — headless·로그인 다 정상이었음.)
+- **수정**: DOM에 노출되는 `adv-*` 클래스·`*Adv*` ID 전부 ad/adv 부분문자열 없는 이름으로 리네임. 클래스 `adv-toggle/sub/caret/body/block(+title)/card` → `moreopt-*`(`ret-adv-card`/`dt-adv-card`도 `ret-moreopt-card`/`dt-moreopt-card`). ID `advBody/advToggle`(calc)·`dtAdv*`·`retAdv*` → `*Moreopt*`. JS 함수명(`calcToggleAdvanced` 등)·grid-area `advanced`는 DOM 비노출이라 유지. 대상 = `calculator.html`·`dividend_target.html`·`retirement.html`·`calculator.js`. calculator.js 캐시 `?v=20260620ds2`.
+- **검증**: jinja 3종 컴파일·calculator.js parse OK. 로컬 서버+로그인 Playwright — calculator 고급옵션 0→210·dividend 0→103·retirement 0→212 펼침, **`[class*="adv"]` 엘리먼트 3탭 모두 0개**(AdGuard 매칭 대상 제거), 콘솔에러0. (오너 측 AdGuard 켠 채 최종 확인은 배포 후.)
+- 교훈: 광고차단기는 `ad`/`adv`/`banner`/`sponsor`/`promo` 부분문자열 클래스·ID를 cosmetic 필터로 숨김. UI 클래스에 이런 단어 쓰지 말 것.
+
+_작성: Claude_
+
 ## [2026-06-20] BUGFIX | 배포 후 변경이 일반 브라우저에서 안 보임(시크릿만 보임) — HTML 휴리스틱 캐싱
 
 오너 제보: retirement 배포됐는데 일반 브라우저선 옛 화면, 시크릿 창에선 새 화면.

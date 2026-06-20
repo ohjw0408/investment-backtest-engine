@@ -34,7 +34,7 @@
 .dt-goal-card { grid-area: goal; }
 .dt-method-card { grid-area: method; }
 .dt-cond-card { grid-area: cond; }
-.dt-adv-card { grid-area: advanced; }
+.dt-moreopt-card { grid-area: advanced; }
 @media (max-width: 900px) {
   .bt-input-grid {
     grid-template-columns: 1fr;
@@ -125,19 +125,19 @@
 #taxAccountList select, #taxAccountList .ticker-search-box { min-width: 0; box-sizing: border-box; max-width: 100%; }
 
 /* ── 고급 옵션 접기 (세금 · 거래수수료) ── */
-.adv-toggle {
+.moreopt-toggle {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
   background: none; border: none; cursor: pointer; padding: 0; text-align: left;
   font-size: var(--fs-title); font-weight: 700; color: var(--ds-ink);
 }
-.adv-toggle .adv-sub { font-size: var(--fs-cap); font-weight: 500; color: var(--ds-muted); margin-left: 6px; }
-.adv-caret { transition: transform .2s; color: var(--ds-muted); font-size: 0.85em; flex-shrink: 0; }
-.adv-toggle.open .adv-caret { transform: rotate(180deg); }
-.adv-body { max-height: 0; overflow: hidden; transition: max-height .4s ease, margin-top .3s ease; }
-.adv-body.open { max-height: 8000px; margin-top: 18px; }
-.adv-block { padding: 16px 0; border-top: 1px solid var(--ds-hairline); }
-.adv-block:first-child { border-top: none; padding-top: 4px; }
-.adv-block-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin: 0 0 12px; }
+.moreopt-toggle .moreopt-sub { font-size: var(--fs-cap); font-weight: 500; color: var(--ds-muted); margin-left: 6px; }
+.moreopt-caret { transition: transform .2s; color: var(--ds-muted); font-size: 0.85em; flex-shrink: 0; }
+.moreopt-toggle.open .moreopt-caret { transform: rotate(180deg); }
+.moreopt-body { max-height: 0; overflow: hidden; transition: max-height .4s ease, margin-top .3s ease; }
+.moreopt-body.open { max-height: 8000px; margin-top: 18px; }
+.moreopt-block { padding: 16px 0; border-top: 1px solid var(--ds-hairline); }
+.moreopt-block:first-child { border-top: none; padding-top: 4px; }
+.moreopt-block-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin: 0 0 12px; }
 
 /* ── 변수 모드 (시드·월납·기간: 고정/범위/자동) ── */
 .var-section { margin-bottom: 14px; }
@@ -361,17 +361,17 @@
     </section>
 
     <!-- 고급 옵션 (세금 · 거래수수료) -->
-    <section class="bt-fcard bt-full dt-adv-card">
-      <button type="button" class="adv-toggle" id="dtAdvToggle" onclick="dtToggleAdvanced()">
-        <span>고급 옵션 <span class="adv-sub">· 세금 · 거래수수료</span></span>
-        <span class="adv-caret">▾</span>
+    <section class="bt-fcard bt-full dt-moreopt-card">
+      <button type="button" class="moreopt-toggle" id="dtMoreoptToggle" onclick="dtToggleAdvanced()">
+        <span>고급 옵션 <span class="moreopt-sub">· 세금 · 거래수수료</span></span>
+        <span class="moreopt-caret">▾</span>
       </button>
-      <div class="adv-body" id="dtAdvBody">
+      <div class="moreopt-body" id="dtMoreoptBody">
 
         <!-- 세금 설정 -->
-        <div class="adv-block">
+        <div class="moreopt-block">
           <div class="bt-toggle-head">
-            <h3 class="adv-block-title" style="margin:0;">세금 설정 <a href="/tax-settings" style="font-size:11px;font-weight:600;color:var(--brand-text);margin-left:6px;text-decoration:none;">⚙ 프로필 →</a></h3>
+            <h3 class="moreopt-block-title" style="margin:0;">세금 설정 <a href="/tax-settings" style="font-size:11px;font-weight:600;color:var(--brand-text);margin-left:6px;text-decoration:none;">⚙ 프로필 →</a></h3>
             <label class="bt-switch">
               <span class="bt-switch-label" id="dtTaxToggleLabel">OFF</span>
               <input type="checkbox" id="dtTaxToggleChk" onchange="toggleTax()">
@@ -393,9 +393,9 @@
         </div>
 
         <!-- 거래수수료 -->
-        <div class="adv-block">
+        <div class="moreopt-block">
           <div class="bt-toggle-head">
-            <label class="adv-block-title" style="margin:0;">거래수수료</label>
+            <label class="moreopt-block-title" style="margin:0;">거래수수료</label>
             <label class="bt-switch">
               <span class="bt-switch-label" id="feeLabel">OFF</span>
               <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()">
@@ -652,8 +652,8 @@ function dtEditConditions() { dtShowInput(); }
 
 // ── 고급 옵션 접기/펼치기 (세금·수수료) ──
 function dtToggleAdvanced(force) {
-  const body = document.getElementById('dtAdvBody');
-  const tog  = document.getElementById('dtAdvToggle');
+  const body = document.getElementById('dtMoreoptBody');
+  const tog  = document.getElementById('dtMoreoptToggle');
   if (!body || !tog) return;
   const open = force === undefined ? !body.classList.contains('open') : !!force;
   body.classList.toggle('open', open);

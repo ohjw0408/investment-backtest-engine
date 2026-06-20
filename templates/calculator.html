@@ -26,7 +26,7 @@
   align-items: stretch;
   margin-bottom: 16px;
 }
-/* 2열 카드만 동일높이 stretch (adv-card는 제외 — max-height 슬라이드와 flex 충돌 방지) */
+/* 2열 카드만 동일높이 stretch (moreopt-card는 제외 — max-height 슬라이드와 flex 충돌 방지) */
 .bt-money-card, .bt-options-card { display: flex; flex-direction: column; }
 .bt-input-grid > .bt-fcard { margin-bottom: 0; }
 .bt-full { grid-column: 1 / -1; }
@@ -175,20 +175,20 @@
 .ticker-remove-btn:hover { color: var(--down); }
 
 /* ── 고급 옵션 접기 (A) ── */
-.adv-card { grid-area: advanced; }
-.adv-toggle {
+.moreopt-card { grid-area: advanced; }
+.moreopt-toggle {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
   background: none; border: none; cursor: pointer; padding: 0; text-align: left;
   font-size: var(--fs-title); font-weight: 700; color: var(--ds-ink);
 }
-.adv-toggle .adv-sub { font-size: var(--fs-cap); font-weight: 500; color: var(--ds-muted); margin-left: 6px; }
-.adv-caret { transition: transform .2s; color: var(--ds-muted); font-size: 0.85em; flex-shrink: 0; }
-.adv-toggle.open .adv-caret { transform: rotate(180deg); }
-.adv-body { max-height: 0; overflow: hidden; transition: max-height .4s ease, margin-top .3s ease; }
-.adv-body.open { max-height: 8000px; margin-top: 18px; }
-.adv-block { padding: 16px 0; border-top: 1px solid var(--ds-hairline); }
-.adv-block:first-child { border-top: none; padding-top: 4px; }
-.adv-block-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin: 0 0 12px; }
+.moreopt-toggle .moreopt-sub { font-size: var(--fs-cap); font-weight: 500; color: var(--ds-muted); margin-left: 6px; }
+.moreopt-caret { transition: transform .2s; color: var(--ds-muted); font-size: 0.85em; flex-shrink: 0; }
+.moreopt-toggle.open .moreopt-caret { transform: rotate(180deg); }
+.moreopt-body { max-height: 0; overflow: hidden; transition: max-height .4s ease, margin-top .3s ease; }
+.moreopt-body.open { max-height: 8000px; margin-top: 18px; }
+.moreopt-block { padding: 16px 0; border-top: 1px solid var(--ds-hairline); }
+.moreopt-block:first-child { border-top: none; padding-top: 4px; }
+.moreopt-block-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin: 0 0 12px; }
 </style>
 {% endblock %}
 
@@ -292,17 +292,17 @@
     </section>
 
     <!-- 고급 옵션 (접기, 전폭) — 거래수수료 · 가상 데이터 · 세금 -->
-    <section class="bt-fcard bt-full adv-card">
-      <button type="button" class="adv-toggle" id="advToggle" onclick="calcToggleAdvanced()">
-        <span>고급 옵션 <span class="adv-sub">· 거래수수료 · 세금 · 가상 데이터</span></span>
-        <span class="adv-caret">▾</span>
+    <section class="bt-fcard bt-full moreopt-card">
+      <button type="button" class="moreopt-toggle" id="moreoptToggle" onclick="calcToggleAdvanced()">
+        <span>고급 옵션 <span class="moreopt-sub">· 거래수수료 · 세금 · 가상 데이터</span></span>
+        <span class="moreopt-caret">▾</span>
       </button>
-      <div class="adv-body" id="advBody">
+      <div class="moreopt-body" id="moreoptBody">
 
         <!-- 거래수수료 (D4) -->
-        <div class="adv-block">
+        <div class="moreopt-block">
           <div class="bt-toggle-head">
-            <label class="adv-block-title" style="margin:0;">거래수수료</label>
+            <label class="moreopt-block-title" style="margin:0;">거래수수료</label>
             <label class="bt-switch">
               <span class="bt-switch-label" id="feeLabel">OFF</span>
               <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()">
@@ -337,7 +337,7 @@
         </div>
 
         <!-- 가상 데이터 옵트인 -->
-        <div class="adv-block">
+        <div class="moreopt-block">
           <section class="bt-synthetic-card" id="syntheticSection" style="margin:0;">
             <label class="bt-synthetic-label">
               <input type="checkbox" id="useSyntheticCheck">
@@ -350,9 +350,9 @@
         </div>
 
         <!-- 세금 적용 -->
-        <div class="adv-block bt-tax-card">
+        <div class="moreopt-block bt-tax-card">
           <div class="bt-toggle-head">
-            <h3 class="adv-block-title" style="margin:0;">세금 적용</h3>
+            <h3 class="moreopt-block-title" style="margin:0;">세금 적용</h3>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
               <span id="taxToggleLabel" style="font-size:var(--fs-cap);color:var(--ds-muted);">OFF</span>
               <div id="taxToggleWrap" onclick="toggleTax()" style="width:44px;height:24px;background:var(--ds-hairline);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
@@ -409,9 +409,9 @@
           <span class="bt-ico muted" style="width:14px;height:14px;color:var(--gold-deep);">{{ nicon('warn') }}</span> 직전 연도 금융소득 종합과세 대상자는 ISA 개설이 불가합니다.
         </div>
           </div><!-- /taxPanel -->
-        </div><!-- /adv-block 세금 -->
-      </div><!-- /adv-body -->
-    </section><!-- /adv-card -->
+        </div><!-- /moreopt-block 세금 -->
+      </div><!-- /moreopt-body -->
+    </section><!-- /moreopt-card -->
     </div><!-- /bt-input-grid -->
 
     <div class="bt-run-wrap">
@@ -647,5 +647,5 @@
 <script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260619ds2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260619ds"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260620ds1"></script>
+<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260620ds2"></script>
 {% endblock %}

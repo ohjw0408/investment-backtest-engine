@@ -245,13 +245,21 @@
               <div class="input-hint" id="simMonthlyHint">₩500,000</div>
             </div>
             <div class="input-row">
-              <label>투자 기간 <span id="simAccYearsLabel" class="label-val">20년</span></label>
+              <div class="bt-fcard-head" style="margin-bottom:6px;">
+                <label style="margin:0;">투자 기간</label>
+                <div class="input-group" style="max-width:90px;margin:0;">
+                  <input type="number" id="simAccYearsInput" class="calc-input" min="1" max="50" value="20"
+                    oninput="retSyncYears('simAccYears','input',1,50)" onblur="retClampYears('simAccYears',1,50)">
+                  <span class="unit">년</span>
+                </div>
+              </div>
               <div class="year-slider-wrap">
                 <input type="range" id="simAccYearsSlider" min="1" max="50" value="20" step="1"
-                  oninput="document.getElementById('simAccYears').value=this.value; document.getElementById('simAccYearsLabel').textContent=this.value+'년';">
-                <div class="year-slider-labels"><span>1년</span><span>10년</span><span>20년</span><span>30년</span><span>50년</span></div>
+                  class="calc-slider" oninput="retSyncYears('simAccYears','slider',1,50)">
+                <div class="year-slider-labels"><span>1년</span><span>50년</span></div>
               </div>
               <input type="hidden" id="simAccYears" value="20">
+              <span id="simAccYearsLabel" style="display:none;">20년</span>
             </div>
             <div class="input-row">
               <label>월 인출금</label>
@@ -262,13 +270,21 @@
               <div class="input-hint" id="simWithdrawHint">₩3,000,000</div>
             </div>
             <div class="input-row">
-              <label>인출 기간 <span id="simWdYearsLabel" class="label-val">30년</span></label>
+              <div class="bt-fcard-head" style="margin-bottom:6px;">
+                <label style="margin:0;">인출 기간</label>
+                <div class="input-group" style="max-width:90px;margin:0;">
+                  <input type="number" id="simWdYearsInput" class="calc-input" min="5" max="50" value="30"
+                    oninput="retSyncYears('simWdYears','input',5,50)" onblur="retClampYears('simWdYears',5,50)">
+                  <span class="unit">년</span>
+                </div>
+              </div>
               <div class="year-slider-wrap">
                 <input type="range" id="simWdYearsSlider" min="5" max="50" value="30" step="1"
-                  oninput="document.getElementById('simWdYears').value=this.value; document.getElementById('simWdYearsLabel').textContent=this.value+'년';">
-                <div class="year-slider-labels"><span>5년</span><span>15년</span><span>30년</span><span>40년</span><span>50년</span></div>
+                  class="calc-slider" oninput="retSyncYears('simWdYears','slider',5,50)">
+                <div class="year-slider-labels"><span>5년</span><span>50년</span></div>
               </div>
               <input type="hidden" id="simWdYears" value="30">
+              <span id="simWdYearsLabel" style="display:none;">30년</span>
             </div>
           </section>
 
@@ -344,13 +360,21 @@
               <div class="input-hint" id="wdWithdrawHint">₩300만</div>
             </div>
             <div class="input-row">
-              <label>인출 기간 <span id="wdYearsLabel" class="label-val">30년</span></label>
+              <div class="bt-fcard-head" style="margin-bottom:6px;">
+                <label style="margin:0;">인출 기간</label>
+                <div class="input-group" style="max-width:90px;margin:0;">
+                  <input type="number" id="wdYearsInput" class="calc-input" min="5" max="50" value="30"
+                    oninput="retSyncYears('wdYears','input',5,50)" onblur="retClampYears('wdYears',5,50)">
+                  <span class="unit">년</span>
+                </div>
+              </div>
               <div class="year-slider-wrap">
                 <input type="range" id="wdYearsSlider" min="5" max="50" value="30" step="1"
-                  oninput="document.getElementById('wdYears').value=this.value; document.getElementById('wdYearsLabel').textContent=this.value+'년';">
-                <div class="year-slider-labels"><span>5년</span><span>15년</span><span>30년</span><span>40년</span><span>50년</span></div>
+                  class="calc-slider" oninput="retSyncYears('wdYears','slider',5,50)">
+                <div class="year-slider-labels"><span>5년</span><span>50년</span></div>
               </div>
               <input type="hidden" id="wdYears" value="30">
+              <span id="wdYearsLabel" style="display:none;">30년</span>
             </div>
           </section>
 
@@ -808,6 +832,38 @@ function retClampProb() {
   v = Math.max(0, Math.min(100, v));
   inp.value = v;
   sl.value  = v;
+}
+
+// ── 연도 슬라이더 ↔ 키보드 입력 동기 (base: simAccYears/simWdYears/wdYears) ──
+// 슬라이더(base+'Slider')·입력(base+'Input')·hidden(base) 3자 동기. 비선형 눈금 제거(정직).
+function retSyncYears(base, src, min, max) {
+  const sl  = document.getElementById(base + 'Slider');
+  const inp = document.getElementById(base + 'Input');
+  const hid = document.getElementById(base);
+  let v;
+  if (src === 'input') {
+    v = parseInt(inp.value, 10);
+    if (isNaN(v)) return;                       // 타이핑 중 — onblur서 정리
+    v = Math.max(min, Math.min(max, v));
+    if (sl) sl.value = v;
+  } else {
+    v = parseInt(sl.value, 10);
+    if (inp) inp.value = v;
+  }
+  if (hid) hid.value = v;
+  if (typeof updateInflationInfo === 'function') updateInflationInfo();
+}
+function retClampYears(base, min, max) {
+  const sl  = document.getElementById(base + 'Slider');
+  const inp = document.getElementById(base + 'Input');
+  const hid = document.getElementById(base);
+  let v = parseInt(inp.value, 10);
+  if (isNaN(v)) v = parseInt((sl && sl.value) || min, 10);
+  v = Math.max(min, Math.min(max, v));
+  if (inp) inp.value = v;
+  if (sl)  sl.value  = v;
+  if (hid) hid.value = v;
+  if (typeof updateInflationInfo === 'function') updateInflationInfo();
 }
 
 // ── 결과 조건 요약 바 (포트폴리오 분석/계산기 결) ──
@@ -1330,6 +1386,7 @@ function retRestoreForm(body) {
   const setSlider = (id, lblId, v, suffix) => {
     const sl = document.getElementById(id); if (sl && v !== undefined) sl.value = v;
     const lbl = document.getElementById(lblId); if (lbl && v !== undefined) lbl.textContent = v + (suffix || '');
+    const inp = document.getElementById(id.replace('Slider', 'Input')); if (inp && v !== undefined) inp.value = v;
   };
   // 인출기 결과는 _withdrawal_only(프론트) — _mode 없음. 둘 다 인식해 sim 필드 오염 방지.
   if (body._mode === 'withdrawal' || body._withdrawal_only) {

@@ -44,9 +44,11 @@ def _init_wd_worker(price_data: dict, dates: list):
     _w_dates      = dates
 
 
-def _run_wd_case(args: tuple):
-    """단일 인출 케이스 실행 워커 함수."""
-    import pandas as pd
+def _run_wd_case_with_data(price_data, dates, start_str, end_str, config_dict, strategy_dict, run_id):
+    """인출 케이스 sim 코어 — 주어진 price_data/dates로 1회 실행.
+
+    워커(_run_wd_case, 전역 슬라이스)와 MVN per-window 합성 경로가 공용한다.
+    """
     from modules.core.portfolio                 import Portfolio
     from modules.config.simulation_config       import SimulationConfig
     from modules.execution.order_executor       import OrderExecutor
@@ -58,87 +60,91 @@ def _run_wd_case(args: tuple):
     from modules.simulation.simulation_loop     import SimulationLoop
     from modules.rebalance.periodic             import PeriodicRebalance
 
-    (start_str, end_str, config_dict, strategy_dict, run_id) = args
+    strategy = PeriodicRebalance(
+        target_weights      = strategy_dict["target_weights"],
+        rebalance_frequency = strategy_dict.get("rebalance_frequency"),
+        drift_threshold     = strategy_dict.get("drift_threshold"),
+    )
+    config = SimulationConfig(
+        start_date           = start_str,
+        end_date             = end_str,
+        tickers              = config_dict["tickers"],
+        target_weights       = strategy_dict["target_weights"],
+        initial_capital      = config_dict["initial_capital"],
+        monthly_contribution = 0,
+        withdrawal_amount    = config_dict["withdrawal_amount"],
+        dividend_mode        = config_dict["dividend_mode"],
+        rebalance_frequency  = strategy_dict.get("rebalance_frequency"),
+        inflation            = config_dict.get("inflation", 0.0),
+        fee_rate             = config_dict.get("fee_rate", 0.0),          # D4 거래수수료
+        stock_tickers        = config_dict.get("stock_tickers"),         # D4 개별주식 매도세
+    )
 
+    # ── 세금 경로 분기 ───────────────────────────────────────
+    tax_enabled    = config_dict.get("tax_enabled", False)
+    account_type   = config_dict.get("account_type", "위탁")
+    user_settings  = config_dict.get("user_settings", {})
+    gain_harvesting = config_dict.get("gain_harvesting", False)
+
+    if tax_enabled:
+        from modules.simulation.taxable_runner import TaxableSimulationRunner
+        runner     = TaxableSimulationRunner()
+        run_result = runner.run(
+            config          = config,
+            price_data      = price_data,
+            dates           = dates,
+            strategy        = strategy,
+            tax_enabled     = True,
+            account_type    = account_type,
+            user_settings   = user_settings,
+            gain_harvesting = gain_harvesting,
+            carried_cost_basis = config_dict.get("cost_basis"),
+        )
+        history_df    = run_result.history_df
+        tax_end_value = run_result.end_value
+        _total_fees   = float(getattr(run_result, "total_fees", 0.0))   # D4
+    else:
+        portfolio = Portfolio(
+            config_dict["initial_capital"],
+            fee_rate      = config_dict.get("fee_rate", 0.0),            # D4
+            stock_tickers = config_dict.get("stock_tickers"),
+        )
+        loop      = SimulationLoop(
+            DividendEngine(), ContributionEngine(), WithdrawalEngine(),
+            OrderExecutor(), CashAllocator()
+        )
+        recorder = HistoryRecorder()
+        loop.run(portfolio, strategy, config, price_data, dates, recorder)
+        history_df    = recorder.to_dataframe()
+        tax_end_value = float(history_df["portfolio_value"].iloc[-1]) if not history_df.empty else 0.0
+        _total_fees   = float(getattr(portfolio, "total_fees", 0.0))    # D4
+
+    return {
+        "history":       history_df,
+        "run_id":        run_id,
+        "start":         start_str,
+        "end":           end_str,
+        "tax_end_value": tax_end_value,
+        "total_fees":    _total_fees,                                    # D4 인출 거래수수료
+    }
+
+
+def _run_wd_case(args: tuple):
+    """단일 인출 케이스 실행 워커 함수(전역 _w_price_data 슬라이스 → 코어 위임)."""
+    import pandas as pd
+    (start_str, end_str, config_dict, strategy_dict, run_id) = args
     try:
         start_ts = pd.Timestamp(start_str)
         end_ts   = pd.Timestamp(end_str)
-
         sliced_dates = [d for d in _w_dates if start_ts <= d <= end_ts]
         sliced_data  = {
             ticker: df.loc[(df.index >= start_ts) & (df.index <= end_ts)]
             for ticker, df in _w_price_data.items()
         }
-
-        strategy = PeriodicRebalance(
-            target_weights      = strategy_dict["target_weights"],
-            rebalance_frequency = strategy_dict.get("rebalance_frequency"),
-            drift_threshold     = strategy_dict.get("drift_threshold"),
+        return _run_wd_case_with_data(
+            sliced_data, sliced_dates, start_str, end_str, config_dict, strategy_dict, run_id
         )
-        config = SimulationConfig(
-            start_date           = start_str,
-            end_date             = end_str,
-            tickers              = config_dict["tickers"],
-            target_weights       = strategy_dict["target_weights"],
-            initial_capital      = config_dict["initial_capital"],
-            monthly_contribution = 0,
-            withdrawal_amount    = config_dict["withdrawal_amount"],
-            dividend_mode        = config_dict["dividend_mode"],
-            rebalance_frequency  = strategy_dict.get("rebalance_frequency"),
-            inflation            = config_dict.get("inflation", 0.0),
-            fee_rate             = config_dict.get("fee_rate", 0.0),          # D4 거래수수료
-            stock_tickers        = config_dict.get("stock_tickers"),         # D4 개별주식 매도세
-        )
-
-        # ── 세금 경로 분기 ───────────────────────────────────────
-        tax_enabled    = config_dict.get("tax_enabled", False)
-        account_type   = config_dict.get("account_type", "위탁")
-        user_settings  = config_dict.get("user_settings", {})
-        gain_harvesting = config_dict.get("gain_harvesting", False)
-
-        if tax_enabled:
-            # TaxableSimulationRunner: 배당세 + 리밸 CG세 + 청산세 적용
-            from modules.simulation.taxable_runner import TaxableSimulationRunner
-            runner     = TaxableSimulationRunner()
-            run_result = runner.run(
-                config          = config,
-                price_data      = sliced_data,
-                dates           = sliced_dates,
-                strategy        = strategy,
-                tax_enabled     = True,
-                account_type    = account_type,
-                user_settings   = user_settings,
-                gain_harvesting = gain_harvesting,
-                carried_cost_basis = config_dict.get("cost_basis"),
-            )
-            history_df    = run_result.history_df
-            tax_end_value = run_result.end_value
-            _total_fees   = float(getattr(run_result, "total_fees", 0.0))   # D4
-        else:
-            portfolio = Portfolio(
-                config_dict["initial_capital"],
-                fee_rate      = config_dict.get("fee_rate", 0.0),            # D4
-                stock_tickers = config_dict.get("stock_tickers"),
-            )
-            loop      = SimulationLoop(
-                DividendEngine(), ContributionEngine(), WithdrawalEngine(),
-                OrderExecutor(), CashAllocator()
-            )
-            recorder = HistoryRecorder()
-            loop.run(portfolio, strategy, config, sliced_data, sliced_dates, recorder)
-            history_df    = recorder.to_dataframe()
-            tax_end_value = float(history_df["portfolio_value"].iloc[-1]) if not history_df.empty else 0.0
-            _total_fees   = float(getattr(portfolio, "total_fees", 0.0))    # D4
-
-        return {
-            "history":       history_df,
-            "run_id":        run_id,
-            "start":         start_str,
-            "end":           end_str,
-            "tax_end_value": tax_end_value,
-            "total_fees":    _total_fees,                                    # D4 인출 거래수수료
-        }
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -170,9 +176,11 @@ class WithdrawalAnalyzer:
         fee_rate:           float     = 0.0,     # D4 거래수수료(인출 단계 매수·매도)
         stock_tickers                 = None,    # D4 개별주식 매도세 가산 대상
         allow_synthetic:    bool      = False,   # 합성 가격·배당 로드 여부(deep history)
+        mc_paths:           int       = 200,     # 몬테카를로 경로 수(SIM 11샘플은 낮게)
     ):
         self.portfolio_engine   = portfolio_engine
         self.allow_synthetic    = bool(allow_synthetic)
+        self.mc_paths           = int(mc_paths)
         self.fee_rate           = float(fee_rate or 0.0)
         self.stock_tickers      = stock_tickers
         self.tickers            = tickers
@@ -307,6 +315,20 @@ class WithdrawalAnalyzer:
             "fee_rate":          self.fee_rate,
             "stock_tickers":     self.stock_tickers,
         }
+
+        # ── MVN 몬테카를로: 실데이터 < 인출기간이면 독립 상관 합성 경로로 ──
+        # 실 독립 데이터가 인출기간보다 짧으면 롤링 윈도우는 단일 합성경로 슬라이스이거나
+        # 불장 suffix에 앵커돼 분포가 거짓(고갈 0·전부 높음). 종목별 mu/sigma + 상관을
+        # 피팅한 독립 다변량-t 풀경로 몬테카를로로 현실적 분포(실패율·넓은 스프레드) 산출.
+        # 가상데이터 체크박스(allow_synthetic)와 무관 — 30년 투영은 실데이터만으론 불가.
+        if self._real_data_years() < self.withdrawal_years:
+            mvn = self._run_mvn_cases(config_dict, strategy_dict)
+            if mvn:
+                return mvn
+            # MVN 추정/생성 실패 → 단일종목 GBM 폴백(기존 거동)
+            mu, sigma = self._get_return_stats(full_price_data)
+            return self._run_synthetic_cases(MIN_CASES, mu, sigma, start_id=1)
+
         task_args = [
             (s, e, config_dict, strategy_dict, rid)
             for s, e, rid in windows
@@ -497,6 +519,144 @@ class WithdrawalAnalyzer:
             "total_fees": 0.0,   # D4: 합성 경로는 거래 없음 → 수수료 0
             "yearly_ratios": yearly_ratios,
         }
+
+    def _real_data_years(self) -> float:
+        """모든 종목이 실데이터(volume>0)를 가진 구간의 연수(포트폴리오 기준 = 가장 늦은 상장)."""
+        try:
+            conn = self.portfolio_engine.price_loader.loader.conn
+        except Exception:
+            return 0.0
+        starts = []
+        for code in self.tickers:
+            try:
+                r = conn.execute(
+                    "SELECT MIN(date) FROM price_daily WHERE code=? AND volume>0", (code,)
+                ).fetchone()
+                if r and r[0]:
+                    starts.append(pd.Timestamp(r[0]))
+            except Exception:
+                pass
+        if not starts:
+            return 0.0
+        eff_real = max(starts)
+        return max(0.0, (self.data_end - eff_real).days / 365.25)
+
+    def _run_mvn_cases(self, config_dict: dict, strategy_dict: dict) -> list:
+        """풀-호라이즌 독립 상관 몬테카를로 — 실데이터 < 인출기간일 때 현실적 분포.
+
+        estimate_joint_stats로 종목별 mu/sigma + 상관행렬을 실데이터서 피팅한 뒤,
+        매 경로마다 상관 반영 다변량-t 일일수익을 인출기간 전체에 독립 생성한다
+        (실 불장 suffix에 앵커하지 않음 → 실패 케이스·넓은 분포 재현). 각 경로의 합성
+        가격에 종목별 실 배당수익률로 분기배당을 주입하고 인출 sim을 실행.
+        joint_stats 추정 실패 시 []를 반환(호출부가 단일종목 GBM 폴백).
+        """
+        from dateutil.relativedelta import relativedelta
+        from modules.retirement.synthetic_price_generator import (
+            SYNTHETIC_DF, T_SCALE, MAX_SYNTH_MU_MONTHLY, TRADING_DAYS_PER_MONTH,
+        )
+        raw_loader = self.portfolio_engine.price_loader.loader
+        try:
+            from modules.retirement.synthetic_mvn import estimate_joint_stats
+            js = estimate_joint_stats(self.tickers, raw_loader)
+        except Exception:
+            js = {"ok": False}
+        if not (js and js.get("ok")):
+            return []
+
+        order = js["order"]                                  # 종목 순서
+        if not all(t in order for t in self.tickers):
+            return []
+        idx   = [order.index(t) for t in self.tickers]
+        mu_d  = np.minimum(np.asarray(js["mu"], float)[idx],
+                           MAX_SYNTH_MU_MONTHLY / TRADING_DAYS_PER_MONTH)   # 일일 drift 상한
+        cov_d = np.asarray(js["cov"], float)[np.ix_(idx, idx)]
+        try:
+            chol = np.linalg.cholesky(cov_d + np.eye(len(idx)) * 1e-12)
+        except Exception:
+            chol = np.diag(np.sqrt(np.clip(np.diag(cov_d), 1e-12, None)))
+
+        # 종목별 연 배당수익률(실데이터 기반) — 합성 가격에 분기배당 주입용.
+        div_yield = self._per_ticker_div_yields()
+
+        # 인출기간 캘린더(월말 경계 정확) — 최근 horizon 구간 영업일.
+        dates = pd.bdate_range(
+            start=(self.data_end - relativedelta(years=self.withdrawal_years)),
+            end=self.data_end,
+        )
+        n_days = len(dates)
+        if n_days < 60:
+            return []
+        k       = len(self.tickers)
+        t_scale = float(T_SCALE)
+        start_str, end_str = dates[0].strftime("%Y-%m-%d"), dates[-1].strftime("%Y-%m-%d")
+        # 각 분기(3·6·9·12월) 마지막 영업일 위치 — 배당 지급일.
+        q_end_pos = []
+        for m in (3, 6, 9, 12):
+            for y in sorted(set(dates.year)):
+                sub = np.where((dates.year == y) & (dates.month == m))[0]
+                if len(sub):
+                    q_end_pos.append(sub[-1])
+
+        cases = []
+        for p in range(self.mc_paths):
+            rng = np.random.default_rng(seed=20260620 + p)
+            # 상관 반영 다변량-t 일일수익 (n_days × k)
+            z   = rng.standard_t(df=SYNTHETIC_DF, size=(n_days, k)) / t_scale
+            ret = z @ chol.T + mu_d                          # 일일 단순수익
+            price_data = {}
+            for j, code in enumerate(self.tickers):
+                close = 100.0 * np.cumprod(1.0 + ret[:, j])
+                dy    = max(float(div_yield.get(code, 0.0)), 0.0)
+                divs  = np.zeros(n_days)
+                if dy > 0:
+                    for pos in q_end_pos:
+                        divs[pos] = close[pos] * (dy / 4.0)
+                df = pd.DataFrame({
+                    "open": close, "high": close, "low": close, "close": close,
+                    "volume": 1.0, "dividend": divs, "split": 1.0,
+                }, index=dates)
+                price_data[code] = df
+            try:
+                res = _run_wd_case_with_data(
+                    price_data, list(dates), start_str, end_str,
+                    config_dict, strategy_dict, p + 1,
+                )
+                if res and res.get("history") is not None and not res["history"].empty:
+                    m  = self._calc_metrics(res["history"], dates[0], self.withdrawal_years)
+                    tv = res["tax_end_value"]
+                    m["end_value"]       = tv
+                    m["end_value_ratio"] = tv / self.initial_capital if self.initial_capital > 0 else 0.0
+                    m["success"]         = tv > 0
+                    m["run_id"]          = p + 1
+                    m["start"]           = "montecarlo"
+                    m["end"]             = "montecarlo"
+                    m["is_synthetic"]    = True
+                    m["total_fees"]      = float(res.get("total_fees", 0.0))
+                    cases.append(m)
+            except Exception:
+                pass
+            if self.progress_callback and (p % 20 == 0):
+                self.progress_callback(current=p, total=self.mc_paths, elapsed=0)
+
+        if self.verbose:
+            print(f"[WithdrawalAnalyzer] 몬테카를로 {len(cases)}/{self.mc_paths} 경로(독립 상관 합성)")
+        return cases
+
+    def _per_ticker_div_yields(self) -> dict:
+        """종목별 연 배당수익률(실데이터) — ticker_stats_cache div_yield_mu 재사용."""
+        out = {}
+        try:
+            from modules.retirement.ticker_stats_cache import TickerStatsCache
+            db = self.portfolio_engine.price_loader.loader.conn
+            tc = TickerStatsCache(db.execute("PRAGMA database_list").fetchone()[2])
+            for code in self.tickers:
+                st = tc.get_or_compute(code) or {}
+                out[code] = float(st.get("div_yield_mu") or 0.0)
+            tc.close()
+        except Exception:
+            for code in self.tickers:
+                out.setdefault(code, 0.0)
+        return out
 
     def _estimate_real_yield(self, real_cases: list) -> float:
         """실측 케이스의 연 배당수익률(초기자본 대비) 중앙값 — 합성 배당 보정용."""

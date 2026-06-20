@@ -62,16 +62,17 @@ class InfoEngine:
             CASE
                 WHEN code = ?       THEN 1
                 WHEN name = ?       THEN 2
-                WHEN name LIKE ?    THEN 3   -- 이름 prefix (삼성전자)
-                WHEN code LIKE ?    THEN 4   -- 코드 prefix
+                WHEN code LIKE ?    THEN 3   -- 코드 prefix (티커 — SPY, S..)
+                WHEN name LIKE ?    THEN 4   -- 이름 prefix (삼성전자)
                 WHEN name LIKE ?    THEN 5   -- 단어 시작 (KODEX 삼성그룹)
                 ELSE 6                       -- 중간 포함
             END,
+            CASE WHEN code LIKE ? THEN length(code) ELSE 999 END,  -- 코드 prefix는 짧은 티커 우선
             length(name)
         LIMIT ?
         """
         df = pd.read_sql(query, conn,
-                         params=(like, like, exact, kw, nprefix, cprefix, wordmid, limit))
+                         params=(like, like, exact, kw, cprefix, nprefix, wordmid, cprefix, limit))
         conn.close()
         return df
 

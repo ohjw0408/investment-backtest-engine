@@ -1,5 +1,20 @@
 # Log
 
+## [2026-06-20] BUGFIX | 인출 배당커버리지/자산성장 0 — 진짜원인=분석기가 합성데이터 미로드 (prod ssh로 규명)
+
+오너: 인출기·은퇴시뮬 배당커버리지 계속 0%, 인출기는 자산성장도 미반영. (앞선 여러 수정에도 잔존.)
+
+- **규명 방법**: prod(178.105.84.213) ssh 직접 접속(키 `~/.ssh/hetzner_ed25519`) + 동기 probe로 prod 실데이터에서 재현. 로컬은 정상(cov 23%)인데 prod만 0 → 데이터 차이 추적.
+- **진짜 근본원인**: `PriceDataLoader.load(allow_synthetic=False 기본)`. 인출/축적 분석기가 `price_loader.load(tickers,start,end)`만 호출 → **prep이 생성한 deep 합성 가격·배당(price_daily_synthetic/corporate_actions_synthetic)을 통째 무시**. prod SCHD는 실데이터 2003~뿐(deep 백필 없음, 로컬은 stage_a rebackfill로 1928~ 실백필 있어 masking). → 인출 30년 윈도우서 SCHD 2003년 이전 결손 → 자산 고갈+배당0. (prod 검증: allow_synthetic=False면 SCHD 2003~·div 12586, True면 1985~·div 14380.)
+- **부가 원인(선결)**: DataPreparer가 합성 'pre-existing' 시 조기반환하며 배당 주입 누락 → `_ensure_synthetic_dividends` 자가복구 추가(실 배당수익률 stats_cache로 corporate_actions_synthetic에 분기배당 주입, 멱등, 무배당종목 스킵). 6b900ed.
+- **본 수정(f36e0e4)**: `WithdrawalAnalyzer`에 `allow_synthetic` 파라미터 추가→load 전달. 인출기=True(prep 일치), 은퇴시뮬 planner wd_config=use_synthetic(축적과 동일 게이팅).
+- **배당 커버리지 정의도 1년차 기준으로 재정의**(앞 커밋 f2ed8b3): 평생 누적÷인출은 재투자로 337% 무의미 → 1년차 배당/1년차 인출.
+- **검증(prod 실측)**: 인출기 SCHD50/QQQ20/GLD30 → cov 0%→**26.5%**, 총배당 0→**21.5억**, 자산 463M고갈→**5.5억→y15 36.9억→y30 147억 성장**. prod 동기 probe + 라이브 celery API 둘 다 동일. 로컬 인출 pytest 5 passed.
+- ⚠️ 멀티계좌 인출 경로(multi_account_analyzer)는 별도 — 이번 수정 범위 밖.
+- 교훈: prod 데이터 이슈는 ssh 동기 probe가 결정적. 로컬 실백필이 prod 합성-미로드 버그를 가렸음.
+
+_작성: Claude_
+
 ## [2026-06-20] BUGFIX | 배당커버리지 정의 재정의(1년차 기준) + prod 0%는 celery worker 미재시작
 
 오너: SCHD50/QQQ20/GLD30으로 둘 다 0%, 인출기는 자산성장도 미반영으로 보임.

@@ -1327,20 +1327,34 @@ function retRestoreForm(body) {
     updateRetWeightUI();
   }
   const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v; };
-  if (body._mode === 'withdrawal') {
+  const setSlider = (id, lblId, v, suffix) => {
+    const sl = document.getElementById(id); if (sl && v !== undefined) sl.value = v;
+    const lbl = document.getElementById(lblId); if (lbl && v !== undefined) lbl.textContent = v + (suffix || '');
+  };
+  // 인출기 결과는 _withdrawal_only(프론트) — _mode 없음. 둘 다 인식해 sim 필드 오염 방지.
+  if (body._mode === 'withdrawal' || body._withdrawal_only) {
     set('wdSeed', body.initial_capital);
     set('wdWithdraw', body.monthly_withdrawal);
+    setSlider('wdYearsSlider', 'wdYearsLabel', body.withdrawal_years, '년');
     set('wdYears', body.withdrawal_years);
   } else {
     set('simSeed', body.initial_capital);
     set('simMonthly', body.monthly_contribution);
     set('simWithdraw', body.monthly_withdrawal);
-    if (body.accumulation_years !== undefined) { set('simAccYears', body.accumulation_years); const sl = document.getElementById('simAccYearsSlider'); if (sl) sl.value = body.accumulation_years; }
-    if (body.withdrawal_years !== undefined) { set('simWdYears', body.withdrawal_years); const sl = document.getElementById('simWdYearsSlider'); if (sl) sl.value = body.withdrawal_years; }
+    if (body.accumulation_years !== undefined) { set('simAccYears', body.accumulation_years); setSlider('simAccYearsSlider', 'simAccYearsLabel', body.accumulation_years, '년'); }
+    if (body.withdrawal_years !== undefined) { set('simWdYears', body.withdrawal_years); setSlider('simWdYearsSlider', 'simWdYearsLabel', body.withdrawal_years, '년'); }
     if (body.dividend_mode) { const el = document.querySelector(`input[name="simDividend"][value="${body.dividend_mode}"]`); if (el) el.checked = true; }
     if (body.rebal_mode) { const el = document.querySelector(`input[name="simRebal"][value="${body.rebal_mode}"]`); if (el) el.checked = true; }
   }
-  if (body.target_percentile !== undefined) set('retTargetProb', Math.round(body.target_percentile * 100));
+  if (body.target_percentile !== undefined) {
+    const tp = Math.round(body.target_percentile * 100);
+    set('retTargetProb', tp); set('retTargetProbInput', tp);
+  }
+  // 복원 후 모든 금액 힌트 값과 동기 (value만 set돼 힌트가 stale해지는 것 방지)
+  ['simSeed','simMonthly','simWithdraw','wdSeed','wdWithdraw'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 
 async function retCancelTask() {
@@ -1698,6 +1712,10 @@ function renderRetirement(data, body) {
       document.getElementById('retWdP10').textContent = fmtKRW(wdDist.p10);
       document.getElementById('retWdP50').textContent = fmtKRW(wdDist.p50);
       document.getElementById('retWdP90').textContent = fmtKRW(wdDist.p90);
+    }
+    // 인출기(wd) 모드 — 전체 종료자산 분포 히스토그램(wd_values)
+    if (Array.isArray(data.wd_values) && data.wd_values.length) {
+      renderHistogram('retWdChart', data.wd_values, '#66BB6A');
     }
   }
 

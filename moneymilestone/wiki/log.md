@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-21] BUGFIX | KRX_GOLD 등 특수종목이 인출 MC 깨뜨려 중앙값 폭발(46억) — get_price 기반 피팅으로 수정
+
+오너: 로그인 일반창선 인출 중앙값 46억(말도 안 됨), 시크릿선 2300만(정상). "로그인 차이"로 보였으나 실은 **저장 포폴 종목 차이** — 로그인 자동로드=SCHD/QQQM/KRX_GOLD, 시크릿 수동=SCHD/QQQ/GLD.
+
+- **원인**: P1 MC가 `synthetic_mvn.estimate_joint_stats`(price_daily 직접쿼리)로 종목 통계 추정 → **KRX_GOLD(금현물 합성 연속 시계열, price_daily 부재)·일부 특수종목을 못 잡음** → `_run_mvn_cases`의 `all(t in order)` 가드 실패 → [] 반환 → 호출부 단일종목 GBM 폴백(`_run_synthetic_cases`, tickers[0]=SCHD만, mu 캡 없음, 배당0) → 중앙값 46억·cov0. 정상종목(QQQ/GLD)은 MVN 돌아 2300만.
+- **수정(`withdrawal_analyzer._run_mvn_cases`)**: 통계 추정을 `raw_loader.get_price(allow_synthetic=False)` 기반 per-ticker로 교체(KRX_GOLD·금현물 등 _build_krx_gold_series 포함 모든 종목 처리). 종목별 mu/sigma + 겹침 일수익 상관(nearest-PSD cholesky, 겹침 부족 시 독립), drift 상한 유지. 한 종목이라도 통계 실패 시에만 폴백.
+- **검증(prod 라이브)**: SCHD/QQQM/KRX_GOLD 5억 월300만 30년 → 중앙값 0(고갈)·cov 22%·생존 45%·**n_syn=200(MC 발동)**. 46억 해소. (전: n_syn=30 폴백.)
+- 교훈: 특수종목(KRX_GOLD 등)은 price_daily에 없음 → 통계는 항상 get_price 경유. 프론트 디버그 시 "로그인 차이"는 대개 저장 포폴 자동로드로 인한 입력 차이 — Network Payload로 실제 요청 확인이 정답.
+
+_작성: Claude_
+
 ## [2026-06-21] FEAT | 은퇴 인출 시뮬을 종목별 피팅 상관 몬테카를로로 (MONTECARLO_PLAN P1)
 
 오너 sanity체크: 5억서 월300만(연 7.2%) 인출인데 하위10%도 30년후 93억·고갈 0건 → 비현실. 원인=deep history가 단일 합성 GBM 경로를 30년 윈도우로 겹쳐 잘라 "시나리오"로 위장(독립X·전부 높음).

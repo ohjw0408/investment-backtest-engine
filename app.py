@@ -410,8 +410,8 @@ def search():
                 'country': 'KR', 'is_etf': False,
             })
 
-        # paged면 넉넉한 universe(전체 페이지네이션용), 아니면 _limit.
-        uni = 1000 if paged else _limit
+        # paged면 전체 매칭(제한 없음 — 서버서 페이지 슬라이스라 페이로드 무관), 아니면 _limit.
+        uni = 10_000_000 if paged else _limit
         df = info_engine.search_fuzzy(q, limit=uni)
         if not df.empty:
             for _, row in df.iterrows():

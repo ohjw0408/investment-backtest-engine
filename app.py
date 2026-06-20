@@ -317,7 +317,8 @@ def myassets():
 
 @app.route('/tax-settings')
 def settings():
-    return render_template('tax_settings.html')
+    # 세금 설정은 /settings 에 편입됨 — 옛 링크·북마크 호환 리다이렉트.
+    return redirect('/settings')
 
 @app.route('/settings')
 def settings_page():

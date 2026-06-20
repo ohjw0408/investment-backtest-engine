@@ -133,7 +133,6 @@
       <div class="mmnav-menu">
         <a href="/myportfolios">내 포트폴리오</a>
         <a href="/myassets">내 자산</a>
-        <a href="/tax-settings">세금 설정</a>
         <a href="/alerts">알림</a>
         <a href="/settings">설정</a>
       </div>
@@ -220,9 +219,6 @@
     </a>
     <a class="sidebar-item {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">
       {{ nicon('briefcase') }} 내 자산
-    </a>
-    <a class="sidebar-item {% if request.path.startswith('/tax-settings') %}active{% endif %}" href="/tax-settings">
-      {{ nicon('receipt') }} 세금 설정
     </a>
     <a class="sidebar-item {% if request.path.startswith('/search') %}active{% endif %}" href="/search">
       {{ nicon('search') }} 종목 검색

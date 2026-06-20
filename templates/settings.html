@@ -1,8 +1,33 @@
 {% extends "base.html" %}
 {% block title %}설정 — Money Milestone{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260618ds">
+{% endblock %}
+
 {% block content %}
 <style>
+/* 세금 폼(설정 편입) — tax_settings.html에서 이식 */
+.tax-card { background:var(--ds-canvas); border-radius:var(--r-lg); border:1px solid var(--ds-hairline); padding:18px 20px; margin-bottom:14px; transition:border-color .15s, box-shadow .15s; }
+.tax-card.active { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-tint); }
+.tax-card-header { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.tax-card-icon { font-size:1.3rem; }
+.tax-card-title { font-size:var(--fs-body); font-weight:600; color:var(--ds-ink); }
+.tax-card-sub { font-size:var(--fs-cap); color:var(--ds-muted); margin-top:2px; }
+.tax-card .input-row label { display:block; font-size:var(--fs-sm); font-weight:600; color:var(--ds-ink); margin-bottom:6px; }
+.tax-card .input-group { position:relative; display:flex; align-items:center; }
+.tax-card .calc-input { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:var(--fs-body); color:var(--ds-ink); background:var(--ds-canvas); border:1px solid var(--ds-hairline); border-radius:var(--r-md); padding:12px 14px; width:100%; box-sizing:border-box; transition:border-color .15s, box-shadow .15s; }
+.tax-card .calc-input:focus { outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-tint); }
+.tax-card .input-group .unit { position:absolute; right:14px; color:var(--ds-muted); font-size:var(--fs-sm); pointer-events:none; }
+.tax-card .input-hint { font-size:var(--fs-cap); color:var(--ds-muted); margin-top:6px; }
+.tax-toggle { margin-left:auto; width:44px; height:24px; background:var(--ds-strong); border-radius:12px; position:relative; cursor:pointer; transition:background .2s; border:none; outline:none; flex-shrink:0; }
+.tax-toggle.on { background:var(--brand); }
+.tax-toggle::after { content:''; position:absolute; width:18px; height:18px; background:#fff; border-radius:50%; top:3px; left:3px; transition:left .2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+.tax-toggle.on::after { left:23px; }
+.tax-card-body { display:none; }
+.tax-card-body.show { display:block; }
+.tax-save-btn { width:100%; padding:14px; background:var(--brand); color:var(--on-brand); border:none; border-radius:var(--r-pill); font-size:var(--fs-body); font-weight:600; font-family:var(--font-sans); cursor:pointer; margin-top:4px; transition:background .15s; }
+.tax-save-btn:hover { background:var(--brand-hover); }
 /* .main-content는 2칸 그리드(1fr 308px) — settings는 전체 폭 차지하도록 두 칸 span */
 .settings-wrap { max-width: 1080px; width: 100%; grid-column: 1 / -1; }
 /* PC: 위젯 카드 멀티컬럼 그리드 / 모바일: 단일 컬럼 */
@@ -80,20 +105,77 @@
     <button class="set-nav-btn"        data-spanel="cal"  onclick="setPanel('cal')">{{ nicon('calendar') }} 캘린더</button>
   </div>
 
-  <!-- 세금 패널 -->
+  <!-- 세금 패널 (편입) -->
   <div class="set-panel active" data-spanel="tax">
     <div class="settings-section">
       <div class="settings-section-head"><span>{{ nicon('receipt') }}</span> 세금 설정</div>
       <div class="settings-section-body">
-        <div class="settings-hint">배당금 계산기·포트폴리오·은퇴 시뮬레이션의 세후 계산에 사용됩니다. 소득·ISA·연금·절세매매를 설정하세요.</div>
-        <div class="set-tax-summary" id="setTaxSummary">
-          <div class="set-tax-item"><span class="lbl">나이</span><span class="val" id="setTaxAge">—</span></div>
-          <div class="set-tax-item"><span class="lbl">연소득</span><span class="val" id="setTaxIncome">—</span></div>
-          <div class="set-tax-item"><span class="lbl">ISA</span><span class="val" id="setTaxIsa">—</span></div>
-          <div class="set-tax-item"><span class="lbl">연금계좌</span><span class="val" id="setTaxPension">—</span></div>
-          <div class="set-tax-item"><span class="lbl">절세매매</span><span class="val" id="setTaxHarvest">—</span></div>
+        <div class="settings-hint">배당금 계산기·포트폴리오·은퇴 시뮬레이션의 세후 계산에 적용됩니다.</div>
+
+        <div class="tax-card active" id="card-income">
+          <div class="tax-card-header">
+            <span class="tax-card-icon">💼</span>
+            <div><div class="tax-card-title">소득 정보</div><div class="tax-card-sub">종합과세 계산에 사용됩니다</div></div>
+          </div>
+          <div class="tax-card-body show">
+            <div class="input-row" style="margin-bottom:12px;">
+              <label>연간 근로/사업소득</label>
+              <div class="input-group"><input type="number" id="earnedIncome" class="calc-input" placeholder="예: 50000000" min="0" step="1000000"><span class="unit">원</span></div>
+              <div class="input-hint" id="earnedIncomeHint"></div>
+            </div>
+            <div class="input-row">
+              <label>나이 <span style="font-size:11px;color:var(--ds-muted);">(연금 수령 세율 계산용)</span></label>
+              <div class="input-group" style="max-width:120px;"><input type="number" id="userAge" class="calc-input" value="40" min="18" max="90" step="1"><span class="unit">세</span></div>
+            </div>
+          </div>
         </div>
-        <a class="set-edit-btn" href="/tax-settings"><span class="bt-ico" style="width:15px;height:15px;color:var(--on-brand);">{{ nicon('gear') }}</span> 세금 설정 편집</a>
+
+        <div class="tax-card active" id="card-isa">
+          <div class="tax-card-header">
+            <span class="tax-card-icon">🛡️</span>
+            <div><div class="tax-card-title">ISA 계좌</div><div class="tax-card-sub">운용 중 비과세, 만기 시 200~400만 비과세 후 9.9%</div></div>
+          </div>
+          <div class="tax-card-body show">
+            <div class="input-row">
+              <label>ISA 가입 여부</label>
+              <div class="rebal-options">
+                <label class="rebal-option"><input type="radio" name="isaType" value="none" checked><span class="rebal-label">미가입</span></label>
+                <label class="rebal-option"><input type="radio" name="isaType" value="general"><span class="rebal-label">일반형 (200만)</span></label>
+                <label class="rebal-option"><input type="radio" name="isaType" value="preferential"><span class="rebal-label">서민형 (400만)</span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tax-card" id="card-pension">
+          <div class="tax-card-header">
+            <span class="tax-card-icon">🏦</span>
+            <div><div class="tax-card-title">연금 계좌 (IRP/연금저축)</div><div class="tax-card-sub">운용 중 과세 이연, 수령 시 3.3~5.5%</div></div>
+            <button class="tax-toggle" id="toggle-pension" onclick="toggleAccount('pension')"></button>
+          </div>
+          <div class="tax-card-body" id="body-pension">
+            <div class="input-row">
+              <label>연금 수령 예정 나이</label>
+              <div class="input-group" style="max-width:120px;"><input type="number" id="pensionAge" class="calc-input" value="65" min="55" max="90" step="1"><span class="unit">세</span></div>
+              <div class="input-hint">55~69세: 5.5% / 70~79세: 4.4% / 80세+: 3.3%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tax-card" id="card-harvest">
+          <div class="tax-card-header">
+            <span class="tax-card-icon">✂️</span>
+            <div><div class="tax-card-title">절세매매 (손익통산)</div><div class="tax-card-sub">연말 손실 실현으로 양도세 절감 (해외주식 연 250만 공제)</div></div>
+            <button class="tax-toggle" id="toggle-harvest" onclick="toggleAccount('harvest')"></button>
+          </div>
+        </div>
+
+        <button class="tax-save-btn" onclick="saveTaxSettings()">세금 설정 저장</button>
+        <div class="we-actions" style="margin-top:8px;"><span class="we-status" id="taxStatus"></span></div>
+
+        <div style="margin-top:14px;padding:14px 16px;background:var(--ds-soft);border:1px solid var(--ds-hairline);border-radius:var(--r-md);font-size:var(--fs-cap);color:var(--ds-muted);line-height:1.7;">
+          💡 <b>참고</b> — 금현물·비트코인은 별도 세율. 금융소득 종합과세는 연 이자+배당 2,000만원 초과 시. 본 계산은 참고용입니다.
+        </div>
       </div>
     </div>
   </div>
@@ -167,29 +249,54 @@ function setPanel(name) {
   document.querySelectorAll('.set-panel').forEach(p => p.classList.toggle('active', p.dataset.spanel === name));
 }
 
-// ── 세금 설정 요약 (편집은 /tax-settings) ──
-(async function loadTaxSummary() {
-  const ISA = { none: '미가입', general: '일반형', preferential: '서민형' };
-  const fmtKRW = v => {
-    if (!v || isNaN(v)) return '미입력';
-    const uk = Math.floor(v/1e8), man = Math.floor((v%1e8)/1e4);
-    if (uk>0 && man>0) return '₩'+uk+'억 '+man.toLocaleString()+'만';
-    if (uk>0) return '₩'+uk+'억';
-    if (v>=1e4) return '₩'+Math.floor(v/1e4).toLocaleString()+'만';
-    return '₩'+Math.round(v).toLocaleString();
+// ── 세금 설정 (설정에 편입 — 구 /tax-settings 이식) ──
+const TAX_STORAGE_KEY = 'domino_tax_settings';
+const taxState = { pension: false, harvest: false };
+function taxFmtKRW(v) {
+  if (v == null || isNaN(v)) return '—';
+  const abs = Math.abs(v), uk = Math.floor(abs/1e8), man = Math.floor((abs%1e8)/1e4);
+  if (uk>0 && man>0) return '₩'+uk.toLocaleString()+'억 '+man.toLocaleString()+'만';
+  if (uk>0) return '₩'+uk.toLocaleString()+'억';
+  if (abs>=1e4) return '₩'+Math.floor(abs/1e4).toLocaleString()+'만';
+  return '₩'+Math.round(abs).toLocaleString();
+}
+function toggleAccount(name) {
+  taxState[name] = !taxState[name];
+  document.getElementById('toggle-'+name).classList.toggle('on', taxState[name]);
+  document.getElementById('card-'+name).classList.toggle('active', taxState[name]);
+  const body = document.getElementById('body-'+name); if (body) body.classList.toggle('show', taxState[name]);
+}
+async function saveTaxSettings() {
+  const settings = {
+    earned_income: parseFloat(document.getElementById('earnedIncome').value) || 0,
+    age:           parseInt(document.getElementById('userAge').value) || 40,
+    pension_age:   parseInt(document.getElementById('pensionAge').value) || 65,
+    isa_type:      document.querySelector('input[name="isaType"]:checked')?.value || 'none',
+    accounts:      { ...taxState },
   };
-  let s = {};
+  localStorage.setItem(TAX_STORAGE_KEY, JSON.stringify(settings));
+  const st = document.getElementById('taxStatus');
   try {
     const me = await fetch('/api/me').then(r=>r.json());
-    if (me.logged_in) { const r = await fetch('/api/settings/tax'); if (r.ok) s = await r.json() || {}; }
+    if (me.logged_in) await fetch('/api/settings/tax', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(settings) });
   } catch(e) {}
-  if (!s || !Object.keys(s).length) { try { s = JSON.parse(localStorage.getItem('domino_tax_settings')||'{}'); } catch(e){ s={}; } }
-  const set = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
-  set('setTaxAge', s.age ? s.age+'세' : '미입력');
-  set('setTaxIncome', s.earned_income ? fmtKRW(s.earned_income) : '미입력');
-  set('setTaxIsa', ISA[s.isa_type] || '미가입');
-  set('setTaxPension', (s.accounts && s.accounts.pension) ? '사용' : '미사용');
-  set('setTaxHarvest', (s.accounts && s.accounts.harvest) ? '사용' : '미사용');
+  if (st) { st.textContent = '저장됐어요.'; st.className = 'we-status ok'; setTimeout(()=>{ st.textContent=''; }, 2500); }
+}
+function taxApply(s) {
+  if (s.earned_income != null) document.getElementById('earnedIncome').value = s.earned_income;
+  if (s.age) document.getElementById('userAge').value = s.age;
+  if (s.pension_age) document.getElementById('pensionAge').value = s.pension_age;
+  const radio = document.querySelector(`input[name="isaType"][value="${s.isa_type||'none'}"]`); if (radio) radio.checked = true;
+  if (s.accounts) ['pension','harvest'].forEach(n => { if (s.accounts[n] && !taxState[n]) toggleAccount(n); });
+  document.getElementById('earnedIncomeHint').textContent = s.earned_income ? taxFmtKRW(s.earned_income) : '';
+}
+(async function loadTaxSettings() {
+  let s = null;
+  try { const me = await fetch('/api/me').then(r=>r.json()); if (me.logged_in) { const r = await fetch('/api/settings/tax'); if (r.ok) { const d = await r.json(); if (d && Object.keys(d).length) s = d; } } } catch(e) {}
+  if (!s) { try { s = JSON.parse(localStorage.getItem(TAX_STORAGE_KEY) || 'null'); } catch(e) {} }
+  if (s) taxApply(s);
+  const ei = document.getElementById('earnedIncome');
+  if (ei) ei.addEventListener('input', function(){ document.getElementById('earnedIncomeHint').textContent = taxFmtKRW(parseFloat(this.value)||0); });
 })();
 
 let _weWidgets = [];

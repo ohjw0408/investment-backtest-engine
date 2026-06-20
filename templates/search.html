@@ -3,112 +3,269 @@
 
 {% block head %}
 <style>
-/* ═══ 종목 검색 — 코인베이스 룩 (ds 토큰, 뱃지 카테고리색 유지) ═══ */
+/* ═══ 종목 검색 — 코인베이스 분석 아키타입(ds 토큰, 타 탭과 결 통일) ═══ */
 .main-content { background: var(--ds-canvas); }
-.search-page { max-width: 900px; margin: 0 auto; padding: var(--sp-xl) var(--sp-base); font-family: var(--font-sans); color: var(--ds-ink); }
-.search-bar {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--ds-strong); border: 1px solid transparent;
-  border-radius: var(--r-pill); padding: 12px 18px; margin-bottom: 20px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.search-bar:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-tint); background: var(--ds-canvas); }
-.search-bar input {
-  border: none; outline: none; flex: 1;
-  font-size: 1rem; font-family: var(--font-sans); color: var(--ds-ink);
-  background: transparent;
-}
-.search-icon { font-size: 1.2rem; color: var(--ds-muted); }
+.sp-page { max-width: 1040px; margin: 0 auto; padding: 32px 20px 64px; font-family: var(--font-sans); color: var(--ds-ink); }
+@media (max-width: 860px) { .sp-page { padding: 18px 12px 48px; } }
 
-/* 2열 그리드 */
-.results-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+.sp-hero { text-align: center; margin-bottom: 22px; }
+.sp-h1 { font-size: var(--fs-h1); font-weight: 800; letter-spacing: -0.02em; color: var(--ds-ink); margin: 0 0 6px; }
+.sp-sub { font-size: var(--fs-sm); color: var(--ds-body); margin: 0; }
+
+/* 큰 검색바 — 타 탭 입력 카드와 결 맞춤(넓고 또렷) */
+.sp-searchwrap { max-width: 720px; margin: 0 auto 14px; position: relative; }
+.sp-bar {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--ds-canvas); border: 1.5px solid var(--ds-hairline);
+  border-radius: var(--r-pill); padding: 15px 22px; box-shadow: var(--ds-shadow);
+  transition: border-color .15s, box-shadow .15s;
 }
-@media (max-width: 560px) {
-  .results-grid { grid-template-columns: 1fr; }
+.sp-bar:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px var(--brand-tint); }
+.sp-bar .sp-ico, .sp-bar .sp-ico svg { width: 20px; height: 20px; color: var(--ds-muted); flex-shrink: 0; }
+.sp-bar input { border: none; outline: none; flex: 1; min-width: 0; font-size: 1.05rem; font-family: var(--font-sans); color: var(--ds-ink); background: transparent; }
+.sp-bar input::placeholder { color: var(--ds-muted); }
+.sp-clear { background: none; border: none; cursor: pointer; color: var(--ds-muted); font-size: 1.2rem; line-height: 1; padding: 0 4px; display: none; }
+.sp-clear:hover { color: var(--ds-ink); }
+
+/* 필터 칩 */
+.sp-filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 22px; }
+.sp-chip {
+  font-size: 0.8rem; font-weight: 700; padding: 7px 14px; border-radius: var(--r-pill);
+  border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body);
+  cursor: pointer; transition: all .12s; white-space: nowrap;
 }
+[data-theme="dark"] .sp-chip { background: var(--ds-dark-el); }
+.sp-chip:hover { border-color: var(--brand); color: var(--brand-text); }
+.sp-chip.active { background: var(--brand); color: var(--on-brand); border-color: transparent; }
+
+/* 섹션 (최근·인기) */
+.sp-section { max-width: 900px; margin: 0 auto 26px; }
+.sp-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.sp-section-title { font-size: var(--fs-title); font-weight: 700; color: var(--ds-ink); display: flex; align-items: center; gap: 8px; }
+.sp-section-title .sp-ico, .sp-section-title .sp-ico svg { width: 17px; height: 17px; color: var(--brand); }
+.sp-clearrecent { background: none; border: none; cursor: pointer; font-size: 0.78rem; color: var(--ds-muted); }
+.sp-clearrecent:hover { color: var(--down); }
+
+/* 최근 검색 칩 */
+.sp-recent { display: flex; flex-wrap: wrap; gap: 8px; }
+.sp-recent-chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: var(--r-pill);
+  border: 1px solid var(--ds-hairline); background: var(--ds-soft); color: var(--ds-ink);
+  cursor: pointer; text-decoration: none; font-size: 0.84rem; transition: border-color .12s;
+}
+[data-theme="dark"] .sp-recent-chip { background: var(--ds-strong); }
+.sp-recent-chip:hover { border-color: var(--brand); }
+.sp-recent-chip b { font-family: var(--font-mono); font-size: 0.78rem; color: var(--brand-text); }
+
+/* 결과·인기 카드 그리드 */
+.results-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 860px) { .results-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .results-grid { grid-template-columns: 1fr; } }
 
 .result-card {
-  background: var(--ds-canvas); border: 1px solid var(--ds-hairline);
-  border-radius: var(--r-lg); padding: 16px 18px;
-  cursor: pointer; text-decoration: none; color: var(--ds-ink);
-  transition: border-color 0.15s, box-shadow 0.15s;
-  display: flex; flex-direction: column; gap: 6px;
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-lg);
+  padding: 16px 18px; cursor: pointer; text-decoration: none; color: var(--ds-ink);
+  transition: border-color .15s, box-shadow .15s; display: flex; flex-direction: column; gap: 6px;
 }
+[data-theme="dark"] .result-card { background: var(--ds-dark-el); }
 .result-card:hover { border-color: var(--brand); box-shadow: var(--ds-shadow); }
-.result-bell { background: none; border: none; cursor: pointer; font-size: 0.95rem; padding: 2px 4px;
-  border-radius: 7px; opacity: 0.6; }
+.result-bell { background: none; border: none; cursor: pointer; font-size: 0.95rem; padding: 2px 4px; border-radius: 7px; opacity: 0.55; }
 .result-bell:hover { opacity: 1; }
-
 .card-top { display: flex; align-items: center; justify-content: space-between; }
-.result-badge {
-  font-size: 0.68rem; font-weight: 600;
-  padding: 3px 9px; border-radius: var(--r-pill); white-space: nowrap;
-}
+.result-badge { font-size: 0.66rem; font-weight: 700; padding: 3px 9px; border-radius: var(--r-pill); white-space: nowrap; }
+.sp-rank { font-size: 0.72rem; font-weight: 800; color: var(--ds-muted); font-family: var(--font-mono); }
 .card-price { font-size: 0.9rem; font-weight: 600; color: var(--ds-ink); font-family: var(--font-mono); }
 .card-name { font-size: 0.97rem; font-weight: 600; color: var(--ds-ink); line-height: 1.3; }
-.card-code { font-size: 0.78rem; color: var(--ds-muted); }
-.card-change {
-  font-size: 0.8rem; font-weight: 600; text-align: right; font-family: var(--font-mono);
-}
-.card-change.up   { color: var(--up); }
-.card-change.down { color: var(--down); }
-.card-change.flat { color: var(--ds-muted); }
+.card-code { font-size: 0.78rem; color: var(--ds-muted); font-family: var(--font-mono); }
+.card-change { font-size: 0.8rem; font-weight: 600; text-align: right; font-family: var(--font-mono); }
+.card-change.up { color: var(--up); } .card-change.down { color: var(--down); } .card-change.flat { color: var(--ds-muted); }
 
-.search-hint { text-align: center; color: var(--ds-muted); padding: 48px 0; font-size: 0.9rem; }
+.search-hint { text-align: center; color: var(--ds-muted); padding: 40px 0; font-size: 0.9rem; }
+.sp-spon-note { text-align: center; font-size: 0.72rem; color: var(--ds-muted); margin-top: 12px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="search-page">
-  <h2 style="font-size:var(--fs-h2);font-weight:600;letter-spacing:-0.4px;margin-bottom:16px;">종목 검색</h2>
-  <div class="search-bar">
-    <span class="search-icon">🔍</span>
-    <input type="text" id="searchInput" placeholder="종목명, ETF, 티커 입력..." autocomplete="off" autofocus>
+<div class="sp-page">
+  <header class="sp-hero">
+    <h1 class="sp-h1">종목 검색</h1>
+    <p class="sp-sub">국내·해외 주식, ETF, 크립토를 한 곳에서 찾아보세요</p>
+  </header>
+
+  <div class="sp-searchwrap">
+    <div class="sp-bar">
+      <span class="sp-ico">{{ nicon('search') }}</span>
+      <input type="text" id="searchInput" placeholder="종목명, ETF, 티커 입력 (예: SPY, 삼성전자)" autocomplete="off" autofocus>
+      <button class="sp-clear" id="spClear" onclick="spClearInput()" title="지우기">✕</button>
+    </div>
   </div>
-  <div id="searchControls" style="display:none;justify-content:space-between;align-items:center;gap:10px;margin:10px 2px 4px;">
-    <span style="font-size:0.7rem;color:var(--ds-muted);">⚠ 시세 약 15분 지연 — 새로고침해도 실시간과 다를 수 있습니다</span>
+
+  <!-- 필터 칩 -->
+  <div class="sp-filters" id="spFilters">
+    <button class="sp-chip active" data-filter="all" onclick="spSetFilter('all')">전체</button>
+    <button class="sp-chip" data-filter="kr" onclick="spSetFilter('kr')">국내</button>
+    <button class="sp-chip" data-filter="us" onclick="spSetFilter('us')">해외</button>
+    <button class="sp-chip" data-filter="etf" onclick="spSetFilter('etf')">ETF</button>
+    <button class="sp-chip" data-filter="crypto" onclick="spSetFilter('crypto')">크립토</button>
+  </div>
+
+  <!-- 검색 결과 시세 안내 -->
+  <div id="searchControls" style="display:none;max-width:900px;margin:0 auto 10px;justify-content:space-between;align-items:center;gap:10px;">
+    <span style="font-size:0.7rem;color:var(--ds-muted);">⚠ 시세 약 15분 지연 — 실시간과 다를 수 있습니다</span>
     <button id="searchRefreshBtn" onclick="refreshSearchPrices()" title="현재 시세로 새로고침"
       style="background:var(--ds-canvas);border:1px solid var(--ds-hairline);border-radius:var(--r-full);width:34px;height:34px;cursor:pointer;font-size:0.9rem;flex-shrink:0;color:var(--ds-ink);">🔄</button>
   </div>
-  <div id="searchResults">
-    <div class="search-hint">종목명 또는 티커를 입력하세요</div>
+
+  <!-- 결과 -->
+  <div id="searchResults"></div>
+
+  <!-- 기본 화면(검색 전): 최근 검색 + 인기 종목 -->
+  <div id="spDefault">
+    <div class="sp-section" id="spRecentSection" style="display:none;">
+      <div class="sp-section-head">
+        <span class="sp-section-title"><span class="sp-ico">{{ nicon('refresh') }}</span> 최근 검색</span>
+        <button class="sp-clearrecent" onclick="spClearRecent()">전체 지우기</button>
+      </div>
+      <div class="sp-recent" id="spRecent"></div>
+    </div>
+
+    <div class="sp-section">
+      <div class="sp-section-head">
+        <span class="sp-section-title"><span class="sp-ico">{{ nicon('trend-up') }}</span> 인기 종목</span>
+      </div>
+      <div class="results-grid" id="spPopular"></div>
+      <div class="sp-spon-note">자주 조회되는 대표 종목입니다.</div>
+    </div>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+// 인기 종목(큐레이션 — 추후 증권사 협찬/조회수 기반 동적화). 국내·해외·ETF 대표.
+const SP_POPULAR = [
+  { code: '005930', name: '삼성전자',        badge: 'KOSPI' },
+  { code: 'SPY',    name: 'SPDR S&P 500 ETF', badge: 'US ETF' },
+  { code: 'QQQ',    name: 'Invesco QQQ',      badge: 'US ETF' },
+  { code: 'NVDA',   name: 'NVIDIA',           badge: 'NASDAQ' },
+  { code: 'SCHD',   name: 'Schwab US Dividend Equity', badge: 'US ETF' },
+  { code: '069500', name: 'KODEX 200',        badge: 'KR ETF' },
+  { code: 'TSLA',   name: 'Tesla',            badge: 'NASDAQ' },
+  { code: '000660', name: 'SK하이닉스',       badge: 'KOSPI' },
+  { code: 'AAPL',   name: 'Apple',            badge: 'NASDAQ' },
+];
+const SP_RECENT_KEY = 'mm_recent_searches';
+
 function badgeColor(badge) {
   if (badge === 'KR ETF' || badge === 'KOSPI' || badge === 'KOSDAQ') return '#1976D2';
   if (badge === 'US ETF' || badge === 'NASDAQ' || badge === 'NYSE')   return '#2E7D32';
   if (badge === 'CRYPTO') return '#F57C00';
   return '#78909C';
 }
-
 function fmtPrice(price, currency) {
   if (price == null) return '—';
   if (currency === 'KRW') {
-    if (price >= 10000) return '₩' + Math.round(price / 100) * 100 .toLocaleString();
+    if (price >= 10000) return '₩' + (Math.round(price / 100) * 100).toLocaleString();
     return '₩' + Math.round(price).toLocaleString();
   }
   return '$' + price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
-
 function fmtChange(pct) {
   if (pct == null) return { text: '—', cls: 'flat' };
   const sign = pct >= 0 ? '+' : '';
   return { text: sign + pct.toFixed(2) + '%', cls: pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat' };
 }
+function spEsc(s) { return String(s ?? '').replace(/'/g, "\\'"); }
+
+// 필터: badge → 카테고리 매핑
+function spCategory(badge) {
+  if (['KOSPI','KOSDAQ','KR ETF'].includes(badge)) return badge === 'KR ETF' ? ['kr','etf'] : ['kr'];
+  if (['NASDAQ','NYSE','US ETF'].includes(badge))  return badge === 'US ETF' ? ['us','etf'] : ['us'];
+  if (badge === 'CRYPTO') return ['crypto'];
+  return [];
+}
 
 const input      = document.getElementById('searchInput');
 const resultsDiv = document.getElementById('searchResults');
-let timer = null;
-let lastCodes = [];
+const defaultDiv = document.getElementById('spDefault');
+let timer = null, lastCodes = [], lastData = [], spFilter = 'all';
 
-// 현재 시세로 새로고침 — 보이는 종목을 라이브 시세(/api/watchlist/quotes, 공유 15분 캐시)로 덮어씀
+// ── 최근 검색 (localStorage) ──
+function spGetRecent() { try { return JSON.parse(localStorage.getItem(SP_RECENT_KEY) || '[]'); } catch(e) { return []; } }
+function spPushRecent(item) {
+  if (!item || !item.code) return;
+  let list = spGetRecent().filter(r => r.code !== item.code);
+  list.unshift({ code: item.code, name: item.name || item.code, badge: item.badge || '' });
+  list = list.slice(0, 8);
+  try { localStorage.setItem(SP_RECENT_KEY, JSON.stringify(list)); } catch(e) {}
+}
+function spClearRecent() { try { localStorage.removeItem(SP_RECENT_KEY); } catch(e) {} renderRecent(); }
+function renderRecent() {
+  const list = spGetRecent();
+  const sec = document.getElementById('spRecentSection');
+  const box = document.getElementById('spRecent');
+  if (!list.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  box.innerHTML = list.map(r => `
+    <a class="sp-recent-chip" href="/symbol/${encodeURIComponent(r.code)}" onclick="spPushRecent(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+      <b>${r.code}</b> ${r.name && r.name !== r.code ? r.name.slice(0,14) : ''}
+    </a>`).join('');
+}
+
+// ── 인기 종목 ──
+function renderPopular() {
+  document.getElementById('spPopular').innerHTML = SP_POPULAR.map((item, i) => {
+    const c = badgeColor(item.badge);
+    return `<a class="result-card" href="/symbol/${encodeURIComponent(item.code)}"
+      onclick="spPushRecent({code:'${spEsc(item.code)}',name:'${spEsc(item.name)}',badge:'${spEsc(item.badge)}'})">
+      <div class="card-top">
+        <span class="result-badge" style="background:${c}22;color:${c}">${item.badge}</span>
+        <span class="sp-rank">#${i+1}</span>
+      </div>
+      <div class="card-name">${item.name}</div>
+      <div class="card-code">${item.code}</div>
+    </a>`;
+  }).join('');
+}
+
+function spClearInput() { input.value = ''; input.dispatchEvent(new Event('input')); input.focus(); }
+
+function spSetFilter(f) {
+  spFilter = f;
+  document.querySelectorAll('.sp-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+  if (lastData.length) renderResults();
+}
+
+function renderResults() {
+  const data = spFilter === 'all' ? lastData : lastData.filter(d => spCategory(d.badge).includes(spFilter));
+  if (!data.length) {
+    resultsDiv.innerHTML = '<div class="search-hint">이 필터에 맞는 결과가 없습니다</div>';
+    return;
+  }
+  lastCodes = data.map(d => d.code);
+  resultsDiv.innerHTML = '<div class="results-grid" style="max-width:900px;margin:0 auto;">' + data.map(item => {
+    const chg = fmtChange(item.change_pct);
+    const priceStr = fmtPrice(item.price, item.currency);
+    const c = badgeColor(item.badge);
+    return `
+      <a class="result-card" href="/symbol/${item.code}" data-code="${item.code}"
+        onclick="spPushRecent({code:'${spEsc(item.code)}',name:'${spEsc(item.name)}',badge:'${spEsc(item.badge)}'})">
+        <div class="card-top">
+          <span class="result-badge" style="background:${c}22;color:${c}">${item.badge}</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span class="card-price">${priceStr}</span>
+            ${window.MM_LOGGED_IN ? `<button class="result-bell" title="알림 설정" onclick="event.preventDefault();event.stopPropagation();mmAlert.openSymbol('${spEsc(item.code)}','${spEsc(item.name)}')">🔔</button>` : ''}
+          </span>
+        </div>
+        <div class="card-name">${item.name}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="card-code">${item.code}${item.subtitle ? ' · ' + item.subtitle : ''}</span>
+          <span class="card-change ${chg.cls}">${chg.text}</span>
+        </div>
+      </a>`;
+  }).join('') + '</div>';
+}
+
 async function refreshSearchPrices() {
   if (!lastCodes.length) return;
   const btn = document.getElementById('searchRefreshBtn');
@@ -119,10 +276,8 @@ async function refreshSearchPrices() {
     document.querySelectorAll('.result-card[data-code]').forEach(card => {
       const q = map[String(card.dataset.code).toUpperCase()];
       if (!q) return;
-      const pe = card.querySelector('.card-price');
-      if (pe) pe.textContent = q.value;
-      const ce = card.querySelector('.card-change');
-      if (ce) { ce.textContent = q.change; ce.className = 'card-change ' + (q.up ? 'up' : 'down'); }
+      const pe = card.querySelector('.card-price'); if (pe) pe.textContent = q.value;
+      const ce = card.querySelector('.card-change'); if (ce) { ce.textContent = q.change; ce.className = 'card-change ' + (q.up ? 'up' : 'down'); }
     });
   } catch (e) {}
   if (btn) { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '🔄'; btn.disabled = false; }, 1200); }
@@ -130,12 +285,16 @@ async function refreshSearchPrices() {
 
 input.addEventListener('input', () => {
   const q = input.value.trim();
+  document.getElementById('spClear').style.display = q ? 'block' : 'none';
   if (!q) {
-    resultsDiv.innerHTML = '<div class="search-hint">종목명 또는 티커를 입력하세요</div>';
+    resultsDiv.innerHTML = '';
+    defaultDiv.style.display = 'block';
     document.getElementById('searchControls').style.display = 'none';
-    lastCodes = [];
+    lastCodes = []; lastData = [];
+    renderRecent();
     return;
   }
+  defaultDiv.style.display = 'none';
   clearTimeout(timer);
   resultsDiv.innerHTML = '<div class="search-hint">검색 중...</div>';
   timer = setTimeout(async () => {
@@ -145,35 +304,20 @@ input.addEventListener('input', () => {
       if (!data.length) {
         resultsDiv.innerHTML = '<div class="search-hint">검색 결과가 없습니다</div>';
         document.getElementById('searchControls').style.display = 'none';
-        lastCodes = [];
+        lastData = []; lastCodes = [];
         return;
       }
-      lastCodes = data.map(d => d.code);
+      lastData = data;
       document.getElementById('searchControls').style.display = 'flex';
-      const color = (b) => badgeColor(b);
-      resultsDiv.innerHTML = '<div class="results-grid">' + data.map(item => {
-        const chg = fmtChange(item.change_pct);
-        const priceStr = fmtPrice(item.price, item.currency);
-        return `
-          <a class="result-card" href="/symbol/${item.code}" data-code="${item.code}">
-            <div class="card-top">
-              <span class="result-badge" style="background:${color(item.badge)}22;color:${color(item.badge)}">${item.badge}</span>
-              <span style="display:flex;align-items:center;gap:8px;">
-                <span class="card-price">${priceStr}</span>
-                ${window.MM_LOGGED_IN ? `<button class="result-bell" title="알림 설정" onclick="event.preventDefault();event.stopPropagation();mmAlert.openSymbol('${item.code}','${(item.name||'').replace(/'/g, "\\'")}')">🔔</button>` : ''}
-              </span>
-            </div>
-            <div class="card-name">${item.name}</div>
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span class="card-code">${item.code}${item.subtitle ? ' · ' + item.subtitle : ''}</span>
-              <span class="card-change ${chg.cls}">${chg.text}</span>
-            </div>
-          </a>`;
-      }).join('') + '</div>';
+      renderResults();
     } catch(e) {
       resultsDiv.innerHTML = '<div class="search-hint">오류가 발생했습니다</div>';
     }
   }, 250);
 });
+
+// 초기: 최근 + 인기
+renderRecent();
+renderPopular();
 </script>
 {% endblock %}

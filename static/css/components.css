@@ -163,7 +163,9 @@
 /* 상단 그룹 드롭다운 (5개라 좁은 데스크탑서도 표시 — 레거시 1400 숨김 무력화) */
 .mmnav-groups { align-items:center; }
 @media (min-width:861px) { .nav-links.mmnav-groups { display:flex; } }
-.mmnav-grp { position:relative; }
+/* hover 히트영역을 메뉴까지 6px 갭 포함 아래로 확장(margin 상쇄로 레이아웃 불변).
+   안 하면 트리거→메뉴 이동 중 갭에서 hover가 풀려 메뉴가 닫힘. */
+.mmnav-grp { position:relative; padding-bottom:8px; margin-bottom:-8px; }
 .mmnav-link { display:inline-flex; align-items:center; gap:4px; padding:8px 12px;
   border-radius:var(--r-pill); font-family:var(--font-sans); font-size:var(--fs-sm);
   font-weight:500; color:var(--ds-body); background:none; border:none; cursor:pointer;

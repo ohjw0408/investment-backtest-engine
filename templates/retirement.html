@@ -403,14 +403,13 @@
 
       <!-- 목표 생존 확률 (공통) -->
       <section class="bt-fcard bt-full ret-target-card">
-        <h2 class="bt-fcard-title tight">목표 생존 확률</h2>
-        <input type="range" id="retTargetProb" min="50" max="99" value="90" step="1"
-          class="calc-slider" oninput="document.getElementById('retTargetProbLabel').textContent=this.value+'%'">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ds-muted);margin-top:2px;">
-          <span>50%</span><span>70%</span>
-          <span id="retTargetProbLabel" class="label-val">90%</span>
-          <span>99%</span>
+        <div class="bt-fcard-head">
+          <h2 class="bt-fcard-title">목표 생존 확률</h2>
+          <span id="retTargetProbLabel" class="label-val" style="font-size:1.05rem;">50%</span>
         </div>
+        <input type="range" id="retTargetProb" min="50" max="99" value="50" step="1"
+          class="calc-slider" oninput="document.getElementById('retTargetProbLabel').textContent=this.value+'%'">
+        <div class="slider-marks"><span>50%</span><span>70%</span><span>90%</span><span>99%</span></div>
       </section>
 
       <!-- 고급 옵션 (가상 데이터 · 세금 · 거래수수료) -->

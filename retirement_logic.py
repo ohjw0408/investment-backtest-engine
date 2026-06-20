@@ -433,9 +433,8 @@ def _build_withdrawal_insights(wd_result: dict, start_asset: float) -> dict:
         "mdd_p50":                 round(_p('mdd'), 4),
         "trajectory": [
             {"year": t["year"],
-             "p10": round(t["p10"] * start_asset),
              "p50": round(t["p50"] * start_asset),
-             "p90": round(t["p90"] * start_asset)}
+             "values": [round(v * start_asset) for v in (t.get("values") or [])]}
             for t in traj
         ],
     }

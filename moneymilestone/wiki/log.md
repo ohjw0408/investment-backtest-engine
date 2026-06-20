@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-20] BUGFIX/UX | 인출 배당커버리지 0% 수정(합성 배당 반영) + 연차 부채꼴 밴드 슬라이더(기본 25/75)
+
+오너: ① 배당 커버리지 0%로 나옴 — 가상데이터(합성) 생성 시 배당 미반영 의심. ② 연차별 잔여자산 부채꼴 기본 10%(p10/p90)는 과격 → 기본 25/75 + 폭 슬라이더.
+
+- **①(`withdrawal_analyzer.py`)**: `_simulate_synthetic_case`가 `total_dividend:0.0`/`withdrawal_coverage:0.0` 하드코딩이라, 한국 데이터 짧아 인출 투영이 대부분 합성일 때 커버리지 p50=0. → 합성 경로에 배당 반영(`div_yield` 파라미터, 월 `asset×yield/12` 누적·재투자, coverage=총배당/총인출). `div_yield`=실측 케이스 연 배당수익률(초기자본 대비) 중앙값(`_estimate_real_yield`), `_run_rolling`서 산출해 합성에 주입. 실측 경로(history dividend_income)는 원래 정상.
+- **②(백엔드+프론트)**: `_aggregate_trajectory`가 연도별 p10/p50 고정 → **연도별 값 배열(`values`, 원화) + p50** 반환으로 변경. 프론트 `renderWdInsights`가 `retPctile`로 임의 percentile 밴드 계산, **밴드 폭 ±W% 슬라이더(기본 25=25/75, 5~45 step5)** `retUpdateTrajBand`로 상/하단 데이터·라벨 갱신. 차트 = 상단/하단(밴드 fill)+중앙값 선.
+- **검증**: `ast` 컴파일 OK, `pytest tests/test_g5_retirement_withdrawal.py` 5 passed. 프론트 Playwright 가짜주입 — 커버리지 31% 표시·밴드 기본 "상위 25%"·슬라이더 45→"상위 5%"로 밴드 확대(598M→698M)·콘솔0. ⚠️ 합성 배당 실수치는 Redis 다운으로 로컬 실 celery 미실행 → 배포 후 라이브 확인.
+
+_작성: Claude_
+
 ## [2026-06-20] FEAT | 은퇴 인출 결과창 정보 보강 — 건전성 지표 + 연차별 잔여자산
 
 오너: 은퇴 시뮬 결과창 인출 파트가 빈약. ① 인플레 반영 월 명목 생활비 ② 연차별 남은 자산 ③ 4% 룰 ④ 월 인출금/배당금 비율 추가 요청.

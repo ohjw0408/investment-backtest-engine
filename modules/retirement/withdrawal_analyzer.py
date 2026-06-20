@@ -245,9 +245,8 @@ class WithdrawalAnalyzer:
             col = arr[:, y]
             out.append({
                 "year": y + 1,
-                "p10": float(np.percentile(col, 10)),
-                "p50": float(np.percentile(col, 50)),
-                "p90": float(np.percentile(col, 90)),
+                "p50":  float(np.percentile(col, 50)),
+                "values": [round(float(x), 4) for x in col],   # 프론트서 임의 percentile 밴드 계산
             })
         return out
 
@@ -380,7 +379,8 @@ class WithdrawalAnalyzer:
         n_needed = max(0, MIN_CASES - n_real)
         if n_needed > 0:
             mu, sigma = self._get_return_stats(full_price_data)
-            synthetic = self._run_synthetic_cases(n_needed, mu, sigma, start_id=run_id)
+            div_yield = self._estimate_real_yield(cases)   # 실측 평균 배당수익률 → 합성에 반영
+            synthetic = self._run_synthetic_cases(n_needed, mu, sigma, div_yield=div_yield, start_id=run_id)
             cases.extend(synthetic)
             if self.verbose:
                 print(f"  [합성 보충] 실제 {n_real}개 부족 → 가상 {len(synthetic)}개 추가")
@@ -427,7 +427,7 @@ class WithdrawalAnalyzer:
         self._return_stats_cache = (mu, sigma)
         return mu, sigma
 
-    def _simulate_synthetic_case(self, mu, sigma, rng) -> dict:
+    def _simulate_synthetic_case(self, mu, sigma, rng, div_yield: float = 0.0) -> dict:
         n_months   = self.withdrawal_years * 12
         t_scale    = np.sqrt(SYNTHETIC_DF / (SYNTHETIC_DF - 2))
         rets       = (rng.standard_t(df=SYNTHETIC_DF, size=n_months) / t_scale) * sigma + mu
@@ -438,8 +438,15 @@ class WithdrawalAnalyzer:
         depleted   = False
         depletion_m = n_months
 
+        # 배당 반영(실측 케이스 평균 배당수익률 div_yield). 기본 재투자 가정 — 자산에 합산.
+        monthly_yield  = max(float(div_yield or 0.0), 0.0) / 12.0
+        total_dividend = 0.0
+
         for i, r in enumerate(rets):
-            asset = asset * (1.0 + r) - withdrawal
+            asset = asset * (1.0 + r)
+            div   = asset * monthly_yield
+            total_dividend += div
+            asset = asset + div - withdrawal
             if self.inflation > 0 and (i + 1) % 12 == 0:
                 withdrawal *= (1.0 + self.inflation)
             if asset <= 0:
@@ -470,22 +477,38 @@ class WithdrawalAnalyzer:
             for y in range(1, self.withdrawal_years + 1)
         ]
 
+        total_withdrawal    = self.monthly_withdrawal * self.withdrawal_years * 12
+        withdrawal_coverage = (total_dividend / total_withdrawal) if total_withdrawal > 0 and total_dividend > 0 else 0.0
+
         return {
             "success": success, "end_value": end_value,
             "end_value_ratio": end_value_ratio,
             "years_to_depletion": years_to_dep,
             "sustainable_months": int(depletion_m),
-            "mdd": mdd, "total_dividend": 0.0,
-            "withdrawal_coverage": 0.0, "sequence_risk": sequence_risk,
+            "mdd": mdd, "total_dividend": total_dividend,
+            "withdrawal_coverage": withdrawal_coverage, "sequence_risk": sequence_risk,
             "dividend_mdd": 0.0, "is_synthetic": True,
             "total_fees": 0.0,   # D4: 합성 경로는 거래 없음 → 수수료 0
             "yearly_ratios": yearly_ratios,
         }
 
-    def _run_synthetic_cases(self, n_needed, mu, sigma, start_id=9000):
+    def _estimate_real_yield(self, real_cases: list) -> float:
+        """실측 케이스의 연 배당수익률(초기자본 대비) 중앙값 — 합성 배당 보정용."""
+        if self.initial_capital <= 0 or self.withdrawal_years <= 0:
+            return 0.0
+        ys = [
+            c.get("total_dividend", 0.0) / (self.initial_capital * self.withdrawal_years)
+            for c in real_cases if not c.get("is_synthetic", False)
+        ]
+        ys = [y for y in ys if y > 0]
+        return float(np.median(ys)) if ys else 0.0
+
+    def _run_synthetic_cases(self, n_needed, mu, sigma, div_yield=0.0, start_id=9000):
         results = []
         for i in range(n_needed):
-            case           = self._simulate_synthetic_case(mu, sigma, np.random.default_rng(seed=1000 + i))
+            case = self._simulate_synthetic_case(
+                mu, sigma, np.random.default_rng(seed=1000 + i), div_yield=div_yield,
+            )
             case["run_id"] = start_id + i
             case["start"]  = "synthetic"
             case["end"]    = "synthetic"

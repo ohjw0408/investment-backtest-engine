@@ -267,31 +267,7 @@ class WithdrawalAnalyzer:
     def _run_rolling(self) -> List[dict]:
         from multiprocessing import Pool
 
-        # 1. 전체 범위 데이터 1회 로드 (allow_synthetic 시 deep 합성 가격·배당 포함)
-        full_price_data, all_dates = self.portfolio_engine.price_loader.load(
-            self.tickers,
-            self.data_start.strftime("%Y-%m-%d"),
-            self.data_end.strftime("%Y-%m-%d"),
-            allow_synthetic=self.allow_synthetic,
-        )
-
-        # 2. 윈도우 목록
-        windows, cur, run_id = [], self.data_start, 1
-        while True:
-            end = cur + relativedelta(years=self.withdrawal_years)
-            if end > self.data_end:
-                break
-            windows.append((cur.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"), run_id))
-            cur    += relativedelta(months=self.step_months)
-            run_id += 1
-
-        if not windows:
-            # GAP-RET-KRDATA: 실데이터 < 인출기간 → 실윈도우 0개 — 전량 합성 폴백.
-            # 기존 MIN_CASES 패딩과 동일 GBM(실측 수익률 통계 기반), is_synthetic 마킹.
-            mu, sigma = self._get_return_stats(full_price_data)
-            return self._run_synthetic_cases(MIN_CASES, mu, sigma, start_id=1)
-
-        # 3. 파라미터 직렬화
+        # 0. 파라미터 직렬화 (MVN·롤링 공용)
         strategy_instance = self.strategy_factory()
         strategy_dict = {
             "target_weights":      strategy_instance.target_weights,
@@ -316,16 +292,42 @@ class WithdrawalAnalyzer:
             "stock_tickers":     self.stock_tickers,
         }
 
-        # ── MVN 몬테카를로: 실데이터 < 인출기간이면 독립 상관 합성 경로로 ──
+        # ── MVN 몬테카를로: 실데이터 < 인출기간이면 독립 상관 합성 경로로 (데이터 로드·윈도우보다 먼저) ──
         # 실 독립 데이터가 인출기간보다 짧으면 롤링 윈도우는 단일 합성경로 슬라이스이거나
         # 불장 suffix에 앵커돼 분포가 거짓(고갈 0·전부 높음). 종목별 mu/sigma + 상관을
         # 피팅한 독립 다변량-t 풀경로 몬테카를로로 현실적 분포(실패율·넓은 스프레드) 산출.
-        # 가상데이터 체크박스(allow_synthetic)와 무관 — 30년 투영은 실데이터만으론 불가.
+        # 가상데이터 체크박스와 무관 — 30년 투영은 실데이터만으론 불가.
         if self._real_data_years() < self.withdrawal_years:
             mvn = self._run_mvn_cases(config_dict, strategy_dict)
             if mvn:
                 return mvn
-            # MVN 추정/생성 실패 → 단일종목 GBM 폴백(기존 거동)
+            # MVN 실패 → 단일종목 GBM 폴백
+            _fpd, _ = self.portfolio_engine.price_loader.load(
+                self.tickers, self.data_start.strftime("%Y-%m-%d"),
+                self.data_end.strftime("%Y-%m-%d"), allow_synthetic=self.allow_synthetic,
+            )
+            mu, sigma = self._get_return_stats(_fpd)
+            return self._run_synthetic_cases(MIN_CASES, mu, sigma, start_id=1)
+
+        # 1. 전체 범위 데이터 1회 로드 (allow_synthetic 시 deep 합성 가격·배당 포함)
+        full_price_data, all_dates = self.portfolio_engine.price_loader.load(
+            self.tickers,
+            self.data_start.strftime("%Y-%m-%d"),
+            self.data_end.strftime("%Y-%m-%d"),
+            allow_synthetic=self.allow_synthetic,
+        )
+
+        # 2. 윈도우 목록
+        windows, cur, run_id = [], self.data_start, 1
+        while True:
+            end = cur + relativedelta(years=self.withdrawal_years)
+            if end > self.data_end:
+                break
+            windows.append((cur.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"), run_id))
+            cur    += relativedelta(months=self.step_months)
+            run_id += 1
+
+        if not windows:
             mu, sigma = self._get_return_stats(full_price_data)
             return self._run_synthetic_cases(MIN_CASES, mu, sigma, start_id=1)
 

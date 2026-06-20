@@ -28,6 +28,9 @@
 .tax-card-body.show { display:block; }
 .tax-save-btn { width:100%; padding:14px; background:var(--brand); color:var(--on-brand); border:none; border-radius:var(--r-pill); font-size:var(--fs-body); font-weight:600; font-family:var(--font-sans); cursor:pointer; margin-top:4px; transition:background .15s; }
 .tax-save-btn:hover { background:var(--brand-hover); }
+/* 세금 카드 2열 (가로 활용) */
+.tax-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+.tax-grid .tax-card { margin-bottom: 0; }
 /* 선택 칩 토글 (캘린더 등 — raw 체크박스 대체, 결 통일) */
 .set-chk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
 .set-chk { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--ds-hairline); border-radius: var(--r-md); background: var(--ds-canvas); cursor: pointer; font-size: 0.83rem; color: var(--ds-body); transition: border-color .12s, background .12s, color .12s; user-select: none; }
@@ -122,6 +125,7 @@
       <div class="settings-section-body">
         <div class="settings-hint">배당금 계산기·포트폴리오·은퇴 시뮬레이션의 세후 계산에 적용됩니다.</div>
 
+        <div class="tax-grid">
         <div class="tax-card active" id="card-income">
           <div class="tax-card-header">
             <span class="tax-card-icon">💼</span>
@@ -179,6 +183,7 @@
             <button class="tax-toggle" id="toggle-harvest" onclick="toggleAccount('harvest')"></button>
           </div>
         </div>
+        </div><!-- /tax-grid -->
 
         <button class="tax-save-btn" onclick="saveTaxSettings()">세금 설정 저장</button>
         <div class="we-actions" style="margin-top:8px;"><span class="we-status" id="taxStatus"></span></div>
@@ -490,6 +495,25 @@ function calEsc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<
       </div></div>`;
   }
   document.getElementById('calSymbols').innerHTML = html || '<div class="settings-hint">표시할 종목이 없어요. 내 자산·포트폴리오·관심목록에 종목을 추가하세요.</div>';
+
+  // 상위(소스) 체크 ↔ 하위(종목) 동기
+  function calSyncParent(card) {
+    const src = card.querySelector('.cal-src');
+    const syms = [...card.querySelectorAll('.cal-sym')];
+    if (!src || !syms.length) return;
+    const checked = syms.filter(s => s.checked).length;
+    src.checked = checked > 0;
+    src.indeterminate = checked > 0 && checked < syms.length;
+  }
+  document.querySelectorAll('#calSymbols .set-src-card').forEach(card => {
+    const src = card.querySelector('.cal-src');
+    if (src) src.addEventListener('change', () => {
+      card.querySelectorAll('.cal-sym').forEach(s => s.checked = src.checked);
+      src.indeterminate = false;
+    });
+    card.querySelectorAll('.cal-sym').forEach(s => s.addEventListener('change', () => calSyncParent(card)));
+    calSyncParent(card);   // 초기 상태
+  });
 })();
 
 async function calSave() {

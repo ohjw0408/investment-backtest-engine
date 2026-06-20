@@ -349,7 +349,7 @@ def search():
         return jsonify([])
     try:
         try:
-            _limit = max(1, min(int(request.args.get('limit', 20)), 50))
+            _limit = max(1, min(int(request.args.get('limit', 20)), 500))
         except (TypeError, ValueError):
             _limit = 20
         results = []

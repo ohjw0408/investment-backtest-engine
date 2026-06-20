@@ -85,6 +85,14 @@
 .card-change { font-size: 0.8rem; font-weight: 600; text-align: right; font-family: var(--font-mono); }
 .card-change.up { color: var(--up); } .card-change.down { color: var(--down); } .card-change.flat { color: var(--ds-muted); }
 
+/* 페이지네이션 */
+.sp-pager { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 22px; flex-wrap: wrap; }
+.sp-pg { min-width: 36px; height: 36px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body); border-radius: var(--r-md); cursor: pointer; font-size: 0.85rem; font-weight: 600; font-family: var(--font-mono); transition: all .12s; }
+[data-theme="dark"] .sp-pg { background: var(--ds-dark-el); }
+.sp-pg:hover:not(:disabled) { border-color: var(--brand); color: var(--brand-text); }
+.sp-pg.active { background: var(--brand); color: var(--on-brand); border-color: transparent; }
+.sp-pg:disabled { opacity: .35; cursor: default; }
+.sp-count { text-align: center; font-size: 0.78rem; color: var(--ds-muted); margin-top: 8px; }
 .search-hint { text-align: center; color: var(--ds-muted); padding: 40px 0; font-size: 0.9rem; }
 .sp-spon-note { text-align: center; font-size: 0.72rem; color: var(--ds-muted); margin-top: 12px; }
 </style>
@@ -125,6 +133,8 @@
 
   <!-- 결과 -->
   <div id="searchResults"></div>
+  <div class="sp-pager" id="spPager" style="display:none;"></div>
+  <div class="sp-count" id="spCount" style="display:none;"></div>
 
   <!-- 기본 화면(검색 전): 최근 검색 + 인기 종목 -->
   <div id="spDefault">
@@ -197,7 +207,8 @@ function spCategory(badge) {
 const input      = document.getElementById('searchInput');
 const resultsDiv = document.getElementById('searchResults');
 const defaultDiv = document.getElementById('spDefault');
-let timer = null, lastCodes = [], lastData = [], spSeq = 0;
+let timer = null, lastCodes = [], lastData = [], spSeq = 0, spPage = 1;
+const SP_PER_PAGE = 18;
 const spActive = new Set();   // 다중선택 필터
 
 // ── 최근 검색 (localStorage) ──
@@ -244,17 +255,46 @@ function spToggle(cat) {
   if (spActive.has(cat)) spActive.delete(cat); else spActive.add(cat);
   document.querySelectorAll('.sp-chip[data-cat]').forEach(c => c.classList.toggle('active', spActive.has(c.dataset.cat)));
   document.getElementById('spReset').style.display = spActive.size ? 'inline-flex' : 'none';
+  spPage = 1;
   if (lastData.length) renderResults();
 }
 function spResetFilter() {
   spActive.clear();
   document.querySelectorAll('.sp-chip[data-cat]').forEach(c => c.classList.remove('active'));
   document.getElementById('spReset').style.display = 'none';
+  spPage = 1;
   if (lastData.length) renderResults();
 }
 
+// 페이지네이션: 10개 단위 그룹 + 작은화살표(이전/다음 그룹)·큰화살표(처음/끝)
+function spGoPage(pg) { spPage = pg; renderResults(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function renderPagination(total) {
+  const pager = document.getElementById('spPager');
+  if (total <= 1) { pager.style.display = 'none'; return; }
+  pager.style.display = 'flex';
+  const cur = spPage;
+  const gStart = Math.floor((cur - 1) / 10) * 10 + 1;
+  const gEnd   = Math.min(gStart + 9, total);
+  let h = '';
+  h += `<button class="sp-pg" ${gStart <= 1 ? 'disabled' : ''} onclick="spGoPage(1)" title="처음">«</button>`;
+  h += `<button class="sp-pg" ${gStart <= 1 ? 'disabled' : ''} onclick="spGoPage(${gStart - 1})" title="이전 묶음">‹</button>`;
+  for (let p = gStart; p <= gEnd; p++)
+    h += `<button class="sp-pg ${p === cur ? 'active' : ''}" onclick="spGoPage(${p})">${p}</button>`;
+  h += `<button class="sp-pg" ${gEnd >= total ? 'disabled' : ''} onclick="spGoPage(${gEnd + 1})" title="다음 묶음">›</button>`;
+  h += `<button class="sp-pg" ${gEnd >= total ? 'disabled' : ''} onclick="spGoPage(${total})" title="끝(${total})">»</button>`;
+  pager.innerHTML = h;
+}
+
 function renderResults() {
-  const data = spActive.size ? lastData.filter(d => spActive.has(spCategory(d.badge))) : lastData;
+  const all = spActive.size ? lastData.filter(d => spActive.has(spCategory(d.badge))) : lastData;
+  const total = all.length;
+  const totalPages = Math.max(1, Math.ceil(total / SP_PER_PAGE));
+  if (spPage > totalPages) spPage = 1;
+  const data = all.slice((spPage - 1) * SP_PER_PAGE, spPage * SP_PER_PAGE);
+  const cntEl = document.getElementById('spCount');
+  cntEl.style.display = total ? 'block' : 'none';
+  cntEl.textContent = total ? `총 ${total}개 · ${spPage}/${totalPages} 페이지` : '';
+  renderPagination(totalPages);
   if (!data.length) {
     resultsDiv.innerHTML = '<div class="search-hint">이 필터에 맞는 결과가 없습니다</div>';
     return;
@@ -308,6 +348,8 @@ input.addEventListener('input', () => {
     resultsDiv.innerHTML = '';
     defaultDiv.style.display = 'block';
     document.getElementById('searchControls').style.display = 'none';
+    document.getElementById('spPager').style.display = 'none';
+    document.getElementById('spCount').style.display = 'none';
     lastCodes = []; lastData = [];
     renderRecent();
     return;
@@ -318,17 +360,20 @@ input.addEventListener('input', () => {
   const seq = ++spSeq;                                  // 요청 순번(stale 결과 폐기용)
   timer = setTimeout(async () => {
     try {
-      const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=40`);
+      const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=300`);
       const data = await res.json();
       // 도배 방지: 응답 도착 시 입력이 바뀌었거나 비었으면 폐기(in-flight stale)
       if (seq !== spSeq || input.value.trim() === '') return;
       if (!data.length) {
         resultsDiv.innerHTML = '<div class="search-hint">검색 결과가 없습니다</div>';
         document.getElementById('searchControls').style.display = 'none';
+        document.getElementById('spPager').style.display = 'none';
+        document.getElementById('spCount').style.display = 'none';
         lastData = []; lastCodes = [];
         return;
       }
       lastData = data;
+      spPage = 1;
       document.getElementById('searchControls').style.display = 'flex';
       renderResults();
     } catch(e) {

@@ -1,5 +1,22 @@
 # Log
 
+## [2026-06-20] UX | 은퇴 설계(retirement) 디자인을 계산기/포트폴리오 분석 탭 아키타입으로 전면 이식
+
+오너: "느낌만 비슷하게 만들지 말고, 결과창이나 기타등등 세부 디테일까지 포트폴리오 분석탭·투자계산기 탭 참고해서 세밀·꼼꼼히 이식." (dividend_target에 이어 retirement 동일 이식)
+
+- **레이아웃 전환**: `templates/retirement.html`을 좌입력/우결과 2단(`.ret-layout` flex)에서 calculator/backtest와 동일한 **전폭 중앙(`.bt-page`) + 입력뷰↔결과뷰 전환**으로 재구성. `retShowInput/retShowResults/retEditConditions` 추가, 실행·복원·렌더가 결과뷰로 전환. 결과 상단 `←조건 수정`/`재실행` 바.
+- **입력 카드**: `.bt-fcard`(ds-canvas·hairline·shadow·dark-el) + `.bt-input-grid` 영역배치(포트폴리오=전폭 / **모드별 금액·옵션 2열** `.ret-mode-grid` / 목표 생존율=전폭 / 고급옵션=전폭). 중앙 히어로 헤더(nicon retire). 모드 탭(은퇴 시뮬/인출기) = ds pill 세그(`.ret-mode-seg`).
+- **고급 옵션 접기**: 가상 데이터·세금·거래수수료를 「고급 옵션 ▾」 collapse(`retToggleAdvanced`/`.adv-body.open`, 기본 접힘, 세금/수수료 ON 시 `retExpandAdvanced` 자동 펼침).
+- **세금·수수료**: calculator/dividend와 동일 `.bt-switch` ON/OFF + `.bt-fee-panel`(is-open). `toggleRetTax`/`toggleFeePanel` bt-switch 결로 재작성(retTaxWrap/retTaxThumb 인라인 토글 제거).
+- **결과 히어로**: 생존율 카드 → `.bt-hero`(목표 생존 확률 달성도 대형 모노숫자 + survival-bar + 메시지박스) + `.bt-cond` 조건요약 바(`retBuildCondSummary`). `.acc-dist-card`→`.result-card`, dist-card 3분위·sample-table·인출 종료자산 분포 ds 토큰화.
+- **종목 줄·검색**: calculator.css 네이티브 마크업(`.ticker-item-code/.ticker-item-name/.weight-input/.ticker-item-slider/.ticker-remove`, 검색 `.ticker-drop-item`)으로. `updateRetWeightUI`/검색 드롭다운 갱신(weight-total ok/over·weight-warn).
+- **아이콘/토큰/토스트**: 이모지→nicon(retire/coins/search/zap/refresh/plus/repeat/trend-down/warn/link/image), 레거시토큰→ds, `alert()` 5곳→`mmToast`. 진행 UI를 결과뷰로 이동.
+- **보존**: 모든 입력 ID·결과 렌더 로직(`renderRetirement`/`renderHistogram`/`retUpdateSplitPlan`)·API·sim/wd 멀티계좌 페이로드·multi_account_ui/portfolio_favorites/limit_guard 배선·분할매도/세금/연금/절세 패널 100% 그대로. 캐시 multi_account_ui `?v=20260619ds2`.
+- **검증**(로컬서버+Playwright 실클릭, 라이트/다크 + 모바일390): 입력뷰 2열(modeGrid 492×492)·모드전환(wd active·grid)·종목검색20건·SPY+TLT 비중100%·고급옵션 접힘(offsetHeight 0)→펼침(212)·세금 ON(패널 block·계좌 1 자동추가)·수수료 ON(is-open)·밴드 토글·**데스크톱1280+모바일390 가로 오버플로우 0(세금ON 포함)**·가짜 결과 주입→결과뷰 전환·히어로 92%(survival-bar safe)·조건요약 8항목·축적 p50 ₩5억·시나리오 3행·메시지박스·뒤로가기→입력뷰·**콘솔에러0·네이티브dialog0**. ⚠️ Redis 다운으로 로컬 실 celery 시뮬은 못 돌림(가짜주입만) — 라이브 실시뮬 검증은 오너 ssh 배포 후.
+- **다음 = 커밋 → 오너 ssh 배포 → 라이브 실시뮬 검증.** 디자인 통일 4탭(backtest·calculator·dividend·retirement) 이식 완료.
+
+_작성: Claude_
+
 ## [2026-06-19] FIX | 결과 sessionStorage 전환(전 탭) + 고급옵션 슬라이드 애니 + 카드 높이 맞춤
 
 오너 라이브 3건: ① 브라우저 껐다 켜도 이전 계산 결과가 남음(탭 전환만 기억, 종료 시 소멸 원함) ② 고급 옵션 눌러도 아무것도 안 바뀜(내려오는 느낌 없음) ③ 투자옵션·투자금액 카드 높이 달라 여백.

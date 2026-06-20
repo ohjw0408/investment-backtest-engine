@@ -5,597 +5,652 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260618ds">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
-.share-pill { background:var(--blue-pale);color:var(--blue-mid);border:none;border-radius:20px;padding:5px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:inherit; }
-.share-pill:hover { background:var(--blue-soft); }
-.ret-layout {
-  display: flex; gap: 24px; align-items: flex-start; padding: 24px;
-}
-.ret-left  {
-  width: 400px; min-width: 360px; flex-shrink: 0;
-  display: flex; flex-direction: column; gap: 0;
-  background:var(--card);
-  border-radius: 16px;
-  border: 1.5px solid var(--border);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  padding: 20px;
-}
-.ret-right { flex: 1; min-width: 0; }
+/* ── 은퇴 설계 — 코인베이스 분석 아키타입 (입력↔결과 뷰 전환, 계산기/포트폴리오 분석 탭과 동일 결) ── */
+.bt-page { grid-column: 1 / -1; width: 100%; max-width: 1180px; box-sizing: border-box; margin: 0 auto; padding: 28px 20px 64px; }
+@media (max-width: 860px) { .bt-page { padding: 16px 12px 48px; } }
 
-/* 반응형 */
-@media (max-width: 860px) {
-  .ret-layout { flex-direction: column; padding: 16px; gap: 16px; }
-  .ret-left   { width: 100%; min-width: 0; }
+.bt-ico, .bt-ico svg { width: 1.05em; height: 1.05em; vertical-align: -0.16em; color: var(--brand); display: inline-block; }
+.bt-ico.muted, .bt-ico.muted svg { color: var(--ds-muted); }
+
+/* ── 입력 뷰 ── */
+.bt-input-view { max-width: 1120px; margin: 0 auto; }
+.bt-hero-head { text-align: center; margin-bottom: 22px; }
+.bt-h1 { font-size: var(--fs-h1); font-weight: 800; color: var(--ds-ink); letter-spacing: -0.02em; margin: 0 0 6px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.bt-hero-sub { font-size: var(--fs-sm); color: var(--ds-body); margin: 0; }
+
+/* 모드 세그먼트 (은퇴 시뮬 / 인출기) */
+.ret-mode-seg { display: flex; gap: 6px; background: var(--ds-soft); border: 1px solid var(--ds-hairline); border-radius: var(--r-pill); padding: 4px; margin: 0 auto 18px; max-width: 460px; }
+[data-theme="dark"] .ret-mode-seg { background: var(--ds-strong); }
+.ret-mode-tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 12px; background: none; border: none; cursor: pointer; font-size: var(--fs-sm); font-weight: 700; color: var(--ds-muted); border-radius: var(--r-pill); transition: background .15s, color .15s; font-family: inherit; }
+.ret-mode-tab.active { background: var(--brand); color: var(--on-brand); }
+.ret-mode-tab.active .bt-ico, .ret-mode-tab.active .bt-ico svg { color: var(--on-brand); }
+.ret-mode-tab .bt-ico, .ret-mode-tab .bt-ico svg { width: 15px; height: 15px; }
+
+.bt-input-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "assets assets"
+    "modes modes"
+    "target target"
+    "advanced advanced";
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+.bt-input-grid > .bt-fcard { margin-bottom: 0; min-width: 0; }
+.bt-full { grid-column: 1 / -1; }
+.ret-assets-card  { grid-area: assets; }
+.ret-mode-wrap    { grid-area: modes; min-width: 0; }
+.ret-target-card  { grid-area: target; }
+.ret-adv-card     { grid-area: advanced; }
+/* 모드 내부 2열 블록 (금액 | 옵션) */
+.ret-mode-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.ret-mode-grid > .bt-fcard { margin-bottom: 0; min-width: 0; display: flex; flex-direction: column; }
+@media (max-width: 900px) {
+  .bt-input-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: "assets" "modes" "target" "advanced";
+  }
+  .ret-mode-grid { grid-template-columns: 1fr; }
+  .bt-full { grid-column: auto; }
 }
 
-/* 페이지 타이틀 */
-.ret-page-title {
-  font-size: 1.15rem; font-weight: 800; color: var(--text); margin-bottom: 2px;
+.bt-fcard {
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-lg); box-shadow: var(--ds-shadow);
+  padding: 22px 24px; margin-bottom: 16px;
 }
-.ret-page-subtitle {
-  font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;
-}
-
-.ret-mode-tabs {
-  display: flex; gap: 0; margin-bottom: 16px;
-  border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden;
-}
-.ret-mode-tab {
-  flex: 1; padding: 10px; background:var(--card); cursor: pointer;
-  font-size: 0.82rem; font-weight: 700; color: var(--text-muted);
-  text-align: center; transition: all 0.15s; border: none;
-}
-.ret-mode-tab.active { background: var(--blue); color: white; }
+[data-theme="dark"] .bt-fcard { background: var(--ds-dark-el); }
+@media (max-width: 860px) { .bt-fcard { padding: 16px 14px; } }
+.bt-fcard-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.bt-fcard-title { font-size: var(--fs-title); font-weight: 700; color: var(--ds-ink); margin: 0; }
+.bt-fcard-title.gap { margin-bottom: 14px; }
+.bt-fcard-title.tight { margin-bottom: 6px; }
+.bt-fcard-head .bt-fcard-title { margin: 0; }
+.bt-opt-row { padding: 12px 0; border-top: 1px solid var(--ds-hairline); }
+.bt-opt-row:first-child { border-top: none; padding-top: 4px; }
+.bt-opt-row > label.bt-opt-label { display: block; font-size: var(--fs-cap); font-weight: 600; color: var(--ds-body); margin-bottom: 8px; }
 
 /* 연도 슬라이더 */
 .year-slider-wrap { margin-top: 6px; }
-.year-slider-wrap input[type=range] {
-  width: 100%; accent-color: var(--blue);
-  height: 4px; cursor: pointer;
-}
-.year-slider-labels {
-  display: flex; justify-content: space-between;
-  font-size: 11px; color: var(--text-muted); margin-top: 2px;
-}
+.year-slider-wrap input[type=range] { width: 100%; accent-color: var(--brand); height: 4px; cursor: pointer; }
+.year-slider-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--ds-muted); margin-top: 2px; }
 
-/* 검색 아이콘 인풋 */
-.ret-search-box {
-  display: flex; align-items: center; gap: 8px;
-  background: var(--bg); border: 1.5px solid var(--border);
-  border-radius: 10px; padding: 10px 14px;
-  transition: border-color 0.15s;
-}
-.ret-search-box:focus-within { border-color: var(--blue); background:var(--card); }
-.ret-search-box .search-icon { font-size: 1rem; flex-shrink: 0; color: var(--text-muted); }
-.ret-search-box input {
-  border: none; outline: none; background: transparent;
-  font-size: 0.875rem; color: var(--text); width: 100%;
-}
-.ret-search-box input::placeholder { color: var(--text-muted); }
+/* 토글 스위치 (세금·수수료) */
+.bt-toggle-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bt-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; user-select: none; }
+.bt-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.bt-switch-label { font-size: var(--fs-cap); font-weight: 700; color: var(--ds-muted); min-width: 26px; text-align: right; }
+.bt-switch-track { width: 44px; height: 24px; border-radius: var(--r-pill); background: var(--ds-hairline); position: relative; flex-shrink: 0; transition: background .2s; }
+.bt-switch-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.22); transition: transform .2s; }
+.bt-switch input:checked + .bt-switch-track { background: var(--brand); }
+.bt-switch input:checked + .bt-switch-track::after { transform: translateX(20px); }
 
-/* 종목 없을 때 플레이스홀더 - 계산기 스타일 */
-.ticker-placeholder {
-  background: var(--bg);
-  border: 1.5px solid var(--border);
-  border-radius: 10px; padding: 18px;
-  text-align: center; color: var(--text-muted);
-  font-size: 0.85rem; margin-bottom: 8px;
-}
+.bt-fee-panel { max-height: 0; overflow: hidden; margin-top: 0; padding: 0 12px; background: var(--ds-soft); border: 1px solid transparent; border-radius: var(--r-md); transition: max-height .35s ease, margin-top .3s ease, padding .3s ease, border-color .3s ease; }
+[data-theme="dark"] .bt-fee-panel { background: var(--ds-strong); }
+.bt-fee-panel.is-open { max-height: 1400px; margin-top: 12px; padding: 12px; border-color: var(--ds-hairline); }
+.bt-fee-field { min-width: 0; display: block; font-size: var(--fs-cap); font-weight: 600; color: var(--ds-muted); }
+.bt-fee-control { width: 100%; min-width: 0; box-sizing: border-box; margin-top: 6px; border: 1.5px solid var(--ds-hairline); border-radius: var(--r-sm); padding: 8px 10px; font-size: 0.82rem; background: var(--ds-canvas); color: var(--ds-ink); outline: none; font-family: inherit; }
+[data-theme="dark"] .bt-fee-control { background: var(--ds-dark-el); }
+.bt-fee-control:focus { border-color: var(--brand); }
+.bt-fee-meta { margin-top: 10px; font-size: 0.72rem; color: var(--ds-muted); line-height: 1.45; }
 
-/* ret-left 안 calc-section은 카드 내부라 border 불필요 */
-.ret-left .calc-section {
-  border: none;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  padding: 16px 0;
-  margin-bottom: 0;
-}
-.ret-left .calc-section:last-of-type { border-bottom: none; }
+/* 실행 버튼 */
+.bt-run-wrap { background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); box-shadow: var(--ds-shadow); margin-top: 8px; padding: 16px; }
+[data-theme="dark"] .bt-run-wrap { background: var(--ds-dark-el); }
+.bt-run-wrap .calc-warning { display: flex; align-items: center; justify-content: center; gap: 7px; background: none; border: none; padding: 0; margin: 0 0 16px; color: var(--ds-muted); font-size: var(--fs-cap); text-align: center; line-height: 1.4; }
+.bt-run { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--brand); color: var(--on-brand); border: none; cursor: pointer; font-size: var(--fs-body); font-weight: 700; padding: 16px; border-radius: var(--r-pill); box-shadow: var(--ds-shadow); transition: background .15s, transform .1s; }
+.bt-run:hover:not(:disabled) { background: var(--brand-hover); }
+.bt-run:active:not(:disabled) { transform: scale(.99); }
+.bt-run:disabled { opacity: .55; cursor: not-allowed; }
+.bt-run .bt-ico, .bt-run .bt-ico svg { color: var(--on-brand); }
 
-/* 인풋 배경 계산기와 통일 */
-.ret-left .calc-input { background: var(--bg) !important; }
-.ret-left .input-group { background: var(--bg); border-radius: 10px; }
+/* ── 결과 뷰 ── */
+.bt-result-view { max-width: 1100px; margin: 0 auto; }
+.bt-result-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.bt-back, .bt-rerun { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: var(--fs-sm); font-weight: 600; padding: 9px 16px; border-radius: var(--r-pill); border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-ink); transition: border-color .15s, color .15s; }
+[data-theme="dark"] .bt-back, [data-theme="dark"] .bt-rerun { background: var(--ds-dark-el); }
+.bt-back:hover { border-color: var(--brand); color: var(--brand-text); }
+.bt-rerun { background: var(--brand); color: var(--on-brand); border-color: transparent; }
+.bt-rerun:hover { background: var(--brand-hover); }
+.bt-rerun .bt-ico, .bt-rerun .bt-ico svg { color: var(--on-brand); }
 
-.ret-result-empty {
-  display: flex; align-items: center; justify-content: center;
-  height: 300px; color: var(--text-muted); font-size: 0.9rem;
-  border: 2px dashed var(--border); border-radius: 12px;
-}
-.survival-bar-wrap { margin: 16px 0; }
-.survival-bar-bg {
-  height: 28px; background: var(--bg); border-radius: 14px;
-  overflow: hidden; border: 1.5px solid var(--border);
-}
-.survival-bar-fill {
-  height: 100%; border-radius: 14px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.85rem; font-weight: 800; color: white;
-  transition: width 0.6s ease; min-width: 36px;
-}
+/* 조건 요약 바 */
+.bt-cond { background: var(--brand-tint); border: 1px solid var(--ds-hairline); border-radius: var(--r-md); padding: 12px 16px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: var(--fs-cap); color: var(--ds-body); }
+.bt-cond-item { display: inline-flex; align-items: center; gap: 6px; }
+.bt-cond-item b { color: var(--ds-ink); font-weight: 700; }
+.bt-cond-sep { width: 1px; height: 12px; background: var(--ds-hairline); }
+
+/* 히어로 지표 — 생존 확률 */
+.bt-hero { background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); box-shadow: var(--ds-shadow); padding: 24px; margin-bottom: 16px; }
+[data-theme="dark"] .bt-hero { background: var(--ds-dark-el); }
+.bt-hero-label { font-size: var(--fs-cap); font-weight: 600; color: var(--ds-muted); margin-bottom: 6px; }
+.bt-hero-value { font-size: var(--fs-display); font-weight: 800; color: var(--ds-ink); font-family: var(--font-mono); letter-spacing: -0.02em; line-height: 1.05; }
+@media (max-width: 560px) { .bt-hero-value { font-size: 34px; } }
+
+.result-card-desc { font-size: 0.72rem; color: var(--ds-muted); margin: -2px 0 10px; line-height: 1.45; }
+.share-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--brand-tint); color: var(--brand-text); border: none; border-radius: var(--r-pill); padding: 6px 12px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+.share-pill:hover { background: var(--ds-soft); }
+.share-pill .bt-ico, .share-pill .bt-ico svg { width: 15px; height: 15px; }
+
+/* 삐져나옴 봉쇄 */
+.bt-input-grid > .bt-fcard { min-width: 0; }
+.input-group, .calc-input, .input-row, .ticker-search-box, .ticker-search-wrap, .calc-slider { min-width: 0; box-sizing: border-box; }
+#taxAccountList { min-width: 0; }
+#taxAccountList .calc-input, #taxAccountList .input-group, #taxAccountList input,
+#taxAccountList select, #taxAccountList .ticker-search-box { min-width: 0; box-sizing: border-box; max-width: 100%; }
+
+/* ── 고급 옵션 접기 (가상 데이터 · 세금 · 거래수수료) ── */
+.adv-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: none; border: none; cursor: pointer; padding: 0; text-align: left; font-size: var(--fs-title); font-weight: 700; color: var(--ds-ink); }
+.adv-toggle .adv-sub { font-size: var(--fs-cap); font-weight: 500; color: var(--ds-muted); margin-left: 6px; }
+.adv-caret { transition: transform .2s; color: var(--ds-muted); font-size: 0.85em; flex-shrink: 0; }
+.adv-toggle.open .adv-caret { transform: rotate(180deg); }
+.adv-body { max-height: 0; overflow: hidden; transition: max-height .4s ease, margin-top .3s ease; }
+.adv-body.open { max-height: 8000px; margin-top: 18px; }
+.adv-block { padding: 16px 0; border-top: 1px solid var(--ds-hairline); }
+.adv-block:first-child { border-top: none; padding-top: 4px; }
+.adv-block-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin: 0 0 12px; }
+
+/* 생존율 바 (결과) */
+.survival-bar-wrap { margin: 16px 0 4px; }
+.survival-bar-bg { height: 28px; background: var(--ds-soft); border-radius: 14px; overflow: hidden; border: 1px solid var(--ds-hairline); }
+[data-theme="dark"] .survival-bar-bg { background: var(--ds-strong); }
+.survival-bar-fill { height: 100%; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; color: white; transition: width 0.6s ease; min-width: 36px; }
 .survival-bar-fill.safe    { background: #2E7D32; }
 .survival-bar-fill.warning { background: #F57F17; }
 .survival-bar-fill.danger  { background: #C62828; }
 
-.ret-msg-box {
-  padding: 14px 16px; border-radius: 10px;
-  font-size: 0.85rem; line-height: 1.7; margin-top: 12px;
-}
-.ret-msg-box.safe    { background:var(--green-pale); border: 1.5px solid #A5D6A7; color:var(--green); }
-.ret-msg-box.warning { background:var(--gold-pale); border: 1.5px solid #FFE082; color:var(--gold-deep); }
-.ret-msg-box.danger  { background:var(--red-pale); border: 1.5px solid #EF9A9A; color:var(--red); }
+.ret-msg-box { padding: 14px 16px; border-radius: var(--r-md); font-size: 0.85rem; line-height: 1.7; margin-top: 12px; }
+.ret-msg-box.safe    { background:var(--green-pale); border: 1px solid var(--green-light); color:var(--green); }
+.ret-msg-box.warning { background:var(--gold-pale); border: 1px solid var(--gold); color:var(--gold-deep); }
+.ret-msg-box.danger  { background:var(--red-pale); border: 1px solid var(--red-light); color:var(--red); }
 
-.acc-dist-card {
-  background:var(--card); border-radius: 12px;
-  border: 1.5px solid var(--border); padding: 16px; margin-bottom: 16px;
-}
-.acc-dist-title { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-bottom: 12px; }
-
+/* 시나리오 테이블 */
 .sample-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 8px; }
-.sample-table th { background: var(--bg); padding: 6px 8px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1.5px solid var(--border); }
-.sample-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+.sample-table th { background: var(--ds-soft); padding: 8px; color: var(--ds-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--ds-hairline); }
+[data-theme="dark"] .sample-table th { background: var(--ds-strong); }
+.sample-table td { padding: 7px 8px; border-bottom: 1px solid var(--ds-hairline); color: var(--ds-ink); }
 .sample-table tr:last-child td { border-bottom: none; }
+
+@keyframes mm-indeterminate { 0% { left: -40%; width: 40%; } 100% { left: 110%; width: 30%; } }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="ret-layout">
+<div class="bt-page">
 
-  <!-- ===== 왼쪽: 입력 패널 ===== -->
-  <div class="ret-left">
+  <!-- ══════════ 입력 뷰 ══════════ -->
+  <div id="retInputView" class="bt-input-view">
+    <header class="bt-hero-head">
+      <h1 class="bt-h1"><span class="bt-ico">{{ nicon('retire') }}</span> 은퇴 설계</h1>
+      <p class="bt-hero-sub">포트폴리오를 구성하고 은퇴 생존 확률을 시뮬레이션해보세요</p>
+    </header>
 
-    <!-- 타이틀 -->
-    <div class="ret-page-title">🏖 은퇴 설계</div>
-    <div class="ret-page-subtitle">포트폴리오를 구성하고 은퇴 생존 확률을 시뮬레이션해보세요</div>
-
-    <!-- 모드 탭 -->
-    <div class="ret-mode-tabs">
-      <button class="ret-mode-tab active" id="tabRetSim" onclick="switchMode('sim')">🏖 은퇴 시뮬레이션</button>
-      <button class="ret-mode-tab" id="tabRetWd" onclick="switchMode('wd')">💸 인출기</button>
+    <!-- 모드 세그먼트 -->
+    <div class="ret-mode-seg">
+      <button class="ret-mode-tab active" id="tabRetSim" onclick="switchMode('sim')"><span class="bt-ico">{{ nicon('retire') }}</span> 은퇴 시뮬레이션</button>
+      <button class="ret-mode-tab" id="tabRetWd" onclick="switchMode('wd')"><span class="bt-ico">{{ nicon('coins') }}</span> 인출기</button>
     </div>
 
-    <!-- 포트폴리오 (공통) -->
-    <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num">01</span> 포트폴리오</div>
-      <div id="favBar"></div>
-      <div id="retTickerList"></div>
-      <div id="retTickerPlaceholder" class="ticker-placeholder">종목을 검색해서 추가해보세요</div>
-      <div class="ticker-search-wrap" style="margin-top:8px;">
-        <div class="ret-search-box">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="retTickerSearch" placeholder="종목 또는 ETF 검색 (예: SCHD, SPY)">
+    <div class="bt-input-grid">
+
+      <!-- 포트폴리오 (공통) -->
+      <section class="bt-fcard ret-assets-card">
+        <div class="bt-fcard-head">
+          <h2 class="bt-fcard-title">포트폴리오 구성</h2>
+          <div id="favBar"></div>
         </div>
-        <div class="ticker-search-dropdown" id="retTickerDropdown"></div>
-      </div>
-      <div class="weight-total-row" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
-        <span style="font-size:0.85rem;color:var(--text-muted);">비중 합계</span>
-        <span class="weight-total-val" id="retWeightTotal" style="font-weight:700;">0%</span>
-      </div>
-      <div class="weight-bar-bg" style="margin-top:4px;"><div class="weight-bar-fill" id="retWeightBar" style="width:0%"></div></div>
-    </div>
-
-    <!-- ===== 은퇴 시뮬레이션 입력 ===== -->
-    <div id="modeSimInputs">
-      <div class="calc-section">
-        <div class="calc-section-title"><span class="calc-section-num">02</span> 은퇴 계획</div>
-
-        <div class="input-row">
-          <label>초기 투자금</label>
-          <div class="input-group">
-            <input type="number" id="simSeed" class="calc-input" value="10000000" min="0" step="1000000">
-            <span class="unit">원</span>
-          </div>
-          <div class="input-hint" id="simSeedHint">₩10,000,000</div>
-        </div>
-
-        <div class="input-row">
-          <label>월 적립금</label>
-          <div class="input-group">
-            <input type="number" id="simMonthly" class="calc-input" value="500000" min="0" step="100000">
-            <span class="unit">원</span>
-          </div>
-          <div class="input-hint" id="simMonthlyHint">₩500,000</div>
-        </div>
-
-        <div class="input-row">
-          <label>투자 기간 <span id="simAccYearsLabel" style="font-weight:800;color:var(--blue);">20년</span></label>
-          <div class="year-slider-wrap">
-            <input type="range" id="simAccYearsSlider" min="1" max="50" value="20" step="1"
-              oninput="document.getElementById('simAccYears').value=this.value; document.getElementById('simAccYearsLabel').textContent=this.value+'년';">
-            <div class="year-slider-labels">
-              <span>1년</span><span>10년</span><span>20년</span><span>30년</span><span>50년</span>
-            </div>
-          </div>
-          <input type="hidden" id="simAccYears" value="20">
-        </div>
-
-        <div class="input-row">
-          <label>배당 처리</label>
-          <div class="rebal-options">
-            <label class="rebal-option"><input type="radio" name="simDividend" value="reinvest" checked><span class="rebal-label">재투자</span></label>
-            <label class="rebal-option"><input type="radio" name="simDividend" value="hold"><span class="rebal-label">현금 보유</span></label>
+        <div class="ticker-search-wrap">
+          <div class="ticker-search-box">
+            <span class="ts-icon">{{ nicon('search') }}</span>
+            <input type="text" id="retTickerSearch" placeholder="종목 또는 ETF 검색 (예: SCHD, SPY)" autocomplete="off">
+            <div class="ticker-dropdown" id="retTickerDropdown"></div>
           </div>
         </div>
-
-        <div class="input-row">
-          <label>리밸런싱</label>
-          <div class="rebal-options">
-            <label class="rebal-option"><input type="radio" name="simRebal" value="none" checked><span class="rebal-label">안 함</span></label>
-            <label class="rebal-option"><input type="radio" name="simRebal" value="monthly"><span class="rebal-label">매월</span></label>
-            <label class="rebal-option"><input type="radio" name="simRebal" value="quarterly"><span class="rebal-label">분기</span></label>
-            <label class="rebal-option"><input type="radio" name="simRebal" value="yearly"><span class="rebal-label">매년</span></label>
-            <label class="rebal-option"><input type="radio" name="simRebal" value="band"><span class="rebal-label">밴드</span></label>
+        <div id="retTickerList" class="ticker-list">
+          <div class="ticker-empty" id="retTickerPlaceholder">종목을 검색해서 추가해보세요</div>
+        </div>
+        <div class="weight-summary">
+          <div class="weight-summary-row">
+            <span>비중 합계</span>
+            <span id="retWeightTotal" class="weight-total-num">0%</span>
           </div>
-          <div class="band-settings" id="simBandSettings" style="display:none">
+          <div class="weight-track"><div class="weight-fill" id="retWeightBar"></div></div>
+          <div class="weight-warn" id="retWeightWarn"></div>
+        </div>
+      </section>
+
+      <!-- 모드별 입력 (금액 | 옵션 2열) -->
+      <div class="ret-mode-wrap">
+
+        <!-- ===== 은퇴 시뮬레이션 입력 ===== -->
+        <div id="modeSimInputs" class="ret-mode-grid">
+          <section class="bt-fcard ret-money-card">
+            <h2 class="bt-fcard-title gap">은퇴 계획</h2>
             <div class="input-row">
-              <label>밴드 폭 <span id="simBandLabel" class="label-val">5%</span></label>
-              <input type="range" id="simBandSlider" class="calc-slider" min="1" max="30" value="5">
-              <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
+              <label>초기 투자금</label>
+              <div class="input-group">
+                <input type="number" id="simSeed" class="calc-input" value="10000000" min="0" step="1000000">
+                <span class="unit">원</span>
+              </div>
+              <div class="input-hint" id="simSeedHint">₩10,000,000</div>
             </div>
-            <div class="band-note">비중이 목표에서 <strong id="simBandNoteVal">5%</strong> 이상 벗어나면 리밸런싱</div>
-          </div>
-        </div>
-
-        <div class="input-row">
-          <label>월 인출금</label>
-          <div class="input-group">
-            <input type="number" id="simWithdraw" class="calc-input" value="3000000" min="0" step="100000">
-            <span class="unit">원</span>
-          </div>
-          <div class="input-hint" id="simWithdrawHint">₩3,000,000</div>
-        </div>
-
-        <div class="input-row">
-          <label>인출 기간 <span id="simWdYearsLabel" style="font-weight:800;color:var(--blue);">30년</span></label>
-          <div class="year-slider-wrap">
-            <input type="range" id="simWdYearsSlider" min="5" max="50" value="30" step="1"
-              oninput="document.getElementById('simWdYears').value=this.value; document.getElementById('simWdYearsLabel').textContent=this.value+'년';">
-            <div class="year-slider-labels">
-              <span>5년</span><span>15년</span><span>30년</span><span>40년</span><span>50년</span>
-            </div>
-          </div>
-          <input type="hidden" id="simWdYears" value="30">
-        </div>
-
-        <div class="input-row">
-          <label>연금 수령 시작 나이 <span style="font-size:0.75rem;color:var(--text-muted);">(연금저축·IRP 세율 결정)</span></label>
-          <div class="input-group" style="max-width:120px;">
-            <input type="number" id="simPensionStartAge" class="calc-input" value="65" min="55" max="90" step="1"
-              oninput="this._manualOverride=true; updateRetTaxInfo();"
-              onblur="if(parseFloat(this.value)<55||!this.value){this.value=55; updateRetTaxInfo();}">
-            <span class="unit">세</span>
-            <div id="simPensionStartAgeHint" style="font-size:0.75rem;color:#E53935;margin-top:2px;display:none;">55세 이상 입력해주세요</div>
-          </div>
-        </div>
-
-        <div class="input-row">
-          <label>인플레이션</label>
-          <div class="input-group" style="max-width:120px;">
-            <input type="number" id="simInflation" class="calc-input" value="2" min="0" max="10" step="0.5"
-              oninput="updateInflationInfo()">
-            <span class="unit">%</span>
-          </div>
-        </div>
-
-        <!-- D5-a: 인플레이션 생활비 인포박스 -->
-        <div id="inflationInfoBox" style="background:var(--blue-pale);border-radius:8px;padding:12px 16px;margin-top:10px;font-size:0.83rem;line-height:1.7;color:var(--text);">
-          <strong>💡 인플레이션 반영 생활비</strong>
-          <div id="inflationInfoDetail" style="margin-top:6px;"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ===== 인출기 입력 ===== -->
-    <div id="modeWdInputs" style="display:none;">
-      <div class="calc-section">
-        <div class="calc-section-title"><span class="calc-section-num">02</span> 인출기 설정</div>
-
-        <div class="input-row">
-          <label>초기 자산</label>
-          <div class="input-group">
-            <input type="number" id="wdSeed" class="calc-input" value="500000000" min="0" step="10000000">
-            <span class="unit">원</span>
-          </div>
-          <div class="input-hint" id="wdSeedHint">₩5억</div>
-        </div>
-
-        <div class="input-row">
-          <label>월 인출금</label>
-          <div class="input-group">
-            <input type="number" id="wdWithdraw" class="calc-input" value="3000000" min="0" step="100000">
-            <span class="unit">원</span>
-          </div>
-          <div class="input-hint" id="wdWithdrawHint">₩300만</div>
-        </div>
-
-        <div class="input-row">
-          <label>인출 기간 <span id="wdYearsLabel" style="font-weight:800;color:var(--blue);">30년</span></label>
-          <div class="year-slider-wrap">
-            <input type="range" id="wdYearsSlider" min="5" max="50" value="30" step="1"
-              oninput="document.getElementById('wdYears').value=this.value; document.getElementById('wdYearsLabel').textContent=this.value+'년';">
-            <div class="year-slider-labels">
-              <span>5년</span><span>15년</span><span>30년</span><span>40년</span><span>50년</span>
-            </div>
-          </div>
-          <input type="hidden" id="wdYears" value="30">
-        </div>
-
-        <div class="input-row">
-          <label>연금 수령 시작 나이 <span style="font-size:0.75rem;color:var(--text-muted);">(연금저축·IRP 세율 결정)</span></label>
-          <div class="input-group" style="max-width:120px;">
-            <input type="number" id="wdPensionStartAge" class="calc-input" value="65" min="55" max="90" step="1">
-            <span class="unit">세</span>
-          </div>
-          <div class="input-hint">55세 미만 입력 시 55세 기준 세율 적용</div>
-        </div>
-
-        <div class="input-row">
-          <label>인플레이션</label>
-          <div class="input-group" style="max-width:120px;">
-            <input type="number" id="wdInflation" class="calc-input" value="2" min="0" max="10" step="0.5">
-            <span class="unit">%</span>
-          </div>
-        </div>
-
-        <div class="input-row">
-          <label>배당 처리</label>
-          <div class="rebal-options">
-            <label class="rebal-option"><input type="radio" name="wdDividend" value="reinvest" checked><span class="rebal-label">재투자</span></label>
-            <label class="rebal-option"><input type="radio" name="wdDividend" value="hold"><span class="rebal-label">현금 보유</span></label>
-          </div>
-        </div>
-
-        <div class="input-row">
-          <label>리밸런싱</label>
-          <div class="rebal-options">
-            <label class="rebal-option"><input type="radio" name="wdRebal" value="none" checked><span class="rebal-label">안 함</span></label>
-            <label class="rebal-option"><input type="radio" name="wdRebal" value="monthly"><span class="rebal-label">매월</span></label>
-            <label class="rebal-option"><input type="radio" name="wdRebal" value="quarterly"><span class="rebal-label">분기</span></label>
-            <label class="rebal-option"><input type="radio" name="wdRebal" value="yearly"><span class="rebal-label">매년</span></label>
-            <label class="rebal-option"><input type="radio" name="wdRebal" value="band"><span class="rebal-label">밴드</span></label>
-          </div>
-          <div class="band-settings" id="wdBandSettings" style="display:none">
             <div class="input-row">
-              <label>밴드 폭 <span id="wdBandLabel" class="label-val">5%</span></label>
-              <input type="range" id="wdBandSlider" class="calc-slider" min="1" max="30" value="5">
-              <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
+              <label>월 적립금</label>
+              <div class="input-group">
+                <input type="number" id="simMonthly" class="calc-input" value="500000" min="0" step="100000">
+                <span class="unit">원</span>
+              </div>
+              <div class="input-hint" id="simMonthlyHint">₩500,000</div>
             </div>
-            <div class="band-note">비중이 목표에서 <strong id="wdBandNoteVal">5%</strong> 이상 벗어나면 리밸런싱</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 목표 생존 확률 (공통) -->
-    <div class="calc-section">
-      <div class="calc-section-title"><span class="calc-section-num" id="retProbNum">03</span> 목표 생존 확률</div>
-      <input type="range" id="retTargetProb" min="50" max="99" value="90" step="1"
-        style="width:100%;" oninput="document.getElementById('retTargetProbLabel').textContent=this.value+'%'">
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-top:2px;">
-        <span>50%</span><span>70%</span>
-        <span id="retTargetProbLabel" style="font-weight:800;color:var(--blue);">90%</span>
-        <span>99%</span>
-      </div>
-    </div>
-
-    <!-- 가상 데이터 옵트인 (계산기와 동일 — 적립·인출 투영의 상장 전 구간 합성 보충) -->
-    <div class="calc-section" id="retSyntheticSection" style="padding:10px 12px;background:var(--gold-pale);border-radius:8px;border:1px solid var(--gold);">
-      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:0.82rem;">
-        <input type="checkbox" id="retUseSyntheticCheck" style="width:14px;height:14px;margin-top:2px;flex-shrink:0;">
-        <div>
-          <span style="font-weight:600;color:var(--gold-deep);">가상 데이터 사용</span><br>
-          <span style="color:var(--text-muted);">실제 데이터가 부족한 경우에만 선택하세요. 통계적으로 생성된 데이터가 포함되어 결과 정확도가 낮아질 수 있습니다.</span>
-        </div>
-      </label>
-    </div>
-
-    <!-- 세금 적용 섹션 -->
-    <div class="calc-section" id="retTaxSection">
-      <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-        <span><span class="calc-section-num">04</span> 세금 적용</span>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
-          <span id="retTaxLabel" style="font-size:0.8rem;color:var(--text-muted);">OFF</span>
-          <div id="retTaxWrap" onclick="toggleRetTax()" style="width:44px;height:24px;background:var(--border);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
-            <div id="retTaxThumb" style="position:absolute;width:18px;height:18px;background:white;border-radius:50%;top:3px;left:3px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
-          </div>
-        </label>
-      </div>
-
-      <div id="retTaxPanel" style="display:none;margin-top:12px;">
-        <!-- 세금 설정 프로필 -->
-        <div style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:10px;">
-          <div style="font-size:0.8rem;font-weight:700;margin-bottom:6px;">세금 설정 프로필</div>
-          <div id="retTaxProfileInfo" style="font-size:0.76rem;color:var(--text-muted);line-height:1.5;">
-            세금 설정에서 불러옵니다.
-          </div>
-        </div>
-
-        <!-- 계좌 설정 (멀티계좌 — 적립기 전용) -->
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;">※ 멀티계좌는 적립기 시뮬에 적용됩니다.</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <span style="font-size:0.82rem;font-weight:700;">계좌 설정</span>
-          <button onclick="addTaxAccount()" style="font-size:0.75rem;padding:4px 10px;background:var(--blue);color:white;border:none;border-radius:6px;cursor:pointer;">+ 계좌 추가</button>
-        </div>
-        <div id="taxAccountList"></div>
-        <div id="taxWarnings" style="margin-top:4px;"></div>
-
-        <!-- ISA 풍차돌리기 옵션 -->
-        <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:var(--green-pale);border-radius:8px;font-size:0.8rem;border:1px solid var(--green-light);">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="isaRenewalCheck" style="width:14px;height:14px;">
-            <div>
-              <span style="font-weight:700;color:var(--green);">♻ ISA 풍차돌리기 (3년마다 해지·재가입)</span>
-              <div style="color:var(--green);font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다.</div>
+            <div class="input-row">
+              <label>투자 기간 <span id="simAccYearsLabel" class="label-val">20년</span></label>
+              <div class="year-slider-wrap">
+                <input type="range" id="simAccYearsSlider" min="1" max="50" value="20" step="1"
+                  oninput="document.getElementById('simAccYears').value=this.value; document.getElementById('simAccYearsLabel').textContent=this.value+'년';">
+                <div class="year-slider-labels"><span>1년</span><span>10년</span><span>20년</span><span>30년</span><span>50년</span></div>
+              </div>
+              <input type="hidden" id="simAccYears" value="20">
             </div>
-          </label>
-        </div>
-
-        <div id="taxDeductionSection" style="display:none;margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;font-size:0.8rem;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="taxDeductionReinvest" checked style="width:14px;height:14px;">
-            <span>세액공제 환급금 재투자</span>
-          </label>
-        </div>
-
-        <!-- 절세 매도 (위탁 계좌 시 표시) -->
-        <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:var(--blue-pale);border-radius:8px;font-size:0.8rem;border:1px solid var(--blue-soft);">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="gainHarvestingCheck" style="width:14px;height:14px;">
-            <div>
-              <span style="font-weight:700;color:var(--blue);">📉 절세 매도 (연 250만 공제 소진)</span>
-              <div style="color:var(--blue-mid);font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
+            <div class="input-row">
+              <label>월 인출금</label>
+              <div class="input-group">
+                <input type="number" id="simWithdraw" class="calc-input" value="3000000" min="0" step="100000">
+                <span class="unit">원</span>
+              </div>
+              <div class="input-hint" id="simWithdrawHint">₩3,000,000</div>
             </div>
-          </label>
+            <div class="input-row">
+              <label>인출 기간 <span id="simWdYearsLabel" class="label-val">30년</span></label>
+              <div class="year-slider-wrap">
+                <input type="range" id="simWdYearsSlider" min="5" max="50" value="30" step="1"
+                  oninput="document.getElementById('simWdYears').value=this.value; document.getElementById('simWdYearsLabel').textContent=this.value+'년';">
+                <div class="year-slider-labels"><span>5년</span><span>15년</span><span>30년</span><span>40년</span><span>50년</span></div>
+              </div>
+              <input type="hidden" id="simWdYears" value="30">
+            </div>
+          </section>
+
+          <section class="bt-fcard ret-options-card">
+            <h2 class="bt-fcard-title tight">투자 옵션</h2>
+            <div class="bt-opt-row">
+              <label class="bt-opt-label">배당 처리</label>
+              <div class="rebal-options">
+                <label class="rebal-option"><input type="radio" name="simDividend" value="reinvest" checked><span class="rebal-label">재투자</span></label>
+                <label class="rebal-option"><input type="radio" name="simDividend" value="hold"><span class="rebal-label">현금 보유</span></label>
+              </div>
+            </div>
+            <div class="bt-opt-row">
+              <label class="bt-opt-label">리밸런싱</label>
+              <div class="rebal-options">
+                <label class="rebal-option"><input type="radio" name="simRebal" value="none" checked><span class="rebal-label">안 함</span></label>
+                <label class="rebal-option"><input type="radio" name="simRebal" value="monthly"><span class="rebal-label">매월</span></label>
+                <label class="rebal-option"><input type="radio" name="simRebal" value="quarterly"><span class="rebal-label">분기</span></label>
+                <label class="rebal-option"><input type="radio" name="simRebal" value="yearly"><span class="rebal-label">매년</span></label>
+                <label class="rebal-option"><input type="radio" name="simRebal" value="band"><span class="rebal-label">밴드</span></label>
+              </div>
+              <div class="band-settings" id="simBandSettings" style="display:none">
+                <div class="input-row">
+                  <label>밴드 폭 <span id="simBandLabel" class="label-val">5%</span></label>
+                  <input type="range" id="simBandSlider" class="calc-slider" min="1" max="30" value="5">
+                  <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
+                </div>
+                <div class="band-note">비중이 목표에서 <strong id="simBandNoteVal">5%</strong> 이상 벗어나면 리밸런싱</div>
+              </div>
+            </div>
+            <div class="bt-opt-row">
+              <label class="bt-opt-label">연금 수령 시작 나이 <span style="font-weight:500;color:var(--ds-muted);">(연금저축·IRP 세율 결정)</span></label>
+              <div class="input-group" style="max-width:140px;">
+                <input type="number" id="simPensionStartAge" class="calc-input" value="65" min="55" max="90" step="1"
+                  oninput="this._manualOverride=true; updateRetTaxInfo();"
+                  onblur="if(parseFloat(this.value)<55||!this.value){this.value=55; updateRetTaxInfo();}">
+                <span class="unit">세</span>
+              </div>
+              <div id="simPensionStartAgeHint" style="font-size:0.75rem;color:var(--down);margin-top:4px;display:none;">55세 이상 입력해주세요</div>
+            </div>
+            <div class="bt-opt-row">
+              <label class="bt-opt-label">인플레이션</label>
+              <div class="input-group" style="max-width:140px;">
+                <input type="number" id="simInflation" class="calc-input" value="2" min="0" max="10" step="0.5" oninput="updateInflationInfo()">
+                <span class="unit">%</span>
+              </div>
+              <div id="inflationInfoBox" style="background:var(--brand-tint);border-radius:var(--r-md);padding:12px 14px;margin-top:12px;font-size:0.83rem;line-height:1.7;color:var(--ds-body);">
+                <strong style="color:var(--ds-ink);">💡 인플레이션 반영 생활비</strong>
+                <div id="inflationInfoDetail" style="margin-top:6px;"></div>
+              </div>
+            </div>
+          </section>
         </div>
 
-        <!-- 수령 시작 나이 자동 표시 -->
-        <div id="retTaxInfo" style="background:var(--bg);border-radius:8px;padding:10px;font-size:0.78rem;color:var(--text-muted);">
-          수령 시작 나이와 세후 월 인출액이 여기에 표시됩니다.
+        <!-- ===== 인출기 입력 ===== -->
+        <div id="modeWdInputs" class="ret-mode-grid" style="display:none;">
+          <section class="bt-fcard ret-money-card">
+            <h2 class="bt-fcard-title gap">인출기 설정</h2>
+            <div class="input-row">
+              <label>초기 자산</label>
+              <div class="input-group">
+                <input type="number" id="wdSeed" class="calc-input" value="500000000" min="0" step="10000000">
+                <span class="unit">원</span>
+              </div>
+              <div class="input-hint" id="wdSeedHint">₩5억</div>
+            </div>
+            <div class="input-row">
+              <label>월 인출금</label>
+              <div class="input-group">
+                <input type="number" id="wdWithdraw" class="calc-input" value="3000000" min="0" step="100000">
+                <span class="unit">원</span>
+              </div>
+              <div class="input-hint" id="wdWithdrawHint">₩300만</div>
+            </div>
+            <div class="input-row">
+              <label>인출 기간 <span id="wdYearsLabel" class="label-val">30년</span></label>
+              <div class="year-slider-wrap">
+                <input type="range" id="wdYearsSlider" min="5" max="50" value="30" step="1"
+                  oninput="document.getElementById('wdYears').value=this.value; document.getElementById('wdYearsLabel').textContent=this.value+'년';">
+                <div class="year-slider-labels"><span>5년</span><span>15년</span><span>30년</span><span>40년</span><span>50년</span></div>
+              </div>
+              <input type="hidden" id="wdYears" value="30">
+            </div>
+          </section>
+
+          <section class="bt-fcard ret-options-card">
+            <h2 class="bt-fcard-title tight">투자 옵션</h2>
+            <div class="bt-opt-row">
+              <label class="bt-opt-label">연금 수령 시작 나이 <span style="font-weight:500;color:var(--ds-muted);">(연금저축·IRP 세율 결정)</span></label>
+              <div class="input-group" style="max-width:140px;">
+                <input type="number" id="wdPensionStartAge" class="calc-input" value="65" min="55" max="90" step="1">
+                <span class="unit">세</span>
+              </div>
+              <div class="input-hint">55세 미만 입력 시 55세 기준 세율 적용</div>
+            </div>
+            <div class="bt-opt-row">
+              <label class="bt-opt-label">인플레이션</label>
+              <div class="input-group" style="max-width:140px;">
+                <input type="number" id="wdInflation" class="calc-input" value="2" min="0" max="10" step="0.5">
+                <span class="unit">%</span>
+              </div>
+            </div>
+            <div class="bt-opt-row">
+              <label class="bt-opt-label">배당 처리</label>
+              <div class="rebal-options">
+                <label class="rebal-option"><input type="radio" name="wdDividend" value="reinvest" checked><span class="rebal-label">재투자</span></label>
+                <label class="rebal-option"><input type="radio" name="wdDividend" value="hold"><span class="rebal-label">현금 보유</span></label>
+              </div>
+            </div>
+            <div class="bt-opt-row">
+              <label class="bt-opt-label">리밸런싱</label>
+              <div class="rebal-options">
+                <label class="rebal-option"><input type="radio" name="wdRebal" value="none" checked><span class="rebal-label">안 함</span></label>
+                <label class="rebal-option"><input type="radio" name="wdRebal" value="monthly"><span class="rebal-label">매월</span></label>
+                <label class="rebal-option"><input type="radio" name="wdRebal" value="quarterly"><span class="rebal-label">분기</span></label>
+                <label class="rebal-option"><input type="radio" name="wdRebal" value="yearly"><span class="rebal-label">매년</span></label>
+                <label class="rebal-option"><input type="radio" name="wdRebal" value="band"><span class="rebal-label">밴드</span></label>
+              </div>
+              <div class="band-settings" id="wdBandSettings" style="display:none">
+                <div class="input-row">
+                  <label>밴드 폭 <span id="wdBandLabel" class="label-val">5%</span></label>
+                  <input type="range" id="wdBandSlider" class="calc-slider" min="1" max="30" value="5">
+                  <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
+                </div>
+                <div class="band-note">비중이 목표에서 <strong id="wdBandNoteVal">5%</strong> 이상 벗어나면 리밸런싱</div>
+              </div>
+            </div>
+          </section>
         </div>
-      </div>
-    </div>
 
-    <!-- 05. 거래수수료 (D4) -->
-    <div class="calc-section">
-      <div class="calc-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-        <span><span class="calc-section-num">05</span> 거래수수료</span>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-size:0.8rem;color:var(--text-muted);">
-          <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()"> 적용
-        </label>
-      </div>
-      <div id="feePanelBody" style="display:none;margin-top:8px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
-          <label style="font-size:0.72rem;color:var(--text-muted);">증권사 프리셋
-            <select id="feePreset" onchange="applyFeePreset(this.value)" style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
-              <option value="0.015">키움 0.015%</option>
-              <option value="0.02">삼성 0.02%</option>
-              <option value="0">토스 0%</option>
-              <option value="custom">직접입력</option>
-            </select>
-          </label>
-          <label style="font-size:0.72rem;color:var(--text-muted);">수수료율 (%)
-            <input type="number" id="feeRateInput" value="0.015" min="0" step="0.001" style="width:100%;margin-top:3px;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:0.82rem;background:var(--input-bg);">
-          </label>
+      </div><!-- /ret-mode-wrap -->
+
+      <!-- 목표 생존 확률 (공통) -->
+      <section class="bt-fcard bt-full ret-target-card">
+        <h2 class="bt-fcard-title tight">목표 생존 확률</h2>
+        <input type="range" id="retTargetProb" min="50" max="99" value="90" step="1"
+          class="calc-slider" oninput="document.getElementById('retTargetProbLabel').textContent=this.value+'%'">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ds-muted);margin-top:2px;">
+          <span>50%</span><span>70%</span>
+          <span id="retTargetProbLabel" class="label-val">90%</span>
+          <span>99%</span>
         </div>
-        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">적립·인출 매수·매도에 적용. 국내 개별주식 매도는 거래세 0.18% 추가(ETF 면제). 멀티계좌는 계좌 카드별 수수료율 입력.</div>
-      </div>
+      </section>
+
+      <!-- 고급 옵션 (가상 데이터 · 세금 · 거래수수료) -->
+      <section class="bt-fcard bt-full ret-adv-card">
+        <button type="button" class="adv-toggle" id="retAdvToggle" onclick="retToggleAdvanced()">
+          <span>고급 옵션 <span class="adv-sub">· 가상 데이터 · 세금 · 거래수수료</span></span>
+          <span class="adv-caret">▾</span>
+        </button>
+        <div class="adv-body" id="retAdvBody">
+
+          <!-- 가상 데이터 옵트인 -->
+          <div class="adv-block" id="retSyntheticSection">
+            <section style="background:var(--gold-pale);border:1px solid var(--gold);border-radius:var(--r-md);padding:14px 16px;">
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="retUseSyntheticCheck" style="margin-top:3px;flex-shrink:0;">
+                <div>
+                  <span style="font-weight:700;color:var(--gold-deep);">가상 데이터 사용</span>
+                  <div style="color:var(--ds-body);font-size:var(--fs-cap);margin-top:3px;line-height:1.45;">실제 데이터가 부족한 경우에만 선택하세요. 통계적으로 생성된 데이터가 포함되어 결과 정확도가 낮아질 수 있습니다.</div>
+                </div>
+              </label>
+            </section>
+          </div>
+
+          <!-- 세금 적용 -->
+          <div class="adv-block" id="retTaxSection">
+            <div class="bt-toggle-head">
+              <h3 class="adv-block-title" style="margin:0;">세금 적용 <a href="/tax-settings" style="font-size:11px;font-weight:600;color:var(--brand-text);margin-left:6px;text-decoration:none;">⚙ 프로필 →</a></h3>
+              <label class="bt-switch">
+                <span class="bt-switch-label" id="retTaxLabel">OFF</span>
+                <input type="checkbox" id="retTaxToggleChk" onchange="toggleRetTax()">
+                <span class="bt-switch-track"></span>
+              </label>
+            </div>
+
+            <div id="retTaxPanel" style="display:none;margin-top:14px;">
+              <!-- 세금 설정 프로필 -->
+              <div style="background:var(--ds-soft);border-radius:var(--r-md);padding:12px;margin-bottom:10px;">
+                <div style="font-size:0.8rem;font-weight:700;margin-bottom:6px;color:var(--ds-ink);">세금 설정 프로필</div>
+                <div id="retTaxProfileInfo" style="font-size:0.76rem;color:var(--ds-muted);line-height:1.5;">
+                  세금 설정에서 불러옵니다.
+                </div>
+              </div>
+
+              <!-- 계좌 설정 (멀티계좌 — 적립기 전용) -->
+              <div style="font-size:0.72rem;color:var(--ds-muted);margin-bottom:6px;">※ 멀티계좌는 적립기 시뮬에 적용됩니다.</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <span style="font-size:0.82rem;font-weight:700;color:var(--ds-ink);">계좌 설정</span>
+                <button onclick="addTaxAccount()" style="display:inline-flex;align-items:center;gap:4px;font-size:0.75rem;padding:6px 12px;background:var(--brand);color:var(--on-brand);border:none;border-radius:var(--r-pill);cursor:pointer;font-weight:600;"><span class="bt-ico" style="width:14px;height:14px;color:var(--on-brand);">{{ nicon('plus') }}</span> 계좌 추가</button>
+              </div>
+              <div id="taxAccountList"></div>
+              <div id="taxWarnings" style="margin-top:4px;"></div>
+
+              <!-- ISA 풍차돌리기 옵션 -->
+              <div id="isaRenewalSection" style="display:none;margin-top:8px;padding:10px;background:var(--green-pale);border-radius:8px;font-size:0.8rem;border:1px solid var(--green-light);">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="isaRenewalCheck" style="width:14px;height:14px;">
+                  <div>
+                    <span style="font-weight:700;color:var(--green);"><span class="bt-ico" style="width:14px;height:14px;color:var(--green);">{{ nicon('repeat') }}</span> ISA 풍차돌리기 (3년마다 해지·재가입)</span>
+                    <div style="color:var(--green);font-size:0.73rem;margin-top:2px;">매 3년마다 비과세 한도 갱신. 만기 목돈은 계좌 우선순위대로 분배됩니다.</div>
+                  </div>
+                </label>
+              </div>
+
+              <div id="taxDeductionSection" style="display:none;margin-top:10px;padding:10px;background:var(--ds-soft);border-radius:8px;font-size:0.8rem;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="taxDeductionReinvest" checked style="width:14px;height:14px;">
+                  <span>세액공제 환급금 재투자</span>
+                </label>
+              </div>
+
+              <!-- 절세 매도 (위탁 계좌 시 표시) -->
+              <div id="gainHarvestingSection" style="display:none;margin-top:8px;padding:10px;background:var(--blue-pale);border-radius:8px;font-size:0.8rem;border:1px solid var(--blue-soft);">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="gainHarvestingCheck" style="width:14px;height:14px;">
+                  <div>
+                    <span style="font-weight:700;color:var(--blue);"><span class="bt-ico" style="width:14px;height:14px;color:var(--blue);">{{ nicon('trend-down') }}</span> 절세 매도 (연 250만 공제 소진)</span>
+                    <div style="color:var(--blue-mid);font-size:0.73rem;margin-top:2px;">12월에 해외직접투자 종목 매도·재매수로 취득단가 리셋</div>
+                  </div>
+                </label>
+              </div>
+
+              <!-- 수령 시작 나이 자동 표시 -->
+              <div id="retTaxInfo" style="background:var(--ds-soft);border-radius:8px;padding:10px;font-size:0.78rem;color:var(--ds-muted);margin-top:10px;">
+                수령 시작 나이와 세후 월 인출액이 여기에 표시됩니다.
+              </div>
+            </div>
+          </div>
+
+          <!-- 거래수수료 (D4) -->
+          <div class="adv-block">
+            <div class="bt-toggle-head">
+              <label class="adv-block-title" style="margin:0;">거래수수료</label>
+              <label class="bt-switch">
+                <span class="bt-switch-label" id="feeLabel">OFF</span>
+                <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()">
+                <span class="bt-switch-track"></span>
+              </label>
+            </div>
+            <div id="feePanelBody" class="bt-fee-panel">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
+                <label class="bt-fee-field">증권사 프리셋
+                  <select id="feePreset" class="bt-fee-control" onchange="applyFeePreset(this.value)">
+                    <option value="0.015">키움 0.015%</option>
+                    <option value="0.02">삼성 0.02%</option>
+                    <option value="0">토스 0%</option>
+                    <option value="custom">직접입력</option>
+                  </select>
+                </label>
+                <label class="bt-fee-field">수수료율 (%)
+                  <input type="number" id="feeRateInput" class="bt-fee-control" value="0.015" min="0" step="0.001">
+                </label>
+              </div>
+              <div class="bt-fee-meta">적립·인출 매수·매도에 적용. 국내 개별주식 매도는 거래세 0.18% 추가(ETF 면제). 멀티계좌는 계좌 카드별 수수료율 입력.</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </div><!-- /bt-input-grid -->
+
+    <div class="bt-run-wrap">
+      <div class="calc-warning"><span class="bt-ico muted">{{ nicon('warn') }}</span> 과거 데이터 기반 통계적 추정입니다. 미래 결과를 보장하지 않습니다.</div>
+      <button class="bt-run" id="retRunBtn" onclick="runRetirement()">
+        <span class="bt-ico" id="retRunBtnIco">{{ nicon('zap') }}</span>
+        <span id="retRunBtnText">시뮬레이션 실행</span>
+      </button>
     </div>
+  </div>
+  <!-- ══════════ /입력 뷰 ══════════ -->
 
-    <div class="calc-warning">
-      ⚠ 과거 데이터 기반 통계적 추정입니다. 미래 결과를 보장하지 않습니다.
+  <!-- ══════════ 결과 뷰 ══════════ -->
+  <div id="retResultView" class="bt-result-view" style="display:none;">
+    <div class="bt-result-top">
+      <button class="bt-back" onclick="retEditConditions()">← 조건 수정</button>
+      <button class="bt-rerun" onclick="runRetirement()"><span class="bt-ico" style="color:var(--on-brand);">{{ nicon('refresh') }}</span> 재실행</button>
     </div>
+    <div id="retCondSummary" class="bt-cond" style="display:none;"></div>
 
-    <button class="calc-run-btn" id="retRunBtn" onclick="runRetirement()">
-      🏖 시뮬레이션 실행
-    </button>
-
-    <style>
-      @keyframes mm-indeterminate {
-        0%   { left: -40%; width: 40%; }
-        100% { left: 110%; width: 30%; }
-      }
-    </style>
-    <div id="retLoading" style="display:none;padding:16px 12px;">
-      <div id="retProgressPhase" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:6px;">준비 중...</div>
-      <div style="background:var(--border);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;position:relative;">
-        <div id="retProgressBar" style="background:var(--blue);height:100%;width:40%;border-radius:8px;position:absolute;top:0;left:0;animation:mm-indeterminate 1.4s ease-in-out infinite;"></div>
+    <!-- 진행 상황 -->
+    <div id="retLoading" style="display:none;padding:20px 16px;">
+      <div id="retProgressPhase" style="font-size:0.85rem;font-weight:700;color:var(--brand-text);margin-bottom:8px;">준비 중...</div>
+      <div style="background:var(--ds-hairline);border-radius:8px;height:8px;overflow:hidden;margin-bottom:6px;position:relative;">
+        <div id="retProgressBar" style="background:var(--brand);height:100%;width:40%;border-radius:8px;position:absolute;top:0;left:0;animation:mm-indeterminate 1.4s ease-in-out infinite;"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);">
+      <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--ds-muted);">
         <span id="retProgressDetail">계산 준비 중</span>
         <span id="retProgressEta"></span>
       </div>
       <div style="text-align:center;margin-top:10px;">
-        <button onclick="retCancelTask()" style="padding:4px 16px;border:1.5px solid #e53935;border-radius:8px;background:var(--card);color:#e53935;font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+        <button onclick="retCancelTask()" style="padding:4px 16px;border:1.5px solid var(--down);border-radius:8px;background:var(--ds-canvas);color:var(--down);font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
       </div>
     </div>
-  </div>
 
-  <!-- ===== 오른쪽: 결과 패널 ===== -->
-  <div class="ret-right">
-
-    <!-- 에러 배너 (retResultContent 밖 — 항상 DOM에 존재) -->
-    <div id="retAccountRestrictBanner" style="display:none;background:var(--red-pale);border:2px solid var(--red-light);border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:var(--red);">
-      <strong>⛔ 계좌 유형 제한 위반</strong>
+    <!-- 에러 배너 (항상 DOM에 존재) -->
+    <div id="retAccountRestrictBanner" style="display:none;background:var(--red-pale);border:2px solid var(--red-light);border-radius:var(--r-md);padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:var(--red);">
+      <strong><span class="bt-ico" style="width:15px;height:15px;color:var(--red);">{{ nicon('warn') }}</span> 계좌 유형 제한 위반</strong>
       <div id="retAccountRestrictDetail" style="margin-top:6px;line-height:1.7;"></div>
     </div>
-    <div id="retIsaLimitErrorBanner" style="display:none;background:var(--red-pale);border:2px solid var(--red-light);border-radius:8px;padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:var(--red);">
-      <strong>⛔ ISA 납입 한도 초과</strong>
+    <div id="retIsaLimitErrorBanner" style="display:none;background:var(--red-pale);border:2px solid var(--red-light);border-radius:var(--r-md);padding:14px 18px;margin-bottom:14px;font-size:0.85rem;color:var(--red);">
+      <strong><span class="bt-ico" style="width:15px;height:15px;color:var(--red);">{{ nicon('warn') }}</span> ISA 납입 한도 초과</strong>
       <div id="retIsaLimitErrorDetail" style="margin-top:6px;line-height:1.7;"></div>
     </div>
 
-    <div id="retResultEmpty" class="ret-result-empty">
-      포트폴리오를 구성하고 시뮬레이션을 실행하세요
+    <div id="retResultEmpty" class="result-empty">
+      <div class="result-empty-icon"><span class="bt-ico muted" style="width:48px;height:48px;">{{ nicon('retire') }}</span></div>
+      <div class="result-empty-title">시뮬레이션 결과가 여기에 표시됩니다</div>
+      <div class="result-empty-sub">포트폴리오를 구성하고 실행해보세요</div>
     </div>
 
     <div id="retResultContent" style="display:none;">
 
       <!-- 금융소득 종합과세 분할매도 패널 (Phase 2f) -->
-      <div id="retSplitSalePanel" style="display:none;background:var(--red-pale);border:1px solid var(--red-light);border-radius:8px;padding:12px 14px;margin-bottom:14px;">
-        <div style="font-weight:700;color:var(--red);margin-bottom:6px;">⚠ 금융소득 종합과세 주의 (중앙값 케이스)</div>
-        <div style="font-size:0.82rem;color:#555;margin-bottom:10px;">
+      <div id="retSplitSalePanel" style="display:none;background:var(--red-pale);border:1px solid var(--red-light);border-radius:var(--r-md);padding:12px 14px;margin-bottom:14px;">
+        <div style="font-weight:700;color:var(--red);margin-bottom:6px;"><span class="bt-ico" style="width:15px;height:15px;color:var(--red);">{{ nicon('warn') }}</span> 금융소득 종합과세 주의 (중앙값 케이스)</div>
+        <div style="font-size:0.82rem;color:var(--ds-body);margin-bottom:10px;">
           적립 종료 시 KR_FOREIGN 미실현 이익이 2천만원을 초과합니다.
           <strong>최종 자산은 일괄 청산 기준 그 해 배당과 합산한 종합과세를 반영합니다.</strong>
           분할 매도 효과는 소득 구간에 따라 다릅니다.
         </div>
-        <div style="font-size:0.82rem;margin-bottom:8px;">KR_FOREIGN 미실현 이익: <strong id="retKrForeignGain">—</strong></div>
+        <div style="font-size:0.82rem;margin-bottom:8px;color:var(--ds-ink);">KR_FOREIGN 미실현 이익: <strong id="retKrForeignGain">—</strong></div>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-          <label style="font-size:0.82rem;white-space:nowrap;">분할 연수:</label>
+          <label style="font-size:0.82rem;white-space:nowrap;color:var(--ds-body);">분할 연수:</label>
           <input type="range" id="retSplitYearsSlider" min="1" max="20" value="5" style="flex:1;" oninput="retUpdateSplitPlan(this.value)">
-          <span id="retSplitYearsLabel" style="font-size:0.85rem;font-weight:700;min-width:30px;">5년</span>
+          <span id="retSplitYearsLabel" style="font-size:0.85rem;font-weight:700;min-width:30px;color:var(--ds-ink);">5년</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;" id="retSplitMetrics"></div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">※ 참고용. 실제 세무 처리는 세무사와 확인하세요.</div>
+        <div style="font-size:0.72rem;color:var(--ds-muted);margin-top:8px;">※ 참고용. 실제 세무 처리는 세무사와 확인하세요.</div>
       </div>
 
-      <!-- 생존율 -->
-      <div class="acc-dist-card">
-        <div class="acc-dist-title" style="display:flex;align-items:center;justify-content:space-between;">
-          <span>🎯 시뮬레이션 결과</span>
-          <div id="retShareBtns" style="display:none;flex-direction:column;gap:4px;">
+      <!-- 히어로 — 생존 확률 -->
+      <div class="bt-hero">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <div class="bt-hero-label">목표 생존 확률 달성도</div>
+            <div class="bt-hero-value" id="retSurvivalPct">—</div>
+            <div class="survival-bar-wrap">
+              <div class="survival-bar-bg">
+                <div class="survival-bar-fill" id="retSurvivalBar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+          <div id="retShareBtns" style="display:none;flex-direction:column;gap:6px;align-items:flex-end;">
             <div style="display:flex;gap:8px;">
-              <button onclick="retCopyLink()" class="share-pill">🔗 링크 복사</button>
-              <button onclick="retDownloadImg()" class="share-pill">📷 이미지 저장</button>
+              <button onclick="retCopyLink()" class="share-pill"><span class="bt-ico">{{ nicon('link') }}</span> 링크 복사</button>
+              <button onclick="retDownloadImg()" class="share-pill"><span class="bt-ico">{{ nicon('image') }}</span> 이미지 저장</button>
             </div>
             <div class="share-url-box" id="retShareUrlBox"></div>
-          </div>
-        </div>
-        <div class="survival-bar-wrap">
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:4px;">
-            <span>생존 확률</span>
-            <span id="retSurvivalPct" style="font-weight:800;font-size:1.1rem;"></span>
-          </div>
-          <div class="survival-bar-bg">
-            <div class="survival-bar-fill" id="retSurvivalBar" style="width:0%"></div>
           </div>
         </div>
         <div class="ret-msg-box" id="retMsgBox"></div>
       </div>
 
       <!-- 축적 결과 (은퇴 시뮬레이션 모드만) -->
-      <div class="acc-dist-card" id="retAccCard">
-        <div class="acc-dist-title">📈 축적기 종료 자산 분포</div>
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-          <div class="dist-card pessimistic" style="flex:1;min-width:80px;">
+      <div class="result-card" id="retAccCard">
+        <div class="result-card-title">축적기 종료 자산 분포</div>
+        <div class="dist-cards">
+          <div class="dist-card pessimistic">
             <div class="dist-card-label">하위 10%</div>
             <div class="dist-card-value" id="retAccP10">—</div>
           </div>
-          <div class="dist-card median" style="flex:1;min-width:80px;">
+          <div class="dist-card median">
             <div class="dist-card-label">중앙값</div>
             <div class="dist-card-value" id="retAccP50">—</div>
           </div>
-          <div class="dist-card optimistic" style="flex:1;min-width:80px;">
+          <div class="dist-card optimistic">
             <div class="dist-card-label">상위 10%</div>
             <div class="dist-card-value" id="retAccP90">—</div>
           </div>
         </div>
         <canvas id="retAccChart" height="140"></canvas>
-        <div style="font-size:11px;color:var(--text-muted);text-align:right;margin-top:4px;" id="retAccCaseNote"></div>
+        <div style="font-size:11px;color:var(--ds-muted);text-align:right;margin-top:4px;" id="retAccCaseNote"></div>
       </div>
 
       <!-- 멀티계좌 계좌별 분포 + 절세 + 자금이동 (적립기 멀티계좌 시) -->
       <div id="multiAccountSummary" style="margin-top:14px;"></div>
 
       <!-- 시나리오별 생존율 (은퇴 시뮬레이션 모드만) -->
-      <div class="acc-dist-card" id="retSampleCard">
-        <div class="acc-dist-title">📊 축적 시나리오별 인출 생존율</div>
+      <div class="result-card" id="retSampleCard">
+        <div class="result-card-title">축적 시나리오별 인출 생존율</div>
         <table class="sample-table">
           <thead>
             <tr>
@@ -610,33 +665,34 @@
       </div>
 
       <!-- 인출기 종료자산 분포 -->
-      <div class="acc-dist-card">
-        <div class="acc-dist-title">💰 인출기 종료 자산 분포 <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">(중앙값 축적 시나리오 기준)</span></div>
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-          <div class="dist-card pessimistic" style="flex:1;min-width:80px;">
+      <div class="result-card">
+        <div class="result-card-title">인출기 종료 자산 분포 <span style="font-weight:400;color:var(--ds-muted);">(중앙값 축적 시나리오 기준)</span></div>
+        <div class="dist-cards">
+          <div class="dist-card pessimistic">
             <div class="dist-card-label">하위 10%</div>
             <div class="dist-card-value" id="retWdP10">—</div>
           </div>
-          <div class="dist-card median" style="flex:1;min-width:80px;">
+          <div class="dist-card median">
             <div class="dist-card-label">중앙값</div>
             <div class="dist-card-value" id="retWdP50">—</div>
           </div>
-          <div class="dist-card optimistic" style="flex:1;min-width:80px;">
+          <div class="dist-card optimistic">
             <div class="dist-card-label">상위 10%</div>
             <div class="dist-card-value" id="retWdP90">—</div>
           </div>
         </div>
         <canvas id="retWdChart" height="140"></canvas>
-        <div id="retWdPensionTax" style="display:none;margin-top:10px;font-size:0.8rem;color:var(--text-muted);background:var(--bg);border-radius:8px;padding:8px 10px;"></div>
+        <div id="retWdPensionTax" style="display:none;margin-top:10px;font-size:0.8rem;color:var(--ds-muted);background:var(--ds-soft);border-radius:8px;padding:8px 10px;"></div>
         <div id="retWdSynthNote" style="display:none;margin-top:8px;font-size:0.76rem;color:var(--gold-deep);background:var(--gold-pale);border:1px solid var(--gold);border-radius:8px;padding:8px 10px;"></div>
       </div>
     </div>
   </div>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260619ds"></script>
+<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260619ds2"></script>
 <script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260619ds"></script>
 <script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
 <script>
@@ -665,11 +721,10 @@ function fmtKRWHint(v) {
 // ── 모드 전환 ──
 function switchMode(mode) {
   retMode = mode;
-  document.getElementById('modeSimInputs').style.display = mode === 'sim' ? 'block' : 'none';
-  document.getElementById('modeWdInputs').style.display  = mode === 'wd'  ? 'block' : 'none';
+  document.getElementById('modeSimInputs').style.display = mode === 'sim' ? 'grid' : 'none';
+  document.getElementById('modeWdInputs').style.display  = mode === 'wd'  ? 'grid' : 'none';
   document.getElementById('tabRetSim').classList.toggle('active', mode === 'sim');
   document.getElementById('tabRetWd').classList.toggle('active',  mode === 'wd');
-  document.getElementById('retProbNum').textContent = mode === 'sim' ? '03' : '03';
 
   // 공용 멀티계좌 패널 MMTAX 스왑 — 인출기(wd)는 시작 목돈(wdSeed)·월적립 숨김.
   const _portfolioTickers = () =>
@@ -684,29 +739,84 @@ function switchMode(mode) {
   document.getElementById('retResultContent').style.display = 'none';
 }
 
+// ── 입력 ↔ 결과 뷰 전환 (계산기/포트폴리오 분석 탭과 동일 아키타입) ──
+function retShowResults() {
+  document.getElementById('retInputView').style.display  = 'none';
+  document.getElementById('retResultView').style.display = 'block';
+}
+function retShowInput() {
+  document.getElementById('retResultView').style.display = 'none';
+  document.getElementById('retInputView').style.display  = 'block';
+}
+function retEditConditions() { retShowInput(); }
+
+// ── 고급 옵션 접기/펼치기 (가상 데이터·세금·수수료) ──
+function retToggleAdvanced(force) {
+  const body = document.getElementById('retAdvBody');
+  const tog  = document.getElementById('retAdvToggle');
+  if (!body || !tog) return;
+  const open = force === undefined ? !body.classList.contains('open') : !!force;
+  body.classList.toggle('open', open);
+  tog.classList.toggle('open', open);
+}
+function retExpandAdvanced() { retToggleAdvanced(true); }
+
+// ── 결과 조건 요약 바 (포트폴리오 분석/계산기 결) ──
+function retBuildCondSummary(body) {
+  const el = document.getElementById('retCondSummary');
+  if (!el) return;
+  const items = [];
+  const port = (retTickers || []).map(t => `${t.code} ${Math.round((t.weight||0)*100)}%`).join(' · ');
+  if (port) items.push(['포트폴리오', port]);
+  if (retMode === 'sim') {
+    items.push(['초기 투자금', fmtKRW(body.initial_capital)]);
+    if (body.monthly_contribution) items.push(['월 적립', fmtKRW(body.monthly_contribution)]);
+    if (body.accumulation_years)   items.push(['적립 기간', body.accumulation_years + '년']);
+  } else {
+    items.push(['초기 자산', fmtKRW(body.initial_capital)]);
+  }
+  items.push(['월 인출', fmtKRW(body.monthly_withdrawal)]);
+  if (body.withdrawal_years) items.push(['인출 기간', body.withdrawal_years + '년']);
+  if (body.target_percentile != null) items.push(['목표 생존율', Math.round(body.target_percentile*100) + '%']);
+  if ((body.inflation || 0) > 0) items.push(['인플레이션', (body.inflation*100).toFixed(1) + '%']);
+  if (body.tax_enabled) items.push(['세금', '적용']);
+  el.innerHTML = items.map(([l, v], i) =>
+    (i > 0 ? '<span class="bt-cond-sep"></span>' : '') +
+    `<span class="bt-cond-item">${l} <b>${v}</b></span>`
+  ).join('');
+  el.style.display = items.length ? 'flex' : 'none';
+}
+
 // ── 종목 관리 ──
 function updateRetWeightUI() {
   const total = retTickers.reduce((s, t) => s + t.weight, 0);
   const pct   = Math.round(total * 100);
-  document.getElementById('retWeightTotal').textContent = pct + '%';
-  document.getElementById('retWeightTotal').style.color = pct === 100 ? '#2E7D32' : '#C62828';
-  document.getElementById('retWeightBar').style.width   = Math.min(pct, 100) + '%';
-  document.getElementById('retWeightBar').style.background = pct === 100 ? '#4CAF50' : '#F44336';
-
-  // 플레이스홀더 토글
-  const placeholder = document.getElementById('retTickerPlaceholder');
-  if (placeholder) placeholder.style.display = retTickers.length ? 'none' : 'block';
+  const totalEl = document.getElementById('retWeightTotal');
+  totalEl.textContent = pct + '%';
+  totalEl.className = 'weight-total-num' + (pct === 100 ? ' ok' : pct > 100 ? ' over' : '');
+  const bar = document.getElementById('retWeightBar');
+  bar.style.width = Math.min(pct, 100) + '%';
+  bar.style.background = pct === 100 ? 'var(--up)' : pct > 100 ? 'var(--down)' : 'var(--brand)';
+  const warn = document.getElementById('retWeightWarn');
+  if (warn) warn.textContent = pct > 100 ? '⚠ 비중 합계가 100%를 초과했어요'
+    : (pct > 0 && pct < 100 ? `나머지 ${100 - pct}%는 현금으로 유지됩니다` : '');
 
   const list = document.getElementById('retTickerList');
+  if (!retTickers.length) {
+    list.innerHTML = '<div class="ticker-empty" id="retTickerPlaceholder">종목을 검색해서 추가해보세요</div>';
+    return;
+  }
   list.innerHTML = retTickers.map((t, i) => `
     <div class="ticker-item">
-      <span class="ticker-badge">${t.code}</span>
-      <span class="ticker-name">${t.name ? t.name.substring(0,10) : ''}</span>
-      <input type="number" class="ticker-weight-input" value="${Math.round(t.weight*100)}" min="1" max="100" step="1"
-        onchange="retUpdateWeight(${i}, this.value)"> %
-      <input type="range" class="ticker-weight-slider" value="${Math.round(t.weight*100)}" min="1" max="100" step="1"
+      <span class="ticker-item-code">${t.code}</span>
+      <span class="ticker-item-name">${t.name ? t.name : ''}</span>
+      <div class="ticker-item-weight">
+        <input class="weight-input" type="number" value="${Math.round(t.weight*100)}" min="1" max="100" step="1"
+          onchange="retUpdateWeight(${i}, this.value)"><span class="weight-pct">%</span>
+      </div>
+      <input type="range" class="ticker-item-slider" value="${Math.round(t.weight*100)}" min="1" max="100" step="1"
         oninput="retUpdateWeight(${i}, this.value)">
-      <button class="ticker-remove-btn" onclick="retRemoveTicker(${i})">×</button>
+      <button class="ticker-remove" onclick="retRemoveTicker(${i})">✕</button>
     </div>
   `).join('');
 }
@@ -735,18 +845,18 @@ retInput.addEventListener('input', (e) => {
   const q = e.target.value.trim();
   if (!q) { retDropdown.style.display = 'none'; return; }
   clearTimeout(retSearchTimer);
-  retDropdown.innerHTML = '<div class="nav-search-hint">검색 중...</div>';
+  retDropdown.innerHTML = '<div class="ticker-drop-item"><span class="ticker-drop-name">검색 중...</span></div>';
   retDropdown.style.display = 'block';
   retSearchTimer = setTimeout(async () => {
     const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
     const data = await res.json();
-    if (!data.length) { retDropdown.innerHTML = '<div class="nav-search-hint">결과 없음</div>'; return; }
+    if (!data.length) { retDropdown.innerHTML = '<div class="ticker-drop-item"><span class="ticker-drop-name">결과 없음</span></div>'; return; }
     retDropdown.innerHTML = data.map(item => `
-      <div class="nav-search-result" onclick="retAddTicker('${item.code}','${item.name.replace(/'/g,"\\'")}')">
-        <span class="nav-search-badge" style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
-        <div class="nav-search-info">
-          <div class="nav-search-code">${item.code}</div>
-          <div class="nav-search-name">${item.name}</div>
+      <div class="ticker-drop-item" onclick="retAddTicker('${item.code}','${item.name.replace(/'/g,"\\'")}')">
+        <span class="ticker-drop-badge" style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
+        <div>
+          <div class="ticker-drop-code">${item.code}</div>
+          <div class="ticker-drop-name">${item.name}</div>
         </div>
       </div>`).join('');
   }, 250);
@@ -811,9 +921,9 @@ function buildRetAccountsPayload(rebalMode, bandWidth, dividendMode) {
   const accounts = [primary];
   for (let i = 1; i < accs.length; i++) {
     const accTickers = ensureAccountTickers(i);
-    if (accTickers.length === 0) { alert(`계좌 ${i + 1}에 종목을 최소 1개 추가해주세요.`); return false; }
+    if (accTickers.length === 0) { mmToast(`계좌 ${i + 1}에 종목을 최소 1개 추가해주세요.`, 'warn'); return false; }
     if (accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0) > 100) {
-      alert(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`); return false;
+      mmToast(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`, 'warn'); return false;
     }
     accounts.push({
       type: accs[i].type || '위탁',
@@ -846,9 +956,9 @@ function buildWdAccountsPayload(rebalMode, bandWidth, dividendMode) {
   const accounts = [primary];
   for (let i = 1; i < accs.length; i++) {
     const accTickers = ensureAccountTickers(i);
-    if (accTickers.length === 0) { alert(`계좌 ${i + 1}에 종목을 최소 1개 추가해주세요.`); return false; }
+    if (accTickers.length === 0) { mmToast(`계좌 ${i + 1}에 종목을 최소 1개 추가해주세요.`, 'warn'); return false; }
     if (accTickers.reduce((s, t) => s + (Number(t.weight) || 0), 0) > 100) {
-      alert(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`); return false;
+      mmToast(`계좌 ${i + 1}의 비중 합계가 100%를 초과했어요.`, 'warn'); return false;
     }
     accounts.push({
       type: accs[i].type || '위탁',
@@ -867,7 +977,10 @@ function buildWdAccountsPayload(rebalMode, bandWidth, dividendMode) {
 function toggleFeePanel() {
   const on = document.getElementById('feeEnabledChk')?.checked;
   const body = document.getElementById('feePanelBody');
-  if (body) body.style.display = on ? 'block' : 'none';
+  const label = document.getElementById('feeLabel');
+  if (body) body.classList.toggle('is-open', !!on);
+  if (label) { label.textContent = on ? 'ON' : 'OFF'; label.style.color = on ? 'var(--brand-text)' : 'var(--ds-muted)'; }
+  if (on) retExpandAdvanced();
   // 멀티계좌면 카드별 수수료 입력 노출/숨김 위해 재렌더.
   if (window.retTaxEnabled && (window.taxAccounts || []).length > 1) renderTaxAccounts();
 }
@@ -891,9 +1004,11 @@ function renderFeeSummary(containerId, totalFees) {
 
 async function runRetirement(_limitOverride) {
   const total = Math.round(retTickers.reduce((s,t) => s+t.weight, 0) * 100);
-  if (!retTickers.length) { alert('종목을 추가해주세요.'); return; }
-  if (total !== 100) { alert(`비중 합계가 ${total}%입니다. 100%로 맞춰주세요.`); return; }
+  if (!retTickers.length) { mmToast('종목을 추가해주세요.', 'warn'); return; }
+  if (total !== 100) { mmToast(`비중 합계가 ${total}%입니다. 100%로 맞춰주세요.`, 'warn'); return; }
 
+  retShowResults();
+  const _cs = document.getElementById('retCondSummary'); if (_cs) _cs.style.display = 'none';
   document.getElementById('retRunBtn').disabled       = true;
   document.getElementById('retLoading').style.display = 'block';
   document.getElementById('retResultEmpty').style.display   = 'none';
@@ -1051,7 +1166,7 @@ async function runRetirement(_limitOverride) {
           }
         }
       }
-      if (!_handled) alert('오류가 발생했습니다: ' + e.message);
+      if (!_handled) mmToast('오류가 발생했습니다: ' + e.message, 'error');
     }
   } finally {
     sessionStorage.removeItem('mm_task_retirement');
@@ -1218,6 +1333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { state = JSON.parse(taskSaved); } catch(e) { sessionStorage.removeItem('mm_task_retirement'); }
     if (state && Date.now() - state.timestamp < 3600000) {
       _retTaskId = state.task_id;
+      retShowResults();
       document.getElementById('retRunBtn').disabled = true;
       document.getElementById('retLoading').style.display = 'block';
       document.getElementById('retResultEmpty').style.display = 'none';
@@ -1266,16 +1382,17 @@ window.MMTAX = {
   totalMonId:  'simMonthly',
 };
 
-function toggleRetTax() {
-  window.retTaxEnabled = !window.retTaxEnabled;
-  window.taxEnabled    = window.retTaxEnabled;  // 모듈이 참조
-  const on = window.retTaxEnabled;
-  document.getElementById('retTaxWrap').style.background = on ? 'var(--blue)' : 'var(--border)';
-  document.getElementById('retTaxThumb').style.left      = on ? '23px' : '3px';
-  document.getElementById('retTaxLabel').textContent     = on ? 'ON' : 'OFF';
-  document.getElementById('retTaxLabel').style.color     = on ? 'var(--blue)' : 'var(--text-muted)';
-  document.getElementById('retTaxPanel').style.display   = on ? 'block' : 'none';
+function toggleRetTax(force) {
+  const chk = document.getElementById('retTaxToggleChk');
+  const on  = force !== undefined ? !!force : (chk ? chk.checked : !window.retTaxEnabled);
+  if (chk) chk.checked = on;
+  window.retTaxEnabled = on;
+  window.taxEnabled    = on;  // 모듈이 참조
+  const label = document.getElementById('retTaxLabel');
+  if (label) { label.textContent = on ? 'ON' : 'OFF'; label.style.color = on ? 'var(--brand-text)' : 'var(--ds-muted)'; }
+  document.getElementById('retTaxPanel').style.display = on ? 'block' : 'none';
   if (on) {
+    retExpandAdvanced();
     if (window.taxAccounts.length === 0) addTaxAccount();
     else renderTaxAccounts();
     loadRetTaxProfile();
@@ -1377,15 +1494,18 @@ function retUpdateSplitPlan(years) {
     { label: years + '년 세후 이익', value: fmtKRW(splitAfterTax),     cls: '' },
     { label: '절감액',             value: fmtKRW(saving),            cls: '' },
     { label: '최적 연수',          value: plan.optimal_years + '년 (세후 ' + fmtKRW(plan.optimal_after_tax ?? (plan.gain - plan.optimal_tax)) + ')', cls: '' },
-  ].map(item => `<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">
-      <div style="font-size:0.68rem;color:var(--text-muted);">${item.label}</div>
-      <div style="font-size:0.82rem;font-weight:800;">${item.value}</div>
+  ].map(item => `<div style="background:var(--ds-soft);border:1px solid var(--ds-hairline);border-radius:6px;padding:8px 10px;">
+      <div style="font-size:0.68rem;color:var(--ds-muted);">${item.label}</div>
+      <div style="font-size:0.82rem;font-weight:800;color:var(--ds-ink);">${item.value}</div>
     </div>`).join('');
 }
 
 function renderRetirement(data, body) {
+  retShowResults();
+  document.getElementById('retLoading').style.display       = 'none';
   document.getElementById('retResultEmpty').style.display   = 'none';
   document.getElementById('retResultContent').style.display = 'block';
+  retBuildCondSummary(body || {});
 
   // 금융소득 종합과세 분할매도 패널 (Phase 2f)
   window._retSplitSaleData = data.split_sale_plan || null;
@@ -1632,7 +1752,7 @@ async function retCopyLink() {
   } finally { btn.disabled = false; }
 }
 function retDownloadImg() {
-  if (typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
+  if (typeof html2canvas === 'undefined') { mmToast('html2canvas 로드 중입니다.', 'warn'); return; }
   retMakeCanvas().then(function(canvas) {
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');

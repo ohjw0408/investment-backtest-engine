@@ -1,5 +1,5 @@
 ---
-updated: 2026-06-19
+updated: 2026-06-20
 tags: [dev]
 ---
 
@@ -20,6 +20,8 @@ tags: [dev]
 ---
 
 ## 한 줄 요약
+
+> ✅ **2026-06-20 업데이트 102 (UX — 은퇴 설계(retirement) 디자인을 계산기/포트폴리오 분석 탭 아키타입으로 전면 이식):** 오너 지시 = "느낌만 비슷❌, 결과창·세부 디테일까지 포트폴리오 분석·투자계산기 탭 참고해 세밀·꼼꼼히 이식". `templates/retirement.html` 전면 재구성. **레이아웃**: 좌입력/우결과 2단(`.ret-layout` flex) → **전폭 중앙(`.bt-page`) + 입력뷰↔결과뷰 전환**(`retShowInput/retShowResults/retEditConditions`, 상단 ←조건수정/재실행). 입력 = `.bt-fcard`(ds-canvas·hairline·shadow·dark-el) `bt-input-grid` 영역배치(포트폴리오 전폭 / **모드별 금액·옵션 2열**(`.ret-mode-grid`) / 목표생존율 전폭 / 고급옵션 전폭). **모드 세그먼트**(은퇴 시뮬/인출기) ds pill 세그로. **고급 옵션 접기**: 가상 데이터·세금·거래수수료를 「고급 옵션 ▾」 collapse(기본 접힘, `retToggleAdvanced`, 세금/수수료 ON 시 자동 펼침). **세금·수수료** = calculator/dividend와 동일 `.bt-switch` ON/OFF + `.bt-fee-panel`(is-open). **결과**: 생존율 카드 → `.bt-hero`(생존확률 대형 모노숫자 + survival-bar + 메시지박스) + `.bt-cond` 조건요약 바(`retBuildCondSummary`), `.acc-dist-card`→`.result-card`, dist-card 3분위·sample-table·인출분포 ds화. 종목줄·검색드롭다운 calculator.css 네이티브 마크업으로. 이모지→nicon(retire/coins/search/zap/refresh/plus/repeat/trend-down/warn/link/image). 레거시토큰→ds. alert→mmToast(5곳). **모든 JS 참조 ID·렌더 로직·멀티계좌/즐겨찾기/limit_guard 배선·분할매도/세금/연금 패널 100% 보존.** multi_account_ui `?v=20260619ds2`. **검증**(로컬서버+Playwright 실클릭, ⚠️Redis 다운 → 가짜 결과 주입으로 결과뷰 렌더 확인): 입력뷰 2열(modeGrid 492×492)·모드전환·종목검색20건·2종목 비중100%·고급옵션 접힘(0)→펼침(212)·세금ON(패널+계좌1)·수수료ON(is-open)·밴드토글·**데스크톱+모바일390 오버플로우0**·결과주입→히어로92%(safe바)·조건요약8항목·축적p50 ₩5억·시나리오3행·메시지박스·뒤로가기·라이트/다크·**콘솔에러0·네이티브dialog0**. **다음=커밋·오너 ssh 배포·라이브 실시뮬 검증.** 상세 → [[디자인통일_plan]]. (Claude)
 
 > ✅ **2026-06-19 업데이트 101 (FIX — 결과 sessionStorage 전환(전 탭) + 고급옵션 슬라이드 애니 + 투자금액/옵션 카드 높이 맞춤):** 오너 라이브 3건. **① 결과 기억 = 브라우저 종료 시 소멸(전 탭):** `mm_task_*`/`mm_result_*` 저장을 `localStorage`→`sessionStorage`로 — 탭 이동·새로고침은 유지, 브라우저/탭 닫으면 소멸. calculator.js·retirement.html·dividend_target.html 전부(backtest는 #96서 기완료). 각 init에 옛 localStorage 잔재 `removeItem` 청소 추가(기존에 박힌 결과 제거). **② 고급 옵션 펼침이 "아무 반응 없어 보임"** → `.adv-body`를 `display:none`→`max-height 0↔8000px + opacity` **슬라이드 다운 트랜지션**(0.4s)으로, 캐럿 180° 회전. 클릭 시 부드럽게 내려옴(접힘 mh0·h0 → 펼침 mh8000·h208 검증). **③ 투자금액·투자옵션 카드 높이 달라 여백** → `.bt-input-grid` `align-items:start`→`stretch` + 카드 `display:flex;flex-direction:column` → 두 카드 동일 높이(383=383 검증). 캐시 `?v=20260619ds3`. **검증**(로컬 Playwright): 카드높이 동일·고급옵션 접힘→펼침 동작·캐럿회전·콘솔0. sessionStorage 동작은 라이브 실시뮬로 확인 예정. **다음=커밋·푸시·라이브 검증.** (Claude)
 

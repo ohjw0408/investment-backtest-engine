@@ -207,7 +207,7 @@ function spCategory(badge) {
 const input      = document.getElementById('searchInput');
 const resultsDiv = document.getElementById('searchResults');
 const defaultDiv = document.getElementById('spDefault');
-let timer = null, lastCodes = [], lastData = [], spSeq = 0, spPage = 1;
+let timer = null, lastCodes = [], lastItems = [], spSeq = 0, spPage = 1, spTotal = 0, spQuery = '';
 const SP_PER_PAGE = 18;
 const spActive = new Set();   // 다중선택 필터
 
@@ -251,23 +251,40 @@ function renderPopular() {
 
 function spClearInput() { input.value = ''; input.dispatchEvent(new Event('input')); input.focus(); }
 
+function spCatsParam() { return [...spActive].join(','); }
+
 function spToggle(cat) {
   if (spActive.has(cat)) spActive.delete(cat); else spActive.add(cat);
   document.querySelectorAll('.sp-chip[data-cat]').forEach(c => c.classList.toggle('active', spActive.has(c.dataset.cat)));
   document.getElementById('spReset').style.display = spActive.size ? 'inline-flex' : 'none';
-  spPage = 1;
-  if (lastData.length) renderResults();
+  if (spQuery) spFetch(1);
 }
 function spResetFilter() {
   spActive.clear();
   document.querySelectorAll('.sp-chip[data-cat]').forEach(c => c.classList.remove('active'));
   document.getElementById('spReset').style.display = 'none';
-  spPage = 1;
-  if (lastData.length) renderResults();
+  if (spQuery) spFetch(1);
+}
+
+// 서버사이드 페이지 조회(전체 결과·필터·페이지당 18)
+async function spFetch(page) {
+  if (!spQuery) return;
+  spPage = page;
+  const seq = ++spSeq;
+  resultsDiv.innerHTML = '<div class="search-hint">검색 중...</div>';
+  try {
+    const url = `/api/search?q=${encodeURIComponent(spQuery)}&page=${page}&per=${SP_PER_PAGE}&cats=${encodeURIComponent(spCatsParam())}`;
+    const r = await (await fetch(url)).json();
+    if (seq !== spSeq || input.value.trim() === '') return;   // stale/빈칸 폐기
+    lastItems = r.items || []; spTotal = r.total || 0; spPage = r.page || page;
+    renderResults();
+  } catch (e) {
+    if (seq === spSeq) resultsDiv.innerHTML = '<div class="search-hint">오류가 발생했습니다</div>';
+  }
 }
 
 // 페이지네이션: 10개 단위 그룹 + 작은화살표(이전/다음 그룹)·큰화살표(처음/끝)
-function spGoPage(pg) { spPage = pg; renderResults(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function spGoPage(pg) { spFetch(pg); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function renderPagination(total) {
   const pager = document.getElementById('spPager');
   if (total <= 1) { pager.style.display = 'none'; return; }
@@ -286,21 +303,19 @@ function renderPagination(total) {
 }
 
 function renderResults() {
-  const all = spActive.size ? lastData.filter(d => spActive.has(spCategory(d.badge))) : lastData;
-  const total = all.length;
+  const total = spTotal;
   const totalPages = Math.max(1, Math.ceil(total / SP_PER_PAGE));
-  if (spPage > totalPages) spPage = 1;
-  const data = all.slice((spPage - 1) * SP_PER_PAGE, spPage * SP_PER_PAGE);
   const cntEl = document.getElementById('spCount');
   cntEl.style.display = total ? 'block' : 'none';
   cntEl.textContent = total ? `총 ${total}개 · ${spPage}/${totalPages} 페이지` : '';
+  document.getElementById('searchControls').style.display = total ? 'flex' : 'none';
   renderPagination(totalPages);
-  if (!data.length) {
-    resultsDiv.innerHTML = '<div class="search-hint">이 필터에 맞는 결과가 없습니다</div>';
+  if (!lastItems.length) {
+    resultsDiv.innerHTML = '<div class="search-hint">' + (spActive.size ? '이 필터에 맞는 결과가 없습니다' : '검색 결과가 없습니다') + '</div>';
     return;
   }
-  lastCodes = data.map(d => d.code);
-  resultsDiv.innerHTML = '<div class="results-grid" style="max-width:900px;margin:0 auto;">' + data.map(item => {
+  lastCodes = lastItems.map(d => d.code);
+  resultsDiv.innerHTML = '<div class="results-grid" style="max-width:900px;margin:0 auto;">' + lastItems.map(item => {
     const chg = fmtChange(item.change_pct);
     const priceStr = fmtPrice(item.price, item.currency);
     const c = badgeColor(item.badge);
@@ -343,6 +358,7 @@ async function refreshSearchPrices() {
 input.addEventListener('input', () => {
   const q = input.value.trim();
   document.getElementById('spClear').style.display = q ? 'block' : 'none';
+  spQuery = q;
   if (!q) {
     clearTimeout(timer); ++spSeq;   // 대기 타이머 취소 + in-flight 응답 무효화(도배 방지)
     resultsDiv.innerHTML = '';
@@ -350,36 +366,14 @@ input.addEventListener('input', () => {
     document.getElementById('searchControls').style.display = 'none';
     document.getElementById('spPager').style.display = 'none';
     document.getElementById('spCount').style.display = 'none';
-    lastCodes = []; lastData = [];
+    lastCodes = []; lastItems = []; spTotal = 0;
     renderRecent();
     return;
   }
   defaultDiv.style.display = 'none';
   clearTimeout(timer);
   resultsDiv.innerHTML = '<div class="search-hint">검색 중...</div>';
-  const seq = ++spSeq;                                  // 요청 순번(stale 결과 폐기용)
-  timer = setTimeout(async () => {
-    try {
-      const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=300`);
-      const data = await res.json();
-      // 도배 방지: 응답 도착 시 입력이 바뀌었거나 비었으면 폐기(in-flight stale)
-      if (seq !== spSeq || input.value.trim() === '') return;
-      if (!data.length) {
-        resultsDiv.innerHTML = '<div class="search-hint">검색 결과가 없습니다</div>';
-        document.getElementById('searchControls').style.display = 'none';
-        document.getElementById('spPager').style.display = 'none';
-        document.getElementById('spCount').style.display = 'none';
-        lastData = []; lastCodes = [];
-        return;
-      }
-      lastData = data;
-      spPage = 1;
-      document.getElementById('searchControls').style.display = 'flex';
-      renderResults();
-    } catch(e) {
-      if (seq === spSeq) resultsDiv.innerHTML = '<div class="search-hint">오류가 발생했습니다</div>';
-    }
-  }, 250);
+  timer = setTimeout(() => spFetch(1), 250);
 });
 
 // 초기: 최근 + 인기

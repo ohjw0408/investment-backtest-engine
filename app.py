@@ -342,16 +342,64 @@ def alerts_page():
 # API - 검색
 # -----------------------------------------------
 
+def _search_badge_cat(badge):
+    if badge == 'KR ETF': return 'kr_etf'
+    if badge in ('KOSPI', 'KOSDAQ', 'KRX'): return 'kr_stock'
+    if badge == 'US ETF': return 'us_etf'
+    if badge in ('NASDAQ', 'NYSE'): return 'us_stock'
+    if badge == 'CRYPTO': return 'crypto'
+    return ''
+
+
+def _search_attach_prices(items):
+    """주어진 종목 리스트에 최근 종가·등락률 부착(price_daily 배치)."""
+    if not items:
+        return
+    try:
+        import sqlite3 as _sq
+        if not PRICE_DB_PATH.exists():
+            return
+        pconn = _sq.connect(str(PRICE_DB_PATH))
+        codes = [r['code'] for r in items]
+        ph = ','.join('?' * len(codes))
+        cur_rows = pconn.execute(f"""
+            SELECT p.code, p.close FROM price_daily p
+            INNER JOIN (SELECT code, MAX(date) as mx FROM price_daily
+                WHERE code IN ({ph}) AND close IS NOT NULL GROUP BY code) m
+            ON p.code=m.code AND p.date=m.mx
+        """, codes).fetchall()
+        prev_rows = pconn.execute(f"""
+            SELECT p.code, p.close FROM price_daily p
+            INNER JOIN (SELECT p2.code, MAX(p2.date) as mx2 FROM price_daily p2
+                INNER JOIN (SELECT code, MAX(date) as mx FROM price_daily
+                    WHERE code IN ({ph}) AND close IS NOT NULL GROUP BY code) m
+                ON p2.code=m.code AND p2.date < m.mx AND p2.close IS NOT NULL
+                GROUP BY p2.code) prev ON p.code=prev.code AND p.date=prev.mx2
+        """, codes).fetchall()
+        pconn.close()
+        price_map = {r[0]: r[1] for r in cur_rows}
+        prev_map  = {r[0]: r[1] for r in prev_rows}
+        for res in items:
+            cur = price_map.get(res['code']); prv = prev_map.get(res['code'])
+            res['price'] = round(cur, 2) if cur else None
+            res['change_pct'] = round((cur - prv) / prv * 100, 2) if cur and prv else None
+            res['currency'] = 'KRW' if res.get('country') == 'KR' else 'USD'
+    except Exception as e:
+        print(f"[search price] {e}")
+
+
 @app.route('/api/search')
 def search():
     q = request.args.get('q', '').strip()
+    paged = request.args.get('page') is not None
     if not q:
-        return jsonify([])
+        return jsonify({'items': [], 'total': 0, 'page': 1, 'per': 18}) if paged else jsonify([])
     try:
         try:
             _limit = max(1, min(int(request.args.get('limit', 20)), 500))
         except (TypeError, ValueError):
             _limit = 20
+        cats = [c for c in request.args.get('cats', '').split(',') if c]
         results = []
 
         # KRX 금현물 특별 처리
@@ -362,18 +410,16 @@ def search():
                 'country': 'KR', 'is_etf': False,
             })
 
-        df = info_engine.search_fuzzy(q, limit=_limit)
+        # paged면 넉넉한 universe(전체 페이지네이션용), 아니면 _limit.
+        uni = 1000 if paged else _limit
+        df = info_engine.search_fuzzy(q, limit=uni)
         if not df.empty:
             for _, row in df.iterrows():
                 if row.get('is_etf'):
                     badge = 'KR ETF' if row.get('country') == 'KR' else 'US ETF'
                 else:
                     badge = row.get('market') or row.get('country') or ''
-                subtitle = (
-                    row.get('index_name') or
-                    row.get('category') or
-                    row.get('issuer') or ''
-                )
+                subtitle = (row.get('index_name') or row.get('category') or row.get('issuer') or '')
                 results.append({
                     'code':     row['code'],
                     'name':     row['name'],
@@ -383,53 +429,26 @@ def search():
                     'is_etf':   bool(row.get('is_etf', 0)),
                 })
 
-        # 가격 배치 조회 (price_daily.db)
-        if results:
-            try:
-                import sqlite3 as _sq
-                pdb = PRICE_DB_PATH
-                if pdb.exists():
-                    pconn = _sq.connect(str(pdb))
-                    codes = [r['code'] for r in results]
-                    ph = ','.join('?' * len(codes))
-                    # 최근 종가
-                    cur_rows = pconn.execute(f"""
-                        SELECT p.code, p.close FROM price_daily p
-                        INNER JOIN (
-                            SELECT code, MAX(date) as mx FROM price_daily
-                            WHERE code IN ({ph}) AND close IS NOT NULL GROUP BY code
-                        ) m ON p.code=m.code AND p.date=m.mx
-                    """, codes).fetchall()
-                    # 전일 종가
-                    prev_rows = pconn.execute(f"""
-                        SELECT p.code, p.close FROM price_daily p
-                        INNER JOIN (
-                            SELECT p2.code, MAX(p2.date) as mx2
-                            FROM price_daily p2
-                            INNER JOIN (
-                                SELECT code, MAX(date) as mx FROM price_daily
-                                WHERE code IN ({ph}) AND close IS NOT NULL GROUP BY code
-                            ) m ON p2.code=m.code AND p2.date < m.mx AND p2.close IS NOT NULL
-                            GROUP BY p2.code
-                        ) prev ON p.code=prev.code AND p.date=prev.mx2
-                    """, codes).fetchall()
-                    pconn.close()
-                    price_map = {r[0]: r[1] for r in cur_rows}
-                    prev_map  = {r[0]: r[1] for r in prev_rows}
-                    for res in results:
-                        c = res['code']
-                        cur = price_map.get(c)
-                        prv = prev_map.get(c)
-                        res['price'] = round(cur, 2) if cur else None
-                        res['change_pct'] = round((cur - prv) / prv * 100, 2) if cur and prv else None
-                        res['currency'] = 'KRW' if res['country'] == 'KR' else 'USD'
-            except Exception as e:
-                print(f"[search price] {e}")
+        # 카테고리 다중필터(서버) — 페이지네이션과 일관
+        if cats:
+            results = [r for r in results if _search_badge_cat(r['badge']) in cats]
 
+        if paged:
+            try:
+                per = max(1, min(int(request.args.get('per', 18)), 50))
+                page = max(1, int(request.args.get('page', 1)))
+            except (TypeError, ValueError):
+                per, page = 18, 1
+            total = len(results)
+            page_items = results[(page - 1) * per: page * per]
+            _search_attach_prices(page_items)   # 보이는 페이지만 가격 조회
+            return jsonify({'items': page_items, 'total': total, 'page': page, 'per': per})
+
+        _search_attach_prices(results)
         return jsonify(results[:_limit])
     except Exception as e:
         print(f"[search] 오류: {e}")
-        return jsonify([])
+        return jsonify({'items': [], 'total': 0, 'page': 1, 'per': 18}) if request.args.get('page') is not None else jsonify([])
 
 # -----------------------------------------------
 # API - 투자 계산기 헬퍼

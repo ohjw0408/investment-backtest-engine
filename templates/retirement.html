@@ -405,11 +405,15 @@
       <section class="bt-fcard bt-full ret-target-card">
         <div class="bt-fcard-head">
           <h2 class="bt-fcard-title">목표 생존 확률</h2>
-          <span id="retTargetProbLabel" class="label-val" style="font-size:1.05rem;">50%</span>
+          <div class="input-group" style="max-width:110px;margin:0;">
+            <input type="number" id="retTargetProbInput" class="calc-input" min="0" max="100" step="1" value="50"
+              oninput="retSyncProb('input')" onblur="retClampProb()">
+            <span class="unit">%</span>
+          </div>
         </div>
-        <input type="range" id="retTargetProb" min="50" max="99" value="50" step="1"
-          class="calc-slider" oninput="document.getElementById('retTargetProbLabel').textContent=this.value+'%'">
-        <div class="slider-marks"><span>50%</span><span>70%</span><span>90%</span><span>99%</span></div>
+        <input type="range" id="retTargetProb" min="0" max="100" value="50" step="1"
+          class="calc-slider" oninput="retSyncProb('slider')">
+        <div class="slider-marks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
       </section>
 
       <!-- 고급 옵션 (가상 데이터 · 세금 · 거래수수료) -->
@@ -759,6 +763,28 @@ function retToggleAdvanced(force) {
   tog.classList.toggle('open', open);
 }
 function retExpandAdvanced() { retToggleAdvanced(true); }
+
+// ── 목표 생존 확률 슬라이더 ↔ 입력칸 동기 ──
+function retSyncProb(src) {
+  const sl  = document.getElementById('retTargetProb');
+  const inp = document.getElementById('retTargetProbInput');
+  if (src === 'input') {
+    const v = parseInt(inp.value, 10);
+    if (isNaN(v)) return;             // 타이핑 중(빈칸 등)엔 강제하지 않음 — onblur서 정리
+    sl.value = Math.max(0, Math.min(100, v));
+  } else {
+    inp.value = sl.value;
+  }
+}
+function retClampProb() {
+  const sl  = document.getElementById('retTargetProb');
+  const inp = document.getElementById('retTargetProbInput');
+  let v = parseInt(inp.value, 10);
+  if (isNaN(v)) v = 50;
+  v = Math.max(0, Math.min(100, v));
+  inp.value = v;
+  sl.value  = v;
+}
 
 // ── 결과 조건 요약 바 (포트폴리오 분석/계산기 결) ──
 function retBuildCondSummary(body) {

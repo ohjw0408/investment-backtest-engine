@@ -169,8 +169,10 @@ class WithdrawalAnalyzer:
         cost_basis:         float     = None,
         fee_rate:           float     = 0.0,     # D4 거래수수료(인출 단계 매수·매도)
         stock_tickers                 = None,    # D4 개별주식 매도세 가산 대상
+        allow_synthetic:    bool      = False,   # 합성 가격·배당 로드 여부(deep history)
     ):
         self.portfolio_engine   = portfolio_engine
+        self.allow_synthetic    = bool(allow_synthetic)
         self.fee_rate           = float(fee_rate or 0.0)
         self.stock_tickers      = stock_tickers
         self.tickers            = tickers
@@ -257,11 +259,12 @@ class WithdrawalAnalyzer:
     def _run_rolling(self) -> List[dict]:
         from multiprocessing import Pool
 
-        # 1. 전체 범위 데이터 1회 로드
+        # 1. 전체 범위 데이터 1회 로드 (allow_synthetic 시 deep 합성 가격·배당 포함)
         full_price_data, all_dates = self.portfolio_engine.price_loader.load(
             self.tickers,
             self.data_start.strftime("%Y-%m-%d"),
             self.data_end.strftime("%Y-%m-%d"),
+            allow_synthetic=self.allow_synthetic,
         )
 
         # 2. 윈도우 목록

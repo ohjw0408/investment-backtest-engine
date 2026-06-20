@@ -655,6 +655,7 @@ def run_retirement_logic(body: dict, progress_callback=None) -> dict:
             "gain_harvesting":    gain_harvesting if tax_enabled else False,
             "fee_rate":           _fee_rate,           # D4 인출 단계 거래수수료
             "stock_tickers":      _stock_tickers,
+            "allow_synthetic":    use_synthetic,       # 인출 투영도 축적과 동일 게이팅
         },
         monthly_withdrawal  = monthly_withdrawal,
         withdrawal_years    = withdrawal_years,
@@ -934,6 +935,8 @@ def run_withdrawal_logic(body: dict, progress_callback=None) -> dict:
         progress_callback  = progress_callback,
         fee_rate           = _fee_rate,           # D4
         stock_tickers      = _stock_tickers,
+        allow_synthetic    = True,                # 인출기: prep이 deep 합성 생성 → 분석기도 로드
+
     )
     result = wd_analyzer.run()
 

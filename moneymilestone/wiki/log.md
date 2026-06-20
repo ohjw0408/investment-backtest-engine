@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-21] FEAT | 은퇴 인출 시뮬을 종목별 피팅 상관 몬테카를로로 (MONTECARLO_PLAN P1)
+
+오너 sanity체크: 5억서 월300만(연 7.2%) 인출인데 하위10%도 30년후 93억·고갈 0건 → 비현실. 원인=deep history가 단일 합성 GBM 경로를 30년 윈도우로 겹쳐 잘라 "시나리오"로 위장(독립X·전부 높음).
+
+- **발견**: 종목별 mu/sigma+상관 MVN MC가 이미 `synthetic_mvn.py`에 있고 축적/계산기는 사용. **인출만 옛 단일종목**(`_get_return_stats` tickers[0]).
+- **구현(`withdrawal_analyzer.py`)**: `_run_mvn_cases` — estimate_joint_stats로 종목별 mu/sigma+상관행렬 실데이터 피팅 → 상관 반영 다변량-t **풀경로 독립 몬테카를로**(MAX_SYNTH_MU drift 캡) + 종목별 실 배당수익률(ticker_stats_cache) 분기 주입 → 인출 sim. **실 불장 suffix 앵커 안 함**(generate_joint_window=실suffix혼합이라 여전히 다 높음 → 폐기, 풀 독립 MC 채택). sim 코어 `_run_wd_case_with_data` 추출(워커·MC 공용). 게이트=`_real_data_years()<withdrawal_years`(가상체크박스 무관, 30년 투영은 실데이터만으론 불가), **윈도우 빌드보다 먼저**(SIM의 if-not-windows 조기반환 우회). `mc_paths`(인출기 200/SIM 60, 1vCPU 성능). planner wd_config·run_withdrawal_logic 배선.
+- **prod 검증(ssh 동기+라이브)**: 인출기 SCHD50/QQQ20/GLD30 5억 월300만 30년 → **생존 51%·고갈 98/200**·51s. SIM(1천만+월50만 20년→월300만 30년) → **cov 36%·생존 89.5%**·169s. 인출률↑→생존↓ 일관·현실적(7.2%=4%룰 1.8배=공격적→반반). 인출 pytest 5 passed.
+- ⚠️ SIM 169s(11샘플×60경로) — 느리면 추후 튜닝. 멀티계좌 인출·계산기/배당금 MC는 다음 단계(P2~).
+
+_작성: Claude_
+
 ## [2026-06-20] BUGFIX | 인출 배당커버리지/자산성장 0 — 진짜원인=분석기가 합성데이터 미로드 (prod ssh로 규명)
 
 오너: 인출기·은퇴시뮬 배당커버리지 계속 0%, 인출기는 자산성장도 미반영. (앞선 여러 수정에도 잔존.)

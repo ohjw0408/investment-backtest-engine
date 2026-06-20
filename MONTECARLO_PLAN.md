@@ -39,7 +39,13 @@ prod 동기 probe로 검증한 올바른 분포(독립 MC 50경로): p10 **0(고
 
 ## 작업 (단계)
 
-### P1. 은퇴 인출 — WithdrawalAnalyzer MVN 이식 (핵심)
+### ✅ P1. 은퇴 인출 — WithdrawalAnalyzer MVN 이식 (완료 2026-06-21, d413ec9·23b9e43)
+- `_run_mvn_cases`: estimate_joint_stats(종목별 mu/sigma+상관) → 상관 다변량-t 풀경로 독립 MC(drift 캡) + 종목별 실 배당수익률 분기주입 → 인출 sim. 실 불장 suffix 앵커 안 함.
+- sim 코어 `_run_wd_case_with_data` 추출(워커·MC 공용). 게이트 = `_real_data_years() < withdrawal_years`(가상체크박스 무관), **윈도우 로직보다 먼저**(SIM의 if-not-windows 조기반환 우회). mc_paths(인출기 200 / SIM 60).
+- **prod 검증**: 인출기 SCHD50/QQQ20/GLD30 5억 월300만 30년 → 생존 51%·고갈 98/200·51s. SIM(1천만+월50만 20년 적립→월300만 30년) → cov 36%·생존 89.5%·169s. 둘 다 현실적(인출률↑→생존↓ 일관). 인출 pytest 5 passed.
+- ⚠️ 잔여: SIM 169s(11샘플×60) — 느리면 P4서 mc_paths/표본 튜닝. 멀티계좌 인출 경로(multi_account_withdrawal)는 미적용.
+
+### P1(원본). 은퇴 인출 — WithdrawalAnalyzer MVN 이식 (핵심)
 - `_run_rolling`에서 실 독립 데이터 < 인출기간이면 **per-window MVN 합성** 생성 경로 추가.
   AccumulationAnalyzer 패턴(`_joint_stats` 캐시 + `generate_joint_window` 윈도우별, 폴백 독립 GBM) 미러.
 - 각 합성 윈도우 = 인출기간 길이의 독립 경로 → 기존 인출 sim(SimulationLoop/TaxableRunner) 그대로 실행 → metrics(yearly_ratios·배당·고갈) 수집.

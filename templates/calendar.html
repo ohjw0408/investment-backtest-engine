@@ -62,12 +62,14 @@
 .cal-note { font-size: 0.74rem; color: var(--gold-deep, #B26A00); background: var(--gold-pale, #FFF8E1); border-radius: var(--r-sm); padding: 8px 11px; margin-top: 6px; }
 .cal-loginnote { font-size: 0.78rem; color: var(--ds-muted); margin-top: 6px; }
 
+/* 기본(데스크톱) = 그리드, 리스트 숨김. ⚠️ media query보다 먼저 선언해야 모바일 override가 이김
+   (같은 specificity는 나중 규칙 승 — 예전엔 이게 media query 뒤라 모바일서도 리스트가 숨겨져 빈 달력이었음) */
+.cal-list { display: none; margin-top: 10px; }
 /* 모바일 = 리스트 */
 @media (max-width: 720px) {
   .cal-grid { display: none; }
   .cal-list { display: block; }
 }
-.cal-list { display: none; margin-top: 10px; }
 .cal-list-day { border: 1px solid var(--ds-hairline); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 8px; background: var(--ds-canvas); }
 .cal-list-day h4 { margin: 0 0 6px; font-size: 0.85rem; }
 .cal-list-ev { font-size: 0.78rem; padding: 3px 0; display: flex; gap: 7px; align-items: center; }

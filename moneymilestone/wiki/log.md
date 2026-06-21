@@ -1,5 +1,25 @@
 # Log
 
+## [2026-06-21] UX | 검색 서버페이지네이션·랭킹수정·캘린더동기·가로재디자인 (오너 후속2)
+
+검색·설정 추가 개편. 커밋 0c9fd59→4f5d1aa.
+
+**검색 (search.html · app.py · info_engine.py)**
+- **서버사이드 페이지네이션+필터** (e478365·4f5d1aa): `/api/search`에 page/per/cats 파라미터. paged면 전체매칭(universe 1e7=사실상 무제한)서 **서버 필터→페이지 슬라이스, 보이는 18개만 가격조회**(페이로드·성능). `page` 없으면 기존 list 반환(nav·계산기 등 호환). 프론트 `spFetch(page)` 페이지마다 재조회. ("s"=9059개·504페이지, 국내필터 61개·KOSPI/KOSDAQ).
+- **페이지네이션 UI**: 18개/페이지, 10단위 그룹 + « 처음 / ‹ 이전묶음 / 1~10 / › 다음묶음 / » 끝.
+- **랭킹 수정** (42b0b73·71e2fe5): `results[:20]` 하드코딩 슬라이스가 긴 ETF이름 잘랐음→제거. 코드(티커) prefix > 이름 prefix + 코드prefix 내 짧은코드 우선 → 티커 surfacing(sp→SPY 4위, spy→1위). 단어시작(% kw%) 티어로 ETF surfacing(삼성→KODEX삼성그룹).
+- **버그 수정** (555a181): 검색바 폭 변동(grid-column 1/-1 전폭+900 고정), 빈칸 도배(spSeq in-flight 가드), 다중선택 필터.
+
+**설정 (settings.html · base.html · app.py)**
+- **카테고리 세분화**: 세그먼트 nav(세금/홈화면/캘린더) 패널 전환.
+- **캘린더 상위↔하위 동기** (0c9fd59): 소스(내자산/포폴/관심) 체크→하위 종목 동기, 하위변경→소스 indeterminate.
+- **가로 재디자인** (0c9fd59): 세금 카드 2~3열 그리드, 캘린더 raw 체크박스→set-chk 칩 토글(세로밴드 탈피).
+
+**검증**: test_client(paged/cats/legacy)·Playwright(폭·페이지이동·국내필터·캘린더동기·세금폼·콘솔0)·스샷.
+⚠️ **로컬 검증 교훈**: 죽지않는 python이 :5000 점유해 스태일코드 서빙 → `Get-NetTCPConnection -LocalPort 5000`로 PID 잡아 죽여야 함. 이것 때문에 슬라이스 버그 늦게 잡음.
+
+_작성: Claude_
+
 ## [2026-06-21] UX | 세금 설정 편입·검색 다중필터·캘린더 칩토글 (오너 후속)
 
 - **세금 설정 → 설정 편입**(settings.html·base.html·app.py): 세금 폼(소득·ISA·연금·절세) 전체를 settings 세금 패널로 이식(toggleAccount/saveTaxSettings/loadTaxSettings, ID·`/api/settings/tax` 보존). nav·사이드바 '세금 설정' 제거. `/tax-settings`→`/settings` 302(옛 링크 호환). (61cb781)

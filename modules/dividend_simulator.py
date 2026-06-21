@@ -105,7 +105,7 @@ class DividendSimulator:
         self._account_type = account_type
         self._isa_total_limit = isa_total_limit
         self._price_cache: Dict[str, pd.DataFrame] = {}
-        self._wmcache: Dict[tuple, tuple] = {}   # (start,end)→(m_data,m_dates) 월변환 캐시(seed/monthly 무관)
+        self._monthly_full_cache = None          # 전체 일별→월별 1회 변환(역산 윈도우 슬라이스)
         self._div_stats_cache = None             # _calc_div_stats 1회 캐시(tickers만 의존)
         self._mvn_fit_cache: Dict[tuple, tuple] = {}   # MVN 피팅(mu/chol/배당) 캐시(tickers만 의존)
         self._sim_cache:   Dict[str, List[float]]   = {}
@@ -155,24 +155,46 @@ class DividendSimulator:
         start = pd.Timestamp(start_date)
         end   = start + pd.DateOffset(years=years)
 
+        # 월변환은 tickers만 의존(윈도우·seed·monthly 무관) → 전체 1회 변환 캐시 후 슬라이스.
+        # 일별슬라이스→월변환 대비 경계월(첫·끝달 부분월, 비영업일 ME) 미세차(<수%, 모든
+        # 퍼센타일 검증 통과, 오너 허용범위) — 첫 달 배당은 일별 캐시로 정확 복제해 최소화.
+        m_full, _ = self._monthly_full()
+        if not m_full:
+            return 0.0
         data = {}
         for t in self.tickers:
-            df = self._load(t)
-            if df.empty:
+            mdf = m_full.get(t)
+            if mdf is None or mdf.empty:
                 return 0.0
-            sliced = df.loc[start:end]
+            sliced = mdf.loc[start:end]
             if sliced.empty:
                 return 0.0
+            sliced = sliced.copy()
+            ddf = self._load(t)
+            first_label = sliced.index[0]
+            div_col = sliced.columns.get_loc("dividend")
+            sliced.iloc[0, div_col] = float(ddf.loc[start:first_label, "dividend"].sum())
             data[t] = sliced
 
-        return self._simulate_from_data(data, seed, monthly, years, end,
-                                        window_key=(start, end))
+        return self._simulate_from_data(data, seed, monthly, years, end, already_monthly=True)
 
-    def _simulate_from_data(self, data, seed, monthly, years, end, window_key=None) -> float:
+    def _monthly_full(self):
+        """전 종목 일별 → 월별(to_monthly_price_data) 1회 변환 캐시 → (m_data, m_dates)."""
+        if self._monthly_full_cache is None:
+            from modules.simulation.monthly_mode import to_monthly_price_data
+            daily = {}
+            for t in self.tickers:
+                df = self._load(t)
+                if not df.empty:
+                    daily[t] = df
+            self._monthly_full_cache = to_monthly_price_data(daily) if daily else ({}, [])
+        return self._monthly_full_cache
+
+    def _simulate_from_data(self, data, seed, monthly, years, end, already_monthly=False) -> float:
         """주입된 가격데이터(실측 슬라이스 또는 MVN 합성)로 1윈도우 시뮬.
 
-        data = {ticker: df[close,dividend] (일별, date index)}, end = pd.Timestamp.
-        window_key 주어지면 월변환 결과를 (start,end)로 캐시(seed/monthly 무관 → 역산 재사용).
+        data = {ticker: df (date index)}, end = pd.Timestamp.
+        already_monthly=True면 data가 이미 월별(전체월별 캐시 슬라이스) → to_monthly 스킵.
         _simulate_one의 본체를 추출(실측·MVN 합성 공용). 반환 = 마지막 1년 순배당 합계.
         """
         from modules.config.simulation_config import SimulationConfig
@@ -187,14 +209,11 @@ class DividendSimulator:
         from modules.simulation.monthly_mode import to_monthly_price_data, last_year_dividend
         from modules.rebalance.periodic import PeriodicRebalance
 
-        # 월변환(resample)은 seed/monthly 무관·(start,end)만 의존 → 역산이 같은 윈도우를
-        # 여러 seed/monthly로 재평가할 때 캐시 재사용(결과 불변: 동일 to_monthly 출력 메모이즈).
-        if window_key is not None and window_key in self._wmcache:
-            m_data, m_dates = self._wmcache[window_key]
+        if already_monthly:
+            m_data = data
+            m_dates = sorted(next(iter(data.values())).index) if data else []
         else:
             m_data, m_dates = to_monthly_price_data(data)
-            if window_key is not None:
-                self._wmcache[window_key] = (m_data, m_dates)
         # 종목별 시작 시차 → 전 종목 유효한 첫 월부터 (leading NaN 가격 오염 방지)
         valid_froms = [df["close"].first_valid_index() for df in m_data.values()]
         if any(v is None for v in valid_froms):

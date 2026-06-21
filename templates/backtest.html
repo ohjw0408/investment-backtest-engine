@@ -547,15 +547,15 @@
       <!-- 포트폴리오 가치 차트 -->
       <div class="bt-card">
         <div class="bt-card-title"><span class="bt-ico">{{ nicon('trend-up') }}</span> 포트폴리오 가치 추이
-          <span style="font-weight:400;color:var(--ds-muted);font-size:0.74rem;">· 그래프를 가로로 드래그하면 그 구간 종목 기여 지분</span>
+          <span style="font-weight:400;color:var(--ds-muted);font-size:0.74rem;">· 그래프를 가로로 드래그하면 그 구간 상승 참여 · 하락 방어</span>
         </div>
         <div class="bt-chart-wrap"><canvas id="btValueChart"></canvas></div>
       </div>
 
-      <!-- 구간 기여 분석 -->
+      <!-- 구간 상승 참여 · 하락 방어 (비중 무관) -->
       <div class="bt-card" id="btAttrCard" style="display:none;">
         <div class="bt-card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-          <span style="display:inline-flex;align-items:center;gap:8px;"><span class="bt-ico">{{ nicon('puzzle') }}</span> 구간 기여 지분 <span id="btAttrRange" style="font-weight:400;color:var(--ds-muted);font-size:0.76rem;"></span></span>
+          <span style="display:inline-flex;align-items:center;gap:8px;"><span class="bt-ico">{{ nicon('puzzle') }}</span> 구간 상승 참여 · 하락 방어 <span id="btAttrRange" style="font-weight:400;color:var(--ds-muted);font-size:0.76rem;"></span></span>
           <button onclick="btAttrReset()" class="ds-btn ds-btn-secondary ds-btn-sm">구간 해제</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
@@ -1604,7 +1604,7 @@ function renderValueChart(history) {
       attrCard.style.display = '';
       const s = document.getElementById('btAttrStart'), e = document.getElementById('btAttrEnd');
       if (s && e) { s.min = e.min = labels[0]; s.max = e.max = labels[labels.length-1]; s.value = labels[0]; e.value = labels[labels.length-1]; }
-      document.getElementById('btAttrBody').innerHTML = '<div style="color:var(--ds-muted);font-size:0.85rem;">위 가치 추이 또는 아래 낙폭 그래프를 가로로 드래그하거나, 날짜를 골라 구간을 정하면 종목별 기여 지분이 나와요.</div>';
+      document.getElementById('btAttrBody').innerHTML = '<div style="color:var(--ds-muted);font-size:0.85rem;">위 가치 추이 또는 아래 낙폭 그래프를 가로로 드래그하거나, 날짜를 골라 구간을 정하면 종목별 상승 참여율·하락 방어율이 나와요.</div>';
       document.getElementById('btAttrRange').textContent = '';
     } else {
       attrCard.style.display = 'none';
@@ -1673,7 +1673,7 @@ async function btAttrAnalyze(start, end) {
   if (si) si.value = start; if (ei) ei.value = end;
   bodyEl.innerHTML = '<div style="color:var(--ds-muted);font-size:0.85rem;padding:10px;">계산 중…</div>';
   try {
-    const j = await (await fetch('/api/attribution/window', {
+    const j = await (await fetch('/api/attribution/capture', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tickers: btTickers.map(t => ({ code: t.code, weight: t.weight })), start, end })
     })).json();
@@ -1683,31 +1683,46 @@ async function btAttrAnalyze(start, end) {
 }
 
 function btAttrRender(a) {
-  const rows = (a.rows || []).filter(r => isFinite(r.contrib));
-  const port = a.port_return;
-  // 가격 이상치(데이터 갭 등)로 수익률이 비현실적이면 숫자 대신 안내(왜곡 방지).
-  if (!isFinite(port) || Math.abs(port) > 1000 || rows.some(r => Math.abs(r.contrib) > 1000)) {
+  // 비중 무관 상승 참여율 / 하락 방어율(포착률). 내자산·계산기와 동일 기준.
+  const A = a.assets || {}, nm = a.names || {};
+  const codes = Object.keys(A);
+  if (!codes.length) {
     document.getElementById('btAttrBody').innerHTML =
-      '<div style="color:var(--ds-muted);font-size:0.85rem;padding:10px;">이 구간은 가격 데이터에 이상치가 있어 기여 지분을 표시할 수 없어요. 다른 구간을 선택해보세요.</div>';
+      '<div style="color:var(--ds-muted);font-size:0.85rem;padding:10px;">이 구간 데이터가 부족해요.</div>';
     return;
   }
-  const maxAbs = Math.max(...rows.map(r => Math.abs(r.contrib)), 0.0001);
-  let html = `<div style="font-size:0.82rem;color:var(--ds-muted);margin-bottom:10px;">선택 구간 포트폴리오 수익 합 <b style="color:${port>=0?'var(--up)':'var(--down)'}">${port>=0?'+':''}${port.toFixed(1)}%p</b> · 막대=기여, %=지분</div>`;
-  html += rows.map(r => {
-    const pos = r.contrib >= 0;
-    const w = Math.abs(r.contrib) / maxAbs * 50; // 좌우 각 50%
-    const col = pos ? 'var(--up)' : 'var(--down)';
-    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.84rem;">
-      <span style="width:88px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${btE(r.name)}">${btE(r.name)}</span>
-      <div style="flex:1;display:flex;align-items:center;height:18px;">
-        <div style="width:50%;display:flex;justify-content:flex-end;"><div style="height:14px;border-radius:3px 0 0 3px;background:${pos?'transparent':col};width:${pos?0:w}%;"></div></div>
-        <div style="width:1px;height:18px;background:var(--ds-hairline);"></div>
-        <div style="width:50%;"><div style="height:14px;border-radius:0 3px 3px 0;background:${pos?col:'transparent'};width:${pos?w:0}%;"></div></div>
-      </div>
-      <span style="width:62px;flex-shrink:0;text-align:right;font-weight:700;color:${col};">${pos?'+':''}${r.contrib.toFixed(1)}%p</span>
-      <span style="width:48px;flex-shrink:0;text-align:right;color:var(--ds-muted);font-size:0.78rem;">${Math.round(Math.abs(r.share))}%</span>
-    </div>`;
-  }).join('');
+  const grn = 'var(--up)', red = 'var(--down)', mut = 'var(--ds-muted)';
+  // 하락 방어 잘하는 순(down_capture 작을수록 위)
+  codes.sort((x, y) => (A[x].down_capture ?? 9) - (A[y].down_capture ?? 9));
+
+  const upCell = u => {
+    if (u.up_capture == null) return '—';
+    const c = u.up_capture >= 1 ? grn : mut;
+    return `<span style="color:${c};font-weight:700;">${u.up_capture.toFixed(2)}배</span>`
+      + `<div style="font-size:0.72rem;color:${mut};">하루 평균 +${u.up_ret.toFixed(2)}%</div>`;
+  };
+  const dnCell = d => {
+    if (d.down_capture == null) return '—';
+    let label, col;
+    if (d.down_capture < 0) { label = '헤지 ↑'; col = grn; }
+    else if (d.down_capture < 1) { label = d.down_capture.toFixed(2) + '배'; col = grn; }
+    else { label = d.down_capture.toFixed(2) + '배'; col = red; }
+    return `<span style="color:${col};font-weight:700;">${label}</span>`
+      + `<div style="font-size:0.72rem;color:${mut};">하루 평균 ${d.down_ret >= 0 ? '+' : ''}${d.down_ret.toFixed(2)}%</div>`;
+  };
+
+  let html = `<div style="font-size:0.78rem;color:${mut};margin-bottom:8px;">분석 구간 ${a.period[0]} ~ ${a.period[1]} · 상승 ${a.n_up}일 / 하락 ${a.n_down}일</div>`;
+  html += `<table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+    <tr style="color:${mut};font-size:0.76rem;text-align:right;">
+      <th style="text-align:left;padding:6px 4px;">종목</th>
+      <th style="padding:6px 4px;">📈 상승 참여율</th>
+      <th style="padding:6px 4px;">🛡️ 하락 방어율</th></tr>`;
+  html += codes.map(c => `<tr style="border-top:1px solid var(--ds-hairline);text-align:right;">
+      <td style="text-align:left;padding:7px 4px;font-weight:700;">${btE(nm[c] || c)}<div style="font-size:0.72rem;color:${mut};font-weight:400;">${btE(c)}</div></td>
+      <td style="padding:7px 4px;">${upCell(A[c])}</td>
+      <td style="padding:7px 4px;">${dnCell(A[c])}</td>
+    </tr>`).join('');
+  html += `</table><div style="font-size:0.72rem;color:${mut};margin-top:8px;">비중과 무관 · 참여율 = 포폴 1%↑ 때 이 종목 X%↑ · 방어율 = 포폴 1%↓ 때 이 종목 X%↓ (작을수록·음수일수록 방어 ↑)</div>`;
   document.getElementById('btAttrBody').innerHTML = html;
 }
 
@@ -1715,7 +1730,7 @@ function btAttrReset() {
   if (btCharts.value && btCharts.value.resetZoom) btCharts.value.resetZoom();
   if (btCharts.drawdown && btCharts.drawdown.resetZoom) btCharts.drawdown.resetZoom();
   document.getElementById('btAttrRange').textContent = '';
-  document.getElementById('btAttrBody').innerHTML = '<div style="color:var(--ds-muted);font-size:0.85rem;">위 가치 추이 또는 아래 낙폭 그래프를 가로로 드래그하거나, 날짜를 골라 구간을 정하면 종목별 기여 지분이 나와요.</div>';
+  document.getElementById('btAttrBody').innerHTML = '<div style="color:var(--ds-muted);font-size:0.85rem;">위 가치 추이 또는 아래 낙폭 그래프를 가로로 드래그하거나, 날짜를 골라 구간을 정하면 종목별 상승 참여율·하락 방어율이 나와요.</div>';
 }
 
 function btE(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }

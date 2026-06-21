@@ -1280,8 +1280,10 @@ def attribution_capture():
             weights[c] = float(t.get('weight') or 0)
     if len(codes) < 2:
         return jsonify({'ok': False, 'reason': 'need 2+ tickers'})
+    start, end = body.get('start'), body.get('end')
     from modules import attribution
-    res = attribution.analyze_capture(portfolio_engine.loader, codes, weights)
+    res = attribution.analyze_capture(portfolio_engine.loader, codes, weights,
+                                      start=start, end=end)
     if not res:
         return jsonify({'ok': False, 'reason': 'no_data'})
     names = _resolve_names(codes)

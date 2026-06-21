@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-21] FIX | 포트폴리오 분석(백테) 구간 카드 — 방어력 비중 제거 (오너)
+
+- **증상**: "구간 기여 지분" 카드가 `analyze_window`(비중×수익 가법분해)로 방어를 표시 → SCHD가 QQQ보다 비중 크면 하락 기여 막대가 커서 "더 위험"하게 보임. 내자산·계산기는 `analyze_capture`(비중 무관 포착률)라 정상.
+- **수정**: 백테 구간 카드를 `/api/attribution/capture`(start/end 인자 추가)로 라우팅 → 계산기와 동일한 상승 참여율/하락 방어율(`up_capture`/`down_capture`) 표로 렌더. 카드 제목/안내문 "기여 지분"→"상승 참여·하락 방어(비중 무관)". `btAttrRender` 다이버징 막대→참여/방어율 테이블 교체.
+- **검증**: test_attribution.py 17 PASS(80/20 가중치서도 DEF down_capture<GRW 불변). 라이브 API: SCHD 80%여도 down_cap 0.97<QQQ 1.12(방어 우위). Playwright DOM 스모크(tests/check_bt_attr_capture.js) 4 PASS + 라이트/다크 스샷 육안.
+- ⚠️ `analyze_window`/`/api/attribution/window`는 이제 프론트 미사용(고아). 테스트 잔존이라 미삭제 — 오너 결정.
+
+_작성: Claude_
+
 ## [2026-06-21] FEAT | 간편 계산기 — 배당 월배당 그래프 + 배당 목표 역산 탭(등위선) (오너)
 
 - **배당 재투자 그래프**(80b0b80): 결과축 평가액→**월 배당금(명목/실질)** 2라인. yearly에 monthlyDiv·monthlyDivReal 추가.

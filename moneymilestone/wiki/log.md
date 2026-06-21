@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-22] FEAT | 출시 선결 — 보안 + 법적(약관·개인정보·동의·탈퇴) (오너)
+
+- **플랜 2종 작성**: `LAUNCH_LEGAL_SECURITY_PLAN.md`(법적#1+보안#3), `MONETIZATION_PLAN.md`(수익화#5, 별도·미착수).
+- **보안**(app.py·requirements): ProxyFix `x_for=1`(실IP 복원), 쿠키 HttpOnly+Secure(prod env 게이팅), SECRET_KEY 기본값이면 prod 기동 거부, 보안헤더(X-Frame·nosniff·Referrer·HSTS·**CSP** 허용=cdnjs·unpkg·gfonts), **flask-limiter**(redis db/1·swallow_errors: 무거운 시뮬 12/분·search 60·attribution 30·정적제외·키 user_id/IP), **CSRF**(상태변경 Origin≠host→403). 검증: 헤더·CSP(차트 콘솔0)·CSRF(same200/cross403/no-origin200).
+- **법적**(app.py·auth_manager·base·legal/*·settings): /terms·/privacy 페이지, 가입 동의 게이트(users.agreed_*_at 마이그레이션, 미동의→/consent, API 403), 회원탈퇴 /account/delete(holdings·groups·portfolios·settings·alerts·users 전삭제), 전역 footer(면책·링크). 검증(mint_session): 미동의→302, 동의 후 정상, 탈퇴 후 DB user 레코드 0, 콘솔0, 라이트 렌더 OK.
+- ⚠️ **오너 입력 필요**: 운영주체/대표/연락처(약관), 개인정보 보호책임자 연락처(개인정보). **prod env**: FLASK_ENV=production, FLASK_SECRET_KEY(강한값), redis. **법무검토**: 유사투자자문 규제선(카피).
+- 커밋: 보안(7846d0c)·법적(직후). **미푸시 — 오너 확인 후 push.**
+
+_작성: Claude_
+
 ## [2026-06-21] PERF | 병목은 상태기계 아닌 pandas 인덱싱 — FX·dates·배당레코더 (오너)
 
 - **계획 전복**: cProfile 결과 병목이 경로의존 상태기계(VECTORIZATION_PLAN P1~P4 대상)가 **아니라 pandas 인덱싱**. 골든 마스터(P0)로 결과 불변 게이트하며 저위험 최적화로 큰 효과. 위험한 경로축 벡터화 불필요 판명.

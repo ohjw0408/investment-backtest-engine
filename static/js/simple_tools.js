@@ -178,10 +178,11 @@ function stHexA(hex, a) {
   return `rgba(${parseInt(n.slice(0,2),16)},${parseInt(n.slice(2,4),16)},${parseInt(n.slice(4,6),16)},${a})`;
 }
 
-function stDrawChart(canvasId, labels, datasets) {
+function stDrawChart(canvasId, labels, datasets, yFmt) {
   if (typeof Chart === 'undefined') return;   // jsdom 등 차트 없는 환경
   const el = document.getElementById(canvasId);
   if (!el) return;
+  const fmt = yFmt || stFmtKRW;   // 기본 KRW, 배당목표 등은 년수 포맷 주입
   if (stCharts[canvasId]) stCharts[canvasId].destroy();
   stCharts[canvasId] = new Chart(el, {
     type: 'line',
@@ -192,10 +193,10 @@ function stDrawChart(canvasId, labels, datasets) {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { labels: { font: { size: 11 } } },
-        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + stFmtKRW(c.parsed.y) } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + (c.parsed.y == null ? '미달' : fmt(c.parsed.y)) } },
       },
       scales: {
-        y: { ticks: { callback: v => stFmtKRW(v), font: { size: 10 } } },
+        y: { ticks: { callback: v => fmt(v), font: { size: 10 } } },
         x: { ticks: { font: { size: 10 } } },
       },
     },
@@ -287,6 +288,51 @@ function stRenderDividend() {
   ]);
 }
 
+/** 배당 목표 역산 — 주어진 (초기금, 월적립)으로 목표 월배당 달성 첫 년수. 미달이면 null. */
+function stDivGoalYears(base, initial, monthly, target, basis) {
+  const r = stDividendReinvest({ ...base, initial, monthly, years: 70 });
+  for (const y of r.yearly) {
+    const md = basis === 'real' ? y.monthlyDivReal : y.monthlyDiv;
+    if (md >= target) return y.year;
+  }
+  return null;
+}
+
+function stRenderDividendGoal() {
+  const base = {
+    annualIncrease: stNum('stDgIncrease', 0) / 100,
+    divYield: stNum('stDgYield', 0) / 100,
+    divGrowth: stNum('stDgGrowth', 0) / 100,
+    frequency: (document.querySelector('input[name="stDgFreq"]:checked') || {}).value || 'quarterly',
+    taxed: stChecked('stDgTaxed'),
+    inflation: stNum('stDgInflation', 0) / 100,
+  };
+  const target = stNum('stDgTarget', 0);
+  const basis  = (document.querySelector('input[name="stDgBasis"]:checked') || {}).value || 'nominal';
+
+  // 축: 가로 = 월 적립액, 선 = 초기 투자금
+  const monthlys = [0, 250000, 500000, 750000, 1000000, 1500000, 2000000, 3000000];
+  const initials = [0, 50000000, 100000000, 200000000, 300000000, 500000000];
+  const palette = ['#0052ff', '#05b169', '#7B1FA2', '#E8830C', '#C62828', '#0097A7'];
+
+  const datasets = initials.map((init, i) => ({
+    label: '초기 ' + stFmtKRW(init),
+    data: monthlys.map(m => stDivGoalYears(base, init, m, target, basis)),
+    borderColor: palette[i % palette.length],
+    backgroundColor: 'transparent',
+    pointRadius: 3, borderWidth: 2, spanGaps: false, tension: 0.2,
+  }));
+  stDrawChart('stDgChart', monthlys.map(m => stFmtKRW(m)), datasets, v => Math.round(v) + '년');
+
+  // 표: 행 = 초기금, 열 = 월적립, 값 = 년수
+  const head = '<tr><th>초기금 \\ 월적립</th>' + monthlys.map(m => `<th>${stFmtKRW(m)}</th>`).join('') + '</tr>';
+  const rows = initials.map((init, i) =>
+    `<tr><td>${stFmtKRW(init)}</td>` +
+    datasets[i].data.map(v => `<td>${v == null ? '—' : v + '년'}</td>`).join('') + '</tr>'
+  ).join('');
+  document.getElementById('stDgTable').innerHTML = head + rows;
+}
+
 // ───────────────────────── 초기화 ─────────────────────────
 
 function stInit() {
@@ -304,6 +350,7 @@ function stInit() {
   wire('stPanel-inflation', stRenderInflation);
   wire('stPanel-realvalue', stRenderRealValue);
   wire('stPanel-dividend', stRenderDividend);
+  wire('stPanel-dividendgoal', stRenderDividendGoal);
   stSwitchTab('compound');
 }
 

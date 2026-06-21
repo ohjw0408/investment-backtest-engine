@@ -56,6 +56,7 @@
   <div class="st-tabs">
     <button class="st-tab-btn active" data-tab="compound">복리 계산기</button>
     <button class="st-tab-btn" data-tab="dividend">배당 재투자</button>
+    <button class="st-tab-btn" data-tab="dividendgoal">배당 목표 역산</button>
     <button class="st-tab-btn" data-tab="inflation">인플레 생활비</button>
     <button class="st-tab-btn" data-tab="realvalue">실질 구매력</button>
   </div>
@@ -166,6 +167,57 @@
     </div>
   </div>
 
+  <!-- ===== 배당 목표 역산 (등위선) ===== -->
+  <div class="st-panel st-panel-box" id="stPanel-dividendgoal" style="display:none;">
+    <div class="st-input-grid">
+      <div class="st-field">
+        <label>목표 월 배당금</label>
+        <div class="input-group"><input type="number" id="stDgTarget" class="calc-input" value="1000000" min="0" step="100000"><span class="unit">원</span></div>
+      </div>
+      <div class="st-field">
+        <label>배당수익률 (시가)</label>
+        <div class="input-group"><input type="number" id="stDgYield" class="calc-input" value="3.5" min="0" max="30" step="0.1"><span class="unit">%</span></div>
+      </div>
+      <div class="st-field">
+        <label>배당성장률 (연)</label>
+        <div class="input-group"><input type="number" id="stDgGrowth" class="calc-input" value="8" min="-10" max="30" step="0.5"><span class="unit">%</span></div>
+      </div>
+      <div class="st-field">
+        <label>적립액 연증액률</label>
+        <div class="input-group"><input type="number" id="stDgIncrease" class="calc-input" value="0" min="0" max="30" step="1"><span class="unit">%</span></div>
+      </div>
+      <div class="st-field">
+        <label>인플레이션</label>
+        <div class="input-group"><input type="number" id="stDgInflation" class="calc-input" value="2.5" min="0" max="20" step="0.5"><span class="unit">%</span></div>
+      </div>
+      <div class="st-field">
+        <label>배당 기준</label>
+        <div class="st-radio-row">
+          <label style="margin:0;display:flex;align-items:center;gap:4px;"><input type="radio" name="stDgBasis" value="nominal" checked> 명목</label>
+          <label style="margin:0;display:flex;align-items:center;gap:4px;"><input type="radio" name="stDgBasis" value="real"> 실질</label>
+        </div>
+      </div>
+      <div class="st-field">
+        <label>배당 주기</label>
+        <div class="st-radio-row">
+          <label style="margin:0;display:flex;align-items:center;gap:4px;"><input type="radio" name="stDgFreq" value="quarterly" checked> 분기</label>
+          <label style="margin:0;display:flex;align-items:center;gap:4px;"><input type="radio" name="stDgFreq" value="monthly"> 월배당</label>
+        </div>
+      </div>
+      <div class="st-toggle-row">
+        <input type="checkbox" id="stDgTaxed" checked><label for="stDgTaxed" style="margin:0;">배당소득세 (15.4%)</label>
+      </div>
+    </div>
+
+    <div class="st-chart-box"><canvas id="stDgChart"></canvas></div>
+    <div class="st-table-wrap"><table class="st-table" id="stDgTable"></table></div>
+    <div class="st-note">
+      각 선 = 초기 투자금. 가로축 = 월 적립액. 세로축 = 목표 월 배당금 달성까지 걸리는 기간(년).
+      같은 높이를 잇는 등위선이에요 — 초기금이 많을수록·적립이 클수록 빨리 달성. 70년 내 미달은 표시 안 돼요.
+      배당 재투자와 같은 가정 모델(주가=배당성장률 상승). 실데이터 역산은 <a href="/dividend-target">배당금 계산기</a>.
+    </div>
+  </div>
+
   <!-- ===== 인플레 생활비 ===== -->
   <div class="st-panel st-panel-box" id="stPanel-inflation" style="display:none;">
     <div class="st-input-grid">
@@ -221,5 +273,5 @@
 
 </div>
 
-<script src="{{ url_for('static', filename='js/simple_tools.js') }}?v=20260621divmon"></script>
+<script src="{{ url_for('static', filename='js/simple_tools.js') }}?v=20260621divgoal2"></script>
 {% endblock %}

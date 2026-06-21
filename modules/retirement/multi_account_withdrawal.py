@@ -353,7 +353,7 @@ def _build_household_mvn(price_data: dict) -> dict:
 
     k = len(tickers)
     L = min(len(mret[t]) for t in tickers)
-    if L >= 12:
+    if k >= 2 and L >= 12:   # 단일종목(k=1)은 corrcoef가 0-d → eye 사용
         M = np.column_stack([mret[t][-L:] for t in tickers])   # tail 정렬
         corr = np.nan_to_num(np.corrcoef(M, rowvar=False), nan=0.0)
         np.fill_diagonal(corr, 1.0)

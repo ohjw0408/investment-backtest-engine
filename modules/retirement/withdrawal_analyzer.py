@@ -590,12 +590,12 @@ class WithdrawalAnalyzer:
         mu_d = np.minimum(mu_raw, MAX_SYNTH_MU_MONTHLY / TRADING_DAYS_PER_MONTH)  # 일일 drift 상한
 
         aligned = pd.DataFrame({c: rets[c] for c in self.tickers}).dropna()
-        if len(aligned) >= 120:
+        if k >= 2 and len(aligned) >= 120:   # 단일종목(k=1)은 corrcoef가 0-d → eye 사용
             corr = np.corrcoef(aligned.values, rowvar=False)
             corr = np.nan_to_num(corr, nan=0.0)
             np.fill_diagonal(corr, 1.0)
         else:
-            corr = np.eye(k)                                  # 겹침 부족 → 독립 가정
+            corr = np.eye(k)                                  # 겹침 부족/단일종목 → 독립 가정
         cov_d = np.outer(sig, sig) * corr
         try:
             chol = np.linalg.cholesky(cov_d + np.eye(k) * 1e-12)

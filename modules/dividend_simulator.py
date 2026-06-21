@@ -545,7 +545,7 @@ class DividendSimulator:
             mu_d = np.minimum(mu_raw, MAX_SYNTH_MU_MONTHLY / TRADING_DAYS_PER_MONTH)
 
             aligned = pd.DataFrame({c: rets[c] for c in self.tickers}).dropna()
-            if len(aligned) >= 120:
+            if k >= 2 and len(aligned) >= 120:   # 단일종목(k=1)은 corrcoef가 0-d → eye 사용
                 corr = np.corrcoef(aligned.values, rowvar=False)
                 corr = np.nan_to_num(corr, nan=0.0)
                 np.fill_diagonal(corr, 1.0)

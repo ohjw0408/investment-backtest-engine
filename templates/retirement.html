@@ -49,7 +49,7 @@
 .ret-mode-grid > .bt-fcard { margin-bottom: 0; min-width: 0; display: flex; flex-direction: column; }
 @media (max-width: 900px) {
   .bt-input-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "assets" "modes" "target" "advanced";
   }
   .ret-mode-grid { grid-template-columns: 1fr; }

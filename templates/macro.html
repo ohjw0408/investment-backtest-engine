@@ -14,6 +14,13 @@
 .mc-toggle { display: inline-flex; gap: 2px; background: var(--ds-strong); border: 1px solid var(--ds-hairline); border-radius: var(--r-pill); padding: 3px; margin-top: 14px; }
 .mc-toggle button { border: none; background: none; padding: 7px 16px; border-radius: var(--r-pill); font-size: 0.85rem; font-weight: 600; color: var(--ds-muted); cursor: pointer; font-family: var(--font-sans); }
 .mc-toggle button.on { background: var(--brand); color: var(--on-brand); }
+@media (max-width: 640px) {
+  /* 탭 7개가 좁은 화면에서 세로로 깨지고 삐져나옴 → 가로 스크롤(스와이프)로 폭 유지 */
+  .mc-toggle { display: flex; flex-wrap: nowrap; max-width: 100%; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .mc-toggle::-webkit-scrollbar { display: none; }
+  .mc-toggle button { flex: 0 0 auto; white-space: nowrap; padding: 7px 13px; }
+}
 
 /* 카테고리 섹션 */
 .mc-cat { margin-top: 22px; }

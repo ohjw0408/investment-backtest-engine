@@ -35,7 +35,7 @@
 .bt-options-card { grid-area: options; }
 @media (max-width: 900px) {
   .bt-input-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "assets" "money" "options" "advanced";
   }
   .bt-full { grid-column: auto; }

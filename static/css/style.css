@@ -834,6 +834,9 @@ img, canvas, svg, video { max-width: 100%; }
   }
   /* 자식 min-content가 트랙을 밀어내며 가로 스크롤 만드는 것 방지 */
   .main-content > * { min-width: 0; max-width: 100%; }
+  /* 즐겨찾기 바(저장 포폴 드롭다운+저장/삭제): 좁은 화면선 카드 머리 한 줄 전체 차지 →
+     fav-select(flex:1)가 줄어들어 카드 밖 오버플로 방지 */
+  #favBar { flex: 1 1 100%; width: 100%; min-width: 0; }
   .right-panel { grid-column: 1; grid-row: auto; }
   .portfolio-card { grid-column: 1; }
   .market-card { grid-column: 1; }

@@ -47,11 +47,91 @@ from modules.rebalance.periodic import PeriodicRebalance
 from modules.market_quote_service import MarketQuoteService
 
 app = Flask(__name__)
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+# x_for=1 추가: 리버스 프록시 뒤에서 실제 클라이언트 IP 복원(rate limit·로그 정확). 없으면
+# remote_addr가 프록시 IP로 고정돼 IP 기반 제한이 전원 한 버킷으로 뭉개짐.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key')
 import datetime as _dt_mod
 app.config['PERMANENT_SESSION_LIFETIME'] = _dt_mod.timedelta(days=30)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+
+# prod(HTTPS)에서만 Secure 쿠키 — 로컬 http 개발이 깨지지 않게 env로 게이팅.
+# 배포 환경에 FLASK_ENV=production (또는 COOKIE_SECURE=1) 설정 필요.
+IS_PROD = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('COOKIE_SECURE') == '1'
+app.config['SESSION_COOKIE_SECURE'] = IS_PROD
+if IS_PROD and app.secret_key == 'dev-secret-key':
+    raise RuntimeError(
+        'prod인데 FLASK_SECRET_KEY가 기본값(dev-secret-key) — 세션 위조 가능. 환경변수 설정 필요.'
+    )
+
+# 외부 의존 호스트(CSP 허용목록): 스크립트=cdnjs·unpkg, 스타일=google fonts, 폰트=gstatic.
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data: https:; "
+    "connect-src 'self'; "
+    "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self' https://accounts.google.com"
+)
+
+
+@app.before_request
+def _csrf_origin_check():
+    """CSRF 1차 방어 — 상태변경 요청(POST/PUT/DELETE/PATCH)의 Origin/Referer가
+    서비스 호스트와 다르면 차단. SameSite=Lax 쿠키와 함께 cross-site 위조 요청을 막는다.
+    Origin/Referer 없는 비브라우저 요청은 통과(브라우저 CSRF 대상 아님)."""
+    if request.method in ('POST', 'PUT', 'DELETE', 'PATCH'):
+        src = request.headers.get('Origin') or request.headers.get('Referer') or ''
+        if src:
+            from urllib.parse import urlparse
+            netloc = urlparse(src).netloc
+            if netloc and netloc != request.host:
+                return jsonify({'error': 'cross-origin 요청이 차단되었습니다.'}), 403
+
+
+@app.after_request
+def _security_headers(resp):
+    """기본 보안 헤더. 클릭재킹·MIME스니핑·레퍼러 누수 방지 + HSTS(prod) + CSP."""
+    resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    resp.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    resp.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    resp.headers.setdefault('Content-Security-Policy', _CSP)
+    if IS_PROD:
+        resp.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    return resp
+
+
+# ── Rate limiting ─────────────────────────────────────────────
+# 무거운 시뮬(MC·역산)을 소수가 두드려 1vCPU 박스를 다운시키는 것 차단.
+# 키 = 로그인 사용자는 user_id, 비로그인은 실제 IP(ProxyFix x_for로 복원).
+# 저장 = redis db/1(celery는 db/0). redis 장애 시 swallow_errors로 fail-open(서비스 우선).
+from flask_limiter import Limiter
+
+
+def _rl_key():
+    uid = session.get('user_id')
+    return f"u:{uid}" if uid else (request.remote_addr or '?')
+
+
+limiter = Limiter(
+    key_func=_rl_key,
+    app=app,
+    storage_uri=os.environ.get('RATELIMIT_STORAGE_URI', 'redis://localhost:6379/1'),
+    default_limits=["600 per minute"],   # 일반 페이지/조회용 넉넉한 안전망
+    strategy="fixed-window",
+    swallow_errors=True,
+)
+
+
+@limiter.request_filter
+def _rl_exempt_static():
+    return request.endpoint == 'static'
+
+
+# 무거운 엔드포인트 공용 제한(시뮬 실행류). 데코레이터로 각 라우트에 부착.
+HEAVY_LIMIT = "12 per minute"
 
 
 @app.after_request
@@ -389,6 +469,7 @@ def _search_attach_prices(items):
 
 
 @app.route('/api/search')
+@limiter.limit("60 per minute")
 def search():
     q = request.args.get('q', '').strip()
     paged = request.args.get('page') is not None
@@ -609,6 +690,7 @@ def _run_calculator_logic(body: dict, progress_callback=None) -> dict:
 
 
 @app.route('/api/calculator/run', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def calculator_run():
     try:
         body   = request.get_json()
@@ -624,6 +706,7 @@ def calculator_run():
 
 
 @app.route('/api/calculator/submit', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def calculator_submit():
     from tasks import run_simulation_task, add_to_queue
     payload = request.get_json()
@@ -633,6 +716,7 @@ def calculator_submit():
 
 
 @app.route('/api/tax-switch/run', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def tax_switch_run():
     """세금 전환 계산기 동기 실행 (로컬 검증용 — 프론트는 submit 사용)."""
     try:
@@ -647,6 +731,7 @@ def tax_switch_run():
 
 
 @app.route('/api/tax-switch/submit', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def tax_switch_submit():
     from tasks import run_tax_switch_task, add_to_queue
     payload = request.get_json()
@@ -722,6 +807,7 @@ def task_status(task_id: str):
 # -----------------------------------------------
 
 @app.route('/api/retirement/submit', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def retirement_submit():
     from tasks import run_retirement_task, add_to_queue
     payload = request.get_json()
@@ -732,6 +818,7 @@ def retirement_submit():
 
 
 @app.route('/api/backtest/submit', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def backtest_submit():
     from tasks import run_backtest_task, add_to_queue
     task = run_backtest_task.delay(request.get_json())
@@ -740,6 +827,7 @@ def backtest_submit():
 
 
 @app.route('/api/dividend-target/submit', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def dividend_target_submit():
     from tasks import run_dividend_task, add_to_queue
     task = run_dividend_task.delay(request.get_json())
@@ -766,6 +854,7 @@ def _make_dividend_analyzer(body):
 
 
 @app.route('/api/dividend-target/probability', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def dividend_target_probability():
     try:
         body     = request.get_json()
@@ -784,6 +873,7 @@ def dividend_target_probability():
 
 
 @app.route('/api/dividend-target/probability-curve', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def dividend_target_probability_curve():
     try:
         body     = request.get_json()
@@ -802,6 +892,7 @@ def dividend_target_probability_curve():
 
 
 @app.route('/api/dividend-target/solve', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def dividend_target_solve():
     try:
         body     = request.get_json()
@@ -1244,6 +1335,7 @@ def _portfolio_quote(uid, pid):
 
 
 @app.route('/api/attribution/window', methods=['POST'])
+@limiter.limit("30 per minute")
 def attribution_window():
     """백테 사용자 지정 구간 — 종목별 기여 + 지분(다이버징). 비로그인 허용(가격 계산)."""
     body = request.get_json(silent=True) or {}
@@ -1268,6 +1360,7 @@ def attribution_window():
 
 
 @app.route('/api/attribution/capture', methods=['POST'])
+@limiter.limit("30 per minute")
 def attribution_capture():
     """투자계산기 — 비중 무관 상승/하락 포착률(방어력). 비로그인 허용."""
     body = request.get_json(silent=True) or {}
@@ -1625,6 +1718,7 @@ def alerts_read_all():
 # -----------------------------------------------
 
 @app.route('/api/dividend-target/scenario', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def dividend_target_scenario():
     # celery 경로(run_dividend_task)와 동일 로직 공유 — 세금·계좌검증·절세액(P4) 포함.
     # (과거엔 여기 인라인 복제가 있었음 — 세금 미배선 stale, 2026-06-13 통일)
@@ -1642,6 +1736,7 @@ def dividend_target_scenario():
 # -----------------------------------------------
 
 @app.route('/api/retirement/run', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def retirement_run():
     try:
         body = request.get_json()
@@ -1785,6 +1880,7 @@ def retirement_run():
 
 
 @app.route('/api/retirement/withdrawal', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def retirement_withdrawal():
     try:
         body = request.get_json()
@@ -2636,6 +2732,7 @@ def portfolio_compare():
 # -----------------------------------------------
 
 @app.route('/api/backtest/run', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def backtest_run():
     from backtest_logic import run_backtest_logic
     body = request.json

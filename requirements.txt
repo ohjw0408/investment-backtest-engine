@@ -94,3 +94,4 @@ wrapt==2.1.2
 xlrd==2.0.2
 yfinance==1.2.0
 zope.interface==8.2
+flask-limiter==3.8.0

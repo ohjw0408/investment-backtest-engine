@@ -22,8 +22,7 @@
   grid-template-areas:
     "assets assets"
     "money options"
-    "synthetic options"
-    "tax tax";
+    "advanced advanced";
   gap: 16px;
   align-items: start;
   margin-bottom: 16px;
@@ -33,8 +32,7 @@
 .bt-assets-card { grid-area: assets; }
 .bt-money-card { grid-area: money; }
 .bt-options-card { grid-area: options; }
-.bt-synthetic-card { grid-area: synthetic; }
-.bt-tax-card { grid-area: tax; }
+.moreopt-card { grid-area: advanced; }
 @media (max-width: 900px) {
   .bt-input-grid {
     grid-template-columns: 1fr;
@@ -42,11 +40,25 @@
       "assets"
       "money"
       "options"
-      "synthetic"
-      "tax";
+      "advanced";
   }
   .bt-full { grid-column: auto; }
 }
+/* ── 고급 옵션 접기 ── */
+.moreopt-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: none; border: none; cursor: pointer; padding: 0; text-align: left;
+  font-size: var(--fs-title); font-weight: 700; color: var(--ds-ink);
+}
+.moreopt-toggle .moreopt-sub { font-size: var(--fs-cap); font-weight: 500; color: var(--ds-muted); margin-left: 6px; }
+.moreopt-caret { transition: transform .2s; color: var(--ds-muted); font-size: 0.85em; flex-shrink: 0; }
+.moreopt-toggle.open .moreopt-caret { transform: rotate(180deg); }
+.moreopt-body { max-height: 0; overflow: hidden; transition: max-height .4s ease, margin-top .3s ease; }
+.moreopt-body.open { max-height: 8000px; margin-top: 18px; }
+.moreopt-block { padding: 16px 0; border-top: 1px solid var(--ds-hairline); }
+.moreopt-block:first-child { border-top: none; padding-top: 4px; }
+.moreopt-block-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin: 0 0 12px; }
+
 .bt-hero-head { text-align: center; margin-bottom: 28px; }
 .bt-h1 { font-size: var(--fs-h1); font-weight: 800; color: var(--ds-ink); letter-spacing: -0.02em; margin: 0 0 6px; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .bt-hero-sub { font-size: var(--fs-sm); color: var(--ds-body); margin: 0; }
@@ -356,60 +368,70 @@
           <div class="band-note">비중이 목표에서 <strong id="btBandNoteVal">5%</strong> 이상 벗어나면 리밸런싱</div>
         </div>
       </div>
+    </section>
 
-      <!-- 거래수수료 (D4) -->
-      <div class="bt-opt-row">
-        <div class="bt-toggle-head">
-          <label class="bt-opt-label" style="margin:0;">거래수수료</label>
-          <label class="bt-switch">
-            <span class="bt-switch-label" id="btFeeLabel">OFF</span>
-            <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()">
-            <span class="bt-switch-track"></span>
-          </label>
-        </div>
-        <div id="feePanelBody" class="bt-fee-panel">
-          <div class="bt-fee-grid">
-            <label class="bt-fee-field">증권사 프리셋
-              <select id="feePreset" class="bt-fee-control" onchange="applyFeePreset()">
-                <option value="kiwoom">키움증권</option>
-                <option value="custom">직접입력</option>
-              </select>
+    <!-- 고급 옵션 (접기, 전폭) — 거래수수료 · 가상 데이터 · 세금 -->
+    <section class="bt-fcard bt-full moreopt-card">
+      <button type="button" class="moreopt-toggle" id="btMoreoptToggle" onclick="btToggleAdvanced()">
+        <span>고급 옵션 <span class="moreopt-sub">· 거래수수료 · 세금 · 가상 데이터</span></span>
+        <span class="moreopt-caret">▾</span>
+      </button>
+      <div class="moreopt-body" id="btMoreoptBody">
+
+        <!-- 거래수수료 (D4) -->
+        <div class="moreopt-block">
+          <div class="bt-toggle-head">
+            <label class="moreopt-block-title" style="margin:0;">거래수수료</label>
+            <label class="bt-switch">
+              <span class="bt-switch-label" id="btFeeLabel">OFF</span>
+              <input type="checkbox" id="feeEnabledChk" onchange="toggleFeePanel()">
+              <span class="bt-switch-track"></span>
             </label>
-            <div class="bt-fee-field">
-              <span>시장 구분</span>
-              <div class="bt-fee-market">
-                <label><input type="radio" name="feeMarket" value="domestic_stock" checked onchange="applyFeePreset()"><span>국내주식</span></label>
-                <label><input type="radio" name="feeMarket" value="domestic_etf" onchange="applyFeePreset()"><span>국내 ETF</span></label>
-                <label><input type="radio" name="feeMarket" value="us_stock" onchange="applyFeePreset()"><span>미국주식</span></label>
+          </div>
+          <div id="feePanelBody" class="bt-fee-panel">
+            <div class="bt-fee-grid">
+              <label class="bt-fee-field">증권사 프리셋
+                <select id="feePreset" class="bt-fee-control" onchange="applyFeePreset()">
+                  <option value="kiwoom">키움증권</option>
+                  <option value="custom">직접입력</option>
+                </select>
+              </label>
+              <div class="bt-fee-field">
+                <span>시장 구분</span>
+                <div class="bt-fee-market">
+                  <label><input type="radio" name="feeMarket" value="domestic_stock" checked onchange="applyFeePreset()"><span>국내주식</span></label>
+                  <label><input type="radio" name="feeMarket" value="domestic_etf" onchange="applyFeePreset()"><span>국내 ETF</span></label>
+                  <label><input type="radio" name="feeMarket" value="us_stock" onchange="applyFeePreset()"><span>미국주식</span></label>
+                </div>
               </div>
+              <label class="bt-fee-field">수수료율 (%)
+                <input type="number" id="feeRateInput" class="bt-fee-control" value="0.015" min="0" step="0.0001" oninput="markFeePresetCustom()">
+              </label>
             </div>
-            <label class="bt-fee-field">수수료율 (%)
-              <input type="number" id="feeRateInput" class="bt-fee-control" value="0.015" min="0" step="0.0001" oninput="markFeePresetCustom()">
+            <div class="bt-fee-meta" id="feePresetMeta">
+              <b>키움증권 · 국내주식 0.015%</b><br>
+              매수·매도 공통 적용. 국내 개별주식 매도 거래세는 별도 반영됩니다.
+            </div>
+          </div>
+        </div>
+
+        <!-- 가상 데이터 옵트인 -->
+        <div class="moreopt-block">
+          <section class="bt-synthetic-card" id="btSyntheticSection" style="margin:0;">
+            <label class="bt-synthetic-label">
+              <input type="checkbox" id="btUseSyntheticCheck">
+              <div>
+                <span class="bt-synthetic-title">가상 데이터 사용</span>
+                <div class="bt-synthetic-copy">실제 데이터가 부족할 때 통계 추정 데이터로 보완합니다. 결과 정확도가 낮아질 수 있습니다.</div>
+              </div>
             </label>
-          </div>
-          <div class="bt-fee-meta" id="feePresetMeta">
-            <b>키움증권 · 국내주식 0.015%</b><br>
-            매수·매도 공통 적용. 국내 개별주식 매도 거래세는 별도 반영됩니다.
-          </div>
+          </section>
         </div>
-      </div>
-    </section>
 
-    <!-- 가상 데이터 옵트인 -->
-    <section class="bt-fcard bt-synthetic-card" id="btSyntheticSection">
-      <label class="bt-synthetic-label">
-        <input type="checkbox" id="btUseSyntheticCheck">
-        <div>
-          <span class="bt-synthetic-title">가상 데이터 사용</span>
-          <div class="bt-synthetic-copy">실제 데이터가 부족할 때 통계 추정 데이터로 보완합니다. 결과 정확도가 낮아질 수 있습니다.</div>
-        </div>
-      </label>
-    </section>
-
-    <!-- 세금 적용 섹션 (전폭) -->
-    <section class="bt-fcard bt-full bt-tax-card">
+        <!-- 세금 적용 -->
+        <div class="moreopt-block bt-tax-card">
       <div class="bt-toggle-head">
-        <h2 class="bt-fcard-title" style="margin:0;">세금 적용</h2>
+        <h3 class="moreopt-block-title" style="margin:0;">세금 적용</h3>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
           <span id="btTaxLabel" style="font-size:var(--fs-cap);color:var(--ds-muted);">OFF</span>
           <div id="btTaxWrap" onclick="toggleBtTax()" style="width:44px;height:24px;background:var(--ds-hairline);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
@@ -460,8 +482,10 @@
         <div style="margin-top:8px;font-size:0.75rem;color:var(--ds-muted);background:var(--ds-soft);padding:8px 12px;border-radius:var(--r-sm);">
           세금 적용 시 최종 자산에 청산세 반영 (배당세·리밸런싱 CG세 포함)
         </div>
-      </div>
-    </section>
+      </div><!-- /btTaxPanel -->
+        </div><!-- /moreopt-block 세금 -->
+      </div><!-- /moreopt-body -->
+    </section><!-- /moreopt-card -->
     </div><!-- /bt-input-grid -->
 
     <div class="bt-run-wrap">
@@ -869,6 +893,15 @@ window.MMTAX = {
   totalInitId: 'btSeed',
   totalMonId:  'btMonthly',
 };
+function btToggleAdvanced(force) {
+  const body = document.getElementById('btMoreoptBody');
+  const tog  = document.getElementById('btMoreoptToggle');
+  if (!body || !tog) return;
+  const open = force === undefined ? !body.classList.contains('open') : !!force;
+  body.classList.toggle('open', open);
+  tog.classList.toggle('open', open);
+}
+
 function toggleBtTax() {
   window.btTaxEnabled = !window.btTaxEnabled;
   window.taxEnabled   = window.btTaxEnabled;  // 모듈이 참조
@@ -1350,6 +1383,9 @@ function btRestoreForm(body) {
     const inp = document.getElementById('feeRateInput');
     if (inp && body.fee_rate != null) inp.value = (Number(body.fee_rate) * 100).toFixed(4).replace(/\.?0+$/, '');
   }
+  if (body.use_synthetic) { const s = document.getElementById('btUseSyntheticCheck'); if (s) s.checked = true; }
+  // 고급 옵션 중 하나라도 켜져 있으면 펼쳐서 복원 상태가 보이게
+  if (body.fee_enabled || body.use_synthetic || body.tax_enabled) btToggleAdvanced(true);
 }
 
 async function btCancelTask() {

@@ -1,5 +1,18 @@
 # Log
 
+## [2026-06-21] FIX | 포트폴리오 분석 — 고급 옵션 접기로 통일(수수료·가상데이터·세금) (오너)
+
+- **지적**: 직전 통일 커밋(a193c99)이 종목/금액 카드 룩만 맞추고 정작 핵심인 "고급 옵션 접기" 구조를 빠뜨림. 다른 3탭(calculator·retirement·dividend_target)은 거래수수료·세금·가상데이터를 `moreopt-card`(접기) 안에 묶는데 백테만 옵션카드 안 수수료 + 별도 가상데이터카드 + 별도 세금카드로 흩어져 있었음.
+- **수정**(backtest.html): calculator 캐논과 동일하게 재구성.
+  - 옵션카드에서 거래수수료 블록 제거 → 옵션카드는 배당처리·리밸런싱만.
+  - 가상데이터/세금 독립 카드 삭제 → `moreopt-card`(`고급 옵션` 토글 + `moreopt-body`) 안 3개 `moreopt-block`(수수료·가상데이터·세금)로 이동.
+  - grid-template-areas: synthetic/tax → advanced(라이트·모바일 둘 다). `.moreopt-*` CSS 이식.
+  - JS `btToggleAdvanced()` 추가(calcToggleAdvanced 동형). 기존 핸들러(toggleFeePanel/toggleBtTax) 보존.
+  - btRestoreForm: 가상데이터 체크 복원 + fee/synthetic/tax 중 하나라도 ON이면 고급옵션 자동 펼침.
+- **검증**: Playwright 라이트/다크 — 고급옵션 카드 1개·블록3·기본접힘·클릭시 펼침·수수료/세금/가상데이터 토글 전부 동작, 옵션카드에 수수료 없음(배당·리밸만), 콘솔에러 0. 전체 입력뷰 스샷이 계산기 레이아웃과 동일. 구간분석 스모크 4 PASS 유지.
+
+_작성: Claude_
+
 ## [2026-06-21] REFACTOR | 포트폴리오 분석 입력 페이지 — 계산기·배당·은퇴와 통일 (오너)
 
 - **배경**: backtest 입력 뷰만 종목/금액 카드가 독자 클래스(`bt-search`/`bt-ticker-list`/`bt-ph`/`bt-weight-row`/`weight-bar-bg`/`bt-grid2`)·nav-search 드롭다운으로 갈라져 나머지 3탭(calculator·retirement·dividend_target, 공통=calculator.css)과 룩 불일치.

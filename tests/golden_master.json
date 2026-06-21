@@ -1,0 +1,72 @@
+{
+  "calc_synth_yearly": {
+    "ok": true,
+    "headline": {
+      "endval_p5": 407937680.0,
+      "endval_p25": 459109645.0,
+      "endval_p50": 519462522.0,
+      "endval_p75": 786662198.0,
+      "endval_p95": 1062985677.0,
+      "n_cases": 61
+    },
+    "fingerprint": "e4b015a05e2c226fa086358b8ef75039"
+  },
+  "calc_nosynth_band_tax_isa": {
+    "ok": true,
+    "headline": {
+      "endval_p5": 121972985.0,
+      "endval_p25": 132192167.75,
+      "endval_p50": 139522370.5,
+      "endval_p75": 153258243.75,
+      "endval_p95": 177147608.0,
+      "n_cases": 66
+    },
+    "fingerprint": "94b38896d7db09908100d07852b37e42"
+  },
+  "backtest_real_none": {
+    "ok": true,
+    "headline": {
+      "cagr": 0.1717,
+      "mdd": -0.2606,
+      "sharpe": 0.88,
+      "total_return": 3.1513
+    },
+    "fingerprint": "a954dab993084909a1682a2b72a5521c"
+  },
+  "backtest_tax_taxable": {
+    "ok": true,
+    "headline": {
+      "cagr": 0.115,
+      "mdd": -0.2559,
+      "sharpe": 1.34,
+      "total_return": 1.3849
+    },
+    "fingerprint": "5833eb8cadda482fc398fbbb0a6ec72e"
+  },
+  "retire_accum_synth": {
+    "ok": true,
+    "headline": {
+      "endval_p5": 406198850.0,
+      "endval_p25": 456864238.0,
+      "endval_p50": 491909157.0,
+      "endval_p75": 771768039.0,
+      "endval_p95": 1039967079.0,
+      "n_cases": 61
+    },
+    "fingerprint": "6909bb47d3e6d138d45971715301b898"
+  },
+  "withdraw_spy": {
+    "ok": true,
+    "headline": {
+      "survival_rate": 1.0
+    },
+    "fingerprint": "1c02557287dd96de66d6360b2c85443a"
+  },
+  "dividend_prob_isa": {
+    "ok": true,
+    "headline": {
+      "tax_saving": 4760624.16
+    },
+    "fingerprint": "7c9f9924aa3134567a8144d253feaa05"
+  }
+}

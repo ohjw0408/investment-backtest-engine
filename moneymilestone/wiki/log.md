@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-21] FEAT | 벡터화 P0 — 골든 마스터 하니스 + 시드 결정성 E2E 검증 (오너)
+
+- **시드 결정화 E2E 검증**(앞 커밋 a741728 후속): `tests/verify_seed_determinism.py` — calculator(합성 ON) MC를 **별도 프로세스 2회** 돌려 fingerprint(케이스 end_value md5) 비교. 5조합(1·2·3·4종목, 미국ETF·한국주식 005930·혼합) 전부 프로세스 간 동일 + 크래시 0. 입력 다르면 지문도 다름(섞임 없음). "버그는 프로세스 간 불일치"였으므로 단일프로세스 테스트로는 못 잡던 걸 직접 확인.
+- **P0 골든 마스터**: `tests/golden_master.py` + `golden_master.json`. 4탭 7시나리오(계산기 합성/세금ISA·백테 실측/세금위탁·은퇴 축적합성·인출·배당확률ISA) 결과를 헤드라인(cases·acc_values 퍼센타일 p5~p95·cagr·mdd·sharpe·survival·tax_saving) + 깊은숫자 md5 fingerprint로 고정. `--generate`/`--check`(5% 허용). ISA는 해외상장 불가라 국내ETF(069500·360750)로, ISA 납입한도 2천만 준수.
+- **검증**: 7/7 생성 ok, `--check` 재실행 **전 시나리오 완전일치(fingerprint exact)** → 하니스 작동 + 4탭 MC 결정성 동시 입증. 이제 벡터화(P1~) 회귀를 이 골든으로 자동 게이트.
+- ⚠️ cp949 콘솔이 유니코드 못 찍어 출력 마커 ASCII([ok]/[FAIL]/[PASS]), 실행 시 `PYTHONIOENCODING=utf-8` 권장. 멀티계좌 시나리오는 미포함(P4 착수 시 추가).
+- **다음**: P1 — MC 합성경로 벡터 엔진(`vector_engine.py`, 세금 OFF부터). 골든 게이트로 검증.
+
+_작성: Claude_
+
 ## [2026-06-21] FIX | MC 시드 결정화 (벡터화 P0 선행 + prod 잠재버그) (오너)
 
 - **버그**: MC/가상데이터 시드가 `abs(hash(문자열))` 기반. Python `hash(str)`는 PYTHONHASHSEED 미고정 시 프로세스마다 랜덤 → 같은 입력도 worker 재시작(=매 배포)마다 다른 시드 → 가상데이터/MC 퍼센타일이 흔들림. (확인: 동일 입력 2회 실행 시드 1503432718 vs 303977800.) 벡터화 검증("동일 난수→분포 동일")의 전제가 깨져 P0 골든 마스터 불가.

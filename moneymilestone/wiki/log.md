@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-21] PERF | 병목은 상태기계 아닌 pandas 인덱싱 — FX·dates·배당레코더 (오너)
+
+- **계획 전복**: cProfile 결과 병목이 경로의존 상태기계(VECTORIZATION_PLAN P1~P4 대상)가 **아니라 pandas 인덱싱**. 골든 마스터(P0)로 결과 불변 게이트하며 저위험 최적화로 큰 효과. 위험한 경로축 벡터화 불필요 판명.
+- **① FX 환율 벡터화**(price_loader.py): `get_rate`가 행마다 `usdkrw[index<=d]` 전체스캔(O(N)) → 68만행. 일별 완전 인덱스라 `reindex(ffill)`로 일괄. **계산기 합성 27.6s→9.8s.** (`import numpy as np` 누락 골든이 잡음.)
+- **② dates pydatetime**(simulation_loop.py): pandas DatetimeIndex 반복 Timestamp 오버헤드(`__iter__` 72만회) → `to_pydatetime()` 1회. 누적 웜 4.7s.
+- **③ 배당 역산 경량 레코더**(dividend_simulator.py): 역산은 date·dividend_income만 쓰는데 HistoryRecorder가 매일 포폴평가·종목별 컬럼·15컬럼 DataFrame 구성(전부 미사용). `_DividendOnlyRecorder`로 교체. **등위선 7.0s→2.2s(3.2x).**
+- **검증**: 매 단계 골든 7시나리오 **fingerprint 비트동일**(결과 0 변동, 오너 3% 기준 훨씬 안쪽). 골든 TOL 5%→3%. test_div_savings 5 PASS.
+- **결론**: 오너 헤드라인 통증(배당 역산 "20케이스 5분반")은 FX+레코더로 사실상 해소. simulation_loop 잔여(cash_allocator·dividend_engine per-day)는 단일 지배 핫스팟 없음 → 추가 최적화 ROI 급감(경로축 벡터화는 위험 대비 이득 작음, 보류 권장).
+- 커밋: 골든(aaf847b)·FX(da33a3c)·dates(345cd59)·배당레코더(a2c790b). 시드결정화(a741728) 별도. **미푸시 다수 — 오너 확인 후 push.**
+
+_작성: Claude_
+
 ## [2026-06-21] FEAT | 벡터화 P0 — 골든 마스터 하니스 + 시드 결정성 E2E 검증 (오너)
 
 - **시드 결정화 E2E 검증**(앞 커밋 a741728 후속): `tests/verify_seed_determinism.py` — calculator(합성 ON) MC를 **별도 프로세스 2회** 돌려 fingerprint(케이스 end_value md5) 비교. 5조합(1·2·3·4종목, 미국ETF·한국주식 005930·혼합) 전부 프로세스 간 동일 + 크래시 0. 입력 다르면 지문도 다름(섞임 없음). "버그는 프로세스 간 불일치"였으므로 단일프로세스 테스트로는 못 잡던 걸 직접 확인.

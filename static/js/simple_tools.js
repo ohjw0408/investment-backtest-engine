@@ -298,6 +298,17 @@ function stDivGoalYears(base, initial, monthly, target, basis) {
   return null;
 }
 
+/** 축 입력(만원 단위, 쉼표) → 원 단위 배열(중복·음수 제거, 오름차순). 비거나 오류면 폴백. */
+function stParseAxis(id, fallback) {
+  const el = document.getElementById(id);
+  if (!el) return fallback;
+  const vals = (el.value || '').split(',')
+    .map(s => parseFloat(s.trim()) * 10000)
+    .filter(v => !isNaN(v) && v >= 0);
+  const uniq = [...new Set(vals)].sort((a, b) => a - b);
+  return uniq.length ? uniq : fallback;
+}
+
 function stRenderDividendGoal() {
   const base = {
     annualIncrease: stNum('stDgIncrease', 0) / 100,
@@ -310,10 +321,10 @@ function stRenderDividendGoal() {
   const target = stNum('stDgTarget', 0);
   const basis  = (document.querySelector('input[name="stDgBasis"]:checked') || {}).value || 'nominal';
 
-  // 축: 가로 = 월 적립액, 선 = 초기 투자금
-  const monthlys = [0, 250000, 500000, 750000, 1000000, 1500000, 2000000, 3000000];
-  const initials = [0, 50000000, 100000000, 200000000, 300000000, 500000000];
-  const palette = ['#0052ff', '#05b169', '#7B1FA2', '#E8830C', '#C62828', '#0097A7'];
+  // 축: 사용자 입력(만원 단위, 쉼표 구분) → 원. 빈/오류 시 기본값 폴백.
+  const monthlys = stParseAxis('stDgMonthlyAxis', [0, 250000, 500000, 750000, 1000000, 1500000, 2000000, 3000000]);
+  const initials = stParseAxis('stDgInitialAxis', [0, 50000000, 100000000, 200000000, 300000000, 500000000]);
+  const palette = ['#0052ff', '#05b169', '#7B1FA2', '#E8830C', '#C62828', '#0097A7', '#00897B', '#5E35B1', '#D81B60', '#3949AB'];
 
   const datasets = initials.map((init, i) => ({
     label: '초기 ' + stFmtKRW(init),

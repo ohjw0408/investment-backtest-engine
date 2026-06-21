@@ -36,6 +36,14 @@
 .st-sum-value.purple { color:#7c3aed; }
 [data-theme="dark"] .st-sum-value.purple { color:#a78bfa; }
 .st-chart-box { height:300px; position:relative; margin:var(--sp-md) 0; }
+/* 배당 목표 역산 — 사용법 안내 + 축 입력 */
+.st-howto { display:flex; gap:10px; align-items:flex-start; background:var(--brand-tint); border:1px solid var(--ds-hairline); border-radius:var(--r-lg); padding:14px 16px; margin-bottom:18px; font-size:var(--fs-sm); color:var(--ds-body); line-height:1.6; }
+.st-howto .st-howto-ico { font-size:1.2rem; line-height:1.3; flex-shrink:0; }
+.st-howto b { color:var(--ds-ink); }
+.st-howto ol { margin:6px 0 0; padding-left:18px; }
+.st-howto li { margin-bottom:2px; }
+.st-axis-field { grid-column:1 / -1; }
+.st-axis-field .calc-input { font-family:var(--font-mono); }
 .st-table-wrap { max-height:320px; overflow-y:auto; border:1px solid var(--ds-hairline); border-radius:var(--r-lg); }
 .st-table { width:100%; border-collapse:collapse; font-size:var(--fs-cap); }
 .st-table th { position:sticky; top:0; background:var(--ds-soft); font-weight:600; color:var(--ds-muted); padding:10px 12px; text-align:right; border-bottom:1px solid var(--ds-hairline); }
@@ -169,6 +177,17 @@
 
   <!-- ===== 배당 목표 역산 (등위선) ===== -->
   <div class="st-panel st-panel-box" id="stPanel-dividendgoal" style="display:none;">
+    <div class="st-howto">
+      <span class="st-howto-ico">🎯</span>
+      <div>
+        <b>목표 배당 달성, 얼마나 걸릴까?</b> 초기 투자금·월 적립액 조합별로 목표 월 배당금까지 걸리는 기간을 한눈에 비교해요.
+        <ol>
+          <li>목표 월 배당금과 기본 가정(배당률·성장률 등)을 정하세요.</li>
+          <li>아래 <b>가로축(월 적립액)</b>·<b>세로축(초기 투자금)</b> 값을 직접 입력 — <b>만원 단위, 쉼표로 구분</b> (예: <code>0, 50, 100</code>).</li>
+          <li>그래프의 각 선 = 초기 투자금, 각 점의 높이 = 그 조합으로 목표 달성까지 걸리는 <b>년수</b>. 같은 높이를 잇는 게 등위선이에요.</li>
+        </ol>
+      </div>
+    </div>
     <div class="st-input-grid">
       <div class="st-field">
         <label>목표 월 배당금</label>
@@ -206,6 +225,14 @@
       </div>
       <div class="st-toggle-row">
         <input type="checkbox" id="stDgTaxed" checked><label for="stDgTaxed" style="margin:0;">배당소득세 (15.4%)</label>
+      </div>
+      <div class="st-field st-axis-field">
+        <label>↔ 가로축 — 월 적립액 <span style="color:var(--ds-muted);font-weight:400;">(만원, 쉼표 구분)</span></label>
+        <input type="text" id="stDgMonthlyAxis" class="calc-input" value="0, 25, 50, 75, 100, 150, 200, 300">
+      </div>
+      <div class="st-field st-axis-field">
+        <label>↕ 세로축(선) — 초기 투자금 <span style="color:var(--ds-muted);font-weight:400;">(만원, 쉼표 구분)</span></label>
+        <input type="text" id="stDgInitialAxis" class="calc-input" value="0, 5000, 10000, 20000, 30000, 50000">
       </div>
     </div>
 
@@ -273,5 +300,5 @@
 
 </div>
 
-<script src="{{ url_for('static', filename='js/simple_tools.js') }}?v=20260621divgoal2"></script>
+<script src="{{ url_for('static', filename='js/simple_tools.js') }}?v=20260621divgoal3"></script>
 {% endblock %}

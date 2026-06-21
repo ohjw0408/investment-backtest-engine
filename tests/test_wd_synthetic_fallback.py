@@ -67,7 +67,7 @@ def test_household_zero_real_windows_falls_back_to_synthetic():
 class _FakePriceLoader:
     def __init__(self, data, dates):
         self._d = (data, dates)
-    def load(self, tickers, start, end):
+    def load(self, tickers, start, end, allow_synthetic=False):
         return self._d
 
 

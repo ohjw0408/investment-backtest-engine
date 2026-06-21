@@ -556,7 +556,9 @@ class WithdrawalAnalyzer:
         from modules.retirement.synthetic_price_generator import (
             SYNTHETIC_DF, T_SCALE, MAX_SYNTH_MU_MONTHLY, TRADING_DAYS_PER_MONTH,
         )
-        raw_loader = self.portfolio_engine.price_loader.loader
+        raw_loader = getattr(self.portfolio_engine.price_loader, "loader", None)
+        if raw_loader is None or not hasattr(raw_loader, "get_price"):
+            return []   # 로더가 get_price 미지원(테스트 페이크 등) → 호출부 단일종목 GBM 폴백
         k = len(self.tickers)
 
         # ── 종목별 mu/sigma + 상관 피팅 (get_price 기반 → KRX_GOLD·금현물 등 특수종목 포함) ──

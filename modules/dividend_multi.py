@@ -162,7 +162,7 @@ class MultiDividendSimulator(DividendSimulator):
 
         return last_year_dividend(result.combined_history_df, end)
 
-    # ── 합성 폴백: 계좌별 단일 합성의 케이스별 합 (G2 라우팅 미모델 근사) ──
+    # ── 합성 폴백: 계좌별 합성의 케이스별 합 (G2 라우팅 미모델 근사) ──
     def _run_synthetic_rolling(self, seed, monthly, years, n_needed) -> List[float]:
         per_acct_params = []
         for idx, a in enumerate(self._accounts):
@@ -172,6 +172,23 @@ class MultiDividendSimulator(DividendSimulator):
                 self._child_stats[idx] = self._children[idx]._calc_div_stats() or {}
             per_acct_params.append((s, m, self._child_stats[idx]))
 
+        # P2 멀티: 계좌별 MVN 케이스(계좌내 종목 mu/sigma+상관) 케이스별 합산.
+        # 계좌간은 시드 오프셋으로 독립(라우팅 미모델 근사 — 단일종목 GBM 대비 개선).
+        mvn_per_acct = []
+        mvn_ok = True
+        for idx, (s, m, _stats) in enumerate(per_acct_params):
+            cases = self._children[idx]._run_mvn_div_cases(
+                s, m, years, n_needed, seed_base=20260621 + idx * 100000,
+            )
+            if not cases:
+                mvn_ok = False
+                break
+            mvn_per_acct.append(cases)
+        if mvn_ok and mvn_per_acct:
+            L = min(len(c) for c in mvn_per_acct)
+            return [sum(c[i] for c in mvn_per_acct) for i in range(L)]
+
+        # 폴백: 구 단일종목 집계 GBM 케이스별 합.
         results = []
         for i in range(n_needed):
             total = 0.0

@@ -296,19 +296,15 @@ def _ticker_return_stats(closes) -> tuple:
     return 0.07 / 12, 0.15 / np.sqrt(12)
 
 
-def _synthetic_household_window(
+def _synthetic_household_window_gbm(
     accounts, ticker_stats, withdrawal_years, monthly_net, rng,
     *, tax_engine, withdrawal_start_age, inflation, dividend_mode,
 ) -> dict:
-    """티커별 GBM(Student-t) 합성 월가격 경로 생성 → simulate_household_window 1회.
-
-    종목 간 상관은 독립 근사(단일 합성도 미모델링). 합성 구간 배당 0.
-    드레인 순서·연금세·취득가·리밸은 simulate_household_window가 그대로 처리.
-    """
+    """폴백: 종목별 독립 GBM(Student-t) 합성 월가격(상관 미모델·배당0).
+    MVN 피팅 실패(_build_household_mvn 빈 dict) 시에만 사용."""
     n_months = withdrawal_years * 12
     dates = pd.date_range("2000-01-01", periods=n_months + 1, freq="MS")
     t_scale = np.sqrt(SYNTHETIC_DF / (SYNTHETIC_DF - 2))
-
     synth_data = {}
     for ticker, (mu, sigma) in ticker_stats.items():
         rets = (rng.standard_t(df=SYNTHETIC_DF, size=n_months) / t_scale) * sigma + mu
@@ -318,6 +314,110 @@ def _synthetic_household_window(
         synth_data[ticker] = pd.DataFrame(
             {"open": closes, "high": closes, "low": closes, "close": closes,
              "volume": 1.0, "dividend": 0.0, "split": 1.0},
+            index=dates,
+        )
+    res = simulate_household_window(
+        accounts, synth_data, list(dates), monthly_net,
+        tax_engine=tax_engine, withdrawal_start_age=withdrawal_start_age,
+        inflation=inflation, dividend_mode=dividend_mode,
+    )
+    res["is_synthetic"] = True
+    return res
+
+
+def _build_household_mvn(price_data: dict) -> dict:
+    """P2: 가구 인출 합성용 종목별 월 mu/sigma + 상관 cholesky + 연 배당수익률.
+
+    price_data(일별 OHLCV+dividend) → 21영업일 간격 월수익으로 mu/sigma/상관 피팅.
+    상관·배당이 없던 단일 GBM(_synthetic_household_window 구버전)을 대체한다.
+    """
+    from modules.retirement.synthetic_price_generator import MAX_SYNTH_MU_MONTHLY
+    tickers = list(price_data.keys())
+    mret = {}
+    for t in tickers:
+        c = np.asarray(price_data[t]["close"].values, float)
+        if len(c) >= 24:
+            mpx = c[::21]
+            r = np.diff(mpx) / np.where(mpx[:-1] > 0, mpx[:-1], 1.0)
+            r = r[np.isfinite(r) & (np.abs(r) < 0.5)]
+            if len(r) >= 12:
+                mret[t] = r
+    if len(mret) < len(tickers):
+        return {}                       # 일부 종목 통계 부족 → 호출부 단일 GBM 폴백
+
+    mu  = np.array([float(np.mean(mret[t])) for t in tickers])
+    sig = np.array([float(np.std(mret[t]))  for t in tickers])
+    if not (np.all(np.isfinite(mu)) and np.all(sig > 0)):
+        return {}
+    mu = np.minimum(mu, MAX_SYNTH_MU_MONTHLY)          # 월 drift 상한
+
+    k = len(tickers)
+    L = min(len(mret[t]) for t in tickers)
+    if L >= 12:
+        M = np.column_stack([mret[t][-L:] for t in tickers])   # tail 정렬
+        corr = np.nan_to_num(np.corrcoef(M, rowvar=False), nan=0.0)
+        np.fill_diagonal(corr, 1.0)
+    else:
+        corr = np.eye(k)
+    cov = np.outer(sig, sig) * corr
+    try:
+        chol = np.linalg.cholesky(cov + np.eye(k) * 1e-12)
+    except Exception:
+        w, V = np.linalg.eigh((cov + cov.T) / 2)
+        cov = V @ np.diag(np.clip(w, 1e-12, None)) @ V.T
+        try:
+            chol = np.linalg.cholesky(cov + np.eye(k) * 1e-12)
+        except Exception:
+            chol = np.diag(sig)
+
+    div_yield = {}
+    for t in tickers:
+        df = price_data[t]
+        yrs = max(1.0, len(df) / 252.0)
+        if "dividend" in df.columns:
+            mean_close = float(df["close"].mean())
+            div_yield[t] = (float(df["dividend"].sum()) / mean_close / yrs) if mean_close > 0 else 0.0
+        else:
+            div_yield[t] = 0.0
+    return {"tickers": tickers, "mu": mu, "chol": chol, "div_yield": div_yield}
+
+
+def _synthetic_household_window(
+    accounts, mvn_stats, withdrawal_years, monthly_net, rng,
+    *, tax_engine, withdrawal_start_age, inflation, dividend_mode,
+) -> dict:
+    """종목별 mu/sigma + 상관(다변량-t) 합성 월가격 경로 + 분기배당 → simulate_household_window.
+
+    P2: 종목간 상관행렬(cholesky)과 종목별 실 배당수익률을 반영(구버전은 무상관·배당0).
+    드레인 순서·연금세·취득가·리밸은 simulate_household_window가 그대로 처리.
+    """
+    tickers   = mvn_stats["tickers"]
+    mu        = mvn_stats["mu"]
+    chol      = mvn_stats["chol"]
+    div_yield = mvn_stats["div_yield"]
+    k = len(tickers)
+    n_months = withdrawal_years * 12
+    dates = pd.date_range("2000-01-01", periods=n_months + 1, freq="MS")
+    t_scale = np.sqrt(SYNTHETIC_DF / (SYNTHETIC_DF - 2))
+
+    # 상관 반영 다변량-t 월수익 (n_months × k)
+    z   = rng.standard_t(df=SYNTHETIC_DF, size=(n_months, k)) / t_scale
+    ret = z @ chol.T + mu
+
+    synth_data = {}
+    for j, ticker in enumerate(tickers):
+        closes = np.empty(n_months + 1)
+        closes[0] = 100.0
+        closes[1:] = 100.0 * np.cumprod(1.0 + ret[:, j])
+        dy   = max(float(div_yield.get(ticker, 0.0)), 0.0)
+        divs = np.zeros(n_months + 1)
+        if dy > 0:
+            # 분기(매 3개월) 배당 = 그 시점 주가 × 연수익률/4
+            for m in range(3, n_months + 1, 3):
+                divs[m] = closes[m] * (dy / 4.0)
+        synth_data[ticker] = pd.DataFrame(
+            {"open": closes, "high": closes, "low": closes, "close": closes,
+             "volume": 1.0, "dividend": divs, "split": 1.0},
             index=dates,
         )
     res = simulate_household_window(
@@ -398,18 +498,29 @@ def analyze_household_withdrawal(
     n_real = len(case_results)
     n_needed = max(0, MIN_CASES_WD - n_real)
     if n_needed > 0:
-        ticker_stats = {
-            t: _ticker_return_stats(df["close"].values)
-            for t, df in price_data.items()
-        }
+        # P2: 종목별 mu/sigma+상관+배당 MVN 우선, 실패 시 구 단일종목 GBM 폴백.
+        mvn_stats = _build_household_mvn(price_data)
+        ticker_stats = None
+        if not mvn_stats:
+            ticker_stats = {
+                t: _ticker_return_stats(df["close"].values)
+                for t, df in price_data.items()
+            }
         for i in range(n_needed):
             rng = np.random.default_rng(seed=1000 + i)
             try:
-                case_results.append(_synthetic_household_window(
-                    accounts, ticker_stats, withdrawal_years, monthly_net, rng,
-                    tax_engine=tax_engine, withdrawal_start_age=withdrawal_start_age,
-                    inflation=inflation, dividend_mode=dividend_mode,
-                ))
+                if mvn_stats:
+                    case_results.append(_synthetic_household_window(
+                        accounts, mvn_stats, withdrawal_years, monthly_net, rng,
+                        tax_engine=tax_engine, withdrawal_start_age=withdrawal_start_age,
+                        inflation=inflation, dividend_mode=dividend_mode,
+                    ))
+                else:
+                    case_results.append(_synthetic_household_window_gbm(
+                        accounts, ticker_stats, withdrawal_years, monthly_net, rng,
+                        tax_engine=tax_engine, withdrawal_start_age=withdrawal_start_age,
+                        inflation=inflation, dividend_mode=dividend_mode,
+                    ))
             except Exception:
                 continue
     n_synthetic = len(case_results) - n_real

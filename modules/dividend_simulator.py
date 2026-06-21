@@ -460,7 +460,7 @@ class DividendSimulator:
 
         return last_year_div
 
-    def _run_mvn_div_cases(self, seed, monthly, years, n_needed) -> List[float]:
+    def _run_mvn_div_cases(self, seed, monthly, years, n_needed, seed_base=20260621) -> List[float]:
         """MVN 몬테카를로 합성 케이스 (P2 — 종목별 mu/sigma + 상관 다변량-t).
 
         WithdrawalAnalyzer._run_mvn_cases 패턴: estimate 대신 get_price(allow_synthetic=False)로
@@ -541,7 +541,7 @@ class DividendSimulator:
 
         results = []
         for p in range(n_needed):
-            rng = np.random.default_rng(seed=20260621 + p)
+            rng = np.random.default_rng(seed=seed_base + p)
             z   = rng.standard_t(df=SYNTHETIC_DF, size=(n_days, k)) / t_scale
             ret = z @ chol.T + mu_d
             data = {}

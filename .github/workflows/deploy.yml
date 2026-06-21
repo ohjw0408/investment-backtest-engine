@@ -23,6 +23,8 @@ jobs:
             # reset 영향 없음.
             git fetch origin main
             git reset --hard origin/main
+            # 새 의존성 설치(멱등 — 변경 없으면 빠름). 누락 시 import 실패로 앱 다운 방지.
+            venv/bin/pip install -q -r requirements.txt
             # 거시지표 최초 적재(테이블 비었을 때만, 멱등). 키는 서버 보유. 실패해도 배포 계속.
             venv/bin/python -m modules.macro_loader --ensure || true
             cp deploy/domino-celery-beat.service /etc/systemd/system/

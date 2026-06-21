@@ -60,13 +60,19 @@ prod 동기 probe로 검증한 올바른 분포(독립 MC 50경로): p10 **0(고
 - **검증**: 배당 타겟테스트 10 passed. probe(SCHD60/QQQ40 10년 무적립, 마지막1년 배당): 구 GBM p10/p50/p90=**975/994/1014만**(분포 없음·비현실) → MVN=**440/928/1687만**(현실적, spread 32배). 종목별 변동성+상관 반영.
 - ⚠️ 합성 발동은 실데이터<기간(짧은역사 종목)일 때만 — SCHD/QQQ 등 긴역사는 실측 경로(1단). MultiDividendSimulator(`dividend_multi._run_synthetic_rolling`)는 미적용(별도).
 
-### P3. 계산기·백테스트 검증
-- 계산기: AccumulationAnalyzer가 use_synthetic 시 MVN 쓰는지 prod 실측(이미 ✅로 보임). 단일 합성경로 아님 확인.
-- 백테스트: 롤링 분포가 단일 합성경로 슬라이스인지 확인. 그렇다면 P1과 동일 처리.
+### ✅ P3. 계산기·백테스트 검증 (완료 2026-06-21)
+- **계산기·은퇴축적 = AccumulationAnalyzer** `_load_with_per_window_synthetic`→estimate_joint_stats+generate_joint_window = **MVN ✅ (윈도우별 독립 상관)**. 단일 합성경로 아님. 멀티 축적 MultiAccountAnalyzer도 동일 ✅.
+- **백테스트(`run_backtest_logic`) = 롤링 아님 — 단일 기간 1회 시뮬**(누적수익·MDD·샤프·연도별; p10/p50/p90 분포 안 만듦). "단일 합성경로 거짓 좁은 분포" 문제는 **분포 도구(withdrawal/dividend)에만** 해당. 백테는 1경로 결과가 목적 → **MVN 이식 불요(해당 없음)**. use_synthetic은 prepare_scenario_data→DataPreparer→generate_and_save(DB 저장 종목별 GBM); 백테는 그 단일 시계열로 1회 시뮬이라 분포 왜곡 없음.
 
-### P4. 공통 정리
-- `MAX_SYNTH_MU_MONTHLY`(drift 상한) 적정성 검토 — forward-looking 보수성.
-- MC 표본수: 좋은 p10/p90 위해 충분히(예 300~500). 1vCPU 성능 고려(은퇴 perf 메모 참조).
+### ✅ 멀티계좌 인출·배당 MVN (완료 2026-06-21, 1e29804)
+- **멀티 인출**(multi_account_withdrawal): `_build_household_mvn`(21영업일 월수익 mu/sigma+상관 cholesky+연배당) + `_synthetic_household_window` 상관 다변량-t+분기배당(구 무상관·배당0 → `_synthetic_household_window_gbm` 폴백). probe: 상관 offdiag 0.023·배당 SCHD3.27%/QQQ0.76%.
+- **멀티 배당**(dividend_multi): 계좌별 `_run_mvn_div_cases` 케이스별 합산(계좌간 시드오프셋 독립), 폴백 구 GBM.
+- **P1 버그 수정**: `_run_mvn_cases`가 loader에 `.loader`/`get_price` 없으면 크래시 → getattr 가드로 [] 반환(폴백). P1서 깨진 `test_wd_synthetic_fallback` fake loader 시그니처(allow_synthetic) 맞춤.
+
+### ✅ P4. 공통 정리 (검토 완료 2026-06-21 — 현 설정 유지)
+- `MAX_SYNTH_MU_MONTHLY`=0.0065(월, ≈8.1%/yr): SCHD·QQQ 실 mu도 이 값에 캡될 만큼 **보수적**. 장기 외삽 폭발 방지 + forward-looking 보수성 = **적정, 변경 안 함**.
+- MC 표본수: 인출기 200 / SIM 60 / dividend·멀티 need(MIN_CASES 30 보충분). p10/p90 안정 충분. 표본↑는 1vCPU서 비용↑(SIM 169s) → 정확도·속도 트레이드, 현 설정 유지.
+- ⚠️ 잔여(성능, 별도): SIM 169s(11샘플×60경로) — perf 최적화 트랙([[perf-optimization]])에서.
 
 ## 검증 (각 단계)
 - prod ssh 동기 probe(`ssh -i ~/.ssh/hetzner_ed25519 root@178.105.84.213`)로 분포 현실성 확인:

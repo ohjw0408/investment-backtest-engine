@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-21] ENGINE | 몬테카를로 P3·P4·멀티계좌 — 플랜 종결 (오너)
+
+`MONTECARLO_PLAN.md` 잔여 전부 처리. 커밋 1e29804.
+
+- **P3 검증**: 계산기·은퇴축적=AccumulationAnalyzer MVN ✅(이미). **백테(`run_backtest_logic`)=롤링 아닌 단일기간 1회 시뮬(분포 안 만듦) → MVN 이식 불요**(단일경로 좁은분포 문제는 분포 도구에만 해당).
+- **멀티계좌 MVN**: 멀티 인출(`_build_household_mvn` 월수익 mu/sigma+상관 cholesky+분기배당, 구 무상관·배당0 폴백 보존), 멀티 배당(계좌별 `_run_mvn_div_cases` 합산). probe: 상관 offdiag 0.023·배당 SCHD3.27%/QQQ0.76%.
+- **P1 버그**: `_run_mvn_cases` loader `.loader` 없으면 크래시→getattr 가드. full pytest 미실행으로 P1서 깨진 `test_wd_synthetic_fallback` fake loader 시그니처 맞춤.
+- **P4 검토(현 설정 유지)**: drift cap 0.0065(8.1%/yr) 보수적 적정. 표본수 인출200/SIM60 충분. SIM 169s는 perf 트랙 별도.
+- **검증**: MC+배당 타겟 27 passed. **잔여=라이브 검증(오너)**. MONTECARLO_PLAN 전 단계 ✅.
+
+_작성: Claude_
+
 ## [2026-06-21] ENGINE | 몬테카를로 P2 — 배당 합성 MVN 이식 (오너)
 
 `MONTECARLO_PLAN.md` P2 완료. 배당 시뮬 합성경로를 단일종목 집계 GBM → 종목별 mu/sigma+상관 다변량-t MC로(P1 WithdrawalAnalyzer 패턴 미러). 커밋 8057c67.

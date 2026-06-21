@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-21] PLAN | 시뮬 엔진 벡터화 계획(멀티 포함) + k=1 MVN 크래시 픽스 (오너)
+
+- **k=1 버그**(a24a5f5): 단일종목 MVN 합성서 `np.corrcoef(rowvar=False)` 0-d→`fill_diagonal` "array must be at least 2-d". 배당·은퇴인출·가구인출 3곳 k>=2 가드.
+- **cash_allocator incremental 시도→롤백**: 2차 while 짧아 효과 0(측정). 공용 엔진 미세최적화로는 큰 절감 불가 확인.
+- **`VECTORIZATION_PLAN.md` 작성**: 4탭+멀티 공용 엔진(SimulationLoop 210줄 단일 / MultiAccountSimulationLoop 1131줄 멀티) 벡터화. 원리=경로축(paths) 2D 동시화(완전벡터화는 경로의존 상태기계라 불가). 기술=numpy 2D 주력+세금은 Numba 보조, **C 직접은 비채택**(ROI 낮음). 단계 P0 골든마스터→P1 MC합성 벡터(세금OFF)→P2 롤링→P3 세금(Numba)→P4 멀티(최고난도). 결과불변=골든+5%전퍼센타일. **착수 전 오너 케이스 설정(MC vs 실측) 확인 필요**.
+- 측정: 배당 20케이스 16초/케이스. SimulationLoop이 진짜 병목(125K 파이썬 iter).
+
+_작성: Claude_
+
 ## [2026-06-21] PERF | 배당금 역산 속도 2.9배 (결과 불변) (오너)
 
 오너: 배당금 계산기 범위 역산 12분+, MC 탭 속도 단축(결과 불변 절대). 커밋 9046b7c.

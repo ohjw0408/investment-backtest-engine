@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-21] PERF | 배당금 역산 속도 2.9배 (결과 불변) (오너)
+
+오너: 배당금 계산기 범위 역산 12분+, MC 탭 속도 단축(결과 불변 절대). 커밋 9046b7c.
+
+- **병목**: cProfile 결과 MC 아님 — 역산이 같은 가격을 후보(seed/monthly/years)마다 `to_monthly_price_data`(resample) 1204회 재변환(22s) + sim loop(11s). MC 경로는 추가로 후보마다 get_price 25년 로드+상관 재피팅.
+- **수정(전부 순수함수 메모이즈→결과 불변)**: ① 월변환 (start,end) 윈도우 캐시(seed/monthly 무관) ② `_calc_div_stats` 인스턴스 1회 캐시 ③ `_run_mvn_div_cases` 피팅(get_price+mu/sigma/상관/배당) tickers 키 캐시.
+- ⚠️ 시도했다 폐기: 전체월별 1회 변환 후 슬라이스 — start가 비영업일 캘린더ME일 때 일별 loc과 1달 시프트 경계차로 결과 0.1~0.3% 변동 → **결과 불변 위반이라 롤백**, 윈도우 캐시(동일 출력 메모이즈)로 대체.
+- **검증**: SCHD/QQQ 역산 anchor 19.0 + seed/monthly 곡선값 변경전후 **비트동일**, 79.2s→27.1s(2.9배). 배당 타겟 4 passed. prod 1vCPU면 12분→~4분대 예상.
+- 타 MC 탭(은퇴 인출/SIM)은 역산 없는 단발 실행이라 폭발 없음. SIM 169s 표본수 본질은 perf 트랙 별도([[perf-optimization]]).
+
+_작성: Claude_
+
 ## [2026-06-21] ENGINE | 몬테카를로 P3·P4·멀티계좌 — 플랜 종결 (오너)
 
 `MONTECARLO_PLAN.md` 잔여 전부 처리. 커밋 1e29804.

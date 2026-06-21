@@ -1,5 +1,18 @@
 # Log
 
+## [2026-06-22] FIX | 모바일 전수 점검·수정(입력·결과뷰·차트·표·모달) (오너)
+
+- **방법**: 390px Playwright로 전 페이지(~20개) + 인터랙션(종목추가·고급옵션·검색·모달·결과뷰) doc 가로오버플로 + 원인 leaf 추적 + 육안.
+- **수정**:
+  - **4 시뮬탭 입력 블로우아웃**: `bt-input-grid` 모바일 `1fr`→`minmax(0,1fr)`. date-row(날짜입력 고유 min-width)·리밸 pill 등 자식 min-content가 컬럼을 viewport 밖(456px)으로 밀던 것 해소. calculator·backtest·retirement(+ret-mode-grid)·dividend.
+  - **macro 탭바**(mc-toggle 7탭): 세로깨짐+12px삐짐 → 가로 스크롤(스와이프).
+  - **#favBar**(즐겨찾기): 좁은 화면 카드머리 전폭 차지 → fav-select 축소.
+  - (footer는 앞 커밋서 main-content 안 grid-column:1/-1로 이미 수정)
+- **검증**: 로컬 390px — 4탭 입력(종목+고급옵션)·macro·심볼상세·risk-return·myassets·settings+모달·calendar·search·simple·tax-switch·alerts·myportfolios 전부 doc 오버플로 0. **prod 실측(celery 결과뷰)**: 계산기·백테 결과뷰(fan/드로우다운/히스토그램/메트릭2열/참여율표) ofx=0·콘솔0. 결과 그리드/표는 기존부터 반응형(auto-fit·2열override·rr-table 가로스크롤).
+- 배포: 595e68c. **결과뷰는 로컬 celery 없어 prod서 검증함.**
+
+_작성: Claude_
+
 ## [2026-06-22] FEAT | 출시 선결 — 보안 + 법적(약관·개인정보·동의·탈퇴) (오너)
 
 - **플랜 2종 작성**: `LAUNCH_LEGAL_SECURITY_PLAN.md`(법적#1+보안#3), `MONETIZATION_PLAN.md`(수익화#5, 별도·미착수).

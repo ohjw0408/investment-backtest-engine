@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-21] REFACTOR | 포트폴리오 분석 입력 페이지 — 계산기·배당·은퇴와 통일 (오너)
+
+- **배경**: backtest 입력 뷰만 종목/금액 카드가 독자 클래스(`bt-search`/`bt-ticker-list`/`bt-ph`/`bt-weight-row`/`weight-bar-bg`/`bt-grid2`)·nav-search 드롭다운으로 갈라져 나머지 3탭(calculator·retirement·dividend_target, 공통=calculator.css)과 룩 불일치.
+- **수정**(backtest.html): 종목 구성 카드를 캐논 구조로 — 검색박스(`ticker-search-box`+`ts-icon`, 드롭다운 박스 내부)→리스트(`ticker-list`>`ticker-empty`)→`weight-summary`(`weight-track`/`weight-fill`/`weight-warn`+`weight-total-num` 상태). 드롭다운 렌더 `nav-search-*`→`ticker-drop-*`. 비중바 JS를 calculator `updateWeightBar`와 동일 상태로직(ok/over/현금잔여 문구). 종목 item에 `.ticker-weight-pct` span 추가·이름 substring(0,10) 제거(ellipsis가 처리). 금액 카드 `bt-grid2`→스택 `input-row`+`input-hint`(분석기간 date-row는 유지). 고아 CSS(bt-search*/bt-ph/bt-ticker-list/bt-weight-row/bt-field/bt-grid2) 제거.
+- **부수효과**: `weight-bar-bg/fill`은 정의 CSS가 없어 트랙이 안 보이던 잠재버그였음 → `weight-track/fill` 전환으로 해결.
+- **검증**: 로컬 Playwright 라이트/다크 — 드롭다운 박스내부·ticker-drop·ticker-list·pct span·weight-summary·input-row 3개 전부 OK, 콘솔에러 0. calculator 종목카드와 스샷 거의 동일. 기존 구간분석 스모크(check_bt_attr_capture.js) 4 PASS 유지. 인덱스 기반 btW/btRemoveTicker 핸들러는 보존(시그니처 미변경).
+
+_작성: Claude_
+
 ## [2026-06-21] FIX | 포트폴리오 분석(백테) 구간 카드 — 방어력 비중 제거 (오너)
 
 - **증상**: "구간 기여 지분" 카드가 `analyze_window`(비중×수익 가법분해)로 방어를 표시 → SCHD가 QQQ보다 비중 크면 하락 기여 막대가 커서 "더 위험"하게 보임. 내자산·계산기는 `analyze_capture`(비중 무관 포착률)라 정상.

@@ -70,30 +70,8 @@
 .bt-synthetic-title { display: block; font-weight: 700; font-size: var(--fs-sm); color: var(--ds-ink); }
 .bt-synthetic-copy { font-size: var(--fs-cap); color: var(--ds-body); margin-top: 3px; line-height: 1.45; }
 
-.bt-field { margin-bottom: 4px; }
-.bt-field > label { display: block; font-size: var(--fs-cap); font-weight: 600; color: var(--ds-body); margin-bottom: 7px; }
-.bt-grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-bottom: 8px; }
-.bt-grid2 > .bt-field { min-width: 0; }
 .bt-money-card .input-group { width: 100%; min-width: 0; box-sizing: border-box; }
 .bt-money-card .calc-input { width: 100%; min-width: 0; }
-@media (max-width: 560px) { .bt-grid2 { grid-template-columns: 1fr; } }
-
-/* 종목 검색 박스 */
-.bt-search { margin-top: 10px; }
-.bt-search-box {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--ds-soft); border: 1.5px solid var(--ds-hairline);
-  border-radius: var(--r-md); padding: 11px 14px; transition: border-color .15s;
-}
-.bt-search-box:focus-within { border-color: var(--brand); }
-.bt-search-ic, .bt-search-ic svg { width: 18px; height: 18px; color: var(--ds-muted); flex-shrink: 0; }
-.bt-search-box input { border: none; outline: none; background: transparent; font-size: var(--fs-sm); width: 100%; color: var(--ds-ink); }
-
-.bt-ph { font-size: var(--fs-sm); color: var(--ds-muted); padding: 14px 4px 4px; }
-.bt-ticker-list { display: flex; flex-direction: column; gap: 8px; }
-
-.bt-weight-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: var(--fs-sm); color: var(--ds-body); }
-.bt-weight-row #btWeightTotal { font-weight: 800; font-family: var(--font-mono); }
 
 .date-row { display: flex; gap: 10px; align-items: center; }
 .date-row input[type=date] {
@@ -299,26 +277,30 @@
         <h2 class="bt-fcard-title">종목 구성</h2>
         <div id="favBar"></div>
       </div>
-      <div id="btTickerList" class="bt-ticker-list"></div>
-      <div id="btTickerPlaceholder" class="bt-ph">종목을 검색해서 추가해보세요</div>
-      <div class="ticker-search-wrap bt-search">
-        <div class="bt-search-box">
-          <span class="bt-search-ic">{{ nicon('search') }}</span>
-          <input type="text" id="btTickerSearch" placeholder="종목 또는 ETF 검색">
+      <div class="ticker-search-wrap">
+        <div class="ticker-search-box">
+          <span class="ts-icon">{{ nicon('search') }}</span>
+          <input type="text" id="btTickerSearch" placeholder="종목 또는 ETF 검색 (예: SPY, QQQ)" autocomplete="off">
+          <div class="ticker-dropdown" id="btTickerDropdown"></div>
         </div>
-        <div class="ticker-search-dropdown" id="btTickerDropdown"></div>
       </div>
-      <div class="bt-weight-row">
-        <span>비중 합계</span>
-        <span id="btWeightTotal">0%</span>
+      <div id="btTickerList" class="ticker-list">
+        <div class="ticker-empty" id="btTickerPlaceholder">종목을 검색해서 추가해보세요</div>
       </div>
-      <div class="weight-bar-bg" style="margin-top:6px;"><div class="weight-bar-fill" id="btWeightBar" style="width:0%"></div></div>
+      <div class="weight-summary">
+        <div class="weight-summary-row">
+          <span>비중 합계</span>
+          <span id="btWeightTotal" class="weight-total-num">0%</span>
+        </div>
+        <div class="weight-track"><div class="weight-fill" id="btWeightBar"></div></div>
+        <div class="weight-warn" id="btWeightWarn"></div>
+      </div>
     </section>
 
     <!-- 기간 · 투자금 -->
     <section class="bt-fcard bt-money-card">
       <h2 class="bt-fcard-title gap">기간 · 투자금</h2>
-      <div class="bt-field" style="margin-bottom:14px;">
+      <div class="input-row">
         <label>분석 기간</label>
         <div class="date-row">
           <input type="date" id="btStartDate" value="2010-01-01">
@@ -326,23 +308,21 @@
           <input type="date" id="btEndDate">
         </div>
       </div>
-      <div class="bt-grid2">
-        <div class="bt-field">
-          <label>초기 투자금</label>
-          <div class="input-group">
-            <input type="number" id="btSeed" class="calc-input" value="10000000" min="0" step="1000000">
-            <span class="unit">원</span>
-          </div>
-          <div class="input-hint" id="btSeedHint">₩10,000,000</div>
+      <div class="input-row">
+        <label>초기 투자금</label>
+        <div class="input-group">
+          <input type="number" id="btSeed" class="calc-input" value="10000000" min="0" step="1000000">
+          <span class="unit">원</span>
         </div>
-        <div class="bt-field">
-          <label>월 적립금</label>
-          <div class="input-group">
-            <input type="number" id="btMonthly" class="calc-input" value="0" min="0" step="100000">
-            <span class="unit">원</span>
-          </div>
-          <div class="input-hint" id="btMonthlyHint">₩0</div>
+        <div class="input-hint" id="btSeedHint">₩10,000,000</div>
+      </div>
+      <div class="input-row">
+        <label>월 적립금</label>
+        <div class="input-group">
+          <input type="number" id="btMonthly" class="calc-input" value="0" min="0" step="100000">
+          <span class="unit">원</span>
         </div>
+        <div class="input-hint" id="btMonthlyHint">₩0</div>
       </div>
     </section>
 
@@ -755,24 +735,41 @@ function btBuildCondSummary(body) {
 function btRefreshWeightBar() {
   const total = btTickers.reduce((s, t) => s + t.weight, 0);
   const pct   = Math.round(total * 100);
-  document.getElementById('btWeightTotal').textContent = pct + '%';
-  document.getElementById('btWeightTotal').style.color = pct === 100 ? 'var(--up)' : 'var(--down)';
-  document.getElementById('btWeightBar').style.width      = Math.min(pct, 100) + '%';
-  document.getElementById('btWeightBar').style.background = pct === 100 ? 'var(--up)' : 'var(--down)';
+  const fill  = document.getElementById('btWeightBar');
+  const label = document.getElementById('btWeightTotal');
+  const warn  = document.getElementById('btWeightWarn');
+  label.textContent = pct + '%';
+  fill.style.width  = Math.min(pct, 100) + '%';
+  if (pct === 100) {
+    fill.style.background = 'var(--up)';
+    label.className = 'weight-total-num ok';
+    if (warn) warn.textContent = '';
+  } else if (pct > 100) {
+    fill.style.background = 'var(--down)';
+    label.className = 'weight-total-num over';
+    if (warn) warn.textContent = '⚠ 비중 합계가 100%를 초과했어요';
+  } else {
+    fill.style.background = 'var(--brand)';
+    label.className = 'weight-total-num';
+    if (warn) warn.textContent = pct > 0 ? `나머지 ${100 - pct}%는 현금으로 유지됩니다` : '';
+  }
 }
 
 // 종목 추가/삭제 시에만 전체 리스트 재생성.
 function updateBtWeightUI() {
   btRefreshWeightBar();
-  const ph = document.getElementById('btTickerPlaceholder');
-  if (ph) ph.style.display = btTickers.length ? 'none' : 'block';
-
-  document.getElementById('btTickerList').innerHTML = btTickers.map((t, i) => `
+  const list = document.getElementById('btTickerList');
+  if (!btTickers.length) {
+    list.innerHTML = '<div class="ticker-empty" id="btTickerPlaceholder">종목을 검색해서 추가해보세요</div>';
+    return;
+  }
+  list.innerHTML = btTickers.map((t, i) => `
     <div class="ticker-item">
       <span class="ticker-badge">${t.code}</span>
-      <span class="ticker-name">${(t.name || '').substring(0, 10)}</span>
+      <span class="ticker-name">${t.name || ''}</span>
       <input type="number" class="ticker-weight-input" value="${Math.round(t.weight*100)}" min="1" max="100"
-        oninput="btW(this, ${i})"> %
+        oninput="btW(this, ${i})">
+      <span class="ticker-weight-pct">%</span>
       <input type="range" class="ticker-weight-slider" value="${Math.round(t.weight*100)}" min="1" max="100"
         oninput="btW(this, ${i})">
       <button class="ticker-remove-btn" onclick="btRemoveTicker(${i})">×</button>
@@ -805,25 +802,25 @@ btInput.addEventListener('input', e => {
   const q = e.target.value.trim();
   if (!q) { btDropdown.style.display = 'none'; return; }
   clearTimeout(btSearchTimer);
-  btDropdown.innerHTML = '<div class="nav-search-hint">검색 중...</div>';
+  btDropdown.innerHTML = '<div style="padding:12px;font-size:0.82rem;color:var(--text-muted)">검색 중...</div>';
   btDropdown.style.display = 'block';
   btSearchTimer = setTimeout(async () => {
     const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
     const data = await res.json();
-    if (!data.length) { btDropdown.innerHTML = '<div class="nav-search-hint">결과 없음</div>'; return; }
+    if (!data.length) { btDropdown.innerHTML = '<div style="padding:12px;font-size:0.82rem;color:var(--text-muted)">검색 결과 없음</div>'; return; }
     btDropdown.innerHTML = data.map(item => `
-      <div class="nav-search-result" onclick="btAddTicker('${item.code}','${item.name.replace(/'/g,"\\'")}')">
-        <span class="nav-search-badge" style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
-        <div class="nav-search-info">
-          <div class="nav-search-code">${item.code}</div>
-          <div class="nav-search-name">${item.name}</div>
+      <div class="ticker-drop-item" onclick="btAddTicker('${item.code}','${item.name.replace(/'/g,"\\'")}')">
+        <span class="ticker-drop-badge" style="background:${badgeColor(item.badge)}22;color:${badgeColor(item.badge)}">${item.badge}</span>
+        <div>
+          <div class="ticker-drop-code">${item.code}</div>
+          <div class="ticker-drop-name">${item.name}</div>
         </div>
       </div>`).join('');
   }, 250);
 });
 
 document.addEventListener('click', e => {
-  if (!btInput.closest('.ticker-search-wrap').contains(e.target))
+  if (!btInput.closest('.ticker-search-box').contains(e.target))
     btDropdown.style.display = 'none';
 });
 

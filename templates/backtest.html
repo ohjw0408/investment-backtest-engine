@@ -24,9 +24,11 @@
     "money options"
     "advanced advanced";
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
   margin-bottom: 16px;
 }
+/* 2열 카드만 동일높이 stretch (moreopt-card는 제외 — max-height 슬라이드와 flex 충돌 방지) */
+.bt-money-card, .bt-options-card { display: flex; flex-direction: column; }
 .bt-input-grid > .bt-fcard { margin-bottom: 0; }
 .bt-full { grid-column: 1 / -1; }
 .bt-assets-card { grid-area: assets; }

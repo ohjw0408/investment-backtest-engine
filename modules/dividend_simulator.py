@@ -105,6 +105,9 @@ class DividendSimulator:
         self._account_type = account_type
         self._isa_total_limit = isa_total_limit
         self._price_cache: Dict[str, pd.DataFrame] = {}
+        self._wmcache: Dict[tuple, tuple] = {}   # (start,end)→(m_data,m_dates) 월변환 캐시(seed/monthly 무관)
+        self._div_stats_cache = None             # _calc_div_stats 1회 캐시(tickers만 의존)
+        self._mvn_fit_cache: Dict[tuple, tuple] = {}   # MVN 피팅(mu/chol/배당) 캐시(tickers만 의존)
         self._sim_cache:   Dict[str, List[float]]   = {}
         # 절세액 P4 — _sim_cache와 같은 키, 윈도우별 {assumed, actual, saving} (실측 윈도우만)
         self._savings_cache: Dict[str, list] = {}
@@ -162,12 +165,14 @@ class DividendSimulator:
                 return 0.0
             data[t] = sliced
 
-        return self._simulate_from_data(data, seed, monthly, years, end)
+        return self._simulate_from_data(data, seed, monthly, years, end,
+                                        window_key=(start, end))
 
-    def _simulate_from_data(self, data, seed, monthly, years, end) -> float:
+    def _simulate_from_data(self, data, seed, monthly, years, end, window_key=None) -> float:
         """주입된 가격데이터(실측 슬라이스 또는 MVN 합성)로 1윈도우 시뮬.
 
         data = {ticker: df[close,dividend] (일별, date index)}, end = pd.Timestamp.
+        window_key 주어지면 월변환 결과를 (start,end)로 캐시(seed/monthly 무관 → 역산 재사용).
         _simulate_one의 본체를 추출(실측·MVN 합성 공용). 반환 = 마지막 1년 순배당 합계.
         """
         from modules.config.simulation_config import SimulationConfig
@@ -182,7 +187,14 @@ class DividendSimulator:
         from modules.simulation.monthly_mode import to_monthly_price_data, last_year_dividend
         from modules.rebalance.periodic import PeriodicRebalance
 
-        m_data, m_dates = to_monthly_price_data(data)
+        # 월변환(resample)은 seed/monthly 무관·(start,end)만 의존 → 역산이 같은 윈도우를
+        # 여러 seed/monthly로 재평가할 때 캐시 재사용(결과 불변: 동일 to_monthly 출력 메모이즈).
+        if window_key is not None and window_key in self._wmcache:
+            m_data, m_dates = self._wmcache[window_key]
+        else:
+            m_data, m_dates = to_monthly_price_data(data)
+            if window_key is not None:
+                self._wmcache[window_key] = (m_data, m_dates)
         # 종목별 시작 시차 → 전 종목 유효한 첫 월부터 (leading NaN 가격 오염 방지)
         valid_froms = [df["close"].first_valid_index() for df in m_data.values()]
         if any(v is None for v in valid_froms):
@@ -272,7 +284,10 @@ class DividendSimulator:
     def _calc_div_stats(self) -> dict:
         """
         실제 배당 데이터에서 배당률/성장률/연평균수익률 분포 계산
+        (tickers만 의존 → 1회 계산 캐시. 역산이 후보마다 재계산하던 비용 제거, 결과 불변.)
         """
+        if self._div_stats_cache is not None:
+            return self._div_stats_cache
         stats = {}
         for t in self.tickers:
             df = self._load(t)
@@ -376,6 +391,7 @@ class DividendSimulator:
                 "reliable": False,
             }
 
+        self._div_stats_cache = stats
         return stats
 
     def _simulate_synthetic(self, seed, monthly, years, div_stats, rng) -> float:
@@ -476,56 +492,68 @@ class DividendSimulator:
         if k == 0:
             return []
 
-        # ── 종목별 일일수익 mu/sigma + 상관 피팅 (실데이터만) ──
-        today = pd.Timestamp.today()
-        look_from = (today - pd.DateOffset(years=25)).strftime("%Y-%m-%d")
-        end_str   = today.strftime("%Y-%m-%d")
-        rets = {}
-        for code in self.tickers:
-            try:
-                df = self.loader.get_price(code, look_from, end_str, allow_synthetic=False)
-                if df is None or len(df) == 0:
-                    continue
-                df = df.copy(); df["date"] = pd.to_datetime(df["date"])
-                s = df.set_index("date")["close"].astype(float).sort_index()
-                r = s.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
-                r = r[r.abs() < 0.5]
-                if len(r) >= 60:
-                    rets[code] = r
-            except Exception:
-                pass
-        if len(rets) < k:
-            return []   # 통계 못 얻은 종목 존재 → 호출부 폴백
+        # ── 피팅(get_price 25년 로드 + mu/sigma/상관/배당)은 tickers만 의존 → 1회 캐시.
+        #    역산이 후보(seed/monthly/years)마다 재피팅하던 폭발 제거(결과 불변). ──
+        fit_key = tuple(self.tickers)
+        cached = self._mvn_fit_cache.get(fit_key)
+        if cached is None:
+            today = pd.Timestamp.today()
+            look_from = (today - pd.DateOffset(years=25)).strftime("%Y-%m-%d")
+            end_str   = today.strftime("%Y-%m-%d")
+            rets = {}
+            for code in self.tickers:
+                try:
+                    df = self.loader.get_price(code, look_from, end_str, allow_synthetic=False)
+                    if df is None or len(df) == 0:
+                        continue
+                    df = df.copy(); df["date"] = pd.to_datetime(df["date"])
+                    s = df.set_index("date")["close"].astype(float).sort_index()
+                    r = s.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
+                    r = r[r.abs() < 0.5]
+                    if len(r) >= 60:
+                        rets[code] = r
+                except Exception:
+                    pass
+            if len(rets) < k:
+                self._mvn_fit_cache[fit_key] = False   # 피팅 불가 표시(폴백)
+                return []
 
-        mu_raw = np.array([rets[c].mean()      for c in self.tickers], float)
-        sig    = np.array([rets[c].std(ddof=1) for c in self.tickers], float)
-        if not (np.all(np.isfinite(mu_raw)) and np.all(sig > 0)):
-            return []
-        mu_d = np.minimum(mu_raw, MAX_SYNTH_MU_MONTHLY / TRADING_DAYS_PER_MONTH)
+            mu_raw = np.array([rets[c].mean()      for c in self.tickers], float)
+            sig    = np.array([rets[c].std(ddof=1) for c in self.tickers], float)
+            if not (np.all(np.isfinite(mu_raw)) and np.all(sig > 0)):
+                self._mvn_fit_cache[fit_key] = False
+                return []
+            mu_d = np.minimum(mu_raw, MAX_SYNTH_MU_MONTHLY / TRADING_DAYS_PER_MONTH)
 
-        aligned = pd.DataFrame({c: rets[c] for c in self.tickers}).dropna()
-        if len(aligned) >= 120:
-            corr = np.corrcoef(aligned.values, rowvar=False)
-            corr = np.nan_to_num(corr, nan=0.0)
-            np.fill_diagonal(corr, 1.0)
-        else:
-            corr = np.eye(k)
-        cov_d = np.outer(sig, sig) * corr
-        try:
-            chol = np.linalg.cholesky(cov_d + np.eye(k) * 1e-12)
-        except Exception:
-            w, V = np.linalg.eigh((cov_d + cov_d.T) / 2)
-            cov_d = V @ np.diag(np.clip(w, 1e-12, None)) @ V.T
+            aligned = pd.DataFrame({c: rets[c] for c in self.tickers}).dropna()
+            if len(aligned) >= 120:
+                corr = np.corrcoef(aligned.values, rowvar=False)
+                corr = np.nan_to_num(corr, nan=0.0)
+                np.fill_diagonal(corr, 1.0)
+            else:
+                corr = np.eye(k)
+            cov_d = np.outer(sig, sig) * corr
             try:
                 chol = np.linalg.cholesky(cov_d + np.eye(k) * 1e-12)
             except Exception:
-                chol = np.diag(sig)
+                w, V = np.linalg.eigh((cov_d + cov_d.T) / 2)
+                cov_d = V @ np.diag(np.clip(w, 1e-12, None)) @ V.T
+                try:
+                    chol = np.linalg.cholesky(cov_d + np.eye(k) * 1e-12)
+                except Exception:
+                    chol = np.diag(sig)
 
-        # 종목별 연 배당수익률 (자체 _calc_div_stats — 종목별 annual_yield_mean)
-        div_stats = self._calc_div_stats() or {}
-        div_yield = {c: max(float(div_stats.get(c, {}).get("annual_yield_mean", 0.0) or 0.0), 0.0)
-                     for c in self.tickers}
+            div_stats = self._calc_div_stats() or {}
+            div_yield = {c: max(float(div_stats.get(c, {}).get("annual_yield_mean", 0.0) or 0.0), 0.0)
+                         for c in self.tickers}
+            self._mvn_fit_cache[fit_key] = (mu_d, chol, div_yield)
+            cached = self._mvn_fit_cache[fit_key]
 
+        if cached is False:
+            return []   # 캐시된 피팅 실패 → 폴백
+        mu_d, chol, div_yield = cached
+
+        today = pd.Timestamp.today()
         # horizon 영업일 캘린더 + 분기말(3·6·9·12월 마지막 영업일) = 배당 지급일
         dates = pd.bdate_range(start=(today - pd.DateOffset(years=years)), end=today)
         n_days = len(dates)

@@ -298,15 +298,18 @@ function stDivGoalYears(base, initial, monthly, target, basis) {
   return null;
 }
 
-/** 축 입력(만원 단위, 쉼표) → 원 단위 배열(중복·음수 제거, 오름차순). 비거나 오류면 폴백. */
-function stParseAxis(id, fallback) {
-  const el = document.getElementById(id);
-  if (!el) return fallback;
-  const vals = (el.value || '').split(',')
-    .map(s => parseFloat(s.trim()) * 10000)
-    .filter(v => !isNaN(v) && v >= 0);
-  const uniq = [...new Set(vals)].sort((a, b) => a - b);
-  return uniq.length ? uniq : fallback;
+// 배당 목표 역산 축(원 단위) — 사용자가 칸 단위로 추가/삭제/편집
+const stDgAxes = {
+  monthly: [0, 250000, 500000, 750000, 1000000, 1500000, 2000000, 3000000],
+  initial: [0, 50000000, 100000000, 200000000, 300000000, 500000000],
+};
+
+function stRenderAxisChips(axis) {
+  const wrap = document.getElementById(axis === 'monthly' ? 'stDgMonthlyChips' : 'stDgInitialChips');
+  if (!wrap) return;
+  wrap.innerHTML = stDgAxes[axis].map((v, i) =>
+    `<span class="st-axis-chip"><input type="number" min="0" step="${axis === 'monthly' ? 100000 : 10000000}" value="${v}" data-axis="${axis}" data-i="${i}"><button type="button" class="st-axis-del" data-axis="${axis}" data-i="${i}" title="삭제">×</button></span>`
+  ).join('');
 }
 
 function stRenderDividendGoal() {
@@ -321,9 +324,10 @@ function stRenderDividendGoal() {
   const target = stNum('stDgTarget', 0);
   const basis  = (document.querySelector('input[name="stDgBasis"]:checked') || {}).value || 'nominal';
 
-  // 축: 사용자 입력(만원 단위, 쉼표 구분) → 원. 빈/오류 시 기본값 폴백.
-  const monthlys = stParseAxis('stDgMonthlyAxis', [0, 250000, 500000, 750000, 1000000, 1500000, 2000000, 3000000]);
-  const initials = stParseAxis('stDgInitialAxis', [0, 50000000, 100000000, 200000000, 300000000, 500000000]);
+  // 축: 사용자 칸 입력(원) — 음수/중복 제거 + 오름차순(차트·표용).
+  const clean = arr => [...new Set(arr.filter(v => !isNaN(v) && v >= 0))].sort((a, b) => a - b);
+  const monthlys = clean(stDgAxes.monthly);
+  const initials = clean(stDgAxes.initial);
   const palette = ['#0052ff', '#05b169', '#7B1FA2', '#E8830C', '#C62828', '#0097A7', '#00897B', '#5E35B1', '#D81B60', '#3949AB'];
 
   const datasets = initials.map((init, i) => ({
@@ -361,7 +365,36 @@ function stInit() {
   wire('stPanel-inflation', stRenderInflation);
   wire('stPanel-realvalue', stRenderRealValue);
   wire('stPanel-dividend', stRenderDividend);
+
+  // 배당 목표 역산 — 동적 축 칸 (입력 편집·삭제·추가는 위임)
+  stRenderAxisChips('monthly');
+  stRenderAxisChips('initial');
+  ['stDgMonthlyChips', 'stDgInitialChips'].forEach(id => {
+    const wrap = document.getElementById(id);
+    if (!wrap) return;
+    wrap.addEventListener('input', e => {
+      const inp = e.target.closest('input[data-axis]'); if (!inp) return;
+      stDgAxes[inp.dataset.axis][+inp.dataset.i] = parseFloat(inp.value) || 0;
+      stRenderDividendGoal();
+    });
+    wrap.addEventListener('click', e => {
+      const del = e.target.closest('.st-axis-del'); if (!del) return;
+      const ax = del.dataset.axis;
+      if (stDgAxes[ax].length <= 1) return;   // 최소 1칸 유지
+      stDgAxes[ax].splice(+del.dataset.i, 1);
+      stRenderAxisChips(ax);
+      stRenderDividendGoal();
+    });
+  });
+  document.querySelectorAll('.st-axis-add').forEach(btn => btn.addEventListener('click', () => {
+    const ax = btn.dataset.axis;
+    const arr = stDgAxes[ax];
+    arr.push(arr.length ? arr[arr.length - 1] + (ax === 'monthly' ? 500000 : 50000000) : 0);
+    stRenderAxisChips(ax);
+    stRenderDividendGoal();
+  }));
   wire('stPanel-dividendgoal', stRenderDividendGoal);
+
   stSwitchTab('compound');
 }
 

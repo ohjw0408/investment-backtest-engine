@@ -43,7 +43,13 @@
 .st-howto ol { margin:6px 0 0; padding-left:18px; }
 .st-howto li { margin-bottom:2px; }
 .st-axis-field { grid-column:1 / -1; }
-.st-axis-field .calc-input { font-family:var(--font-mono); }
+.st-axis-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.st-axis-chip { display:inline-flex; align-items:center; background:var(--ds-soft); border:1px solid var(--ds-hairline); border-radius:var(--r-md); padding:2px 2px 2px 4px; }
+.st-axis-chip input { width:96px; border:none; background:transparent; font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:0.85rem; color:var(--ds-ink); padding:6px 4px; outline:none; text-align:right; }
+.st-axis-del { border:none; background:transparent; color:var(--ds-muted); cursor:pointer; font-size:1rem; line-height:1; padding:0 6px; border-radius:var(--r-sm); }
+.st-axis-del:hover { color:var(--down); }
+.st-axis-add { margin-top:8px; display:inline-flex; align-items:center; gap:5px; background:var(--brand-tint); color:var(--brand-text); border:1px dashed var(--brand); border-radius:var(--r-md); padding:7px 14px; font-size:var(--fs-cap); font-weight:700; cursor:pointer; font-family:var(--font-sans); }
+.st-axis-add:hover { background:var(--brand); color:var(--on-brand); }
 .st-table-wrap { max-height:320px; overflow-y:auto; border:1px solid var(--ds-hairline); border-radius:var(--r-lg); }
 .st-table { width:100%; border-collapse:collapse; font-size:var(--fs-cap); }
 .st-table th { position:sticky; top:0; background:var(--ds-soft); font-weight:600; color:var(--ds-muted); padding:10px 12px; text-align:right; border-bottom:1px solid var(--ds-hairline); }
@@ -227,12 +233,14 @@
         <input type="checkbox" id="stDgTaxed" checked><label for="stDgTaxed" style="margin:0;">배당소득세 (15.4%)</label>
       </div>
       <div class="st-field st-axis-field">
-        <label>↔ 가로축 — 월 적립액 <span style="color:var(--ds-muted);font-weight:400;">(만원, 쉼표 구분)</span></label>
-        <input type="text" id="stDgMonthlyAxis" class="calc-input" value="0, 25, 50, 75, 100, 150, 200, 300">
+        <label>↔ 가로축 — 월 적립액 <span style="color:var(--ds-muted);font-weight:400;">(원)</span></label>
+        <div class="st-axis-chips" id="stDgMonthlyChips"></div>
+        <button type="button" class="st-axis-add" data-axis="monthly">＋ 칸 추가</button>
       </div>
       <div class="st-field st-axis-field">
-        <label>↕ 세로축(선) — 초기 투자금 <span style="color:var(--ds-muted);font-weight:400;">(만원, 쉼표 구분)</span></label>
-        <input type="text" id="stDgInitialAxis" class="calc-input" value="0, 5000, 10000, 20000, 30000, 50000">
+        <label>↕ 세로축(선) — 초기 투자금 <span style="color:var(--ds-muted);font-weight:400;">(원)</span></label>
+        <div class="st-axis-chips" id="stDgInitialChips"></div>
+        <button type="button" class="st-axis-add" data-axis="initial">＋ 칸 추가</button>
       </div>
     </div>
 
@@ -300,5 +308,5 @@
 
 </div>
 
-<script src="{{ url_for('static', filename='js/simple_tools.js') }}?v=20260621divgoal3"></script>
+<script src="{{ url_for('static', filename='js/simple_tools.js') }}?v=20260621divgoal4"></script>
 {% endblock %}

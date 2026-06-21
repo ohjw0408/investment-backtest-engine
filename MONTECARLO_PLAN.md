@@ -53,9 +53,12 @@ prod 동기 probe로 검증한 올바른 분포(독립 MC 50경로): p10 **0(고
 - `allow_synthetic` 게이팅 정리: 인출 투영은 horizon>실데이터면 항상 MC(축적과 동일 결).
 - ⚠️ 병렬 워커(`_run_wd_case` 전역 `_w_price_data`) 구조 — per-window 합성은 순차 생성 후 워커에 주입하거나, 축적처럼 순차 실행 경로 분리.
 
-### P2. 배당금 — dividend_simulator MVN 이식
-- `_simulate_synthetic`/`_run_synthetic_rolling` 단일종목 GBM → estimate_joint_stats + generate_joint_window 기반 다종목 상관 합성으로 교체.
-- 배당 통계도 종목별 실 yield 유지(이미 div_stats 있음 — 종목별로 확장).
+### ✅ P2. 배당금 — dividend_simulator MVN 이식 (완료 2026-06-21)
+- `_simulate_from_data(data, seed, monthly, years, end)` 추출 — `_simulate_one` 본체(실측·MVN 합성 공용 시뮬 코어).
+- `_run_mvn_div_cases`: get_price(allow_synthetic=False)로 종목별 일일 mu/sigma + 상관행렬(corrcoef·nearest-PSD cholesky) 피팅 → 경로마다 상관 다변량-t 풀-호라이즌 독립 생성 + 종목별 실 배당수익률(`_calc_div_stats` annual_yield_mean) 분기주입 → `_simulate_from_data` 실행. drift 캡(MAX_SYNTH_MU_MONTHLY).
+- `_run_rolling` 3단(부족분 보충): MVN 우선 → 실패 시 구 단일종목 GBM(`_run_synthetic_rolling`) 폴백.
+- **검증**: 배당 타겟테스트 10 passed. probe(SCHD60/QQQ40 10년 무적립, 마지막1년 배당): 구 GBM p10/p50/p90=**975/994/1014만**(분포 없음·비현실) → MVN=**440/928/1687만**(현실적, spread 32배). 종목별 변동성+상관 반영.
+- ⚠️ 합성 발동은 실데이터<기간(짧은역사 종목)일 때만 — SCHD/QQQ 등 긴역사는 실측 경로(1단). MultiDividendSimulator(`dividend_multi._run_synthetic_rolling`)는 미적용(별도).
 
 ### P3. 계산기·백테스트 검증
 - 계산기: AccumulationAnalyzer가 use_synthetic 시 MVN 쓰는지 prod 실측(이미 ✅로 보임). 단일 합성경로 아님 확인.

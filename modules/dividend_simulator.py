@@ -149,18 +149,6 @@ class DividendSimulator:
         - 비중합<100% 잔여는 CashAllocator가 전액 투자(구: 미투자 방치). UI는 합 100 강제.
         ※ self.fee_engine은 프로덕션 미사용(항상 None) — 신 경로 미반영.
         """
-        from modules.config.simulation_config import SimulationConfig
-        from modules.core.portfolio import Portfolio, TaxTrackedPortfolio
-        from modules.execution.order_executor import OrderExecutor, TaxedOrderExecutor
-        from modules.execution.cash_allocator import CashAllocator
-        from modules.simulation.dividend_engine import DividendEngine
-        from modules.simulation.contribution_engine import ContributionEngine
-        from modules.simulation.withdrawal_engine import WithdrawalEngine
-        from modules.simulation.history_recorder import HistoryRecorder
-        from modules.simulation.simulation_loop import SimulationLoop
-        from modules.simulation.monthly_mode import to_monthly_price_data, last_year_dividend
-        from modules.rebalance.periodic import PeriodicRebalance
-
         start = pd.Timestamp(start_date)
         end   = start + pd.DateOffset(years=years)
 
@@ -173,6 +161,26 @@ class DividendSimulator:
             if sliced.empty:
                 return 0.0
             data[t] = sliced
+
+        return self._simulate_from_data(data, seed, monthly, years, end)
+
+    def _simulate_from_data(self, data, seed, monthly, years, end) -> float:
+        """주입된 가격데이터(실측 슬라이스 또는 MVN 합성)로 1윈도우 시뮬.
+
+        data = {ticker: df[close,dividend] (일별, date index)}, end = pd.Timestamp.
+        _simulate_one의 본체를 추출(실측·MVN 합성 공용). 반환 = 마지막 1년 순배당 합계.
+        """
+        from modules.config.simulation_config import SimulationConfig
+        from modules.core.portfolio import Portfolio, TaxTrackedPortfolio
+        from modules.execution.order_executor import OrderExecutor, TaxedOrderExecutor
+        from modules.execution.cash_allocator import CashAllocator
+        from modules.simulation.dividend_engine import DividendEngine
+        from modules.simulation.contribution_engine import ContributionEngine
+        from modules.simulation.withdrawal_engine import WithdrawalEngine
+        from modules.simulation.history_recorder import HistoryRecorder
+        from modules.simulation.simulation_loop import SimulationLoop
+        from modules.simulation.monthly_mode import to_monthly_price_data, last_year_dividend
+        from modules.rebalance.periodic import PeriodicRebalance
 
         m_data, m_dates = to_monthly_price_data(data)
         # 종목별 시작 시차 → 전 종목 유효한 첫 월부터 (leading NaN 가격 오염 방지)
@@ -452,9 +460,110 @@ class DividendSimulator:
 
         return last_year_div
 
+    def _run_mvn_div_cases(self, seed, monthly, years, n_needed) -> List[float]:
+        """MVN 몬테카를로 합성 케이스 (P2 — 종목별 mu/sigma + 상관 다변량-t).
+
+        WithdrawalAnalyzer._run_mvn_cases 패턴: estimate 대신 get_price(allow_synthetic=False)로
+        종목별 일일수익 mu/sigma + 상관행렬을 피팅하고, 경로마다 상관 반영 다변량-t로 horizon
+        전체 가격을 독립 생성한 뒤 종목별 실 배당수익률을 분기 주입 → 기존 시뮬 코어
+        (_simulate_from_data) 실행. 단일종목 집계 GBM(_simulate_synthetic)을 대체한다.
+        피팅 실패 시 []를 반환(호출부가 _run_synthetic_rolling로 폴백).
+        """
+        from modules.retirement.synthetic_price_generator import (
+            SYNTHETIC_DF, T_SCALE, MAX_SYNTH_MU_MONTHLY, TRADING_DAYS_PER_MONTH,
+        )
+        k = len(self.tickers)
+        if k == 0:
+            return []
+
+        # ── 종목별 일일수익 mu/sigma + 상관 피팅 (실데이터만) ──
+        today = pd.Timestamp.today()
+        look_from = (today - pd.DateOffset(years=25)).strftime("%Y-%m-%d")
+        end_str   = today.strftime("%Y-%m-%d")
+        rets = {}
+        for code in self.tickers:
+            try:
+                df = self.loader.get_price(code, look_from, end_str, allow_synthetic=False)
+                if df is None or len(df) == 0:
+                    continue
+                df = df.copy(); df["date"] = pd.to_datetime(df["date"])
+                s = df.set_index("date")["close"].astype(float).sort_index()
+                r = s.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
+                r = r[r.abs() < 0.5]
+                if len(r) >= 60:
+                    rets[code] = r
+            except Exception:
+                pass
+        if len(rets) < k:
+            return []   # 통계 못 얻은 종목 존재 → 호출부 폴백
+
+        mu_raw = np.array([rets[c].mean()      for c in self.tickers], float)
+        sig    = np.array([rets[c].std(ddof=1) for c in self.tickers], float)
+        if not (np.all(np.isfinite(mu_raw)) and np.all(sig > 0)):
+            return []
+        mu_d = np.minimum(mu_raw, MAX_SYNTH_MU_MONTHLY / TRADING_DAYS_PER_MONTH)
+
+        aligned = pd.DataFrame({c: rets[c] for c in self.tickers}).dropna()
+        if len(aligned) >= 120:
+            corr = np.corrcoef(aligned.values, rowvar=False)
+            corr = np.nan_to_num(corr, nan=0.0)
+            np.fill_diagonal(corr, 1.0)
+        else:
+            corr = np.eye(k)
+        cov_d = np.outer(sig, sig) * corr
+        try:
+            chol = np.linalg.cholesky(cov_d + np.eye(k) * 1e-12)
+        except Exception:
+            w, V = np.linalg.eigh((cov_d + cov_d.T) / 2)
+            cov_d = V @ np.diag(np.clip(w, 1e-12, None)) @ V.T
+            try:
+                chol = np.linalg.cholesky(cov_d + np.eye(k) * 1e-12)
+            except Exception:
+                chol = np.diag(sig)
+
+        # 종목별 연 배당수익률 (자체 _calc_div_stats — 종목별 annual_yield_mean)
+        div_stats = self._calc_div_stats() or {}
+        div_yield = {c: max(float(div_stats.get(c, {}).get("annual_yield_mean", 0.0) or 0.0), 0.0)
+                     for c in self.tickers}
+
+        # horizon 영업일 캘린더 + 분기말(3·6·9·12월 마지막 영업일) = 배당 지급일
+        dates = pd.bdate_range(start=(today - pd.DateOffset(years=years)), end=today)
+        n_days = len(dates)
+        if n_days < 60:
+            return []
+        t_scale = float(T_SCALE)
+        q_end_pos = []
+        for m in (3, 6, 9, 12):
+            for y in sorted(set(dates.year)):
+                sub = np.where((dates.year == y) & (dates.month == m))[0]
+                if len(sub):
+                    q_end_pos.append(sub[-1])
+
+        results = []
+        for p in range(n_needed):
+            rng = np.random.default_rng(seed=20260621 + p)
+            z   = rng.standard_t(df=SYNTHETIC_DF, size=(n_days, k)) / t_scale
+            ret = z @ chol.T + mu_d
+            data = {}
+            for j, code in enumerate(self.tickers):
+                close = 100.0 * np.cumprod(1.0 + ret[:, j])
+                dy    = div_yield.get(code, 0.0)
+                divs  = np.zeros(n_days)
+                if dy > 0:
+                    for pos in q_end_pos:
+                        divs[pos] = close[pos] * (dy / 4.0)
+                data[code] = pd.DataFrame({"close": close, "dividend": divs}, index=dates)
+            try:
+                val = self._simulate_from_data(data, seed, monthly, years, dates[-1])
+                if val > 0:
+                    results.append(val)
+            except Exception:
+                pass
+        return results
+
     def _run_synthetic_rolling(self, seed, monthly, years, n_needed) -> List[float]:
         """
-        가상 데이터로 n_needed개 케이스 생성
+        가상 데이터로 n_needed개 케이스 생성 (구 단일종목 집계 GBM — MVN 폴백).
         충분히 긴 가상 시계열 1개 만들어서 롤링
         """
         div_stats = self._calc_div_stats()
@@ -553,8 +662,12 @@ class DividendSimulator:
             else:
                 # 3단 — 부족분만 가상으로 보충 (실측/백필 케이스는 유지).
                 # [SYNTHETIC_PATH: In-Memory] DB 기록 없음. 합성 윈도우는 절세액·수수료 미산출.
+                # P2: MVN 몬테카를로(종목별 mu/sigma+상관) 우선, 실패 시 구 단일종목 GBM 폴백.
                 need    = self.MIN_CASES - len(full)
-                results = full + self._run_synthetic_rolling(seed, monthly, years, need)
+                synth   = self._run_mvn_div_cases(seed, monthly, years, need)
+                if not synth:
+                    synth = self._run_synthetic_rolling(seed, monthly, years, need)
+                results = full + synth
                 savings = full_sav
                 fees    = full_fees
         self._sim_cache[cache_key] = results

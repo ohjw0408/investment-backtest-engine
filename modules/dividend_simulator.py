@@ -12,6 +12,27 @@ from typing import Optional, List, Dict
 from modules.sim.fee_engine import FeeEngine
 
 
+class _DividendOnlyRecorder:
+    """배당 역산 전용 경량 레코더 — 결과(last_year_dividend·절세)에 쓰이는 date·
+    dividend_income만 적재. 일반 HistoryRecorder가 매일 계산하던 포폴 평가/종목별
+    value·quantity·weight(전부 미사용) + 15컬럼 DataFrame 구성을 생략해 윈도우당 비용 절감.
+    결과 동일(동일 배당 흐름)."""
+    __slots__ = ("_dates", "_divs")
+
+    def __init__(self):
+        self._dates = []
+        self._divs = []
+
+    def record(self, date, portfolio, price_dict, tickers, dividend_by_ticker, cash_flow=0.0):
+        self._dates.append(date)
+        self._divs.append(sum(dividend_by_ticker.values()))
+
+    def to_dataframe(self):
+        if not self._dates:
+            return pd.DataFrame()
+        return pd.DataFrame({"date": self._dates, "dividend_income": self._divs})
+
+
 def _finite_float(value, default=0.0) -> float:
     try:
         v = float(value)
@@ -204,7 +225,6 @@ class DividendSimulator:
         from modules.simulation.dividend_engine import DividendEngine
         from modules.simulation.contribution_engine import ContributionEngine
         from modules.simulation.withdrawal_engine import WithdrawalEngine
-        from modules.simulation.history_recorder import HistoryRecorder
         from modules.simulation.simulation_loop import SimulationLoop
         from modules.simulation.monthly_mode import to_monthly_price_data, last_year_dividend
         from modules.rebalance.periodic import PeriodicRebalance
@@ -270,7 +290,7 @@ class DividendSimulator:
 
         loop = SimulationLoop(div_engine, ContributionEngine(), WithdrawalEngine(),
                               executor, CashAllocator())
-        recorder = HistoryRecorder()
+        recorder = _DividendOnlyRecorder()   # date·dividend_income만 필요(평가 컬럼 미사용)
         loop.run(portfolio, strategy, cfg, m_data, m_dates, recorder)
         history_df = recorder.to_dataframe()
         self._last_fees = float(getattr(portfolio, "total_fees", 0.0))   # D4 윈도우 거래수수료

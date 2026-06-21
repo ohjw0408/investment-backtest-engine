@@ -26,6 +26,7 @@ import pandas as pd
 from modules.backfill_engine              import BackfillEngine
 from modules.retirement.ticker_stats_cache       import TickerStatsCache
 from modules.retirement.synthetic_price_generator import generate_and_save
+from modules.seed_util                     import stable_seed
 
 BASE_DIR      = Path(__file__).resolve().parent.parent.parent
 PRICE_DB_PATH = BASE_DIR / "data" / "price_cache" / "price_daily.db"
@@ -309,7 +310,7 @@ class DataPreparer:
                 target_start  = _target_start,
                 actual_start  = actual_start,
                 price_conn    = self.price_conn,
-                seed          = abs(hash(code)) % 100000,
+                seed          = stable_seed(code, 100000),
             )
 
             if gen_result["status"] == "ok":
@@ -345,7 +346,7 @@ class DataPreparer:
                             code=code,
                             price_series=price_series,
                             annual_yield_src=("musigma", div_yield_mu, div_yield_sigma),
-                            seed=abs(hash(code)) % 2**31,
+                            seed=stable_seed(code),
                             table_name="corporate_actions_synthetic",
                         )
 
@@ -493,7 +494,7 @@ class DataPreparer:
             code             = code,
             price_series     = series,
             annual_yield_src = ("musigma", dy_mu, dy_sigma),
-            seed             = abs(hash(code)) % 2**31,
+            seed             = stable_seed(code),
             table_name       = "corporate_actions_synthetic",
         )
         self.price_conn.commit()

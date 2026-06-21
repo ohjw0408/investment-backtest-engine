@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
+from modules.seed_util import stable_seed
+
 
 # use_synthetic=True 시 롤링 케이스를 이 개수까지 윈도우별 독립 합성으로 보충한다.
 # (체크박스 OFF면 보충 없음 — 순수 실데이터 롤링)
@@ -584,7 +586,7 @@ class MultiAccountAnalyzer:
             bdays = pd.bdate_range(start=window_start, end=synth_end)
             synth_df = None
             if len(bdays) > 0:
-                seed = abs(hash(code + ws)) % (2 ** 31)
+                seed = stable_seed(code + ws)
                 n = len(bdays)
                 rng = np.random.default_rng(seed=seed)
                 rets = (rng.standard_t(df=SYNTHETIC_DF, size=n) / T_SCALE) * sig_d + mu_d

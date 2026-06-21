@@ -24,6 +24,7 @@ import pandas as pd
 from modules.retirement.synthetic_price_generator import (
     SYNTHETIC_DF, T_SCALE, TRADING_DAYS_PER_MONTH, MAX_SYNTH_MU_MONTHLY,
 )
+from modules.seed_util import stable_seed
 
 MIN_OBS_DAYS      = 252      # 종목별 최소 일수익 표본
 MIN_OVERLAP_DAYS  = 252      # 쌍별 상관 추정 최소 겹침
@@ -204,7 +205,7 @@ def generate_joint_window(tickers, joint_stats, window_start, window_end, raw_lo
         seg_edges    = [ws] + [b for b in boundaries] + [synth_end + pd.Timedelta(days=1)]
         seg_edges    = sorted(set(seg_edges))
 
-        seed = abs(hash(",".join(use_codes) + "|" + ws_str)) % (2 ** 31)
+        seed = stable_seed(",".join(use_codes) + "|" + ws_str)
         rng  = np.random.default_rng(seed=seed)
 
         # 합성종목별 일일수익 저장(index=영업일)

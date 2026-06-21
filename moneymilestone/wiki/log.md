@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-21] FIX | MC 시드 결정화 (벡터화 P0 선행 + prod 잠재버그) (오너)
+
+- **버그**: MC/가상데이터 시드가 `abs(hash(문자열))` 기반. Python `hash(str)`는 PYTHONHASHSEED 미고정 시 프로세스마다 랜덤 → 같은 입력도 worker 재시작(=매 배포)마다 다른 시드 → 가상데이터/MC 퍼센타일이 흔들림. (확인: 동일 입력 2회 실행 시드 1503432718 vs 303977800.) 벡터화 검증("동일 난수→분포 동일")의 전제가 깨져 P0 골든 마스터 불가.
+- **수정**(오너 승인=A안): `modules/seed_util.py` 신규 `stable_seed(s, mod=2**31)` = md5 기반 결정적 정수. `hash()` 시드 8곳 전부 교체 — backfill_engine(2)·accumulation_analyzer·data_preparer(3, mod 100000/2**31)·multi_account_analyzer·synthetic_mvn. 로직 불변, 시드 출처만 교체. 종목 종류/개수/비중 무관(문자열→md5, 크래시 경로 없음). 기계 무관 → 로컬=prod 일치.
+- **일회성**: 시드값 자체가 hash→md5로 달라져 현 MC 출력이 1회 변함(이후 영구 고정). 실측(비-MC) 무영향. 오너 합의된 재현성 확보 대가.
+- **검증**: stable_seed 2회 실행 동일, 전 모듈 import OK, MC 타겟 33 PASS(synthetic_mvn·wd_synthetic_fallback·anchor_fx·retire accum/withdrawal·div_savings·wd_household).
+- **다음**: P0 골든 마스터 하니스(4탭+멀티 시나리오 퍼센타일 JSON 고정) → P1 MC 합성 벡터.
+
+_작성: Claude_
+
 ## [2026-06-21] FIX | 포트폴리오 분석 — 고급 옵션 접기로 통일(수수료·가상데이터·세금) (오너)
 
 - **지적**: 직전 통일 커밋(a193c99)이 종목/금액 카드 룩만 맞추고 정작 핵심인 "고급 옵션 접기" 구조를 빠뜨림. 다른 3탭(calculator·retirement·dividend_target)은 거래수수료·세금·가상데이터를 `moreopt-card`(접기) 안에 묶는데 백테만 옵션카드 안 수수료 + 별도 가상데이터카드 + 별도 세금카드로 흩어져 있었음.

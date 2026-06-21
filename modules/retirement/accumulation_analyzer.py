@@ -10,6 +10,8 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 from typing import Callable, List, Optional
 
+from modules.seed_util import stable_seed
+
 
 class AccumulationAnalyzer:
 
@@ -523,7 +525,7 @@ class AccumulationAnalyzer:
             bdays = pd.bdate_range(start=window_start, end=synth_end_dt)
 
             if len(bdays) > 0:
-                seed   = abs(hash(code + window_start_str)) % (2 ** 31)
+                seed   = stable_seed(code + window_start_str)
                 n      = len(bdays)
                 mu_d   = mu_monthly / TRADING_DAYS_PER_MONTH
                 sig_d  = sigma_monthly / np.sqrt(TRADING_DAYS_PER_MONTH)

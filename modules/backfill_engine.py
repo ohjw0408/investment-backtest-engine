@@ -25,6 +25,8 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
+from modules.seed_util import stable_seed
+
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 # 배당 없는 지수 — 배당 주입 제외
@@ -668,7 +670,7 @@ class BackfillEngine:
                     code=code,
                     price_series=scaled,
                     annual_yield_src=("table", yield_table, self._resolve_yield),
-                    seed=abs(hash(code)) % 2**31,
+                    seed=stable_seed(code),
                 )
             else:
                 # Tier 3: ETF 자신의 실측 corporate_actions에서 mu/sigma 계산
@@ -679,7 +681,7 @@ class BackfillEngine:
                         code=code,
                         price_series=scaled,
                         annual_yield_src=("musigma", actual[0], actual[1]),
-                        seed=abs(hash(code)) % 2**31,
+                        seed=stable_seed(code),
                     )
                 # actual이 None이면 배당 없음 (비배당 ETF) → div_rows = 0
 

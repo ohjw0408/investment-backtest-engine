@@ -16,7 +16,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 GOLDEN_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "golden_master.json")
-TOL = 0.05  # 5% 허용(부동소수 누적순서 차이)
+TOL = 0.03  # 3% 허용(오너 기준: 2~3% 언저리). 부동소수 누적순서 차이 + 벡터화 미세차.
 
 _QS = [("p5", 5), ("p25", 25), ("p50", 50), ("p75", 75), ("p95", 95)]
 

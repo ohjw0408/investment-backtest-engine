@@ -1,5 +1,6 @@
 import sqlite3
 import pandas as pd
+import numpy as np
 import yfinance as yf
 import logging
 import warnings
@@ -588,15 +589,17 @@ class PriceLoader:
         if apply_fx and self.is_us_asset(code) and not df.empty:
             usdkrw = self._load_usdkrw()
             dates  = pd.to_datetime(df["date"])
-
-            def get_rate(d):
-                d = d.tz_localize(None) if d.tzinfo is not None else d
-                if d in usdkrw.index:
-                    return float(usdkrw[d])
-                before = usdkrw[usdkrw.index <= d]
-                return float(before.iloc[-1]) if not before.empty else 1.0
-
-            rates = dates.map(get_rate).values
+            if getattr(getattr(dates, "dt", None), "tz", None) is not None:
+                dates = dates.dt.tz_localize(None)
+            # 벡터화 환율 정렬: usdkrw는 일별 완전 인덱스(정렬). 행마다 스캔하던
+            # get_rate(O(N)×행수) → reindex로 일괄. 의미 동일:
+            #   범위 내=정확, 범위 밖(미래)=마지막값(ffill), 범위 이전=1.0.
+            arr = dates.to_numpy()
+            rates = usdkrw.reindex(arr).to_numpy(dtype=float)        # 일별이라 범위 내는 정확
+            if np.isnan(rates).any():
+                ff = usdkrw.reindex(arr, method="ffill").to_numpy(dtype=float)
+                rates = np.where(np.isnan(rates), ff, rates)
+                rates = np.where(np.isnan(rates), 1.0, rates)        # 첫 환율 이전
             for col in ["open", "high", "low", "close"]:
                 if col in df.columns:
                     df[col] = df[col] * rates

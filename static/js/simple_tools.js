@@ -113,6 +113,8 @@ function stDividendReinvest(p) {
         real: value / Math.pow(1 + p.inflation, y),
         annualDiv: yearDiv,
         cumDiv: cumDiv,
+        monthlyDiv: yearDiv / 12,                                   // 그 해 월평균 배당(명목)
+        monthlyDivReal: (yearDiv / 12) / Math.pow(1 + p.inflation, y), // 월 배당(실질, 인플레 조정)
       });
       yearDiv = 0;
       monthly *= (1 + p.annualIncrease);
@@ -280,9 +282,8 @@ function stRenderDividend() {
       `<tr><td>${y.year}년</td><td>${stFmtKRW(y.value)}</td><td>${stFmtKRW(y.annualDiv)}</td><td>${stFmtKRW(y.cumDiv)}</td><td>${stFmtKRW(y.real)}</td></tr>`
     ).join('');
   stDrawChart('stDvChart', r.yearly.map(y => y.year + '년'), [
-    { label: '평가액(명목)', data: r.yearly.map(y => y.value), borderColor: stCssVar('--brand', '#0052ff'), backgroundColor: stHexA(stCssVar('--brand', '#0052ff'), 0.08), fill: true, pointRadius: 0, borderWidth: 2 },
-    { label: '누적배당(세후)', data: r.yearly.map(y => y.cumDiv), borderColor: stCssVar('--up', '#05b169'), pointRadius: 0, borderWidth: 2 },
-    { label: '실질가치', data: r.yearly.map(y => y.real), borderColor: '#7B1FA2', borderDash: [5, 4], pointRadius: 0, borderWidth: 2 },
+    { label: '월 배당금(명목)', data: r.yearly.map(y => y.monthlyDiv), borderColor: stCssVar('--brand', '#0052ff'), backgroundColor: stHexA(stCssVar('--brand', '#0052ff'), 0.08), fill: true, pointRadius: 0, borderWidth: 2 },
+    { label: '월 배당금(실질)', data: r.yearly.map(y => y.monthlyDivReal), borderColor: '#7B1FA2', borderDash: [5, 4], pointRadius: 0, borderWidth: 2 },
   ]);
 }
 

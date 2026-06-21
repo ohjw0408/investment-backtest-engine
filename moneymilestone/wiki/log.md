@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-21] ENGINE | 몬테카를로 P2 — 배당 합성 MVN 이식 (오너)
+
+`MONTECARLO_PLAN.md` P2 완료. 배당 시뮬 합성경로를 단일종목 집계 GBM → 종목별 mu/sigma+상관 다변량-t MC로(P1 WithdrawalAnalyzer 패턴 미러). 커밋 8057c67.
+
+- `_simulate_from_data` 추출(실측·MVN 공용 시뮬 코어), `_run_mvn_div_cases`(get_price allow_synthetic=False 피팅→상관 다변량-t 풀호라이즌+종목별 실배당 분기주입), `_run_rolling` 3단 MVN 우선·구 GBM 폴백.
+- **검증**: dividend 타겟 10 passed. probe SCHD60/QQQ40 10년: 구 GBM 975/994/1014만(분포 없음·비현실)→MVN 440/928/1687만(현실적, spread 32배).
+- 합성 발동=실데이터<기간(짧은역사 종목)만. **잔여**: dividend_multi(멀티계좌)·MC 표본수/drift 튜닝(P4)·계산기/백테 검증(P3).
+
+_작성: Claude_
+
 ## [2026-06-21] UX | 검색 서버페이지네이션·랭킹수정·캘린더동기·가로재디자인 (오너 후속2)
 
 검색·설정 추가 개편. 커밋 0c9fd59→4f5d1aa.

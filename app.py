@@ -15,6 +15,7 @@ from modules.auth_manager import (
     init_portfolios_db, get_portfolios, get_portfolio, upsert_portfolio, delete_portfolio,
     get_home_widgets, save_home_widgets,
     get_calendar_config, save_calendar_config,
+    set_user_consent, has_consented, delete_user,
 )
 
 load_dotenv()
@@ -240,6 +241,66 @@ def google_callback():
 def logout():
     session.clear()
     return redirect('/')
+
+
+# -----------------------------------------------
+# 법적 페이지 · 동의 · 회원탈퇴
+# -----------------------------------------------
+
+@app.route('/terms')
+def terms_page():
+    return render_template('legal/terms.html')
+
+
+@app.route('/privacy')
+def privacy_page():
+    return render_template('legal/privacy.html')
+
+
+# 동의 게이트 면제 경로(로그인했지만 미동의 시에도 접근 허용)
+_CONSENT_EXEMPT = {'consent_page', 'consent_submit', 'terms_page', 'privacy_page',
+                   'logout', 'account_delete', 'me'}
+
+
+@app.before_request
+def _require_consent():
+    """로그인 사용자가 약관·개인정보 미동의면 동의 페이지로. OAuth/법적/정적은 면제."""
+    uid = session.get('user_id')
+    if not uid:
+        return
+    ep = request.endpoint or ''
+    if ep == 'static' or ep.startswith('google_') or ep in _CONSENT_EXEMPT:
+        return
+    if not has_consented(uid):
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'consent_required'}), 403
+        return redirect(url_for('consent_page'))
+
+
+@app.route('/consent')
+def consent_page():
+    if not session.get('user_id'):
+        return redirect('/')
+    return render_template('legal/consent.html')
+
+
+@app.route('/consent', methods=['POST'])
+def consent_submit():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    set_user_consent(uid)
+    return jsonify({'ok': True})
+
+
+@app.route('/account/delete', methods=['POST'])
+def account_delete():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    delete_user(uid)
+    session.clear()
+    return jsonify({'ok': True})
 
 
 @app.route('/api/me')

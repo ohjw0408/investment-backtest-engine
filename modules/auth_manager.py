@@ -46,7 +46,49 @@ def init_db():
         _conn.execute("ALTER TABLE user_settings ADD COLUMN home_widgets TEXT")
     if "calendar_config" not in cols:
         _conn.execute("ALTER TABLE user_settings ADD COLUMN calendar_config TEXT")
+    # 마이그레이션: 약관·개인정보 동의 시각(최초 1회 동의, 버전 변경 시 재동의 용도)
+    ucols = [r[1] for r in _conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "agreed_terms_at" not in ucols:
+        _conn.execute("ALTER TABLE users ADD COLUMN agreed_terms_at TEXT")
+    if "agreed_privacy_at" not in ucols:
+        _conn.execute("ALTER TABLE users ADD COLUMN agreed_privacy_at TEXT")
     _conn.commit()
+
+
+def set_user_consent(user_id):
+    """약관·개인정보 동의 기록(현재 시각)."""
+    now = datetime.now().isoformat()
+    c = _get_conn()
+    c.execute("UPDATE users SET agreed_terms_at=?, agreed_privacy_at=? WHERE id=?",
+              (now, now, user_id))
+    c.commit()
+
+
+def has_consented(user_id):
+    """약관·개인정보 모두 동의했는지."""
+    row = _get_conn().execute(
+        "SELECT agreed_terms_at, agreed_privacy_at FROM users WHERE id=?", (user_id,)
+    ).fetchone()
+    return bool(row and row["agreed_terms_at"] and row["agreed_privacy_at"])
+
+
+def delete_user(user_id):
+    """회원 탈퇴 — 해당 사용자의 모든 개인데이터 삭제(개인정보보호법 이용자 권리)."""
+    c = _get_conn()
+    for sql in (
+        "DELETE FROM holdings WHERE user_id=?",
+        "DELETE FROM asset_groups WHERE user_id=?",
+        "DELETE FROM saved_portfolios WHERE user_id=?",
+        "DELETE FROM alert_rules WHERE user_id=?",
+        "DELETE FROM alert_events WHERE user_id=?",
+        "DELETE FROM user_settings WHERE user_id=?",
+        "DELETE FROM users WHERE id=?",
+    ):
+        try:
+            c.execute(sql, (user_id,))
+        except sqlite3.OperationalError:
+            pass  # 테이블 미존재 환경 방어
+    c.commit()
 
 
 def _get_conn():

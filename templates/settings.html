@@ -116,6 +116,7 @@
     <button class="set-nav-btn active" data-spanel="tax"  onclick="setPanel('tax')">{{ nicon('receipt') }} 세금</button>
     <button class="set-nav-btn"        data-spanel="home" onclick="setPanel('home')">{{ nicon('home') }} 홈 화면</button>
     <button class="set-nav-btn"        data-spanel="cal"  onclick="setPanel('cal')">{{ nicon('calendar') }} 캘린더</button>
+    <button class="set-nav-btn"        data-spanel="account" onclick="setPanel('account')">{{ nicon('gear') }} 계정</button>
   </div>
 
   <!-- 세금 패널 (편입) -->
@@ -244,6 +245,42 @@
       </div>
     </div>
   </div><!-- /캘린더 패널 -->
+
+  <div class="set-panel" data-spanel="account">
+  <div class="settings-section">
+    <div class="settings-section-head"><span>{{ nicon('gear') }}</span> 계정</div>
+    <div class="settings-section-body">
+      <div class="settings-hint">로그아웃하거나 회원 탈퇴(모든 데이터 삭제)를 할 수 있어요.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+        <a href="/auth/logout" style="padding:10px 18px;border:1.5px solid var(--border);border-radius:8px;
+           text-decoration:none;color:var(--text);font-size:0.88rem;font-weight:600;">로그아웃</a>
+        <button onclick="openDeleteModal()" style="padding:10px 18px;border:1.5px solid var(--down);
+           background:transparent;border-radius:8px;color:var(--down);font-size:0.88rem;font-weight:700;
+           cursor:pointer;">회원 탈퇴</button>
+      </div>
+      <div class="settings-hint" style="margin-top:12px;">
+        탈퇴 시 보유종목·저장 포트폴리오·설정·알림 등 모든 데이터가 즉시 삭제되며 복구할 수 없어요.
+      </div>
+    </div>
+  </div>
+  </div><!-- /계정 패널 -->
+</div>
+
+<div class="we-modal-bg" id="deleteModal" style="display:none;">
+  <div class="we-modal" style="max-width:380px;">
+    <div style="padding:24px 22px;">
+      <div style="font-size:1.05rem;font-weight:800;color:var(--down);margin-bottom:8px;">회원 탈퇴</div>
+      <div style="font-size:0.88rem;color:var(--text);line-height:1.6;margin-bottom:18px;">
+        정말 탈퇴하시겠어요?<br>보유종목·포트폴리오·설정·알림 등 <b>모든 데이터가 영구 삭제</b>되며
+        복구할 수 없어요.</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeDeleteModal()" style="padding:9px 16px;border:1.5px solid var(--border);
+          background:transparent;border-radius:8px;color:var(--text);font-size:0.86rem;cursor:pointer;">취소</button>
+        <button id="deleteConfirmBtn" onclick="confirmDelete()" style="padding:9px 16px;border:none;
+          background:var(--down);border-radius:8px;color:#fff;font-size:0.86rem;font-weight:700;cursor:pointer;">탈퇴하기</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="we-modal-bg" id="weModal">
@@ -260,6 +297,20 @@
 
 {% block scripts %}
 <script>
+// ── 회원 탈퇴 ──
+function openDeleteModal()  { document.getElementById('deleteModal').style.display = 'flex'; }
+function closeDeleteModal() { document.getElementById('deleteModal').style.display = 'none'; }
+async function confirmDelete() {
+  const btn = document.getElementById('deleteConfirmBtn');
+  btn.disabled = true; btn.textContent = '삭제 중…';
+  try {
+    const r = await fetch('/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const j = await r.json();
+    if (j.ok) { location.href = '/'; }
+    else { btn.disabled = false; btn.textContent = '탈퇴하기'; }
+  } catch (e) { btn.disabled = false; btn.textContent = '탈퇴하기'; }
+}
+
 // ── 설정 카테고리 패널 전환 ──
 function setPanel(name) {
   document.querySelectorAll('.set-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.spanel === name));

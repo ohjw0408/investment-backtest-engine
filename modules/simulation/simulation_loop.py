@@ -29,6 +29,11 @@ class SimulationLoop:
     ):
         import time as _time
 
+        # dates가 pandas DatetimeIndex면 매 반복마다 Timestamp 생성(__iter__ 비용 큼).
+        # 한 번에 파이썬 datetime 배열로 변환 → 루프 내 .year/.month 접근도 빨라짐(결과 불변).
+        if hasattr(dates, "to_pydatetime"):
+            dates = dates.to_pydatetime()
+
         last_month             = None
         last_withdrawal_month  = (dates[0].year, dates[0].month) if dates else None
         elapsed_months         = 0

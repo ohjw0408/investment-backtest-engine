@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-22] FEAT | 포폴비교 비로그인 — 풀 경험 통합(다중 빌더+오버레이+산점도+레이더) (오너)
+
+- **재요청**: 앞 커밋(단일 빌더+표만)은 의도와 달랐음. 오너 = 여러 포폴 구성→서로+지수 비교 + **겹쳐보기 그래프·산점도·육각형 레이더까지** 비로그인 노출.
+- **통합 설계**: 로그인용 풀 UI/렌더를 비로그인도 공유. 마크업의 `{% if not user %}/{% else %}` 메인 분기 제거 → 오버레이·비교카드·결과(표/산점도/레이더)·벤치마크 UI를 **공유**. 차이는 포폴 소스뿐: `{% if user %}`=저장목록(rrPfList) / `{% else %}`=다중 즉석 빌더(rrBuilder + 포폴 추가). share·로그인CTA만 조건부.
+- **스크립트**: `{% block scripts %}`의 `{% if user %}` 게이트 제거 → 전체 실행 + `RR_AUTH={{ ... }}`. rrCompare가 RR_AUTH면 `portfolio_ids`, 아니면 `portfolios`(빌더 ad-hoc) 전송. init: RR_AUTH면 rrLoadPortfolios, 아니면 rrRenderBuilder. 빌더 함수(abPorts/rrRenderBuilder/abEqualize/abBindSearch) 추가. 기존 별도 anon IIFE 삭제. 결과 렌더(rrRenderTable/Scatter/Spider)·오버레이(rrOv*) **전부 재사용**(비로그인 rrPortfolios=[]라 오버레이 기본 SPY/코스피/금).
+- 백엔드 compare ad-hoc 허용은 앞 커밋(2bade5f). Chart.js=base 전역이라 비로그인 차트 OK.
+- **검증**: 비로그인 — 빌더·오버레이차트·벤치5칩, 포폴2개 구성→비교 표7행+**산점도+레이더 그려짐**, 콘솔0. 로그인 회귀 — rrPfList 유지·빌더0. Jinja 밸런스·렌더200.
+- 잔여: #5 벤치마크 선택 UI 직관화(공통, 별도).
+- 배포: push(main).
+
+_작성: Claude_
+
 ## [2026-06-22] FEAT | 포폴비교 비로그인 찍먹 — 즉석 빌더 (오너)
 
 - **변경**: 포트폴리오 비교(/risk-return) 비로그인 = 로그인벽이었음 → **즉석 포트폴리오 빌더**로 교체. 종목 검색(/api/search)→추가→비중 입력(추가/삭제 시 균등분배 자동, 편집가능)→비교 실행→핵심지표 표(내 포폴 vs 벤치마크 SPY·QQQ·GLD·KODEX200·TLT). 하단 "로그인하면 저장·차트·다중비교" CTA.

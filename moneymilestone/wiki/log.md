@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-22] INFRA | 도메인 co.kr 컷오버 — DNS+nginx+TLS+canonical (오너)
+
+- **moneymilestone.co.kr 라이브.** hosting.kr 구매(개인명의). 오너가 DNS A레코드(@·www→178.105.84.213) 설정, 전파 확인(구글·클플 둘 다).
+- **서버(SSH, nginx 스택)**: `/etc/nginx/sites-enabled/domino` server_name을 co.kr+www+IP로 교체(duckdns 제거, 백업 `/root/domino.nginx.bak.*`). `certbot --nginx -d moneymilestone.co.kr -d www` 인증서 발급(만료 2026-09-20 자동갱신)+80→443 301. 옛 duckdns cert `certbot delete`로 정리(DNS 삭제돼 갱신실패 방지).
+- **canonical 고정**: 서버 `.env`에 `CANONICAL_HOST=moneymilestone.co.kr` 추가 → domino restart. www·IP로 들어와도 canonical=non-www co.kr (검증함). `.env`에 FLASK_ENV 없음(IS_PROD는 systemd Environment 추정 — ⚠️확인 필요).
+- **검증(라이브 Playwright)**: https://moneymilestone.co.kr 200·인증서유효·canonical·6카드·콘솔0. http→https 301, www 200, robots/sitemap https. `/auth/google` redirect_uri=`https://moneymilestone.co.kr/auth/google/callback` 정확.
+- **모바일**: `mobile/capacitor.config.json` server.url + allowNavigation duckdns→co.kr, README도. (효과는 npx cap sync+재빌드 시 — Android Studio 블로커. mobile/는 untracked 유지.)
+- ⚠️ **오너 잔여**: ①Google OAuth Console에 위 redirect URI + JS원본 등록(안 하면 co.kr 로그인 死, 진행중) ②Search Console 등록+sitemap 제출. **duckdns는 오너가 실수로 DNS 삭제 — 앱 미출시라 영향 없음, co.kr이 유일 경로 됨.**
+
+_작성: Claude_
+
 ## [2026-06-22] SEO | 인프라 1차 — robots/sitemap/canonical/meta+og (오너, co.kr 이전 준비)
 
 - **동기**: mysnowball식 도구 페이지 검색 유입. 진단 = 도구 title만 있고 meta description·canonical·og·sitemap·robots **전무**.

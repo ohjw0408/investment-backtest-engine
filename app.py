@@ -260,7 +260,34 @@ p{font-size:0.88rem;color:#546E7A;line-height:1.6;margin-bottom:20px}
 </div>
 </body></html>''', 200
     redirect_uri = url_for('google_callback', _external=True)
+    # Capacitor 앱 플로우: 시스템 브라우저에서 로그인 후 딥링크로 토큰 핸드오프(WebView 세션 분리 회피)
+    session['oauth_app'] = (request.args.get('app') == '1')
     return google.authorize_redirect(redirect_uri)
+
+
+# ── OAuth 앱 핸드오프 토큰 (시스템 브라우저 ↔ WebView 세션 브리지, redis 120s) ──
+def _oauth_handoff_set(token, user_id):
+    r = getattr(market_quote_service, '_redis', None)
+    if not r:
+        return False
+    try:
+        r.setex(f"mmoauth:{token}", 120, str(user_id))
+        return True
+    except Exception:
+        return False
+
+def _oauth_handoff_pop(token):
+    r = getattr(market_quote_service, '_redis', None)
+    if not r:
+        return None
+    try:
+        v = r.get(f"mmoauth:{token}")
+        if v is None:
+            return None
+        r.delete(f"mmoauth:{token}")
+        return v.decode() if isinstance(v, bytes) else v
+    except Exception:
+        return None
 
 
 @app.route('/auth/google/callback')
@@ -280,8 +307,27 @@ def google_callback():
         picture   = userinfo.get('picture', ''),
     )
     session.permanent = True
+    # 앱 플로우면 일회용 토큰 발급 → 딥링크로 앱에 전달(앱이 /auth/exchange로 WebView 세션 설정)
+    if session.pop('oauth_app', False):
+        import secrets
+        tok = secrets.token_urlsafe(24)
+        if _oauth_handoff_set(tok, user['id']):
+            return redirect(f"moneymilestone://auth?token={tok}")
+        # redis 없으면 핸드오프 불가 → 일반 세션 폴백
     session['user_id'] = user['id']
     return redirect('/')
+
+
+@app.route('/auth/exchange')
+def auth_exchange():
+    """앱 딥링크 후 WebView가 호출 — 일회용 토큰으로 WebView에 세션 쿠키 설정."""
+    tok = request.args.get('token', '')
+    uid = _oauth_handoff_pop(tok) if tok else None
+    if uid:
+        session.permanent = True
+        session['user_id'] = int(uid)
+        return redirect('/')
+    return redirect('/?login=expired')
 
 
 @app.route('/auth/logout')

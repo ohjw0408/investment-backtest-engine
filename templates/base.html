@@ -419,6 +419,14 @@ function isInAppBrowser() {
 }
 
 function handleGoogleLogin(e) {
+  // Capacitor 네이티브 앱: 시스템 브라우저로 OAuth → 딥링크 토큰 핸드오프(WebView 세션 차단 회피)
+  try {
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      e.preventDefault();
+      window.Capacitor.Plugins.Browser.open({ url: location.origin + '/auth/google?app=1' });
+      return false;
+    }
+  } catch (err) {}
   if (!isInAppBrowser()) return true;
   e.preventDefault();
   const url = encodeURIComponent(location.href);
@@ -430,6 +438,23 @@ function handleGoogleLogin(e) {
   }
   return false;
 }
+
+// ── Capacitor 앱: OAuth 딥링크 콜백 → WebView 세션 교환 ──
+(function () {
+  try {
+    if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) return;
+    const App = window.Capacitor.Plugins.App, Browser = window.Capacitor.Plugins.Browser;
+    if (!App) return;
+    App.addListener('appUrlOpen', function (data) {
+      const u = (data && data.url) || '';
+      if (u.indexOf('moneymilestone://auth') === 0) {
+        try { if (Browser) Browser.close(); } catch (e) {}
+        const m = u.match(/[?&]token=([^&]+)/);
+        if (m) location.href = '/auth/exchange?token=' + encodeURIComponent(m[1]);
+      }
+    });
+  } catch (e) {}
+})();
 
 function mmCopyText(text) {
   if (navigator.clipboard && window.isSecureContext) {

@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-23] FEAT | 앱 OAuth WebView 차단 해결 — 시스템브라우저+딥링크 핸드오프 (오너)
+
+- **문제**: 구글이 WebView 내 OAuth 차단(disallowed_useragent) + 시스템브라우저 로그인해도 쿠키 jar가 WebView와 분리 → 세션 안 넘어옴.
+- **해법**(서버세션 모델): ①앱 로그인→`@capacitor/browser`로 시스템브라우저 `/auth/google?app=1` ②서버 OAuth 완료→일회용 토큰(redis `mmoauth:{tok}` 120s)→딥링크 `moneymilestone://auth?token=` 리다이렉트 ③앱 `App.appUrlOpen` 가로채→WebView를 `/auth/exchange?token=`로→**WebView 자체 요청이라 세션쿠키 WebView에 설정**→로그인.
+- **구현**: app.py(google_login `?app=1`→session flag, callback 앱플로우면 토큰+딥링크, `/auth/exchange`, redis 핸드오프 헬퍼=market_quote_service._redis 재사용·graceful), base.html(handleGoogleLogin Capacitor 분기→Browser.open, appUrlOpen 리스너→exchange), mobile/android AndroidManifest intent-filter(scheme=moneymilestone host=auth, launchMode singleTask).
+- **기존 웹 OAuth 클라이언트/redirect URI(co.kr/auth/google/callback) 재사용** — 구글 콘솔 추가설정 불필요(시스템브라우저는 허용 UA).
+- **검증**: 로컬 — 서버 부팅·`/auth/exchange?token=bad`→/?login=expired(graceful)·`/auth/google?app=1`→302google. 웹 Playwright(Capacitor mock): 로그인클릭→Browser.open(/auth/google?app=1)·WebView이동안함·appUrlOpen 등록·콘솔0. ⚠️구글완료+redis토큰+실기기 딥링크는 프로드/디바이스 검증 필요.
+- **빌드**: Manifest 변경=네이티브라 **재빌드 필요**(`cd mobile && npx cap sync android && npx cap open android`). 웹변경은 원격로드 자동. mobile/는 untracked(디스크 빌드).
+- 배포: push(main). [[project-mobile-app-capacitor]]
+
+_작성: Claude_
+
 ## [2026-06-23] FEAT | 모바일앱 하단 탭바 — 앱 크롬(Capacitor 감지) (오너)
 
 - **목표**: 모바일앱(Capacitor WebView)을 앱답게 — 하단 탭바. 모바일 웹은 그대로.

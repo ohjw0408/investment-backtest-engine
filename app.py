@@ -46,6 +46,7 @@ from modules.retirement.data_preparer import DataPreparer
 from modules.dividend_simulator import DividendSimulator
 from modules.rebalance.periodic import PeriodicRebalance
 from modules.market_quote_service import MarketQuoteService
+from modules.market_alias import search_market_aliases
 
 app = Flask(__name__)
 # x_for=1 추가: 리버스 프록시 뒤에서 실제 클라이언트 IP 복원(rate limit·로그 정확). 없으면
@@ -590,13 +591,8 @@ def search():
         cats = [c for c in request.args.get('cats', '').split(',') if c]
         results = []
 
-        # KRX 금현물 특별 처리
-        if any(k in q.upper() for k in ['금', 'GOLD', 'KRX', '현물']):
-            results.append({
-                'code': 'KRX_GOLD', 'name': '금 현물 (KRX, 1g)',
-                'badge': 'KRX', 'subtitle': 'KRX 금시장 현물',
-                'country': 'KR', 'is_etf': False,
-            })
+        # 지수·환율·원자재·금리 (symbol_master에 없는 시장 심볼) — 한글 별칭 검색
+        results.extend(search_market_aliases(q, limit=12))
 
         # paged면 전체 매칭(제한 없음 — 서버서 페이지 슬라이스라 페이로드 무관), 아니면 _limit.
         uni = 10_000_000 if paged else _limit

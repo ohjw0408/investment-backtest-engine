@@ -320,7 +320,7 @@ function renderResults() {
     const priceStr = fmtPrice(item.price, item.currency);
     const c = badgeColor(item.badge);
     return `
-      <a class="result-card" href="/symbol/${item.code}" data-code="${item.code}"
+      <a class="result-card" href="/symbol/${encodeURIComponent(item.code)}" data-code="${item.code}"
         onclick="spPushRecent({code:'${spEsc(item.code)}',name:'${spEsc(item.name)}',badge:'${spEsc(item.badge)}'})">
         <div class="card-top">
           <span class="result-badge" style="background:${c}22;color:${c}">${item.badge}</span>

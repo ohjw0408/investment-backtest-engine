@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-22] FEAT | 검색에 지수·환율·원자재·금리 한글별칭 추가 (오너)
+
+- **문제**: `/api/search`가 symbol_master(주식/ETF)만 검색 → "나스닥/원달러/snp500/금/유가" 등 시장 심볼 검색 불가. index_master.index_meta엔 있으나 영문 description뿐.
+- **구현**: `modules/market_alias.py` — 지수·환율·원자재·주요금리 ~30개 큐레이션(code·한글명·배지·별칭). `search_market_aliases(q)` = 정규화(소문자+영숫자/한글만, "s&p 500"→"sp500") 후 **토큰 startswith 매칭**(부분매칭은 금⊂금리 오검색 유발해 제외). `/api/search`에서 기존 KRX금 특별처리를 이걸로 교체, 결과 앞에 prepend.
+- **반영 범위**: 전역검색·**알림 검색**·포폴비교 벤치마크 검색 전부(같은 API). search.html 결과링크 `encodeURIComponent`로 안전화(슬래시 코드 대비, line 323).
+- **검증**: 모듈 단위(나스닥→^NDX, 원달러→USD/KRW, snp500→^GSPC, 금→GC=F+KRX_GOLD, 은행→무, 미국금리→DGS10) + /api/search 라우트(주식 SCHD·삼성 그대로) + 알림 드롭다운 렌더(원/달러 환율 표시). ⚠️로컬 redis off라 가격붙이기 ~4s(프로드 캐시 빠름).
+- 배포: push(main).
+
+_작성: Claude_
+
 ## [2026-06-22] FIX | 알림 종목 추가 — 직접입력 → 검색 콤보 (오너)
 
 - **변경**(alerts.html): 알림 만들기의 종목 "+직접입력"(하단 텍스트칸) 제거 → 셀렉트(보유 빠른선택) 옆에 **검색창** 추가. `/api/search`로 종목 검색→결과 드롭다운→클릭하면 셀렉트에 옵션 추가+선택. syncForm/createRule에서 `__manual__` 분기 제거.

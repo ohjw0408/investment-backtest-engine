@@ -40,6 +40,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Money Milestone{% endblock %}</title>
+  <meta name="description" content="{% block meta_desc %}백테스트·배당·은퇴 설계까지, 투자 결정을 한 곳에서. 로그인 없이 30년 시뮬레이션을 지금 돌려보세요. — Money Milestone{% endblock %}">
+  {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Money Milestone">
+  <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
+  <meta property="og:description" content="{{ self.meta_desc() }}">
+  {% if canonical_url %}<meta property="og:url" content="{{ canonical_url }}">{% endif %}
+  <meta name="twitter:card" content="summary">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
   <script>
     // 다크모드 FOUC 방지: CSS 로드 전에 테마 결정

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, Response
 from werkzeug.middleware.proxy_fix import ProxyFix
 import random
 import datetime
@@ -178,14 +178,60 @@ google = oauth.register(
 # DB 초기화
 init_db()
 
-# 모든 템플릿에 user 자동 주입
+# SEO 정식 호스트. env 미설정 시 요청 호스트로 self-canonical(도메인 이전 전 안전).
+# co.kr 컷오버 시 서버 env에 CANONICAL_HOST=moneymilestone.co.kr 만 넣으면 코드 변경 없이 고정.
+def _canonical_host():
+    return os.environ.get('CANONICAL_HOST') or request.host
+
+# 색인 대상 공개 페이지(사이트맵·robots 공용). 로그인/개인/API는 제외.
+SEO_PUBLIC_PATHS = [
+    '/', '/calculator', '/backtest', '/risk-return', '/simple',
+    '/dividend-target', '/retirement', '/macro', '/calendar',
+    '/terms', '/privacy',
+]
+
+# 모든 템플릿에 user + canonical URL 자동 주입
 @app.context_processor
 def inject_user():
-    return {'user': current_user()}
+    scheme = 'https' if IS_PROD else request.scheme
+    return {
+        'user': current_user(),
+        'canonical_url': f"{scheme}://{_canonical_host()}{request.path}",
+    }
 
 def current_user():
     uid = session.get('user_id')
     return get_user_by_id(uid) if uid else None
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    scheme = 'https' if IS_PROD else request.scheme
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /auth\n"
+        "Disallow: /api\n"
+        "Disallow: /myassets\n"
+        "Disallow: /myportfolios\n"
+        "Disallow: /settings\n"
+        "Disallow: /account\n"
+        "Disallow: /alerts\n"
+        f"Sitemap: {scheme}://{_canonical_host()}/sitemap.xml\n"
+    )
+    return Response(body, mimetype='text/plain')
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    scheme = 'https' if IS_PROD else request.scheme
+    base = f"{scheme}://{_canonical_host()}"
+    urls = "".join(
+        f"<url><loc>{base}{p}</loc><changefreq>weekly</changefreq></url>"
+        for p in SEO_PUBLIC_PATHS
+    )
+    body = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'
+    return Response(body, mimetype='application/xml')
 
 # -----------------------------------------------
 # Google OAuth 라우트

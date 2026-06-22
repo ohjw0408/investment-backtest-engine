@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-22] SEO | 인프라 1차 — robots/sitemap/canonical/meta+og (오너, co.kr 이전 준비)
+
+- **동기**: mysnowball식 도구 페이지 검색 유입. 진단 = 도구 title만 있고 meta description·canonical·og·sitemap·robots **전무**.
+- **app.py**: `/robots.txt`(개인/API/auth Disallow + Sitemap 링크), `/sitemap.xml`(공개 11페이지: 홈·6도구·macro·calendar·terms·privacy). `inject_user` context에 `canonical_url` 추가. **`CANONICAL_HOST` env 전략**: 미설정 시 요청 호스트로 self-canonical(이전 전 안전), co.kr 컷오버 때 서버 env에 `CANONICAL_HOST=moneymilestone.co.kr`만 넣으면 코드변경 없이 canonical 고정.
+- **base.html head**: meta description(`{% block meta_desc %}` 기본값), canonical link, og(type/site_name/title=self.title()/description=self.meta_desc()/url), twitter:card.
+- **페이지별 meta_desc**: 홈+투자계산기·백테·포폴비교·간편·배당·은퇴 — 키워드 타겟 스니펫.
+- **검증**: 로컬 — robots/sitemap 200·유효 XML, 홈/계산기/배당 canonical+description 렌더, 콘솔에러 0, 홈 레이아웃 무손상.
+- 배포: push(main). 현재 duckdns에 self-canonical로 안전 적용.
+- ⚠️ **남은 컷오버(DNS 전파 후)**: ①레지스트라 A레코드 co.kr→178.105.84.213 (오너) ②Google OAuth redirect URI 등록 (오너) ③서버 vhost+TLS+301 duckdns→co.kr (SSH) ④서버 env CANONICAL_HOST=co.kr ⑤모바일 capacitor config duckdns→co.kr. **duckdns는 삭제❌→301 유지(모바일앱 로드 의존).**
+
+_작성: Claude_
+
 ## [2026-06-22] DESIGN | 홈 투자도구 6타일 → persona 질문 카드 2열 (오너)
 
 - **동기**: mysnowball.kr 벤치마크. 기능명 나열("투자 계산기 — …") = 방문자 자기 호명 안 됨. 정체성=자산관리(데모 포폴 카드)는 **불변 유지**, 그 아래 도구 섹션만 개편.

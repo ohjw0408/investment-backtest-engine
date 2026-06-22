@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-22] FEAT | 신규 상장 종목 동기화 — resync + 월간 CI 파이프라인 (오너)
+
+- **문제**: 검색 마스터(`data/meta/symbol_master.db`, `symbols` 테이블)는 빌드 스냅샷이라 이후 상장 종목 누락(SpaceX 계기). `SYMBOL_DB_PATH`=config.py. (db_builder.py는 `data/symbol_master.db` 상대경로=레거시·미사용; index_master.db는 가격/지수용 별개)
+- **resync 함수**(`modules/symbol_resync.py`): `fdr.StockListing(NASDAQ/NYSE)` 현재 상장목록 ↔ 마스터 기존 code 차집합 → 신규만 INSERT(멱등, code UNIQUE 제약 의존X). US 주식만(ETF/KRX 별소스). 가격은 backfill_engine on-demand라 메타만.
+- **지금 실행**: 로컬 +318 적용(15015→15333, US 11162→11480, 중복0, 2회차 0=멱등). 신규 검색 확인(UAMY·FMAC). **DB 커밋→배포로 프로드 운반.**
+- **월간 자동화**(`.github/workflows/resync-symbols.yml`): cron 매월1일 06:00 UTC + 수동. resync→DB diff시 커밋·푸시→SSH로 프로드 배포(reset-hard+restart). ⚠️ **celery beat 부적합** — symbol_master.db가 git 추적 seed라 prod의 `git reset --hard`가 beat 갱신을 되돌림. CI 커밋 경로만 영속.
+- ⚠️ **SpaceX**: fdr NASDAQ/NYSE 목록에 없음(실상장 안 됐거나 타 거래소/티커). 강제 추가하려면 정확한 티커 필요.
+- 배포: push(main).
+
+_작성: Claude_
+
 ## [2026-06-22] FIX | 설정 페이지 — 계정 패널 재건 + 세금 정렬 + 가운데정렬 + div버그 (오너)
 
 - **계정 패널 안 보이던 근본원인**: 캘린더 패널 `set-panel` 닫는 `</div>` 1개 누락(기존 버그) → 계정 패널이 캘린더(display:none) 안에 중첩돼 항상 숨김. div 추가로 수정. (DOM 체인 추적으로 발견: acct-profile h=0 → 부모 set-panel display:none)

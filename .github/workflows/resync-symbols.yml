@@ -1,0 +1,52 @@
+name: Monthly Symbol Resync
+
+# 신규 상장 종목을 검색 마스터(symbol_master.db)에 동기화.
+# DB는 git 추적 seed라, CI가 resync→커밋→푸시→프로드 배포로 운반한다.
+# (celery beat는 prod의 git reset --hard로 되돌려져 부적합)
+on:
+  schedule:
+    - cron: '0 6 1 * *'   # 매월 1일 06:00 UTC
+  workflow_dispatch: {}    # 수동 실행 허용
+
+permissions:
+  contents: write
+
+jobs:
+  resync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install FinanceDataReader pandas
+      - name: Resync symbols
+        run: python -m modules.symbol_resync
+      - name: Commit if changed
+        id: commit
+        run: |
+          if git diff --quiet -- data/meta/symbol_master.db; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "신규 종목 없음 — 변경 없음"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add data/meta/symbol_master.db
+            git commit -m "chore: 신규 상장 종목 동기화 (자동)"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Deploy to prod
+        if: steps.commit.outputs.changed == 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 178.105.84.213
+          username: root
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            set -e
+            cd /root/investment-backtest-engine
+            git fetch origin main
+            git reset --hard origin/main
+            systemctl restart domino

@@ -89,6 +89,10 @@
     border: 1.5px solid var(--border); color: var(--text); border-radius: 10px; padding: 7px 13px;
     font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: inherit; }
   .mm-alert-btn:hover { border-color: var(--blue); color: var(--blue); }
+  /* 모바일: 종 위치가 좌측이라 right:0 드롭다운이 화면 밖으로 잘림 → 뷰포트 고정 풀폭 */
+  @media (max-width: 560px) {
+    .mm-bell-dd { position: fixed; top: 64px; left: 8px; right: 8px; width: auto; max-width: none; }
+  }
   </style>
   {% block head %}{% endblock %}
 </head>

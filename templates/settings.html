@@ -28,9 +28,9 @@
 .tax-card-body.show { display:block; }
 .tax-save-btn { width:100%; padding:14px; background:var(--brand); color:var(--on-brand); border:none; border-radius:var(--r-pill); font-size:var(--fs-body); font-weight:600; font-family:var(--font-sans); cursor:pointer; margin-top:4px; transition:background .15s; }
 .tax-save-btn:hover { background:var(--brand-hover); }
-/* 세금 카드 2열 (가로 활용) */
-.tax-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
-.tax-grid .tax-card { margin-bottom: 0; }
+/* 세금 카드 2열 고정 (폭 따라 열수 안 흔들리게 — 정렬 일관) */
+.tax-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-items: stretch; }
+.tax-grid .tax-card { margin-bottom: 0; display: flex; flex-direction: column; }
 /* 선택 칩 토글 (캘린더 등 — raw 체크박스 대체, 결 통일) */
 .set-chk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
 .set-chk { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--ds-hairline); border-radius: var(--r-md); background: var(--ds-canvas); cursor: pointer; font-size: 0.83rem; color: var(--ds-body); transition: border-color .12s, background .12s, color .12s; user-select: none; }
@@ -41,14 +41,36 @@
 .set-sub-title { font-weight: 700; font-size: 0.85rem; color: var(--ds-ink); margin: 16px 0 8px; }
 .set-src-card { border: 1px solid var(--ds-hairline); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 10px; background: var(--ds-soft); }
 [data-theme="dark"] .set-src-card { background: var(--ds-strong); }
-/* .main-content는 2칸 그리드(1fr 308px) — settings는 전체 폭 차지하도록 두 칸 span */
-.settings-wrap { max-width: 1080px; width: 100%; grid-column: 1 / -1; }
+/* .main-content는 2칸 그리드(1fr 308px) — settings는 두 칸 span + 가운데정렬 */
+/* 설정 페이지: main-content를 단일 중앙 컬럼으로(전역 2열 그리드 해제) → 콘텐츠 가운데정렬 */
+.main-content { grid-template-columns: minmax(0, 920px); justify-content: center; }
+.settings-wrap { max-width: 920px; width: 100%; }
+.page-title { max-width: 920px; width: 100%; }
+/* ── 계정 패널 ── */
+.acct-profile { display: flex; align-items: center; gap: 14px; padding: 16px; background: var(--ds-soft); border-radius: var(--r-lg); margin-bottom: 16px; }
+[data-theme="dark"] .acct-profile { background: var(--ds-strong); }
+.acct-avatar { width: 52px; height: 52px; border-radius: var(--r-full); object-fit: cover; flex-shrink: 0; background: var(--ds-strong); }
+.acct-avatar-fb { width: 52px; height: 52px; border-radius: var(--r-full); flex-shrink: 0; background: var(--brand-tint); color: var(--brand-text); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 700; }
+.acct-name { font-size: var(--fs-body); font-weight: 700; color: var(--ds-ink); }
+.acct-email { font-size: var(--fs-cap); color: var(--ds-muted); margin-top: 2px; }
+.acct-links { display: flex; flex-direction: column; border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); overflow: hidden; margin-bottom: 16px; }
+.acct-link { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; text-decoration: none; color: var(--ds-ink); font-size: var(--fs-sm); font-weight: 600; border-bottom: 1px solid var(--ds-hairline); transition: background .12s; }
+.acct-link:last-child { border-bottom: none; }
+.acct-link:hover { background: var(--ds-soft); }
+.acct-link .arr { color: var(--ds-muted); }
+.acct-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.acct-btn { padding: 11px 20px; border-radius: var(--r-pill); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; font-family: var(--font-sans); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.acct-btn.ghost { border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-ink); }
+.acct-btn.ghost:hover { border-color: var(--ds-muted); }
+.acct-btn.danger { border: 1px solid var(--down); background: transparent; color: var(--down); }
+.acct-btn.danger:hover { background: var(--down-tint); }
 /* PC: 위젯 카드 멀티컬럼 그리드 / 모바일: 단일 컬럼 */
 #weList { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; align-items: start; }
 .we-widget { margin-bottom: 0; }
 @media (max-width: 768px) {
   .settings-wrap { max-width: 760px; }
   #weList { grid-template-columns: 1fr; }
+  .tax-grid { grid-template-columns: 1fr; }
 }
 /* 카테고리 세그먼트 nav */
 .set-nav { display: flex; gap: 6px; background: var(--ds-soft); border: 1px solid var(--ds-hairline); border-radius: var(--r-pill); padding: 5px; margin-bottom: 20px; max-width: 460px; }
@@ -250,23 +272,42 @@
         </div>
       </div>
     </div>
+  </div>
   </div><!-- /캘린더 패널 -->
 
   <div class="set-panel" data-spanel="account">
   <div class="settings-section">
     <div class="settings-section-head"><span>{{ nicon('gear') }}</span> 계정</div>
     <div class="settings-section-body">
-      <div class="settings-hint">로그아웃하거나 회원 탈퇴(모든 데이터 삭제)를 할 수 있어요.</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
-        <a href="/auth/logout" style="padding:10px 18px;border:1.5px solid var(--border);border-radius:8px;
-           text-decoration:none;color:var(--text);font-size:0.88rem;font-weight:600;">로그아웃</a>
-        <button onclick="openDeleteModal()" style="padding:10px 18px;border:1.5px solid var(--down);
-           background:transparent;border-radius:8px;color:var(--down);font-size:0.88rem;font-weight:700;
-           cursor:pointer;">회원 탈퇴</button>
+      {% if user %}
+      <div class="acct-profile">
+        {% if user.picture %}<img class="acct-avatar" src="{{ user.picture }}" alt="" referrerpolicy="no-referrer">
+        {% else %}<div class="acct-avatar-fb">{{ (user.name or user.email or '?')[0]|upper }}</div>{% endif %}
+        <div>
+          <div class="acct-name">{{ user.name or '사용자' }}</div>
+          <div class="acct-email">{{ user.email }}</div>
+        </div>
       </div>
-      <div class="settings-hint" style="margin-top:12px;">
+      <div class="acct-links">
+        <a class="acct-link" href="/privacy">개인정보 처리방침 <span class="arr">›</span></a>
+        <a class="acct-link" href="/terms">이용약관 <span class="arr">›</span></a>
+      </div>
+      <div class="acct-actions">
+        <a href="/auth/logout" class="acct-btn ghost">로그아웃</a>
+        <button onclick="openDeleteModal()" class="acct-btn danger">회원 탈퇴</button>
+      </div>
+      <div class="settings-hint" style="margin-top:14px;">
         탈퇴 시 보유종목·저장 포트폴리오·설정·알림 등 모든 데이터가 즉시 삭제되며 복구할 수 없어요.
       </div>
+      {% else %}
+      <div class="login-gate">
+        계정 설정은 <a href="/auth/google" onclick="return handleGoogleLogin(event)">로그인</a> 후 이용할 수 있어요.
+      </div>
+      <div class="acct-links" style="margin-top:16px;">
+        <a class="acct-link" href="/privacy">개인정보 처리방침 <span class="arr">›</span></a>
+        <a class="acct-link" href="/terms">이용약관 <span class="arr">›</span></a>
+      </div>
+      {% endif %}
     </div>
   </div>
   </div><!-- /계정 패널 -->

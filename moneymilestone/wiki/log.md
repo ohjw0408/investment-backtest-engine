@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-22] FIX | 설정 페이지 — 계정 패널 재건 + 세금 정렬 + 가운데정렬 + div버그 (오너)
+
+- **계정 패널 안 보이던 근본원인**: 캘린더 패널 `set-panel` 닫는 `</div>` 1개 누락(기존 버그) → 계정 패널이 캘린더(display:none) 안에 중첩돼 항상 숨김. div 추가로 수정. (DOM 체인 추적으로 발견: acct-profile h=0 → 부모 set-panel display:none)
+- **계정 패널 재건**(settings.html): `{% if user %}` 게이트. 비로그인=로그인 유도+약관/개인정보 링크. 로그인=프로필 카드(아바타·이름·이메일)+약관/개인정보 링크+로그아웃+회원탈퇴+안내. 기존 인라인 레거시토큰(`var(--border)/(--text)`)→디자인시스템 토큰(acct-* 클래스).
+- **세금 그리드 정렬**: `auto-fit minmax(300px)`(폭따라 열수 흔들림)→`repeat(2,1fr)` 고정 + `align-items:stretch`+카드 flex column(높이 통일). 모바일 1열.
+- **가운데정렬**: settings 페이지 한정 `.main-content`를 단일 중앙컬럼(`grid-template-columns:minmax(0,920px); justify-content:center`)로 오버라이드(전역 1fr/308px 2열 해제 — 설정엔 위젯사이드바 없음). page-title도.
+- **검증**: 로컬 Playwright — 계정 anon(게이트+링크)·auth(프로필 E2E로컬+링크+버튼)·다크·회원탈퇴 모달 open, 세금 2열 라이트/다크, 콘솔0.
+- 배포: push(main).
+
+_작성: Claude_
+
 ## [2026-06-22] FIX | 세금설정 로그인 게이트 + duckdns 잔재 co.kr 일괄정리 (오너)
 
 - **세금설정 비로그인 차단**: `/settings` 세금 패널이 비로그인서도 폼 편집 가능했음(다른 탭은 `{% if user %}` 게이트 있음). settings.html 세금 폼을 `{% if user %}…{% else %}로그인 게이트{% endif %}`로 감쌈(myassets·alerts 패턴). `loadTaxSettings` IIFE에 `if(!#earnedIncome) return` 가드(폼 없을 때 taxApply throw 방지).

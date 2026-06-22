@@ -1,5 +1,13 @@
 # Log
 
+## [2026-06-22] FIX | 알림 종목 추가 — 직접입력 → 검색 콤보 (오너)
+
+- **변경**(alerts.html): 알림 만들기의 종목 "+직접입력"(하단 텍스트칸) 제거 → 셀렉트(보유 빠른선택) 옆에 **검색창** 추가. `/api/search`로 종목 검색→결과 드롭다운→클릭하면 셀렉트에 옵션 추가+선택. syncForm/createRule에서 `__manual__` 분기 제거.
+- **검증**: 로컬 Playwright(로그인) — SCHD 검색→드롭다운→클릭→셀렉트값 일치, 라이트/다크, 콘솔0. ⚠️ 로컬은 redis off라 `/api/search` 가격조회가 ~4s(프로드는 캐시로 빠름) — API 기존 동작, 본 변경과 무관.
+- 배포: push(main).
+
+_작성: Claude_
+
 ## [2026-06-22] SEO | 검색엔진 4사 등록 + 도구페이지 서버렌더 h1·설명문 (오너)
 
 - **검색엔진 등록**: Google(소유확인 meta+sitemap 제출)·Naver(meta+sitemap+웹페이지수집)·Daum(검색등록 URL)·Bing(GSC import). 소유확인 meta = base.html(`google-site-verification`·`naver-site-verification`, 프로드 라이브 확인). 점유율 Google~60%+Naver~30%.

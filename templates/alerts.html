@@ -39,6 +39,16 @@
 .al-x { background: none; border: none; color: var(--ds-muted); cursor: pointer; font-size: 1rem; padding: 4px; }
 .al-toggle { cursor: pointer; }
 .al-login { text-align: center; padding: 60px 20px; color: var(--ds-muted); }
+/* 종목 검색 콤보 */
+.al-search-wrap { position: relative; }
+.al-search-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-md);
+  box-shadow: var(--ds-shadow-lg); max-height: 240px; overflow-y: auto; display: none; }
+.al-search-results.open { display: block; }
+.al-sr-item { padding: 9px 12px; cursor: pointer; font-size: 0.84rem; display: flex; gap: 8px;
+  align-items: center; justify-content: space-between; }
+.al-sr-item:hover { background: var(--ds-soft); }
+.al-sr-code { color: var(--ds-muted); font-size: 0.74rem; flex-shrink: 0; }
 </style>
 {% endblock %}
 
@@ -66,12 +76,13 @@
         </select>
       </div>
       <div class="al-field" id="fSymbol">
-        <label>종목</label>
+        <label>종목 (보유)</label>
         <select id="alCode"></select>
       </div>
-      <div class="al-field" id="fCodeManual" style="display:none;">
-        <label>직접 입력</label>
-        <input id="alCodeManual" placeholder="예: AAPL, 005930" />
+      <div class="al-field al-search-wrap" id="fSymSearch">
+        <label>검색으로 추가</label>
+        <input id="alSymSearch" placeholder="예: AAPL, 삼성전자, SCHD" autocomplete="off" />
+        <div class="al-search-results" id="alSymResults"></div>
       </div>
       <div class="al-field" id="fDir" style="display:none;">
         <label>방향</label>
@@ -118,24 +129,56 @@ const DIR_OPTS = {
 
 function $(id){ return document.getElementById(id); }
 
-// 종목 셀렉트 채우기
+// 종목 셀렉트 채우기 (보유/관심 종목 빠른선택)
 (function(){
   const sel = $('alCode');
   if (MM_SYMBOLS.length) {
-    sel.innerHTML = MM_SYMBOLS.map(s => `<option value="${s.code}">${s.name} (${s.code})</option>`).join('')
-      + '<option value="__manual__">+ 직접 입력</option>';
+    sel.innerHTML = MM_SYMBOLS.map(s => `<option value="${s.code}">${s.name} (${s.code})</option>`).join('');
   } else {
-    sel.innerHTML = '<option value="__manual__">직접 입력</option>';
+    sel.innerHTML = '<option value="" disabled selected>보유 종목 없음 — 검색으로 추가</option>';
   }
 })();
+
+// 종목 검색 → 선택 (검색결과 클릭 시 셀렉트에 옵션 추가+선택)
+let _alSearchTimer = null;
+function _alPickSymbol(code, name){
+  const sel = $('alCode');
+  let opt = Array.from(sel.options).find(o => o.value === code);
+  if (!opt) { opt = new Option(`${name} (${code})`, code); sel.add(opt, 0); }
+  sel.value = code;
+  $('alSymResults').classList.remove('open');
+  $('alSymSearch').value = '';
+  syncForm();
+}
+$('alSymSearch').addEventListener('input', function(){
+  const q = this.value.trim();
+  clearTimeout(_alSearchTimer);
+  const box = $('alSymResults');
+  if (!q) { box.classList.remove('open'); return; }
+  _alSearchTimer = setTimeout(async () => {
+    try {
+      const res = await (await fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=8')).json();
+      const items = Array.isArray(res) ? res : (res.items || []);
+      if (!items.length) { box.innerHTML = '<div class="al-sr-item" style="color:var(--ds-muted);cursor:default;">결과 없음</div>'; box.classList.add('open'); return; }
+      box.innerHTML = items.map(it =>
+        `<div class="al-sr-item" data-code="${it.code}" data-name="${(it.name||'').replace(/"/g,'&quot;')}">
+           <span>${it.name||it.code}</span><span class="al-sr-code">${it.code}</span></div>`).join('');
+      box.classList.add('open');
+      box.querySelectorAll('.al-sr-item[data-code]').forEach(el =>
+        el.onclick = () => _alPickSymbol(el.dataset.code, el.dataset.name));
+    } catch(e) { box.classList.remove('open'); }
+  }, 220);
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#fSymSearch')) $('alSymResults').classList.remove('open');
+});
 
 function syncForm(){
   const t = $('alType').value;
   const isReb = t === 'rebalance_band';
   const isExtreme = (t === 'new_high' || t === 'new_low');
-  const manual = !isReb && $('alCode').value === '__manual__';
   $('fSymbol').style.display = isReb ? 'none' : '';
-  $('fCodeManual').style.display = manual ? '' : 'none';
+  $('fSymSearch').style.display = isReb ? 'none' : '';
   $('fDir').style.display = (t === 'daily_pct' || t === 'target_price') ? '' : 'none';
   $('fWindow').style.display = isExtreme ? '' : 'none';
   $('fThreshold').style.display = isExtreme ? 'none' : '';
@@ -156,7 +199,7 @@ async function createRule(){
   if (t === 'rebalance_band') {
     body.threshold = parseFloat($('alThr').value);
   } else {
-    body.code = ($('alCode').value === '__manual__') ? $('alCodeManual').value.trim() : $('alCode').value;
+    body.code = $('alCode').value;
     if (t === 'new_high' || t === 'new_low') {
       body.window = $('alWindow').value;
     } else {

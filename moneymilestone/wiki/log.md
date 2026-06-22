@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-22] SEO | 검색엔진 4사 등록 + 도구페이지 서버렌더 h1·설명문 (오너)
+
+- **검색엔진 등록**: Google(소유확인 meta+sitemap 제출)·Naver(meta+sitemap+웹페이지수집)·Daum(검색등록 URL)·Bing(GSC import). 소유확인 meta = base.html(`google-site-verification`·`naver-site-verification`, 프로드 라이브 확인). 점유율 Google~60%+Naver~30%.
+- **도구페이지 SEO 콘텐츠 1차**: 6개 도구(calculator·backtest·dividend_target·retirement·simple·risk_return) hero 부제를 키워드 풍부 설명문으로 보강 + h1 정상화. simple `h2.calc-title`→`h1`, risk_return `<div class="rr-title">`→`<h1>` 이며 **로그인벽(`{% if not user %}`) 위 공통으로 이동**(비로그인 Googlebot이 h1·설명 크롤 가능하게 — 기존엔 로그인벽만 보여 색인 불가였음). 페이지당 h1 1개 확인.
+- **검증**: 로컬 — 6페이지 서버HTML에 h1 1개+설명문 존재(curl), Playwright simple/risk_return(anon·dark)/dividend 렌더·콘솔0.
+- 계획: `검색_plan.md` 갱신. 남은 SEO=FAQ 섹션·쿼리파라미터 프리필·백링크.
+- 배포: push(main).
+
+_작성: Claude_
+
 ## [2026-06-22] FEAT | 신규 상장 종목 동기화 — resync + 월간 CI 파이프라인 (오너)
 
 - **문제**: 검색 마스터(`data/meta/symbol_master.db`, `symbols` 테이블)는 빌드 스냅샷이라 이후 상장 종목 누락(SpaceX 계기). `SYMBOL_DB_PATH`=config.py. (db_builder.py는 `data/symbol_master.db` 상대경로=레거시·미사용; index_master.db는 가격/지수용 별개)

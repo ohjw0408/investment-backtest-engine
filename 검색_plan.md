@@ -17,18 +17,21 @@
 - **Google Search Console**: URL접두어 `https://moneymilestone.co.kr` 소유확인 완료(meta 태그 base.html, commit 5af4c39, 프로드 라이브 확인).
 - (UX) 홈 persona 6카드 — 진입 동선 개선.
 
-## ⏳ 진행 중
+## ✅ 추가 완료 (2026-06-22)
 
-- **Google**: 소유확인 통과. 현재 GSC 데이터 처리중(며칠). **→ Sitemaps에 `sitemap.xml` 즉시 제출**(처리중이어도 가능, 막지 않음). 제출 후 며칠~2주 색인 시작.
+- **검색엔진 4사 등록**: Google(소유확인+sitemap 제출)·Naver(소유확인+sitemap+웹페이지수집)·Daum(검색등록 URL 제출)·Bing(GSC import). 소유확인 meta=base.html(google·naver). Google+Naver=한국 ~90%가 본진.
+- **도구페이지 서버렌더 SEO 콘텐츠 1차**: 6개 도구에 h1(키워드 포함)+키워드 풍부 설명문단을 **서버 HTML**로(JS 아님). simple h2→h1 승격, risk_return은 h1+설명을 **로그인벽 위 공통으로** 빼서 Googlebot(비로그인) 크롤 가능. 페이지당 h1 1개. Playwright 검증(렌더·콘솔0).
+
+## ⏳ 대기 (자동)
+
+- 색인: sitemap 제출됨 → 며칠~2주 크롤·색인. `site:moneymilestone.co.kr`로 확인. GSC URL검사 "색인 생성 요청"으로 당기기 가능.
 
 ## ☐ 다음 (우선순위)
 
-1. **네이버 서치어드바이저** 등록 — searchadvisor.naver.com, HTML 태그 받아 base.html에 추가(google 태그 옆). **국내 유입 최대라 중요.** + sitemap 제출.
-2. **Bing Webmaster** — "Import from GSC"로 한방, 또는 msvalidate.01 메타. + sitemap.
-3. **★ 도구 페이지 서버렌더 콘텐츠 (랭킹 본체)** — 현재 도구 페이지는 JS 렌더라 본문 텍스트 빈약 → 구글이 주제 약하게 인식. 각 페이지에 **서버 HTML `<h1>` + 설명 문단**(키워드 자연 포함) 추가. 예: 배당금 계산기 → `<h1>배당금 계산기</h1><p>목표 배당수익을 받으려면 얼마를 투자해야 하는지 역산…</p>`. "배당금 계산기" 등 경쟁어 상위노출의 핵심.
-4. **FAQ 섹션** (각 도구 하단) — 롱테일 검색 흡수 + JSON-LD FAQPage 리치결과.
-5. **쿼리파라미터 프리필** — `/dividend-target?stock=SCHD&yield=3.34…` 식 결과 공유 딥링크(스노우볼식). 백링크·바이럴.
-6. **백링크 + 시간** — 외부 링크 = 권위. 통제 어려움, 콘텐츠로 유도.
+1. **FAQ 섹션** (각 도구 하단) — 롱테일 검색 흡수 + JSON-LD FAQPage 리치결과.
+2. **쿼리파라미터 프리필** — `/dividend-target?stock=SCHD&yield=3.34…` 식 결과 공유 딥링크(스노우볼식). 백링크·바이럴.
+3. **백링크 + 시간** — 외부 링크 = 권위. 통제 어려움, 콘텐츠로 유도.
+4. (선택) 도구페이지 본문 콘텐츠 더 확장.
 
 ## 기대치 (정직)
 

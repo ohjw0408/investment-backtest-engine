@@ -102,6 +102,9 @@
 {% block content %}
 <div class="rr-wrap">
 
+  <h1 class="rr-title">📊 포트폴리오 비교</h1>
+  <div class="rr-sub">여러 자산배분 전략과 벤치마크의 리스크(변동성) 대비 수익을 한 화면에서 비교해 효율적인 투자 조합을 찾는 도구입니다. 배당 재투자(총수익) 기준.</div>
+
   {% if not user %}
   <div class="login-required">
     <div style="font-size:2rem;margin-bottom:12px;">🔒</div>
@@ -110,9 +113,6 @@
     <a href="/auth/google" style="display:inline-block;margin-top:16px;padding:10px 24px;background:var(--blue);color:white;border-radius:8px;text-decoration:none;font-weight:700;">Google로 로그인</a>
   </div>
   {% else %}
-
-  <div class="rr-title">📊 포트폴리오 비교</div>
-  <div class="rr-sub">저장한 포트폴리오와 벤치마크를 한눈에 비교해요. 배당 재투자(총수익)·전 종목 공통 겹침 기간 기준.</div>
 
   <!-- 광고 CTA (맨 위) -->
   <div class="rr-card" style="display:flex;align-items:center;gap:16px;background:rgba(25,118,210,0.08);border-color:rgba(25,118,210,0.45);">

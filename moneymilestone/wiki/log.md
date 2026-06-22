@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-23] FEAT | 모바일앱 하단 탭바 — 앱 크롬(Capacitor 감지) (오너)
+
+- **목표**: 모바일앱(Capacitor WebView)을 앱답게 — 하단 탭바. 모바일 웹은 그대로.
+- **방식**(base.html, 웹사이드): `window.Capacitor.isNativePlatform()` 감지 → `html.is-app` 클래스(head FOUC + 폴백 스크립트). `.is-app`에서만 하단 탭바 표시(홈·계산기·분석·내자산·알림, nicon 아이콘, request.path active), main-content 하단 패딩+safe-area-inset, 긴 footer 숨김. 상단 햄버거 유지(전체메뉴).
+- **앱은 co.kr 원격 로드라 push만 하면 다음 실행 시 반영**(재빌드 불필요).
+- **검증**: 로컬 Playwright(390px) — Capacitor mock 시 is-app·탭바 5개·하단고정·footer숨김·라이트/다크, mock 없으면(웹) 탭바 숨김. 콘솔0.
+- ⚠️ **남은 앱 작업**: OAuth WebView 블로커(구글 로그인 차단 → @capacitor/browser 시스템브라우저+딥링크 또는 네이티브 구글로그인), 스플래시/푸시, 안드로이드 스튜디오 빌드(오너 환경에 있음). [[project-mobile-app-capacitor]]
+- 배포: push(main).
+
+_작성: Claude_
+
 ## [2026-06-23] UI | 포폴비교 벤치마크 칩 직관화 (오너, 공통)
 
 - **문제**: 벤치마크 칩이 무채색 테두리+흐린 ✕라 "선택됨/제거/추가"가 비직관적.

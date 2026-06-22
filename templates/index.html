@@ -127,15 +127,18 @@
 
 /* ── 기능 유도 타일 ── */
 .feat-sec { margin-top: 4px; }
-.feat-sec-title { font-size: var(--fs-title); font-weight: 600; color: var(--ds-ink); margin: 0 0 14px 2px; }
-.feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-.feat-tile { display: flex; flex-direction: column; gap: 10px; padding: 20px; background: var(--ds-canvas);
+.feat-sec-title { font-size: var(--fs-title); font-weight: 600; color: var(--ds-ink); margin: 0 0 2px 2px; }
+.feat-sec-sub { font-size: var(--fs-cap); color: var(--ds-muted); margin: 0 0 14px 2px; }
+.feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.feat-tile { display: flex; flex-direction: column; gap: 10px; padding: 26px 24px; background: var(--ds-canvas);
   border: 1px solid var(--ds-hairline); border-radius: var(--r-xl); text-decoration: none; color: inherit; transition: border-color .15s, box-shadow .15s; }
 .feat-tile:hover { border-color: var(--brand); box-shadow: var(--ds-shadow); }
 .feat-ic { width: 44px; height: 44px; border-radius: var(--r-md); background: var(--brand-tint); color: var(--brand-text);
   display: flex; align-items: center; justify-content: center; }
+.feat-kick { font-size: var(--fs-cap); font-weight: 600; color: var(--ds-muted); }
+.feat-head { font-size: 19px; font-weight: 700; color: var(--ds-ink); letter-spacing: -.3px; line-height: 1.32; }
 .feat-t { font-size: var(--fs-body); font-weight: 600; color: var(--ds-ink); }
-.feat-d { font-size: var(--fs-cap); color: var(--ds-muted); line-height: 1.5; }
+.feat-d { font-size: var(--fs-cap); color: var(--ds-muted); line-height: 1.5; margin-top: auto; }
 /* ── 비로그인 데모 그래프 오버레이 ── */
 .demo-badge { font-size: var(--fs-cap); font-weight: 600; color: var(--brand-text); background: var(--brand-tint);
   padding: 2px 9px; border-radius: var(--r-pill); margin-left: 6px; vertical-align: middle; }
@@ -166,7 +169,7 @@
 .cta-card.ghost .cta-go { color: var(--brand-text); }
 
 @media (max-width: 720px) {
-  .feat-grid { grid-template-columns: 1fr 1fr; }
+  .feat-grid { grid-template-columns: 1fr; }
   .cta-grid { grid-template-columns: 1fr; }
 }
 </style>
@@ -258,39 +261,44 @@
 
   <!-- ===== 투자 도구 (기능 유도 — 로그인/비로그인 공용) ===== -->
   <div class="feat-sec">
-    <div class="feat-sec-title">투자 도구</div>
+    <div class="feat-sec-title">투자, 어디서부터 막막하세요?</div>
+    <div class="feat-sec-sub">고민 하나 고르면, 맞는 도구로 안내해드려요</div>
     <div class="feat-grid">
-      <a href="/calculator" class="feat-tile">
-        <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11.5" x2="8.01" y2="11.5"/><line x1="12" y1="11.5" x2="12.01" y2="11.5"/><line x1="16" y1="11.5" x2="16.01" y2="11.5"/><line x1="8" y1="15.5" x2="8.01" y2="15.5"/><line x1="12" y1="15.5" x2="12.01" y2="15.5"/><line x1="16" y1="15.5" x2="16" y2="17.5"/></svg></div>
-        <div class="feat-t">투자 계산기</div>
-        <div class="feat-d">포트폴리오를 짜고 30년 뒤 내 자산이 얼마일지 시뮬레이션</div>
-      </a>
-      <a href="/backtest" class="feat-tile">
-        <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="11" width="3" height="7" rx="1"/><rect x="11" y="6" width="3" height="12" rx="1"/><rect x="16" y="14" width="3" height="4" rx="1"/></svg></div>
-        <div class="feat-t">포트폴리오 분석</div>
-        <div class="feat-d">과거 30년 실제 데이터로 수익률·최대낙폭을 백테스트</div>
+      <a href="/simple" class="feat-tile">
+        <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg></div>
+        <div class="feat-kick">간편 계산기</div>
+        <div class="feat-head">복잡한 건 됐고, 빠르게만 보고 싶어요</div>
+        <div class="feat-d">목돈·매달 적립의 미래가치를 1분 만에</div>
       </a>
       <a href="/risk-return" class="feat-tile">
         <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V9"/><path d="M12 16V5"/><path d="M19 16v-4"/><path d="M3 20h18"/><circle cx="5" cy="9" r="1.4"/><circle cx="12" cy="5" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></div>
-        <div class="feat-t">포트폴리오 비교</div>
-        <div class="feat-d">여러 전략의 리스크 대비 수익을 한눈에 비교</div>
+        <div class="feat-kick">포트폴리오 비교</div>
+        <div class="feat-head">내 자산배분, 이게 맞는 걸까?</div>
+        <div class="feat-d">여러 전략 리스크 대비 수익을 한눈에</div>
       </a>
-    </div>
-    <div class="feat-grid" style="margin-top:14px;">
-      <a href="/simple" class="feat-tile">
-        <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg></div>
-        <div class="feat-t">간편 계산기</div>
-        <div class="feat-d">복잡한 설정 없이 목돈·매달 적립의 미래 가치를 빠르게 계산</div>
+      <a href="/backtest" class="feat-tile">
+        <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="11" width="3" height="7" rx="1"/><rect x="11" y="6" width="3" height="12" rx="1"/><rect x="16" y="14" width="3" height="4" rx="1"/></svg></div>
+        <div class="feat-kick">포트폴리오 분석</div>
+        <div class="feat-head">이 전략, 과거엔 통했을까?</div>
+        <div class="feat-d">30년 실제 데이터로 수익·낙폭 백테스트</div>
+      </a>
+      <a href="/calculator" class="feat-tile">
+        <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11.5" x2="8.01" y2="11.5"/><line x1="12" y1="11.5" x2="12.01" y2="11.5"/><line x1="16" y1="11.5" x2="16.01" y2="11.5"/><line x1="8" y1="15.5" x2="8.01" y2="15.5"/><line x1="12" y1="15.5" x2="12.01" y2="15.5"/><line x1="16" y1="15.5" x2="16" y2="17.5"/></svg></div>
+        <div class="feat-kick">투자 계산기</div>
+        <div class="feat-head">10년 뒤 내 돈, 얼마나 불어날까?</div>
+        <div class="feat-d">포트폴리오 30년 성장 시뮬레이션</div>
       </a>
       <a href="/dividend-target" class="feat-tile">
         <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg></div>
-        <div class="feat-t">배당금 계산기</div>
-        <div class="feat-d">목표 배당수익을 받으려면 얼마를 투자해야 하는지 역산</div>
+        <div class="feat-kick">배당금 계산기</div>
+        <div class="feat-head">배당으로 매달 현금흐름 만들려면?</div>
+        <div class="feat-d">목표 배당 받으려면 얼마 넣을지 역산</div>
       </a>
       <a href="/retirement" class="feat-tile">
         <div class="feat-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18"/><path d="M5 18a7 7 0 0 1 14 0"/><line x1="12" y1="6" x2="12" y2="3"/><line x1="5" y1="9" x2="3.5" y2="7.5"/><line x1="19" y1="9" x2="20.5" y2="7.5"/></svg></div>
-        <div class="feat-t">은퇴 설계</div>
-        <div class="feat-d">은퇴 후 매달 쓸 돈과 그에 필요한 목표 자산을 시뮬레이션</div>
+        <div class="feat-kick">은퇴 설계</div>
+        <div class="feat-head">은퇴 후에도 돈이 마르지 않으려면?</div>
+        <div class="feat-d">노후 생활비와 필요 목표 자산 시뮬</div>
       </a>
     </div>
   </div>

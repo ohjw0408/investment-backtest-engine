@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-22] FEAT | 포폴비교 비로그인 찍먹 — 즉석 빌더 (오너)
+
+- **변경**: 포트폴리오 비교(/risk-return) 비로그인 = 로그인벽이었음 → **즉석 포트폴리오 빌더**로 교체. 종목 검색(/api/search)→추가→비중 입력(추가/삭제 시 균등분배 자동, 편집가능)→비교 실행→핵심지표 표(내 포폴 vs 벤치마크 SPY·QQQ·GLD·KODEX200·TLT). 하단 "로그인하면 저장·차트·다중비교" CTA.
+- **백엔드**(app.py `/api/portfolio/compare`): `portfolios`(ad-hoc [{name,tickers:[{code,weight}]}]) 받으면 로그인 없이 처리(compute_comparison에 직접 전달), 없으면 기존 저장ID 경로. `@limiter.limit(HEAVY_LIMIT)` 추가(비로그인 노출 방어). **로그인 경로 불변.**
+- **프론트**: 비로그인 빌더 markup + 독립 `{% if not user %}` 스크립트(IIFE). 결과표는 rr-table 재사용. period 객체({start,end,years,warning}) 형식화(`[object Object]` 버그 수정).
+- **검증**: 로컬 Playwright(비로그인) — 빌더 표시·SPY+QQQ 추가·비교 6행(내폴+벤치5)·period 정상·라이트/다크·콘솔0.
+- ⚠️ 잔여(오너 요청): #3 비로그인 기본 자동실행, #5 벤치마크 선택 UI 직관화(공통). #4 저장안내는 CTA로 반영.
+- 배포: push(main).
+
+_작성: Claude_
+
 ## [2026-06-22] FEAT | 검색에 지수·환율·원자재·금리 한글별칭 추가 (오너)
 
 - **문제**: `/api/search`가 symbol_master(주식/ETF)만 검색 → "나스닥/원달러/snp500/금/유가" 등 시장 심볼 검색 불가. index_master.index_meta엔 있으나 영문 description뿐.

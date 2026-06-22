@@ -106,11 +106,29 @@
   <div class="rr-sub">여러 자산배분 전략과 벤치마크의 리스크(변동성) 대비 수익을 한 화면에서 비교해 효율적인 투자 조합을 찾는 도구입니다. 배당 재투자(총수익) 기준.</div>
 
   {% if not user %}
-  <div class="login-required">
-    <div style="font-size:2rem;margin-bottom:12px;">🔒</div>
-    <div style="font-weight:700;font-size:1rem;margin-bottom:8px;">로그인이 필요합니다</div>
-    <div style="font-size:0.85rem;">포트폴리오 비교는 저장한 포트폴리오를 사용해요.</div>
-    <a href="/auth/google" style="display:inline-block;margin-top:16px;padding:10px 24px;background:var(--blue);color:white;border-radius:8px;text-decoration:none;font-weight:700;">Google로 로그인</a>
+  <!-- 비로그인: 즉석 포트폴리오 빌더로 찍먹 -->
+  <div class="rr-card" id="abCard" style="border-color:rgba(25,118,210,0.45);">
+    <div style="font-size:1.05rem;font-weight:800;display:flex;align-items:center;gap:8px;">🔬 포트폴리오 만들어 비교해보기</div>
+    <div style="font-size:0.84rem;color:var(--text-muted);margin:6px 0 14px;line-height:1.55;">
+      종목과 비중을 넣어 나만의 포트폴리오를 만들고, 벤치마크(S&amp;P500·나스닥·금 등)와 수익·위험을 바로 비교해보세요.
+      <b>로그인하면 만든 포트폴리오를 저장</b>할 수 있어요.
+    </div>
+    <div class="rr-search-wrap" style="max-width:440px;">
+      <input id="abSearch" class="rr-input" placeholder="🔍 종목·ETF 검색해서 추가 (예: SPY, 삼성전자, SCHD)" autocomplete="off">
+      <div class="rr-dropdown" id="abDD"></div>
+    </div>
+    <div id="abList" style="margin-top:14px;"></div>
+    <div id="abSum" style="font-size:0.78rem;color:var(--text-muted);margin-top:8px;"></div>
+    <button class="btn-primary" id="abRun" style="margin-top:14px;width:100%;padding:13px;font-size:1.02rem;font-weight:800;border-radius:11px;" disabled>📊 비교하기</button>
+    <div id="abStatus" style="margin-top:10px;font-size:0.84rem;"></div>
+  </div>
+
+  <div id="abResults" style="display:none;"></div>
+
+  <div class="rr-card" style="display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;background:rgba(25,118,210,0.06);border-color:rgba(25,118,210,0.4);">
+    <div style="font-weight:800;">로그인하면 더 많은 걸 할 수 있어요</div>
+    <div style="font-size:0.84rem;color:var(--text-muted);">포트폴리오 저장 · 여러 개 동시 비교 · 추세 겹쳐보기 · 리스크-리턴 도표 · 레이더 차트</div>
+    <a href="/auth/google" class="btn-primary" style="text-decoration:none;padding:11px 26px;">Google로 로그인</a>
   </div>
   {% else %}
 
@@ -706,6 +724,99 @@ async function rrOvSearch(q){
 // init
 rrRenderChips();
 rrLoadPortfolios().then(rrOvInit);
+</script>
+{% endif %}
+
+{% if not user %}
+<script>
+// 비로그인 즉석 포트폴리오 빌더 → 비교(찍먹). 저장은 로그인 필요.
+(function(){
+  function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  let abItems = [];   // {code,name,weight}
+  const $ = id => document.getElementById(id);
+
+  function abRender(){
+    const list = $('abList');
+    if(!abItems.length){
+      list.innerHTML = '<div style="color:var(--text-muted);font-size:0.84rem;">아직 종목이 없어요. 위에서 검색해 추가하세요.</div>';
+      $('abRun').disabled = true; $('abSum').textContent = ''; return;
+    }
+    list.innerHTML = abItems.map((it,i)=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="flex:1;min-width:0;"><span style="font-weight:700;">${esc(it.name||it.code)}</span> <span style="color:var(--text-muted);font-size:0.78rem;">${esc(it.code)}</span></div>
+        <input type="number" min="0" max="100" step="1" value="${it.weight}" data-i="${i}" class="ab-w rr-input" style="width:78px;text-align:right;">
+        <span style="color:var(--text-muted);">%</span>
+        <button data-del="${i}" class="ab-del" title="삭제" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;">✕</button>
+      </div>`).join('');
+    const sum = abItems.reduce((s,x)=>s+(+x.weight||0),0);
+    $('abSum').textContent = `합계 ${sum}%` + (sum!==100 ? ' · 100% 기준으로 정규화되어 계산돼요' : '');
+    $('abRun').disabled = false;
+    list.querySelectorAll('.ab-w').forEach(inp=>inp.onchange=()=>{ abItems[+inp.dataset.i].weight = Math.max(0, +inp.value||0); abRender(); });
+    list.querySelectorAll('.ab-del').forEach(b=>b.onclick=()=>{ abItems.splice(+b.dataset.del,1); abEqualize(); });
+  }
+  function abEqualize(){
+    const n = abItems.length;
+    if(n){ const w = Math.round(100/n); abItems.forEach((it,i)=> it.weight = (i===n-1) ? 100-w*(n-1) : w); }
+    abRender();
+  }
+  function abAdd(code,name){ if(abItems.find(x=>x.code===code)) return; abItems.push({code,name,weight:0}); abEqualize(); }
+
+  let _t=null;
+  $('abSearch').addEventListener('input', function(){
+    const q=this.value.trim(); clearTimeout(_t); const dd=$('abDD');
+    if(!q){ dd.style.display='none'; return; }
+    _t=setTimeout(async()=>{
+      try{
+        const res=await fetch('/api/search?q='+encodeURIComponent(q)+'&limit=8').then(r=>r.json());
+        const items=Array.isArray(res)?res:(res.items||[]);
+        if(!items.length){ dd.innerHTML='<div class="rr-dd-item">결과 없음</div>'; dd.style.display='block'; return; }
+        dd.innerHTML=items.map(s=>`<div class="rr-dd-item" data-code="${esc(s.code)}" data-name="${esc(s.name||s.code)}"><span style="font-weight:700;">${esc(s.code)}</span><span style="color:var(--text-muted);">${esc(s.name||'')}</span></div>`).join('');
+        dd.style.display='block';
+        dd.querySelectorAll('.rr-dd-item[data-code]').forEach(el=>el.onclick=()=>{ abAdd(el.dataset.code, el.dataset.name); $('abSearch').value=''; dd.style.display='none'; });
+      }catch(e){ dd.style.display='none'; }
+    },240);
+  });
+  document.addEventListener('click',e=>{ if(!e.target.closest('#abCard .rr-search-wrap')) $('abDD').style.display='none'; });
+
+  function abRenderResults(data){
+    const items=data.items||[];
+    const box=$('abResults');
+    if(!items.length){ box.style.display='none'; return; }
+    const pct=(v,d=1)=> (v==null||isNaN(v))?'—':(v*100).toFixed(d)+'%';
+    const rows=items.map(it=>`<tr>
+      <td style="text-align:left;font-weight:700;">${esc(it.name)}</td>
+      <td>${pct(it.cagr)}</td><td>${pct(it.vol)}</td><td>${pct(it.mdd)}</td>
+      <td>${it.sharpe!=null?it.sharpe.toFixed(2):'—'}</td><td>${pct(it.div_yield,2)}</td></tr>`).join('');
+    box.innerHTML=`<div class="rr-card">
+      <div class="rr-card-title">📋 비교 결과 · 핵심 지표</div>
+      <div class="rr-table-wrap"><table class="rr-table">
+        <thead><tr><th style="text-align:left;">이름</th><th>수익률(CAGR)</th><th>변동성</th><th>MDD</th><th>Sharpe</th><th>배당률</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      ${data.period?`<div class="rr-period">비교 기간: ${esc(data.period.start)} ~ ${esc(data.period.end)} (${esc(String(data.period.years))}년, 전 종목 공통 겹침 구간)</div>`:''}
+      ${data.period&&data.period.warning?`<div class="rr-warn">⚠ ${esc(data.period.warning)}</div>`:''}
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:10px;">💡 내 포트폴리오 vs 벤치마크(SPY·QQQ·GLD·KODEX200·TLT). <b>로그인하면</b> 저장 · 리스크-리턴 도표 · 레이더 차트 · 여러 포트폴리오 동시 비교까지 볼 수 있어요.</div>
+    </div>`;
+    box.style.display='block';
+    box.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+  $('abRun').addEventListener('click', async()=>{
+    if(!abItems.length) return;
+    const btn=$('abRun'), st=$('abStatus');
+    btn.disabled=true; st.textContent='⏳ 산출 중...'; $('abResults').style.display='none';
+    try{
+      const res=await fetch('/api/portfolio/compare',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({portfolios:[{name:'내 포트폴리오', tickers: abItems.map(x=>({code:x.code, weight:x.weight}))}]})});
+      const data=await res.json();
+      if(!res.ok){ st.textContent=data.error||'산출에 실패했어요.'; return; }
+      if(!data.items||!data.items.length){ st.textContent='데이터가 부족해요. 다른 종목으로 시도해보세요.'; return; }
+      st.textContent=''; abRenderResults(data);
+    }catch(e){ st.textContent='산출에 실패했어요. 네트워크를 확인해주세요.'; }
+    finally{ btn.disabled=false; }
+  });
+
+  abRender();
+})();
 </script>
 {% endif %}
 {% endblock %}

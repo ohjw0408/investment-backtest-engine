@@ -2797,24 +2797,36 @@ def risk_return():
 
 
 @app.route('/api/portfolio/compare', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
 def portfolio_compare():
     """포트폴리오 비교 탭 — 선택 포폴 + 벤치마크의 11지표.
 
-    body: {portfolio_ids:[int], benchmarks:[{code,name}]}
+    body: {portfolio_ids:[int], benchmarks:[{code,name}]}  (로그인 — 저장 포폴)
+       또는 {portfolios:[{name, tickers:[{code,weight}]}], benchmarks} (비로그인 즉석 비교)
     portfolio_ids 비면 전체 저장 포폴. benchmarks 없으면 기본셋.
     """
-    if not session.get('user_id'):
-        return jsonify({'error': '로그인 필요'}), 401
     from risk_return_logic import compute_comparison, DEFAULT_BENCHMARKS
     body = request.get_json(silent=True) or {}
 
-    all_p = get_portfolios(session['user_id'])
-    ids = body.get('portfolio_ids')
-    if ids is None:
-        selected = all_p           # 키 부재 = 전체
+    adhoc = body.get('portfolios')   # 즉석 포폴(비로그인 찍먹) — 로그인 없이 허용
+    if adhoc:
+        selected = []
+        for p in adhoc[:5]:
+            if not isinstance(p, dict):
+                continue
+            tickers = [t for t in (p.get('tickers') or []) if isinstance(t, dict) and t.get('code')]
+            if tickers:
+                selected.append({'name': str(p.get('name') or '내 포트폴리오'), 'tickers': tickers})
     else:
-        idset = {int(i) for i in ids}
-        selected = [p for p in all_p if p['id'] in idset]   # 빈 배열 = 선택 0
+        if not session.get('user_id'):
+            return jsonify({'error': '로그인 필요'}), 401
+        all_p = get_portfolios(session['user_id'])
+        ids = body.get('portfolio_ids')
+        if ids is None:
+            selected = all_p           # 키 부재 = 전체
+        else:
+            idset = {int(i) for i in ids}
+            selected = [p for p in all_p if p['id'] in idset]   # 빈 배열 = 선택 0
 
     benchmarks = []
     for b in (body.get('benchmarks') or [])[:15]:

@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-22] FIX | 세금설정 로그인 게이트 + duckdns 잔재 co.kr 일괄정리 (오너)
+
+- **세금설정 비로그인 차단**: `/settings` 세금 패널이 비로그인서도 폼 편집 가능했음(다른 탭은 `{% if user %}` 게이트 있음). settings.html 세금 폼을 `{% if user %}…{% else %}로그인 게이트{% endif %}`로 감쌈(myassets·alerts 패턴). `loadTaxSettings` IIFE에 `if(!#earnedIncome) return` 가드(폼 없을 때 taxApply throw 방지).
+- **duckdns 잔재 정리**(도메인 이전 후속): 사용자노출 죽은 도메인 텍스트 co.kr로 일괄 교체 — app.py(카카오 외부브라우저 링크·공유이미지 푸터), base.html(카카오 alert), backtest/dividend_target/retirement/risk_return.html + calculator.js(공유카드 푸터). 테스트·plan 문서는 제외. 코드 내 duckdns 0 확인.
+- **검증**: 로컬 Playwright — 세금 비로그인=게이트(폼0·저장0)·로그인=폼1, 라이트/다크, 콘솔0. 스모크(홈·설정·백테·포폴비교) 전부 200·콘솔0.
+- 배포: push(main).
+
+_작성: Claude_
+
 ## [2026-06-22] INFRA | 도메인 co.kr 컷오버 — DNS+nginx+TLS+canonical (오너)
 
 - **moneymilestone.co.kr 라이브.** hosting.kr 구매(개인명의). 오너가 DNS A레코드(@·www→178.105.84.213) 설정, 전파 확인(구글·클플 둘 다).

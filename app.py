@@ -255,7 +255,7 @@ p{font-size:0.88rem;color:#546E7A;line-height:1.6;margin-bottom:20px}
   <h2>⚠️ 카카오톡 내부 브라우저</h2>
   <p>Google 로그인은 카카오톡 내부 브라우저에서 차단됩니다.<br><br>
   아래 버튼을 눌러 <strong>외부 브라우저(크롬/사파리)</strong>로 열어주세요.</p>
-  <button class="btn" onclick="location.href='kakaotalk://web/openExternal?url='+encodeURIComponent('https://moneymilestone.duckdns.org')">외부 브라우저로 열기</button>
+  <button class="btn" onclick="location.href='kakaotalk://web/openExternal?url='+encodeURIComponent('https://moneymilestone.co.kr')">외부 브라우저로 열기</button>
 </div>
 </body></html>''', 200
     redirect_uri = url_for('google_callback', _external=True)
@@ -3122,7 +3122,7 @@ def share_og_thumb():
 
     # 하단 워터마크
     draw.rectangle([0, H - 60, W, H], fill=CARD)
-    draw.text((48, H - 40), 'moneymilestone.duckdns.org', font=font_xs, fill=MUTED)
+    draw.text((48, H - 40), 'moneymilestone.co.kr', font=font_xs, fill=MUTED)
 
     buf = io.BytesIO()
     img.save(buf, 'PNG')

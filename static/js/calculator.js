@@ -1523,7 +1523,7 @@ async function calcMakeCanvas() {
       const hdr = doc.createElement('div');
       hdr.style.cssText = 'background:#1A2332;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;width:100%;box-sizing:border-box;margin-bottom:4px;';
       hdr.innerHTML = '<span style="color:var(--blue-mid);font-size:0.95rem;font-weight:800;">💰 Money Milestone</span>'
-                    + '<span style="color:var(--text-muted);font-size:0.78rem;">moneymilestone.duckdns.org · 무료 투자 분석 도구</span>';
+                    + '<span style="color:var(--text-muted);font-size:0.78rem;">moneymilestone.co.kr · 무료 투자 분석 도구</span>';
       clonedEl.insertBefore(hdr, clonedEl.firstChild);
       const cond = doc.createElement('div');
       cond.style.cssText = 'background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;font-family:inherit;';

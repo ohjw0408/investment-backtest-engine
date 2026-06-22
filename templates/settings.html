@@ -126,6 +126,7 @@
       <div class="settings-section-body">
         <div class="settings-hint">배당금 계산기·포트폴리오·은퇴 시뮬레이션의 세후 계산에 적용됩니다.</div>
 
+        {% if user %}
         <div class="tax-grid">
         <div class="tax-card active" id="card-income">
           <div class="tax-card-header">
@@ -192,6 +193,11 @@
         <div style="margin-top:14px;padding:14px 16px;background:var(--ds-soft);border:1px solid var(--ds-hairline);border-radius:var(--r-md);font-size:var(--fs-cap);color:var(--ds-muted);line-height:1.7;">
           💡 <b>참고</b> — 금현물·비트코인은 별도 세율. 금융소득 종합과세는 연 이자+배당 2,000만원 초과 시. 본 계산은 참고용입니다.
         </div>
+        {% else %}
+        <div class="login-gate">
+          세금 설정은 <a href="/auth/google" onclick="return handleGoogleLogin(event)">로그인</a> 후 저장·이용할 수 있어요.<br>설정한 세율은 배당·은퇴·포트폴리오 세후 계산에 적용됩니다.
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -359,6 +365,7 @@ function taxApply(s) {
   document.getElementById('earnedIncomeHint').textContent = s.earned_income ? taxFmtKRW(s.earned_income) : '';
 }
 (async function loadTaxSettings() {
+  if (!document.getElementById('earnedIncome')) return;  // 비로그인=세금 폼 게이트, 스킵
   let s = null;
   try { const me = await fetch('/api/me').then(r=>r.json()); if (me.logged_in) { const r = await fetch('/api/settings/tax'); if (r.ok) { const d = await r.json(); if (d && Object.keys(d).length) s = d; } } } catch(e) {}
   if (!s) { try { s = JSON.parse(localStorage.getItem(TAX_STORAGE_KEY) || 'null'); } catch(e) {} }

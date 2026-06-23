@@ -499,6 +499,17 @@ async function mmInitPush(force) {
       } catch (e) {}
     });
     Push.addListener('registrationError', function (e) { console.warn('[push] reg error', e); });
+    // 앱 포그라운드서 푸시 수신 → 시스템 알림 재현(로컬 알림) + 인앱 토스트 + 종 갱신
+    Push.addListener('pushNotificationReceived', function (n) {
+      try {
+        const t = (n && n.title) || (n && n.notification && n.notification.title) || '알림';
+        const bd = (n && n.body) || (n && n.notification && n.notification.body) || '';
+        if (typeof mmToast === 'function') mmToast('🔔 ' + t + (bd ? ' · ' + bd : ''), 'ok');
+        if (window.mmRefreshBell) window.mmRefreshBell();
+        const LN = Cap.Plugins && Cap.Plugins.LocalNotifications;
+        if (LN) LN.schedule({ notifications: [{ id: Math.floor(Math.random() * 2000000000) + 1, title: t, body: bd }] });
+      } catch (e) {}
+    });
     // 알림 탭 → 관련 화면 이동(종목 알림=종목 페이지, 그 외=수신함)
     Push.addListener('pushNotificationActionPerformed', function (a) {
       const d = (a && a.notification && a.notification.data) || {};

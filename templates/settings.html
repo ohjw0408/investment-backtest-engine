@@ -64,6 +64,17 @@
 .acct-btn.ghost:hover { border-color: var(--ds-muted); }
 .acct-btn.danger { border: 1px solid var(--down); background: transparent; color: var(--down); }
 .acct-btn.danger:hover { background: var(--down-tint); }
+/* 선택 동의(알림 권한) 토글 */
+.acct-notif { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); margin-bottom: 16px; }
+.acct-notif-main { flex: 1; min-width: 0; }
+.acct-notif-t { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); }
+.acct-notif-d { font-size: var(--fs-cap); color: var(--ds-muted); margin-top: 3px; line-height: 1.45; }
+.acct-sw { position: relative; width: 46px; height: 28px; flex-shrink: 0; cursor: pointer; }
+.acct-sw input { opacity: 0; width: 0; height: 0; }
+.acct-sw-tr { position: absolute; inset: 0; background: var(--ds-hairline); border-radius: var(--r-full); transition: background .18s; }
+.acct-sw-tr:before { content: ""; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .18s; }
+.acct-sw input:checked + .acct-sw-tr { background: var(--brand); }
+.acct-sw input:checked + .acct-sw-tr:before { transform: translateX(18px); }
 /* PC: 위젯 카드 멀티컬럼 그리드 / 모바일: 단일 컬럼 */
 #weList { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; align-items: start; }
 .we-widget { margin-bottom: 0; }
@@ -288,6 +299,14 @@
           <div class="acct-email">{{ user.email }}</div>
         </div>
       </div>
+      <div class="acct-notif">
+        <div class="acct-notif-main">
+          <div class="acct-notif-t">푸시 알림</div>
+          <div class="acct-notif-d">관심 종목 가격·신고가/신저가·리밸런싱 등 내가 설정한 서비스 알림. 광고·마케팅 아님 · 선택사항이라 언제든 끌 수 있어요.</div>
+          <div class="acct-notif-d" id="pushHint" style="margin-top:4px;"></div>
+        </div>
+        <label class="acct-sw"><input type="checkbox" id="pushToggle"><span class="acct-sw-tr"></span></label>
+      </div>
       <div class="acct-links">
         <a class="acct-link" href="/privacy">개인정보 처리방침 <span class="arr">›</span></a>
         <a class="acct-link" href="/terms">이용약관 <span class="arr">›</span></a>
@@ -357,6 +376,30 @@ async function confirmDelete() {
     else { btn.disabled = false; btn.textContent = '탈퇴하기'; }
   } catch (e) { btn.disabled = false; btn.textContent = '탈퇴하기'; }
 }
+
+// ── 푸시 알림 권한 토글(선택 동의 철회 가능) ──
+(function initPushToggle() {
+  const t = document.getElementById('pushToggle');
+  if (!t) return;   // 비로그인 = 토글 없음
+  const hint = document.getElementById('pushHint');
+  const isApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if (hint) hint.textContent = isApp
+    ? '동의하지 않으면 알림을 받을 수 없어요. 언제든 다시 켤 수 있어요.'
+    : '푸시 알림은 앱에서 켤 수 있어요. (웹은 화면이 열려 있을 때만 알림이 표시돼요)';
+  fetch('/api/push/status').then(r => r.json()).then(j => { t.checked = !!j.enabled; }).catch(() => {});
+  t.addEventListener('change', async () => {
+    if (t.checked) {
+      if (!isApp) { t.checked = false; mmToast('푸시 알림은 앱에서 켤 수 있어요.'); return; }
+      const ok = await window.mmInitPush(true);
+      if (ok) { mmToast('알림을 켰어요.', 'ok'); }
+      else { t.checked = false; mmToast('알림 권한이 필요해요. 휴대폰 설정 › 앱 › 알림에서 허용해 주세요.', 'err'); }
+    } else {
+      try { await fetch('/api/push/disable', { method: 'POST' }); } catch (e) {}
+      try { localStorage.setItem('mm_push_optout', '1'); } catch (e) {}
+      mmToast('알림을 껐어요.');
+    }
+  });
+})();
 
 // ── 설정 카테고리 패널 전환 ──
 function setPanel(name) {

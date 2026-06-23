@@ -457,49 +457,56 @@ function handleGoogleLogin(e) {
 })();
 
 // ── Capacitor 앱: 푸시 알림(FCM) 등록 — 로그인 후 권한 동의 시 토큰 서버 등록 ──
-(function () {
-  async function mmInitPush() {
-    try {
-      const Cap = window.Capacitor;
-      if (!(Cap && Cap.isNativePlatform && Cap.isNativePlatform())) return;   // 앱에서만
-      if (!window.MM_LOGGED_IN) return;                                        // 로그인 후만
-      const Push = Cap.Plugins && Cap.Plugins.PushNotifications;
-      if (!Push) return;
+// force=true(설정서 직접 켤 때): asked/opt-out 무시하고 강제 권한요청·등록. 반환=성공 여부.
+async function mmInitPush(force) {
+  try {
+    const Cap = window.Capacitor;
+    if (!(Cap && Cap.isNativePlatform && Cap.isNativePlatform())) return false;  // 앱에서만
+    if (!window.MM_LOGGED_IN) return false;                                       // 로그인 후만
+    if (!force && localStorage.getItem('mm_push_optout')) return false;           // 설정서 끔 → 자동등록 안함
+    const Push = Cap.Plugins && Cap.Plugins.PushNotifications;
+    if (!Push) return false;
 
-      let perm = await Push.checkPermissions();
-      if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+    let perm = await Push.checkPermissions();
+    if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+      if (!force) {
         // 소프트 프리프롬프트 1회 — 거절해도 앱 정상, 다시 안 물음
-        if (localStorage.getItem('mm_push_asked')) return;
+        if (localStorage.getItem('mm_push_asked')) return false;
         localStorage.setItem('mm_push_asked', '1');
         const yes = await mmConfirm('서비스 알림을 받을까요?', {
           sub: '관심 종목 가격·신고가/신저가·리밸런싱 등 내가 설정한 알림만 보내드려요. ' +
-               '광고·마케팅 알림이 아니에요. 받지 않아도 앱은 그대로 쓸 수 있지만, ' +
-               '동의하지 않으면 알림을 받을 수 없어요.',
+               '광고·마케팅 알림이 아니에요. 받지 않아도 앱은 그대로 쓸 수 있고, ' +
+               '나중에 설정 › 계정에서 언제든 켜고 끌 수 있어요.',
           ok: '알림 받기', cancel: '안 받기' });
-        if (!yes) return;
-        perm = await Push.requestPermissions();
+        if (!yes) return false;
       }
-      if (perm.receive !== 'granted') return;   // 거절 → 인앱 알림만(푸시 없음)
+      perm = await Push.requestPermissions();
+    }
+    if (perm.receive !== 'granted') return false;   // 거절 → 인앱 알림만(푸시 없음)
+    localStorage.removeItem('mm_push_optout');
 
-      // 리스너 먼저 등록(토큰 이벤트 누락 방지) → register
-      Push.addListener('registration', function (t) {
-        try {
-          fetch('/api/push/register', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: t.value, platform: 'android' })
-          });
-        } catch (e) {}
-      });
-      Push.addListener('registrationError', function (e) { console.warn('[push] reg error', e); });
-      // 알림 탭 → 관련 화면 이동(종목 알림=종목 페이지, 그 외=수신함)
-      Push.addListener('pushNotificationActionPerformed', function (a) {
-        const d = (a && a.notification && a.notification.data) || {};
-        location.href = d.code ? ('/symbol/' + encodeURIComponent(d.code)) : '/alerts';
-      });
-      await Push.register();
-    } catch (e) { /* 푸시 실패해도 앱 정상 */ }
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mmInitPush);
+    // 리스너 먼저 등록(토큰 이벤트 누락 방지) → register
+    Push.addListener('registration', function (t) {
+      try {
+        fetch('/api/push/register', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: t.value, platform: 'android' })
+        });
+      } catch (e) {}
+    });
+    Push.addListener('registrationError', function (e) { console.warn('[push] reg error', e); });
+    // 알림 탭 → 관련 화면 이동(종목 알림=종목 페이지, 그 외=수신함)
+    Push.addListener('pushNotificationActionPerformed', function (a) {
+      const d = (a && a.notification && a.notification.data) || {};
+      location.href = d.code ? ('/symbol/' + encodeURIComponent(d.code)) : '/alerts';
+    });
+    await Push.register();
+    return true;
+  } catch (e) { return false; }   // 푸시 실패해도 앱 정상
+}
+window.mmInitPush = mmInitPush;
+(function () {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { mmInitPush(); });
   else mmInitPush();
 })();
 

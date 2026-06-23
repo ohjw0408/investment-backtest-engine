@@ -117,7 +117,7 @@
 @keyframes ds-shimmer { to { background-position:-200% 0; } }
 
 /* ── MODAL / DIALOG / BOTTOM-SHEET ── */
-.ds-overlay { position:fixed; inset:0; background:rgba(10,11,13,.5); z-index:1000;
+.ds-overlay { position:fixed; inset:0; background:rgba(10,11,13,.5); z-index:2000;
   display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .18s; }
 .ds-overlay.open { opacity:1; pointer-events:auto; }
 .ds-modal { background:var(--ds-canvas); border-radius:var(--r-xl); width:100%; max-width:460px;
@@ -137,7 +137,7 @@
 
 /* ── TOAST ── */
 .ds-toast-wrap { position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
-  z-index:1100; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none; }
+  z-index:2100; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none; }
 .ds-toast { display:flex; align-items:center; gap:10px; background:var(--ds-ink); color:var(--ds-canvas);
   font-size:var(--fs-sm); font-weight:500; padding:12px 18px; border-radius:var(--r-pill);
   box-shadow:var(--ds-shadow-lg); animation:ds-toast-in .2s; }

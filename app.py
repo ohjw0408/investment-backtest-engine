@@ -1892,6 +1892,25 @@ def push_unregister():
     return jsonify({'ok': True})
 
 
+@app.route('/api/push/status')
+def push_status():
+    """푸시 알림 켜짐 여부(설정 토글용)."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'enabled': False}), 401
+    return jsonify({'enabled': alert_store.has_device_tokens(uid)})
+
+
+@app.route('/api/push/disable', methods=['POST'])
+def push_disable():
+    """푸시 알림 끄기(동의 철회) — 전 기기 토큰 제거."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    alert_store.delete_user_device_tokens(uid)
+    return jsonify({'ok': True})
+
+
 # -----------------------------------------------
 # API - 배당 목표 시나리오
 # -----------------------------------------------

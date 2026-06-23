@@ -226,3 +226,17 @@ def delete_device_token(token):
     c = _conn()
     c.execute("DELETE FROM device_tokens WHERE token=?", (token,))
     c.commit()
+
+
+def has_device_tokens(user_id):
+    """푸시 알림 켜짐 여부 = 등록된 기기 토큰 존재."""
+    return _conn().execute(
+        "SELECT 1 FROM device_tokens WHERE user_id=? LIMIT 1", (user_id,)
+    ).fetchone() is not None
+
+
+def delete_user_device_tokens(user_id):
+    """사용자 푸시 끄기 — 전 기기 토큰 제거."""
+    c = _conn()
+    c.execute("DELETE FROM device_tokens WHERE user_id=?", (user_id,))
+    c.commit()

@@ -28,6 +28,11 @@
 .mk-item-chg.up { color: var(--up); }
 .mk-item-chg.down { color: var(--down); }
 .mk-empty { color: var(--ds-muted); font-size: 0.84rem; padding: 14px 4px; }
+.mk-login-hint { display: block; margin-bottom: 12px; padding: 11px 14px; border: 1px solid var(--brand);
+  border-radius: var(--r-lg); background: var(--ds-soft); color: var(--ds-ink); font-size: 0.82rem; font-weight: 500;
+  text-decoration: none; line-height: 1.45; transition: background .12s, border-color .12s; }
+.mk-login-hint b { color: var(--brand); font-weight: 700; }
+.mk-login-hint:hover { background: var(--ds-canvas); border-color: var(--brand); }
 .mk-links { display: flex; flex-direction: column; border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); overflow: hidden; margin-top: 14px; }
 .mk-link { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; text-decoration: none;
   color: var(--ds-ink); font-size: 0.86rem; font-weight: 600; border-bottom: 1px solid var(--ds-hairline); transition: background .12s; }
@@ -49,6 +54,9 @@
       <div class="mk-sec-t">내 지수</div>
       <button class="mk-refresh" id="mkRefresh">{{ nicon('refresh') }} 새로고침</button>
     </div>
+    <a class="mk-login-hint" id="mkLoginHint" href="/auth/google" style="display:none;">
+      ✨ <b>로그인</b>하시면 지수들을 내 마음대로 편집·수정·추가할 수 있어요 ›
+    </a>
     <div class="mk-grid" id="mkIndexGrid"><div class="mk-empty">불러오는 중…</div></div>
   </div>
 
@@ -77,6 +85,8 @@ async function mkLoadIndices() {
   const grid = document.getElementById('mkIndexGrid');
   try {
     const cfg = await (await fetch('/api/home-config', { cache: 'no-store' })).json();
+    const hint = document.getElementById('mkLoginHint');
+    if (hint) hint.style.display = cfg.logged_in ? 'none' : 'block';
     const items = [];
     (cfg.widgets || []).forEach(w => (w.items || []).forEach(it => {
       const code = String(it.code).toUpperCase();

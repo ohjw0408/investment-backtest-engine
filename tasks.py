@@ -342,6 +342,23 @@ def evaluate_alerts():
 
 
 @celery.task
+def refresh_index_ohlc():
+    """장중 주기 실행(Celery Beat) — 시장지수 index_ohlc를 당일까지 갱신.
+
+    이게 없으면 index_ohlc는 첫 방문 지연백필 이후 갱신 안 돼 라인차트/위젯이 어제 종가에
+    멈춘다(캔들 1H는 라이브 intraday라 당일 보임 → 불일치). 장 열린 동안 당일 봉을 채운다.
+    """
+    try:
+        from modules.price_loader import PriceLoader
+        n = PriceLoader().refresh_index_ohlc()
+        print(f"[refresh_index_ohlc] {n} rows upserted")
+        return {"status": "ok", "rows": n}
+    except Exception as e:
+        print(f"[refresh_index_ohlc] 오류: {e}")
+        raise
+
+
+@celery.task
 def refresh_macro():
     """거시경제 지표 증분 갱신 (Celery Beat 자동 실행). FRED·ECOS·yfinance 시장지수."""
     try:

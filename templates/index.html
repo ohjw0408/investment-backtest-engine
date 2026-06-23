@@ -313,6 +313,7 @@
       <button id="widgetRefreshBtn" class="widget-cog" title="현재 시세로 새로고침" onclick="refreshWidgets()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v5h-5"/></svg></button>
       <a href="/settings" class="widget-cog" title="홈 화면 설정"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></a>
     </div>
+    <a id="widgetLoginHint" href="/auth/google" style="display:none;margin:0 14px 12px;padding:11px 14px;border:1px solid var(--brand);border-radius:12px;background:var(--ds-soft,rgba(0,0,0,0.03));color:var(--ds-ink,inherit);font-size:0.82rem;font-weight:500;line-height:1.45;text-decoration:none;">✨ <b style="color:var(--brand);font-weight:700;">로그인</b>하시면 지수들을 내 마음대로 편집·수정·추가할 수 있어요 ›</a>
     <div class="widget-tabs" id="widgetTabs" style="display:none;"></div>
     <div class="widget-body" id="widgetBody">
       <div class="market-loading">데이터 불러오는 중...</div>
@@ -593,6 +594,8 @@ function _esc(s) {
 async function loadWidgets() {
   try {
     const cfg = await (await fetch('/api/home-config', { cache: 'no-store' })).json();
+    const _lh = document.getElementById('widgetLoginHint');
+    if (_lh) _lh.style.display = cfg.logged_in ? 'none' : 'block';
     _widgets = cfg.widgets || [];
     const codes = [...new Set(_widgets.flatMap(w => (w.items || []).map(i => String(i.code).toUpperCase())))];
     if (codes.length) {

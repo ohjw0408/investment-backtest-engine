@@ -18,6 +18,11 @@ META_DIR        = DATA_DIR / "meta"
 DB_PATH         = PRICE_CACHE_DIR / "price_daily.db"
 INDEX_DB_PATH   = META_DIR / "index_master.db"
 
+# 캔들(OHLCV)을 index_ohlc에 보관·갱신하는 시장지수/선물/환율 집합.
+# get_symbol_data(라인·캔들 공용)와 refresh_index_ohlc(beat 갱신)가 공유.
+CANDLE_INDEX_CODES = frozenset({'^GSPC', '^IXIC', '^KS11', '^NDX', '^DJI', '^N225',
+                                'GC=F', 'SI=F', 'CL=F', 'NG=F', 'HG=F', 'KRW=X'})
+
 
 def _yf_dl_ticker(code) -> str:
     """yfinance 다운로드용 티커. US 클래스주(BRK.B→BRK-B)는 점→하이픈.
@@ -28,8 +33,13 @@ def _yf_dl_ticker(code) -> str:
     return c.replace(".", "-") if "." in c else c
 
 
-def _drop_isolated_price_spikes(df: pd.DataFrame, ratio_threshold: float = 25.0) -> pd.DataFrame:
-    """Drop one-day price outliers that immediately return to the prior scale."""
+def _drop_isolated_price_spikes(df: pd.DataFrame, ratio_threshold: float = 4.0) -> pd.DataFrame:
+    """Drop one-day price outliers that immediately return to the prior scale.
+
+    threshold=4.0: 정상 일간 변동(한국 ±30% 상한·美 서킷브레이커)으로는 하루 4배 급등 후
+    익일 4배 급락 복귀가 불가능 → reverting 4배+는 yfinance 오틱(bad tick)으로 단정.
+    (분할/액면병합은 영구 레벨변화라 neighbors_same_scale 가드에 걸려 보존됨.)
+    25.0이던 기존 임계는 ~7배 오틱(005930 2026-06-16 2,382,000원)을 놓쳤다."""
     if df is None or df.empty or len(df) < 3 or "close" not in df.columns:
         return df
 
@@ -609,6 +619,70 @@ class PriceLoader:
         self._price_cache[cache_key] = df
         return df
     # -------------------------------------------------
+    # 지수 OHLCV(index_ohlc) 트레일링 갱신
+    # -------------------------------------------------
+    def _idx_recent_fetch_ok(self, code: str, ttl: int = 900) -> bool:
+        """코드별 in-process 레이트리밋. 마지막 fetch 후 ttl초 지났으면 True(+타임스탬프 갱신)."""
+        import time as _time
+        now = _time.time()
+        if not hasattr(self, "_idx_recent_fetch"):
+            self._idx_recent_fetch = {}
+        if now - self._idx_recent_fetch.get(code, 0) < ttl:
+            return False
+        self._idx_recent_fetch[code] = now
+        return True
+
+    def refresh_index_ohlc(self, codes=None) -> int:
+        """시장지수 index_ohlc에 최근 며칠치 OHLCV를 upsert. Celery beat(장중 주기 갱신)용.
+
+        period='7d' fetch로 오늘(장중=부분 종가)까지 포함 → 라인차트/위젯이 당일 반영.
+        INSERT OR REPLACE라 장중 부분봉은 이후 호출·마감 후 최종봉으로 덮어쓰여 자정합.
+        """
+        if self.index_conn is None:
+            return 0
+        codes = list(codes) if codes else list(CANDLE_INDEX_CODES)
+        try:
+            self.index_conn.execute(
+                "CREATE TABLE IF NOT EXISTS index_ohlc ("
+                "code TEXT, date TEXT, open REAL, high REAL, low REAL, "
+                "close REAL, volume REAL, PRIMARY KEY(code, date))")
+        except Exception:
+            pass
+        total = 0
+        for code in codes:
+            try:
+                raw = yf.download(code, period="7d", progress=False,
+                                  auto_adjust=False, threads=False)
+                if raw is None or raw.empty:
+                    continue
+                if isinstance(raw.columns, pd.MultiIndex):
+                    raw.columns = raw.columns.get_level_values(0)
+                raw = raw.reset_index()
+                rows = []
+                for _, r in raw.iterrows():
+                    d = r["Date"].strftime("%Y-%m-%d") if hasattr(r["Date"], "strftime") else str(r["Date"])[:10]
+                    try:
+                        rows.append((code, d, float(r["Open"]), float(r["High"]),
+                                     float(r["Low"]), float(r["Close"]),
+                                     float(r["Volume"]) if pd.notna(r["Volume"]) else 0.0))
+                    except (ValueError, TypeError):
+                        continue
+                if rows:
+                    self.index_conn.executemany(
+                        "INSERT OR REPLACE INTO index_ohlc "
+                        "(code, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)",
+                        rows)
+                    total += len(rows)
+            except Exception as e:
+                print(f"[refresh_index_ohlc] {code} 오류: {e}")
+                continue
+        try:
+            self.index_conn.commit()
+        except Exception:
+            pass
+        return total
+
+    # -------------------------------------------------
     # 종목 상세 데이터 (symbol detail page용)
     # -------------------------------------------------
 
@@ -683,8 +757,7 @@ class PriceLoader:
         # index_daily는 종가만 → 캔들 불가. 시장지수 OHLCV를 index_ohlc에 둔다.
         # 배포 안전: 테이블 없으면 생성(no such table 예외로 지수 페이지 깨짐 방지).
         # 데이터 없으면 yfinance에서 지연 백필 → 첫 진입이 자동 적재(수동 작업 불필요).
-        _CANDLE_INDEX = frozenset({'^GSPC', '^IXIC', '^KS11', '^NDX', '^DJI', '^N225',
-                                   'GC=F', 'SI=F', 'CL=F', 'NG=F', 'HG=F', 'KRW=X'})
+        _CANDLE_INDEX = CANDLE_INDEX_CODES
         if is_index and self.index_conn is not None:
             try:
                 self.index_conn.execute(
@@ -733,12 +806,14 @@ class PriceLoader:
                            "close": round(float(r[4]), 4),
                            "volume": float(r[5]) if r[5] is not None else 0.0}
                           for r in ohlc_rows]
+                # 트레일링 갱신: DB 최종일이 오늘이 아니면 최근 며칠치를 yfinance에서 당겨
+                # 오늘(장중=부분 종가)까지 봉합한다. period 기반이라 end-exclusive 함정 없음.
+                # 과도한 호출 방지: 코드별 in-process TTL(기본 15분) 가드 — beat가 prod를
+                # 항시 최신으로 유지하므로 이 경로는 보조(로컬·beat 미가동 시).
                 last_date = prices[-1]["date"]
-                five_ago  = (_dt.today() - _td(days=5)).strftime("%Y-%m-%d")
-                if last_date < five_ago:
+                if last_date < today and self._idx_recent_fetch_ok(code):
                     try:
-                        gap_start = (_dt.strptime(last_date, "%Y-%m-%d") + _td(days=1)).strftime("%Y-%m-%d")
-                        yf_raw = yf.download(code, start=gap_start, end=today,
+                        yf_raw = yf.download(code, period="7d",
                                              progress=False, auto_adjust=False, threads=False)
                         if not yf_raw.empty:
                             if isinstance(yf_raw.columns, pd.MultiIndex):
@@ -747,6 +822,8 @@ class PriceLoader:
                             new_rows = []
                             for _, r in yf_raw.iterrows():
                                 d = r["Date"].strftime("%Y-%m-%d") if hasattr(r["Date"], "strftime") else str(r["Date"])[:10]
+                                if d <= last_date:   # 이미 보유한 구간은 건너뜀
+                                    continue
                                 rec = (code, d, float(r["Open"]), float(r["High"]),
                                        float(r["Low"]), float(r["Close"]),
                                        float(r["Volume"]) if pd.notna(r["Volume"]) else 0.0)

@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-23] FIX | 삼성전자 오틱 + 지수 라인차트 당일반영 + 비로그인 로그인유도 (오너)
+
+- **BUG-005930-SPIKE**: prod `005930 2026-06-16` 행 전체 오염(close 2,382,000, ~7배). `_drop_isolated_price_spikes` 임계 **25.0→4.0**(`price_loader.py`) — reverting 4배+는 오틱 확정, 분할은 same-scale 가드 보존. read-time 필터라 전 경로 자동정정. prod 오염행 DELETE. 회귀 2 PASS + 06-16 drop 확인.
+- **BUG-INDEX-OHLC-NO-REFRESH**: 지수 라인차트(기간뷰)가 `index_ohlc` 일봉 읽는데 당일봉 갱신 스케줄러 부재 → 어제에 멈춤(캔들 1H는 라이브라 당일 보임=불일치). 신규 `PriceLoader.refresh_index_ohlc()`+`tasks.refresh_index_ohlc`+beat `*/30 hour 0-6,13-21 mon-fri`. lazy 경로도 `last_date<today`+`period="7d"`(end-exclusive 함정 제거)+15분 TTL 가드. 기억하신 "장 열리면 새로고침"은 원래 미구현이었음 → 이번에 신설. 스모크: KOSPI last_date→당일.
+- **비로그인 로그인 유도**(index.html 홈 위젯·market.html 시장 "내 지수"): `cfg.logged_in=false`면 "✨ 로그인하시면 지수들을 내 마음대로 편집·수정·추가할 수 있어요 ›"(`/auth/google`). Playwright 라이트+다크 비로그인 노출·콘솔에러0, 데스크톱 홈 위젯 확인.
+- 배포: push(main). [[reference-prod-deploy-access]] [[reference-symbol-master-seed-db]]
+
+_작성: Claude_
+
 ## [2026-06-23] FIX | 시장 모바일 오버플로우 + 거시 분석기능(한·미비교·겹쳐보기) 노출 (오너)
 
 - **시장 모바일 가로 스크롤**(commit 49c50f0): `mk-grid`가 `1fr`(min-width:auto)라 긴 시세 숫자가 칸을 밀어내 가로 오버플로우 → 탭바 우측까지 잘려 보임. `repeat(2, minmax(0,1fr))` + 값/등락 ellipsis로 칸 폭 통일, 오버플로우 0(390=390). 내 지수·핵심거시 칸 동일.

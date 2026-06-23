@@ -456,6 +456,50 @@ function handleGoogleLogin(e) {
   } catch (e) {}
 })();
 
+// ── Capacitor 앱: 푸시 알림(FCM) 등록 — 로그인 후 권한 동의 시 토큰 서버 등록 ──
+(function () {
+  async function mmInitPush() {
+    try {
+      const Cap = window.Capacitor;
+      if (!(Cap && Cap.isNativePlatform && Cap.isNativePlatform())) return;   // 앱에서만
+      if (!window.MM_LOGGED_IN) return;                                        // 로그인 후만
+      const Push = Cap.Plugins && Cap.Plugins.PushNotifications;
+      if (!Push) return;
+
+      let perm = await Push.checkPermissions();
+      if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+        // 소프트 프리프롬프트 1회 — 거절해도 앱 정상, 다시 안 물음
+        if (localStorage.getItem('mm_push_asked')) return;
+        localStorage.setItem('mm_push_asked', '1');
+        const yes = await mmConfirm('실시간 알림을 받을까요?', {
+          sub: '관심 종목 가격·신고가·리밸런싱 알림을 푸시로 보내드려요.', ok: '좋아요', cancel: '나중에' });
+        if (!yes) return;
+        perm = await Push.requestPermissions();
+      }
+      if (perm.receive !== 'granted') return;   // 거절 → 인앱 알림만(푸시 없음)
+
+      // 리스너 먼저 등록(토큰 이벤트 누락 방지) → register
+      Push.addListener('registration', function (t) {
+        try {
+          fetch('/api/push/register', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: t.value, platform: 'android' })
+          });
+        } catch (e) {}
+      });
+      Push.addListener('registrationError', function (e) { console.warn('[push] reg error', e); });
+      // 알림 탭 → 관련 화면 이동(종목 알림=종목 페이지, 그 외=수신함)
+      Push.addListener('pushNotificationActionPerformed', function (a) {
+        const d = (a && a.notification && a.notification.data) || {};
+        location.href = d.code ? ('/symbol/' + encodeURIComponent(d.code)) : '/alerts';
+      });
+      await Push.register();
+    } catch (e) { /* 푸시 실패해도 앱 정상 */ }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mmInitPush);
+  else mmInitPush();
+})();
+
 function mmCopyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
     return navigator.clipboard.writeText(text);

@@ -5,7 +5,7 @@
 
 > 작성: 2026-06-02 (Claude). 엔진·서버 API는 결정론 테스트(L-SAVE 24종)+실데이터
 > end-to-end로 검증 완료. 이 문서는 **결과 패널이 화면에 실제로 그려지는지** 육안 확인 보완 절차다.
-> 대상 커밋: `03f28cb` 이후. 서버: https://moneymilestone.duckdns.org/calculator
+> 대상 커밋: `03f28cb` 이후. 서버: https://moneymilestone.co.kr/calculator
 
 ---
 

@@ -1,7 +1,7 @@
 /** GAP-RET-KRDATA 조사 — 라이브 C1 구성(sim 멀티) API 직접 호출. 읽기성 시뮬만. */
 'use strict';
 
-const BASE = process.argv[2] || 'https://moneymilestone.duckdns.org';
+const BASE = process.argv[2] || 'https://moneymilestone.co.kr';
 
 const BODY = {
   tickers: [{ code: '458730', name: 'TIGER 미국배당다우존스', weight: 1.0 }],

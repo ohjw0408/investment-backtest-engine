@@ -1,7 +1,7 @@
 /** BUG-WD-MULTI-LIVE 조사 — 라이브 D2 구성 API 직접 호출, n_real/n_synthetic/data_start 캡처. 읽기성 시뮬만. */
 'use strict';
 
-const BASE = process.argv[2] || 'https://moneymilestone.duckdns.org';
+const BASE = process.argv[2] || 'https://moneymilestone.co.kr';
 const UNREALIZED = process.argv[3] !== undefined ? Number(process.argv[3]) : 100000000;
 
 const BODY = {

@@ -6,7 +6,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 
-const BASE = process.argv[2] || 'https://moneymilestone.duckdns.org';
+const BASE = process.argv[2] || 'https://moneymilestone.co.kr';
 const SHOTS = path.join(__dirname, 'results', 'shots');
 
 (async () => {

@@ -1,7 +1,7 @@
 """
 E2E API Test — investment-backtest-engine
 Usage:
-    python e2e_test.py                                      # 기본: moneymilestone.duckdns.org
+    python e2e_test.py                                      # 기본: moneymilestone.co.kr
     python e2e_test.py http://localhost:5000                # 로컬
     python e2e_test.py http://216.128.152.205               # 서버 IP 직접
 """
@@ -18,7 +18,7 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-BASE_URL = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://moneymilestone.duckdns.org"
+BASE_URL = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://moneymilestone.co.kr"
 POLL_INTERVAL = 3       # seconds between polls
 ASYNC_TIMEOUT = 300     # 5 minutes
 

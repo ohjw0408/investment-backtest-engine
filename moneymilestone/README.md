@@ -181,7 +181,7 @@ _검토/추가: Codex, 2026-05-28_
 
 **앱**: Flask 웹앱 + Celery 비동기 계산 + Redis + SQLite × 4개 DB.  
 **배포**: Hetzner VPS Ubuntu, SSH키 `~/.ssh/hetzner_ed25519`, IP `178.105.84.213`.
-라이브 `https://moneymilestone.duckdns.org` (main push = 자동배포).
+라이브 `https://moneymilestone.co.kr` (main push = 자동배포).
 **언어**: Python (백엔드) + HTML/JS (프론트, 프레임워크 없음).
 **JS 테스트 도구**: `package.json` devDependencies — jsdom(DOM 스모크) + **Playwright Chromium**(실브라우저·스크린샷, 2026-06-10 도입).
 

@@ -1,11 +1,11 @@
 /**
  * 간편 계산기 실브라우저(Playwright Chromium) 검증 — 라이브 서버 대상.
  * 실행: node tests/test_simple_tools_browser.js [BASE_URL] [SCREENSHOT_DIR]
- * 기본: https://moneymilestone.duckdns.org, 스크린샷 저장 안 함(인자 주면 저장)
+ * 기본: https://moneymilestone.co.kr, 스크린샷 저장 안 함(인자 주면 저장)
  */
 const { chromium } = require('playwright');
 
-const BASE = process.argv[2] || 'https://moneymilestone.duckdns.org';
+const BASE = process.argv[2] || 'https://moneymilestone.co.kr';
 const SHOT_DIR = process.argv[3] || null;
 
 let pass = 0, fail = 0;

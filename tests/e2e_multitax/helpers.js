@@ -8,7 +8,7 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 
-const BASE = process.argv[2] || 'https://moneymilestone.duckdns.org';
+const BASE = process.argv[2] || 'https://moneymilestone.co.kr';
 const RESULTS_DIR = path.join(__dirname, 'results');
 const SHOTS_DIR = path.join(RESULTS_DIR, 'shots');
 const CASE_TIMEOUT = 180_000;

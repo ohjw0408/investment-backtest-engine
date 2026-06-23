@@ -4,7 +4,7 @@
  * 실행: node tests/test_fan_live.js [BASE_URL]
  */
 const { chromium } = require('playwright');
-const BASE = process.argv[2] || 'https://moneymilestone.duckdns.org';
+const BASE = process.argv[2] || 'https://moneymilestone.co.kr';
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; console.log('PASS  ' + n); } else { fail++; console.log('FAIL  ' + n); } };

@@ -4,7 +4,7 @@
  * 실행: node tests/test_rolling_view_live.js [BASE_URL] [SHOT_DIR]
  */
 const { chromium } = require('playwright');
-const BASE = process.argv[2] || 'https://moneymilestone.duckdns.org';
+const BASE = process.argv[2] || 'https://moneymilestone.co.kr';
 const SHOT = process.argv[3] || null;
 
 let pass = 0, fail = 0;

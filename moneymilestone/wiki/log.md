@@ -1,5 +1,61 @@
 # Log
 
+## [2026-06-23] FIX | 시장 모바일 오버플로우 + 거시 분석기능(한·미비교·겹쳐보기) 노출 (오너)
+
+- **시장 모바일 가로 스크롤**(commit 49c50f0): `mk-grid`가 `1fr`(min-width:auto)라 긴 시세 숫자가 칸을 밀어내 가로 오버플로우 → 탭바 우측까지 잘려 보임. `repeat(2, minmax(0,1fr))` + 값/등락 ellipsis로 칸 폭 통일, 오버플로우 0(390=390). 내 지수·핵심거시 칸 동일.
+- **거시 분석기능 묻힘 해결**(49c50f0 + 6476379): `/macro` 토글 7개 중 한·미비교(CMP)·겹쳐보기(CUSTOM)가 끝이라 모바일선 가로 스크롤해야 보임 = 핵심기능 묻힘. 해법 = ①분석탭(`/tools`) "분석·비교"에 카드 2개 추가(`/macro?view=CMP`·`?view=CUSTOM` 딥링크) ②`/macro` **검색창 바로 밑에 brand-tint 카드 2개**(한·미 지표 비교/겹쳐보기, 짧은설명) 전면 노출 → 스크롤없이 직행, 클릭 시 토글 뷰 위임 ③토글 두 버튼 brand-tint 강조.
+- **macro.js**: `?view=` 파라미터로 해당 뷰 바로 열기(딥링크). 캐시 v14.
+- **검증**: 시장 오버플로우0·2열통일, tools 카드9, 딥링크 CMP/CUSTOM 활성, 검색창밑 카드 스크롤없이 노출·클릭 전환, 단일클릭 콘솔에러0. (빠른 CMP↔CUSTOM 연타 시 기존 renderCompare 비동기 레이스 에러 — 정상사용 무관, 미수정.)
+- 배포: push(main). [[project-design-unification]]
+
+_작성: Claude_
+
+## [2026-06-23] FEAT | 하단탭 6개 개편 + 분석 허브·시장 페이지 신설 (오너)
+
+- **하단탭바**(commit adad986, base.html): 홈·계산기·분석·내자산·알림(5) → **홈·분석·시장·내자산·검색·설정(6)**. 알림은 탭서 빼고 상단 종(우상단)으로 일원화. nicon home/chart/globe/wallet/search/gear. active state는 그룹 경로 매칭. 가로 오버플로우0.
+- **분석 허브**(`/tools` 신규, tools.html): 도구 카드 그룹. **계산기**(간편·투자·배당·은퇴·ISA) + **분석·비교**(포트폴리오 분석·비교 + 한·미비교·겹쳐보기). 아이콘+1줄설명+`<a href>`, 스크롤. 오너 지정 순서(간편→투자→배당→은퇴→ISA).
+- **시장**(`/market` 신규, market.html): 큐레이션 대시보드. 내 지수(`/api/home-config`+`/api/watchlist/quotes` 홈 재사용) + 핵심 거시지표(`/api/macro/overview` 카테고리별 헤드라인 8개) + 거시전체(`/macro`)·캘린더(`/calendar`) 링크.
+- 라우트 app.py `/tools`·`/market`(context processor가 user 주입). 검색·내자산·설정·홈=기존 연결.
+- **네이밍 기능중심 리네임**(계산기 이름들)은 라우트/SEO 영향으로 별도 작업 보류.
+- **검증**: /tools·/market 200, 6탭 라벨·링크·알림제거, 카드7→9·그룹2, is-app 탭바 오버플로우0, 콘솔에러0, 라이트 스샷.
+- 배포: push(main). [[project-design-unification]]
+
+_작성: Claude_
+
+## [2026-06-23] FEAT | 앱 푸시 알림(FCM) — 끝→끝 완성·실기기 검증 (오너)
+
+- **목표**: 기존 인앱 수신함 알림에 더해 **앱 닫혀도 OS 알림**. 발화 경로 재사용, 채널만 추가. 키 없으면 graceful no-op(인앱 무영향).
+- **서버**(commit 912425e): `device_tokens` 테이블+CRUD(alert_store) / `push_sender.py`(신규, FCM HTTP v1 — google-auth 서비스계정→OAuth2→REST, 죽은토큰 UNREGISTERED 자동삭제) / alert_runner 발화 훅(add_event 직후 send_to_user, try/except 격리) / `/api/push/register`·`/unregister`(로그인+consent 게이트) / requirements google-auth==2.55.0+pyasn1 2종.
+- **웹 인앱 토스트**(912425e, base.html): 종 폴링서 미읽음 증가 감지 → mmToast. **웹푸시(서비스워커/VAPID) 미채택**(오너: 브라우저 알림권한·개인정보 회피, 탭 열린 중만). iOS 웹푸시도 어차피 X.
+- **모바일 등록 JS**(ead5c60, base.html): 네이티브+로그인 시 소프트 프리프롬프트(mmConfirm)→OS권한→FCM토큰 POST `/api/push/register`, 알림탭→종목/수신함 이동. `@capacitor/push-notifications@8.1.1`, google-services.json(project moneymilestone-c8476) mobile/android/app/, cap sync.
+- **동의 문구**(b696887): 광고·마케팅 아님·선택·거부 시 미수신·설정서 철회 가능 명시.
+- **포그라운드 표시**(8410f32): 앱 켜진 중 FCM은 안드로이드가 자동표시 안 함 → `@capacitor/local-notifications@8.2.0`로 시스템 알림 재현 + mmToast + 종배지. 백그라운드는 FCM 자동.
+- **권한 철회**(833284d): 설정›계정 "푸시 알림" 토글. `/api/push/status`·`/disable`, has_device_tokens/delete_user_device_tokens. 끄면 전 기기 토큰 삭제+opt-out 플래그. mmInitPush 전역노출+force 인자.
+- **서버 키(PHASE2 인프라)**: serviceAccountKey → prod `/root/secrets/fcm.json`(600). 워커 env = 드롭인 `/etc/systemd/system/domino-celery.service.d/fcm.conf`(`FCM_SERVICE_ACCOUNT_FILE`). 전송은 워커서 실행. prod 검증 = push_sender.enabled()=True·OAuth 토큰 발급.
+- **실기기 검증**: USB 디버깅(R5CT42ZQ9WH), CLI 빌드(`gradlew assembleDebug`+`adb install`). 백그라운드·포그라운드 둘 다 OS 알림 확인 완료. 토큰 등록→FCM→OS알림 전 경로 작동.
+- **테스트법**: prod서 `FCM_SERVICE_ACCOUNT_FILE=... venv/bin/python`로 `push_sender.send_to_user(uid,t,b)` 직접(수신함 안 들어감=종 비어도 정상). 실룰은 evaluate_alerts→add_event+send_to_user(장중 15분 beat).
+- 배포: push(main). [[project-push-notifications]]
+
+_작성: Claude_
+
+## [2026-06-23] FIX | 동의 모달·드로어 탭바 가림 (z-index/패딩) (오너)
+
+- **동의 모달/토스트 가림**(commit 833284d, components.css): 앱 하단탭바(z1200) > ds-overlay(z1000)·ds-toast-wrap(z1100) → 모달/토스트가 탭바 뒤. 모바일선 모달이 하단 시트라 버튼 안 보임. ds-overlay z2000·toast z2100으로 탭바 위로.
+- **드로어 하단 가림**(commit 565df58, base.html): 햄버거 사이드바(z300)가 탭바(z1200) 뒤로 깔려 마지막 항목(설정) 스크롤로도 안 닿음. `html.is-app .sidebar { padding-bottom: 120px+safe-area }`로 탭바 위까지 스크롤.
+- **검증**: ds-overlay z-index 2000>1200, 드로어 설정항목 bottom<탭바 top(탭바 위 노출), Playwright is-app 모방.
+- 배포: push(main).
+
+_작성: Claude_
+
+## [2026-06-23] UX | 알림 "새 알림 만들기" 직관 개편 — 드롭다운 → 분리 카드 (오너)
+
+- **문제**: `/alerts` 종류 select 하나에 5종 욱여넣어 리밸런싱이 드롭다운에 묻혀 발견 불가(오너가 기능 없는 줄 앎). 백엔드 rebalance_band·mmAlert 위젯엔 이미 있었음 = 발견성 문제.
+- **변경**(commit 69008c7, alerts.html): "종목 알림" 카드(종목 선택+검색 + 타입 칩 4개 변동률·목표가·신고가·신저가, 칩 선택 시 관련입력만) + **"포트폴리오 리밸런싱" 독립 카드**(목표비중 ±%p 이탈, 안내문). API 페이로드·룰종류·검색콤보·mmAlert 위젯 보존.
+- **검증**: 로그인 Playwright 17 PASS(카드분리·칩전환), 라이트/다크/모바일(390) 콘솔에러0.
+- 배포: push(main). [[project-design-unification]]
+
+_작성: Claude_
+
 ## [2026-06-23] FEAT | 앱 OAuth WebView 차단 해결 — 시스템브라우저+딥링크 핸드오프 (오너)
 
 - **문제**: 구글이 WebView 내 OAuth 차단(disallowed_useragent) + 시스템브라우저 로그인해도 쿠키 jar가 WebView와 분리 → 세션 안 넘어옴.

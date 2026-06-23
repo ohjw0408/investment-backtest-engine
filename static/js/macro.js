@@ -503,6 +503,12 @@
     detailType = b.dataset.t; renderDetail();
   }));
 
-  fetch('/api/macro/overview').then(r => r.json()).then(d => { DATA = d; renderCountry('US'); })
-    .catch(() => { $('mcBody').innerHTML = '<div class="mc-loading">불러오기 실패</div>'; });
+  fetch('/api/macro/overview').then(r => r.json()).then(d => {
+    DATA = d;
+    // ?view= 딥링크 (분석탭 → 한·미 비교/겹쳐보기 바로 열기)
+    const want = (new URLSearchParams(location.search).get('view') || '').toUpperCase();
+    const btn = want && want !== 'US' ? $('mcToggle').querySelector(`button[data-view="${want}"]`) : null;
+    if (btn) btn.click();
+    else renderCountry('US');
+  }).catch(() => { $('mcBody').innerHTML = '<div class="mc-loading">불러오기 실패</div>'; });
 })();

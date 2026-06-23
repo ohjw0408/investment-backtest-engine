@@ -41,6 +41,16 @@ CREATE TABLE IF NOT EXISTS alert_events (
 );
 CREATE INDEX IF NOT EXISTS idx_alert_events_inbox ON alert_events(user_id, read_at, id);
 CREATE INDEX IF NOT EXISTS idx_alert_rules_user ON alert_rules(user_id);
+
+CREATE TABLE IF NOT EXISTS device_tokens (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    token      TEXT NOT NULL UNIQUE,
+    platform   TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
 """
 
 # 사용자당 알림 룰 한도(스팸/부하 방지). 요금제 차등 시 단일 변경점.
@@ -186,4 +196,33 @@ def mark_all_read(user_id):
     c = _conn()
     c.execute("UPDATE alert_events SET read_at=? WHERE user_id=? AND read_at IS NULL",
               (datetime.now().isoformat(), user_id))
+    c.commit()
+
+
+# ── 푸시 기기 토큰(FCM) ──────────────────────────────────
+
+def register_device_token(user_id, token, platform):
+    """기기 토큰 등록(업서트). 토큰은 기기당 1개라 unique — 재로그인/계정전환 시 user_id 재배정."""
+    now = datetime.now().isoformat()
+    c = _conn()
+    c.execute(
+        "INSERT INTO device_tokens (user_id, token, platform, created_at, updated_at) "
+        "VALUES (?,?,?,?,?) "
+        "ON CONFLICT(token) DO UPDATE SET user_id=excluded.user_id, "
+        "platform=excluded.platform, updated_at=excluded.updated_at",
+        (user_id, token, platform, now, now)
+    )
+    c.commit()
+
+
+def get_device_tokens(user_id):
+    return [dict(r) for r in _conn().execute(
+        "SELECT token, platform FROM device_tokens WHERE user_id=?", (user_id,)
+    ).fetchall()]
+
+
+def delete_device_token(token):
+    """죽은 토큰(FCM UNREGISTERED) 또는 로그아웃 시 정리."""
+    c = _conn()
+    c.execute("DELETE FROM device_tokens WHERE token=?", (token,))
     c.commit()

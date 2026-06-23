@@ -270,6 +270,14 @@ def run_alert_evaluation(loader, rules=None, now=None):
                                   code=r.get("code"), rule_id=r["id"], meta=ev.get("meta"))
             alert_store.mark_rule_fired(r["id"], now_iso, new_extreme=ev.get("new_extreme"))
             fired += 1
+            # 앱 푸시(FCM) — 비활성/실패해도 인앱 수신함엔 영향 없음
+            try:
+                from modules.alerts import push_sender
+                push_sender.send_to_user(
+                    r["user_id"], ev["title"], ev["body"],
+                    data={"code": r.get("code") or "", "rule_id": str(r["id"])})
+            except Exception as pe:
+                print(f"[alert_runner] 룰 {r.get('id')} 푸시 실패(무시): {pe}")
         except Exception as e:
             print(f"[alert_runner] 룰 {r.get('id')} 평가 오류: {e}")
     return fired

@@ -1862,6 +1862,36 @@ def alerts_read_all():
     return jsonify({'ok': True})
 
 
+@app.route('/api/push/register', methods=['POST'])
+def push_register():
+    """앱/기기 FCM 토큰 등록 — 발화 시 이 토큰으로 푸시 전송."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    body = request.get_json(silent=True) or {}
+    token = str(body.get('token', '')).strip()
+    platform = str(body.get('platform', 'android')).strip().lower()
+    if not token:
+        return jsonify({'error': '토큰이 필요합니다.'}), 400
+    if platform not in ('web', 'android', 'ios'):
+        platform = 'android'
+    alert_store.register_device_token(uid, token, platform)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/push/unregister', methods=['POST'])
+def push_unregister():
+    """로그아웃/알림 끄기 시 토큰 제거."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    body = request.get_json(silent=True) or {}
+    token = str(body.get('token', '')).strip()
+    if token:
+        alert_store.delete_device_token(token)
+    return jsonify({'ok': True})
+
+
 # -----------------------------------------------
 # API - 배당 목표 시나리오
 # -----------------------------------------------

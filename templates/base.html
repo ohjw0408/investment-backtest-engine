@@ -568,12 +568,24 @@ function mmPrompt(title, opts) {
     return new Date(iso).toLocaleDateString('ko-KR');
   }
 
+  let _alPrevCount = null;   // 직전 미읽음 수(증가 감지용). null=최초 로드(토스트 억제)
   async function refreshCount() {
     try {
       const j = await (await fetch('/api/alerts/unread-count')).json();
       const n = j.count || 0;
       badge.style.display = n ? 'block' : 'none';
       badge.textContent = n > 99 ? '99+' : n;
+      // 탭 켜진 중 새 알림 도착 → 토스트(웹 인앱 알림). 최초 로드/감소 시엔 안 띄움.
+      if (_alPrevCount !== null && n > _alPrevCount && typeof mmToast === 'function') {
+        try {
+          const e = (await (await fetch('/api/alerts/events?limit=1')).json()).events || [];
+          if (e.length) {
+            const more = (n - _alPrevCount) > 1 ? ` 외 ${n - _alPrevCount - 1}건` : '';
+            mmToast('🔔 ' + e[0].title + (e[0].body ? ' · ' + e[0].body : '') + more, 'ok');
+          }
+        } catch (_) {}
+      }
+      _alPrevCount = n;
     } catch (e) {}
   }
   window.mmRefreshBell = refreshCount;

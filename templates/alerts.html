@@ -49,6 +49,13 @@
   align-items: center; justify-content: space-between; }
 .al-sr-item:hover { background: var(--ds-soft); }
 .al-sr-code { color: var(--ds-muted); font-size: 0.74rem; flex-shrink: 0; }
+/* 타입 칩 */
+.al-types { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.al-chip { border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-ink);
+  border-radius: var(--r-pill); padding: 8px 16px; font-size: 0.84rem; font-weight: 600;
+  cursor: pointer; font-family: var(--font-sans); transition: border-color .12s, background .12s, color .12s; }
+.al-chip:hover { border-color: var(--brand); }
+.al-chip.on { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
 </style>
 {% endblock %}
 
@@ -61,20 +68,10 @@
   <div class="al-card"><div class="al-login">알림은 로그인 후 사용할 수 있어요.</div></div>
   {% else %}
 
-  <!-- 새 알림 만들기 -->
+  <!-- 종목 알림 -->
   <div class="al-card">
-    <h3>새 알림 만들기</h3>
-    <div class="al-row">
-      <div class="al-field">
-        <label>종류</label>
-        <select id="alType">
-          <option value="daily_pct">일간 변동률 ±%</option>
-          <option value="target_price">목표가 도달</option>
-          <option value="new_high">신고가 갱신</option>
-          <option value="new_low">신저가 갱신</option>
-          <option value="rebalance_band">리밸런싱 밴드 이탈</option>
-        </select>
-      </div>
+    <h3>종목 알림</h3>
+    <div class="al-row" style="margin-bottom:14px;">
       <div class="al-field" id="fSymbol">
         <label>종목 (보유)</label>
         <select id="alCode"></select>
@@ -84,6 +81,14 @@
         <input id="alSymSearch" placeholder="예: AAPL, 삼성전자, SCHD" autocomplete="off" />
         <div class="al-search-results" id="alSymResults"></div>
       </div>
+    </div>
+    <div class="al-types" id="alTypeChips">
+      <button type="button" class="al-chip on" data-type="daily_pct">일간 변동률</button>
+      <button type="button" class="al-chip" data-type="target_price">목표가 도달</button>
+      <button type="button" class="al-chip" data-type="new_high">신고가 갱신</button>
+      <button type="button" class="al-chip" data-type="new_low">신저가 갱신</button>
+    </div>
+    <div class="al-row">
       <div class="al-field" id="fDir" style="display:none;">
         <label>방향</label>
         <select id="alDir"></select>
@@ -93,12 +98,30 @@
         <select id="alWindow"><option value="52w">52주</option><option value="all">전체기간</option></select>
       </div>
       <div class="al-field" id="fThreshold">
-        <label id="alThrLabel">기준 %</label>
+        <label id="alThrLabel">변동률 %</label>
         <input id="alThr" type="number" step="any" placeholder="5" />
       </div>
       <button class="al-btn" id="alCreate">알림 추가</button>
     </div>
     <div class="al-err" id="alErr"></div>
+  </div>
+
+  <!-- 포트폴리오 리밸런싱 -->
+  <div class="al-card">
+    <h3>포트폴리오 리밸런싱</h3>
+    <div class="al-sub" style="margin-bottom:12px;">보유 자산이 <b>그룹 목표 비중</b>에서 설정한 폭 이상 벗어나면 리밸런싱하라고 알려드려요. 목표 비중은 <b>내 자산 › 그룹 관리</b>에서 설정해요.</div>
+    <div class="al-row">
+      <div class="al-field">
+        <label>이탈 폭</label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:0.86rem;color:var(--ds-muted);">목표 비중 ±</span>
+          <input id="alBand" type="number" step="any" placeholder="5" style="width:80px;min-width:0;" />
+          <span style="font-size:0.86rem;color:var(--ds-muted);">%p 이탈 시</span>
+        </div>
+      </div>
+      <button class="al-btn" id="alRebCreate">리밸런싱 알림 추가</button>
+    </div>
+    <div class="al-err" id="alRebErr"></div>
   </div>
 
   <!-- 내 알림 -->
@@ -173,39 +196,40 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#fSymSearch')) $('alSymResults').classList.remove('open');
 });
 
+// 종목 알림 타입 = 칩 선택
+let currentType = 'daily_pct';
+const _chipBox = $('alTypeChips');
+_chipBox.querySelectorAll('.al-chip').forEach(b => b.addEventListener('click', () => {
+  _chipBox.querySelectorAll('.al-chip').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  currentType = b.dataset.type;
+  syncForm();
+}));
+
 function syncForm(){
-  const t = $('alType').value;
-  const isReb = t === 'rebalance_band';
+  const t = currentType;
   const isExtreme = (t === 'new_high' || t === 'new_low');
-  $('fSymbol').style.display = isReb ? 'none' : '';
-  $('fSymSearch').style.display = isReb ? 'none' : '';
   $('fDir').style.display = (t === 'daily_pct' || t === 'target_price') ? '' : 'none';
   $('fWindow').style.display = isExtreme ? '' : 'none';
   $('fThreshold').style.display = isExtreme ? 'none' : '';
   if (t === 'daily_pct') { $('alThrLabel').textContent = '변동률 %'; $('alThr').placeholder = '5'; }
   else if (t === 'target_price') { $('alThrLabel').textContent = '목표가'; $('alThr').placeholder = '150'; }
-  else if (isReb) { $('alThrLabel').textContent = '밴드 %p'; $('alThr').placeholder = '5'; $('fThreshold').style.display=''; }
   // 방향 옵션
   if (DIR_OPTS[t]) $('alDir').innerHTML = DIR_OPTS[t].map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
 }
-$('alType').addEventListener('change', syncForm);
-$('alCode').addEventListener('change', syncForm);
 syncForm();
 
 async function createRule(){
   $('alErr').textContent = '';
-  const t = $('alType').value;
-  const body = { rule_type: t, cooldown_h: 24 };
-  if (t === 'rebalance_band') {
-    body.threshold = parseFloat($('alThr').value);
+  const t = currentType;
+  const code = $('alCode').value;
+  if (!code) { $('alErr').textContent = '종목을 선택하세요.'; return; }
+  const body = { rule_type: t, code: code, cooldown_h: 24 };
+  if (t === 'new_high' || t === 'new_low') {
+    body.window = $('alWindow').value;
   } else {
-    body.code = $('alCode').value;
-    if (t === 'new_high' || t === 'new_low') {
-      body.window = $('alWindow').value;
-    } else {
-      body.direction = $('alDir').value;
-      body.threshold = parseFloat($('alThr').value);
-    }
+    body.direction = $('alDir').value;
+    body.threshold = parseFloat($('alThr').value);
   }
   const r = await fetch('/api/alerts/rules', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   const j = await r.json();
@@ -213,6 +237,16 @@ async function createRule(){
   loadRules();
 }
 $('alCreate').addEventListener('click', createRule);
+
+async function createRebalance(){
+  $('alRebErr').textContent = '';
+  const body = { rule_type: 'rebalance_band', threshold: parseFloat($('alBand').value), cooldown_h: 24 };
+  const r = await fetch('/api/alerts/rules', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) { $('alRebErr').textContent = j.error || '추가 실패'; return; }
+  loadRules();
+}
+$('alRebCreate').addEventListener('click', createRebalance);
 
 function ruleDesc(r){
   if (r.rule_type === 'daily_pct') return `하루 ${({up:'+',down:'-',both:'±'})[r.direction]||'±'}${r.threshold}% 변동 시`;

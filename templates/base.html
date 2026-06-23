@@ -290,10 +290,11 @@
 <!-- ===== 앱 하단 탭바 (Capacitor 앱에서만 표시) ===== -->
 <nav class="mm-tabbar" aria-label="하단 탭">
   <a class="mm-tab {% if request.path == '/' %}active{% endif %}" href="/">{{ nicon('home') }}<span>홈</span></a>
-  <a class="mm-tab {% if request.path.startswith('/calculator') %}active{% endif %}" href="/calculator">{{ nicon('calc') }}<span>계산기</span></a>
-  <a class="mm-tab {% if request.path.startswith(('/backtest','/risk-return')) %}active{% endif %}" href="/backtest">{{ nicon('chart') }}<span>분석</span></a>
-  <a class="mm-tab {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">{{ nicon('briefcase') }}<span>내 자산</span></a>
-  <a class="mm-tab {% if request.path.startswith('/alerts') %}active{% endif %}" href="/alerts">{{ nicon('bell') }}<span>알림</span></a>
+  <a class="mm-tab {% if request.path.startswith(('/tools','/calculator','/simple','/dividend-target','/retirement','/tax-switch','/backtest','/risk-return')) %}active{% endif %}" href="/tools">{{ nicon('chart') }}<span>분석</span></a>
+  <a class="mm-tab {% if request.path.startswith(('/market','/macro','/calendar')) %}active{% endif %}" href="/market">{{ nicon('globe') }}<span>시장</span></a>
+  <a class="mm-tab {% if request.path.startswith(('/myassets','/myportfolios')) %}active{% endif %}" href="/myassets">{{ nicon('wallet') }}<span>내 자산</span></a>
+  <a class="mm-tab {% if request.path.startswith('/search') %}active{% endif %}" href="/search">{{ nicon('search') }}<span>검색</span></a>
+  <a class="mm-tab {% if request.path.startswith('/settings') %}active{% endif %}" href="/settings">{{ nicon('gear') }}<span>설정</span></a>
 </nav>
 
 <script>

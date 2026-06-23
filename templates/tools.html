@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}분석 도구 — Money Milestone{% endblock %}
+{% block meta_desc %}투자·배당·은퇴·ISA 계산기와 포트폴리오 분석·비교를 한 곳에서. 핵심 투자 도구 모음. — Money Milestone{% endblock %}
+
+{% block head %}
+<style>
+.main-content { background: var(--ds-canvas); }
+.tl-wrap { grid-column: 1 / -1; max-width: 760px; margin: 0 auto; width: 100%; box-sizing: border-box; padding: var(--sp-xl); font-family: var(--font-sans); color: var(--ds-ink); }
+.tl-title { font-size: var(--fs-h2); font-weight: 600; letter-spacing: -0.4px; }
+.tl-sub { font-size: 0.82rem; color: var(--ds-muted); margin-top: 4px; }
+.tl-group { margin-top: 26px; }
+.tl-group-h { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ds-muted); margin-bottom: 10px; padding-left: 2px; }
+.tl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.tl-card { display: flex; align-items: flex-start; gap: 13px; padding: 16px; border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-xl); background: var(--ds-canvas); text-decoration: none; color: var(--ds-ink);
+  transition: border-color .14s, box-shadow .14s, transform .14s; }
+.tl-card:hover { border-color: var(--brand); box-shadow: var(--ds-shadow-sm); transform: translateY(-1px); }
+.tl-ic { flex-shrink: 0; width: 38px; height: 38px; border-radius: var(--r-lg); display: flex; align-items: center;
+  justify-content: center; background: var(--brand-tint); color: var(--brand); }
+.tl-ic .si-ic { width: 22px; height: 22px; }
+.tl-card-main { min-width: 0; flex: 1; }
+.tl-card-t { font-size: 0.92rem; font-weight: 700; display: flex; align-items: center; gap: 5px; }
+.tl-card-t .arr { color: var(--ds-muted); font-weight: 400; }
+.tl-card-d { font-size: 0.76rem; color: var(--ds-muted); margin-top: 4px; line-height: 1.45; }
+@media (max-width: 560px) { .tl-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tl-wrap">
+  <div class="tl-title">분석 도구</div>
+  <div class="tl-sub">계산기와 포트폴리오 분석을 한 곳에서. 원하는 도구를 골라 바로 시작하세요.</div>
+
+  <div class="tl-group">
+    <div class="tl-group-h">계산기</div>
+    <div class="tl-grid">
+      <a class="tl-card" href="/simple">
+        <div class="tl-ic">{{ nicon('zap') }}</div>
+        <div class="tl-card-main">
+          <div class="tl-card-t">간편 계산기 <span class="arr">›</span></div>
+          <div class="tl-card-d">목돈·매월 적립으로 미래 자산을 빠르게 추정</div>
+        </div>
+      </a>
+      <a class="tl-card" href="/calculator">
+        <div class="tl-ic">{{ nicon('calc') }}</div>
+        <div class="tl-card-main">
+          <div class="tl-card-t">투자 계산기 <span class="arr">›</span></div>
+          <div class="tl-card-d">포트폴리오 30년 백테스트·리밸런싱·세금까지</div>
+        </div>
+      </a>
+      <a class="tl-card" href="/dividend-target">
+        <div class="tl-ic">{{ nicon('coins') }}</div>
+        <div class="tl-card-main">
+          <div class="tl-card-t">배당 계산기 <span class="arr">›</span></div>
+          <div class="tl-card-d">목표 배당금까지 필요한 투자액·기간 계산</div>
+        </div>
+      </a>
+      <a class="tl-card" href="/retirement">
+        <div class="tl-ic">{{ nicon('retire') }}</div>
+        <div class="tl-card-main">
+          <div class="tl-card-t">은퇴 설계 <span class="arr">›</span></div>
+          <div class="tl-card-d">은퇴 자금·인출 전략의 생존율 시뮬레이션</div>
+        </div>
+      </a>
+      <a class="tl-card" href="/tax-switch">
+        <div class="tl-ic">{{ nicon('repeat') }}</div>
+        <div class="tl-card-main">
+          <div class="tl-card-t">ISA 전환 계산기 <span class="arr">›</span></div>
+          <div class="tl-card-d">일반 위탁 vs ISA 계좌 절세 효과 비교</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <div class="tl-group">
+    <div class="tl-group-h">분석 · 비교</div>
+    <div class="tl-grid">
+      <a class="tl-card" href="/backtest">
+        <div class="tl-ic">{{ nicon('chart') }}</div>
+        <div class="tl-card-main">
+          <div class="tl-card-t">포트폴리오 분석 <span class="arr">›</span></div>
+          <div class="tl-card-d">구간 수익·최대 낙폭·상승 기여도 심층 분석</div>
+        </div>
+      </a>
+      <a class="tl-card" href="/risk-return">
+        <div class="tl-ic">{{ nicon('compare') }}</div>
+        <div class="tl-card-main">
+          <div class="tl-card-t">포트폴리오 비교 <span class="arr">›</span></div>
+          <div class="tl-card-d">여러 포트폴리오·지수의 위험-수익 한눈 비교</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

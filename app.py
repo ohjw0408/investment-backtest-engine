@@ -501,6 +501,14 @@ def index():
 def search_page():
     return render_template('search.html')
 
+@app.route('/tools')
+def tools_page():
+    return render_template('tools.html')
+
+@app.route('/market')
+def market_page():
+    return render_template('market.html')
+
 @app.route('/calculator')
 def calculator():
     return render_template('calculator.html')

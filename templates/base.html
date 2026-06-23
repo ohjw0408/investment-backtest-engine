@@ -123,6 +123,9 @@
   /* 앱: 하단탭 공간 확보 + 긴 푸터 숨김(약관은 설정에) */
   html.is-app .main-content { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
   html.is-app footer { display: none; }
+  /* 앱: 햄버거 드로어(사이드바)가 탭바(z1200)에 가려 마지막 항목(설정) 안 닿던 문제 →
+     넉넉한 하단 패딩으로 탭바 위까지 스크롤되게 */
+  html.is-app .sidebar { padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important; box-sizing: border-box; }
   /* 앱: 상단 햄버거는 유지(전체메뉴), 하단탭이 주 네비 */
   </style>
   {% block head %}{% endblock %}

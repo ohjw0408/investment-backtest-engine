@@ -632,6 +632,17 @@ class PriceLoader:
         self._idx_recent_fetch[code] = now
         return True
 
+    def _intraday_fetch_ok(self, code: str, ttl: int = 1200) -> bool:
+        """시간봉 재조회 레이트리밋(기본 20분). 장중 차트 신선도용. 온디맨드(방문 시)라 부하 작음."""
+        import time as _time
+        now = _time.time()
+        if not hasattr(self, "_intraday_fetch_ts"):
+            self._intraday_fetch_ts = {}
+        if now - self._intraday_fetch_ts.get(code, 0) < ttl:
+            return False
+        self._intraday_fetch_ts[code] = now
+        return True
+
     def refresh_index_ohlc(self, codes=None) -> int:
         """시장지수 index_ohlc에 최근 며칠치 OHLCV를 upsert. Celery beat(장중 주기 갱신)용.
 
@@ -1075,13 +1086,15 @@ class PriceLoader:
         온디맨드로 yfinance interval=1h fetch → price_hourly 캐시.
         - range '1d'/'1w': 라인차트 1일/1주(최근 7일 fetch면 충분).
         - range 'max': 캔들차트 1시간봉(yfinance 1h 상한 730일치 fetch).
-        같은 날 캐시가 있으면 재사용(장중 시세 앱 아님 → 일 단위 신선도면 충분).
+        장중 신선도: 코드별 20분 TTL(_intraday_fetch_ok)로 최근 시간봉을 재조회 →
+        라인(1d/1w)·캔들(1h/max) 모두 당일 최신 반영. 온디맨드(방문 시)라 부하 작음.
         """
         from datetime import datetime as _dt, timedelta as _td
         code  = str(code).split(".")[0].upper()
         is_kr = self.is_kr_etf(code)
 
         today = _dt.today().strftime("%Y-%m-%d")
+        recent_ok = self._intraday_fetch_ok(code)   # 20분 경과 시 최신 재조회 허용
         if range_key == "max":
             # 730일치 보유 여부 = 30일 이전 row 존재로 판정. 없으면 730일 fetch.
             old_cutoff = (_dt.now() - _td(days=30)).strftime("%Y-%m-%d")
@@ -1091,13 +1104,15 @@ class PriceLoader:
             ).fetchone()[0]
             if not has_deep:
                 self._fetch_intraday(code, is_kr, period="730d")
+            elif recent_ok:
+                self._fetch_intraday(code, is_kr, period="7d")   # 최근 시간봉만 갱신
             cutoff = (_dt.now() - _td(days=730)).strftime("%Y-%m-%d")
         else:
             have_today = self.conn.execute(
                 "SELECT COUNT(*) FROM price_hourly WHERE code=? AND datetime >= ?",
                 (code, today)
             ).fetchone()[0]
-            if not have_today:
+            if not have_today or recent_ok:
                 self._fetch_intraday(code, is_kr, period="7d")
             days   = 7 if range_key == "1w" else 2  # 1d는 직전 거래일 포함 위해 2일치 조회
             cutoff = (_dt.now() - _td(days=days)).strftime("%Y-%m-%d")
@@ -1111,6 +1126,10 @@ class PriceLoader:
                    "low":   round(float(r[3]), 4), "close": round(float(r[4]), 4),
                    "volume": float(r[5]) if r[5] is not None else 0}
                   for r in rows]
+        # 시간봉 오틱(bad tick) 제거 — 일봉과 동일 isolated-revert 필터(read-time, self-heal).
+        if len(prices) >= 3:
+            kept = set(_drop_isolated_price_spikes(pd.DataFrame(prices))["date"])
+            prices = [p for p in prices if p["date"] in kept]
         return {
             "code": code, "range": range_key,
             "currency": "KRW" if is_kr else "USD",

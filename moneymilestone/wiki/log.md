@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-23] FIX | intraday 오틱 필터 + 모든 지수/원자재/환율 차트 장중 20분 신선도 (오너)
+
+- **intraday 오틱 필터**: `get_intraday_data`가 `price_hourly` 읽은 뒤 `_drop_isolated_price_spikes`(일봉과 동일 isolated-revert, 임계 4.0) 적용 — 시간봉 bad tick도 read-time 제거·self-heal. 기존엔 일봉(`get_price`)만 필터됐음. 7배 시간봉 시나리오 drop 확인.
+- **장중 20분 신선도**: 기존 시간봉은 "당일 1행 있으면 종일 재조회 안 함"이라 9시 값에 얼어붙음. 신규 `_intraday_fetch_ok`(코드별 20분 TTL)로 `get_intraday_data`가 20분 경과 시 최근 7d 시간봉 재조회(라인 1d/1w·캔들 1h/max 공통). 온디맨드(방문 시)라 부하 작음.
+- **index_ohlc beat */30→*/20**: 지수/원자재/환율 12종 일봉을 장중 20분마다 갱신. 검증=12종 전부 refresh_index_ohlc+get_symbol_data 당일반영(US지수는 개장 13:30 UTC 후 당일봉 생성=정상).
+- **yfinance 밴 위험 조사**: 공식 한도 없음, 밴은 IP당 버스트/대량에서 발생(2025 Yahoo 강화). 우리 부하=장중 */20×12종 순차(threads=False)≈576 req/일, 피크 ~36/시 — 버스트 아님. prod 기존 macro(~150×2/일)+alerts 무탈 → +576/일 무시 가능. **밴 위험 없음**으로 판단·구현.
+- 배포: push(main). [[reference-prod-deploy-access]]
+
+_작성: Claude_
+
 ## [2026-06-23] FIX | 삼성전자 오틱 + 지수 라인차트 당일반영 + 비로그인 로그인유도 (오너)
 
 - **BUG-005930-SPIKE**: prod `005930 2026-06-16` 행 전체 오염(close 2,382,000, ~7배). `_drop_isolated_price_spikes` 임계 **25.0→4.0**(`price_loader.py`) — reverting 4배+는 오틱 확정, 분할은 same-scale 가드 보존. read-time 필터라 전 경로 자동정정. prod 오염행 DELETE. 회귀 2 PASS + 06-16 drop 확인.

@@ -52,7 +52,7 @@ celery.conf.beat_schedule = {
     # KR 정규장 00:00~06:30 UTC, US 정규장 13:30~21:00 UTC(서머타임 여유) 커버.
     'refresh-index-ohlc': {
         'task': 'tasks.refresh_index_ohlc',
-        'schedule': crontab(minute='*/30', hour='0-6,13-21', day_of_week='mon-fri'),
+        'schedule': crontab(minute='*/20', hour='0-6,13-21', day_of_week='mon-fri'),
     },
     # 알림 룰 평가 — 장중 15분마다(US 13:30~20:00 + KR 00:00~06:30 UTC). task 내부서 장시간 재확인.
     'evaluate-alerts': {

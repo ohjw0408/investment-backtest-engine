@@ -479,6 +479,11 @@
     else if (VIEW === 'CURVE') renderCurves();
     else renderCountry(VIEW, $('mcSearch').value);
   }));
+  // 검색창 밑 분석도구 바로가기 → 토글 해당 뷰 위임
+  document.querySelectorAll('#mcTools .mc-tool').forEach(b => b.addEventListener('click', () => {
+    const t = $('mcToggle').querySelector(`button[data-view="${b.dataset.view}"]`);
+    if (t) { t.click(); t.scrollIntoView({ inline: 'center', block: 'nearest' }); }
+  }));
   $('mcSearch').addEventListener('input', () => { if (VIEW === 'US' || VIEW === 'KR' || VIEW === 'GL' || VIEW === 'COMM') renderCountry(VIEW, $('mcSearch').value); });
   $('mcFsBtn').addEventListener('click', () => {
     const box = document.querySelector('.mc-modal-box');

@@ -28,7 +28,7 @@
 /* 깊이: 배경 한 톤 낮춤(후경) + 카드 띄움(전경) — 홈과 동일 패턴 */
 .main-content { background: var(--ds-soft); }
 [data-theme="dark"] .main-content { background: var(--ds-canvas); }
-.ma-wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+.ma-wrap { max-width: 1100px; min-width: 0; margin: 0 auto; padding: 24px; }
 
 /* 아이콘 (duotone) */
 .ic { width: 18px; height: 18px; flex-shrink: 0; vertical-align: -3px; }
@@ -334,7 +334,7 @@
 .btn-danger { padding: 9px 20px; background: var(--down); color: #fff; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
 
 @media (max-width: 768px) {
-  .ma-wrap { padding: 14px 12px; }
+  .ma-wrap { padding: 14px 12px; max-width: 100%; }
   .ma-tabs { width: 100%; overflow-x: auto; }
   .ma-tab { flex: 1; padding: 9px 6px; text-align: center; white-space: nowrap; font-size: 0.78rem; }
   .ma-card { padding: 14px; }

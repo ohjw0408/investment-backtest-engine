@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-25] FIX | 앱 로그아웃이 안 풀리는 버그 (테마토글 시 로그인 부활) (오너)
+
+- **증상(앱 전용)**: 다크서 로그아웃 후 라이트로 전환(또는 반대) → **로그인 부활**, 또 로그아웃해야 함. 신뢰 박살 버그.
+- **뿌리**: 세션 = 서버 저장 없는 **stateless 서명쿠키**(`SecureCookieSessionInterface`). `/auth/logout`=`session.clear()`로 **빈 세션** → Flask가 쿠키 *삭제*(Set-Cookie 만료) 전송. **Android WebView가 삭제 Set-Cookie를 무시** → 옛 서명쿠키(user_id 든)가 살아남고, 테마토글 `location.reload()`(차트색 위해 reload)가 그 쿠키 재전송 → Flask 재인증 → 부활. (브라우저는 삭제를 먹어 무증상 = 앱 전용.)
+- **수정(A안, 최소·오너 선택)**: 로그아웃서 `session.clear()` 후 **더미값 `session['_lo']=1`** 넣어 user_id 없는 새 세션으로 **'덮어쓰기'(Set-Cookie 새값)** 강제. WebView는 *삭제*는 씹어도 *쓰기*는 먹는다 → reload해도 user_id 없는 쿠키라 로그아웃 유지. + `Cache-Control: no-store`. **스키마 변경 0.**
+- **검증(로컬 HTTP)**: 로그아웃 응답 Set-Cookie=`session=eyJfbG8iOjF9…`(디코드 `{"_lo":1}`, **비어있지 않은 새 값 = 덮어쓰기 확정**), 그 쿠키로 `/api/me`→`logged_in:false`. 브라우저 회귀 0. ⚠️ **실기기 최종확인 필요**(WebView 동작) — `chrome://inspect`로 로그아웃→테마토글→부활 안 하나. 안 되면 B안(서버측 `users.token_version` 무효화)으로 승격.
+- **핵심**: 서버측 수정이라 **앱 재빌드 0**, co.kr 배포만으로 앱 즉시 반영. 변경=`app.py`(logout만).
+- **보류**: 모바일 비로그인 홈 정비(6엔진 첫화면+로그인카드 제거)=오너 "일단 보류".
+
 ## [2026-06-24] UX/FIX | 리밸 밴드 계정저장 + 알림설정 모바일이동 + 알림페이지 오버플로우 (오너)
 
 오너 4건 지시 후속:

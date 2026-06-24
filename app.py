@@ -333,7 +333,13 @@ def auth_exchange():
 @app.route('/auth/logout')
 def logout():
     session.clear()
-    return redirect('/')
+    # 앱(Android WebView) 대응: 빈 세션이면 Flask가 쿠키 '삭제'(Set-Cookie 만료)를 보내는데
+    # WebView가 삭제를 무시해 옛 서명쿠키(user_id 든)가 살아남고 reload 시 재인증된다.
+    # 더미값을 넣어 user_id 없는 새 세션으로 '덮어쓰기'(Set-Cookie)를 강제 → WebView가 먹는다.
+    session['_lo'] = 1
+    resp = redirect('/')
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 
 # -----------------------------------------------

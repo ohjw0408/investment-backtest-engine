@@ -212,6 +212,7 @@ CREATE TABLE IF NOT EXISTS holdings (
     quantity     REAL NOT NULL DEFAULT 0,
     avg_price    REAL DEFAULT 0,
     manual_price REAL,
+    buy_date     TEXT,
     account_type TEXT DEFAULT '일반',
     group_id     INTEGER,
     created_at   TEXT NOT NULL,
@@ -228,6 +229,11 @@ def init_holdings_db():
     # 수동 가격 override 컬럼 (기존 DB 마이그레이션)
     try:
         c.execute("ALTER TABLE holdings ADD COLUMN manual_price REAL")
+    except Exception:
+        pass
+    # 매수일 컬럼 (기존 DB 마이그레이션)
+    try:
+        c.execute("ALTER TABLE holdings ADD COLUMN buy_date TEXT")
     except Exception:
         pass
     c.commit()
@@ -272,20 +278,20 @@ def get_holdings(user_id):
     ).fetchall()]
 
 
-def upsert_holding(user_id, code, quantity, avg_price, account_type='일반', group_id=None, holding_id=None):
+def upsert_holding(user_id, code, quantity, avg_price, account_type='일반', group_id=None, holding_id=None, buy_date=None):
     now = datetime.now().isoformat()
     c   = _get_conn()
     if holding_id:
         c.execute(
-            "UPDATE holdings SET code=?, quantity=?, avg_price=?, account_type=?, group_id=?, updated_at=? "
+            "UPDATE holdings SET code=?, quantity=?, avg_price=?, account_type=?, group_id=?, buy_date=?, updated_at=? "
             "WHERE id=? AND user_id=?",
-            (code, quantity, avg_price, account_type, group_id, now, holding_id, user_id)
+            (code, quantity, avg_price, account_type, group_id, buy_date, now, holding_id, user_id)
         )
     else:
         c.execute(
-            "INSERT INTO holdings (user_id, code, quantity, avg_price, account_type, group_id, created_at, updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (user_id, code, quantity, avg_price, account_type, group_id, now, now)
+            "INSERT INTO holdings (user_id, code, quantity, avg_price, account_type, group_id, buy_date, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (user_id, code, quantity, avg_price, account_type, group_id, buy_date, now, now)
         )
     c.commit()
 

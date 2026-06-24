@@ -139,7 +139,45 @@
 }
 .ma-asset-change.up { display: inline-flex; background: var(--up-tint); color: var(--up); }
 .ma-asset-change.down { display: inline-flex; background: var(--down-tint); color: var(--down); }
+.ma-asset-change .lab { font-weight: 600; opacity: .72; margin-right: 5px; }
+.ma-asset-sub { margin-top: 8px; min-height: 4px; }
 .ma-asset-periods { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* 오늘/기간 메트릭 토글 (세그먼트) */
+.ma-metric-toggle { display: inline-flex; background: var(--ds-soft); border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-pill); padding: 3px; gap: 2px; flex-shrink: 0; }
+.mt-btn { border: none; background: transparent; color: var(--ds-body); font-weight: 700; font-size: .8rem;
+  padding: 6px 18px; border-radius: var(--r-pill); cursor: pointer; font-family: inherit; }
+.mt-btn.active { background: var(--ds-ink); color: var(--ds-canvas); }
+.ma-period-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 20px 0; }
+
+/* 보유 종목 = 한 줄 카드 + 탭하면 펼침 */
+.hold-list { display: flex; flex-direction: column; }
+.hold-card { border-bottom: 1px solid var(--ds-hairline); padding: 12px 4px; cursor: pointer; }
+.hold-card:last-child { border-bottom: none; }
+.hc-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.hc-name { font-weight: 700; font-size: .95rem; color: var(--ds-ink); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hc-name .hc-code { color: var(--ds-muted); font-weight: 400; font-size: .74rem; margin-left: 4px; }
+.hc-gdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.hc-val { font-family: var(--font-mono); font-weight: 700; font-size: .92rem; color: var(--ds-ink);
+  white-space: nowrap; flex-shrink: 0; }
+.hc-meta { display: flex; align-items: center; gap: 7px; margin-top: 3px; font-size: .78rem; }
+.hc-wt { color: var(--ds-muted); font-weight: 600; }
+.hc-ret { font-weight: 700; }
+.hc-ret.up { color: var(--up); } .hc-ret.down { color: var(--down); } .hc-ret.flat { color: var(--ds-muted); }
+.hc-chev { margin-left: auto; color: var(--ds-muted); transition: transform .2s; display: inline-flex; }
+.hold-card.open .hc-chev { transform: rotate(180deg); }
+.hc-exp { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--ds-hairline); }
+.hc-detail { font-size: .76rem; color: var(--ds-body); line-height: 1.7; margin-bottom: 10px; }
+.hc-detail b { color: var(--ds-ink); font-weight: 700; }
+.hc-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.hc-actions button, .hc-actions a { font-size: .8rem; font-weight: 600; padding: 7px 14px; border-radius: var(--r-pill);
+  border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body); cursor: pointer;
+  font-family: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+.hc-actions button.danger { color: var(--down); border-color: color-mix(in srgb, var(--down) 40%, transparent); }
+.hc-actions .grp-sel { padding: 6px 10px; border: 1px solid var(--ds-hairline); border-radius: var(--r-pill);
+  background: var(--ds-canvas); color: var(--ds-body); font-size: .78rem; font-family: inherit; cursor: pointer; }
 .ma-asset-chart { position: relative; height: 210px; padding: 8px 16px 16px; }
 .ma-asset-chart canvas { width: 100% !important; height: 100% !important; }
 #maHistoryEmpty { position: absolute; inset: 8px 16px 16px; display: none; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
@@ -285,41 +323,10 @@
   .ma-asset-card { padding: 0; }
   .ma-asset-head { padding: 16px 14px 0; flex-direction: column; }
   .ma-asset-value { font-size: 30px; }
-  .ma-asset-periods { width: 100%; justify-content: stretch; }
-  .ma-asset-periods .ma-period-btn { flex: 1; }
+  .ma-metric-toggle { align-self: flex-start; margin-top: 10px; }
+  .ma-period-chips { padding: 12px 14px 0; }
+  .ma-period-chips .ma-period-btn { flex: 1; min-width: 0; }
   .ma-asset-chart { height: 180px; padding: 8px 10px 14px; }
-
-  /* 보유 종목 테이블 → 종목별 카드 스택 (가로 스크롤 제거) */
-  .holdings-table, .holdings-table tbody { display: block; width: 100%; }
-  .holdings-table thead { display: none; }
-  .holdings-table tr {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 14px;
-    border: 1.5px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 12px;
-    margin-bottom: 10px;
-  }
-  .holdings-table tr:hover td { background: transparent; }
-  .holdings-table td {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border: none;
-    padding: 2px 0;
-  }
-  .holdings-table td::before {
-    content: attr(data-label);
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    margin-right: 8px;
-    flex-shrink: 0;
-  }
-  .holdings-table td.h-code { grid-column: 1; font-size: 0.95rem; }
-  .holdings-table td.h-return { grid-column: 2; justify-content: flex-end; gap: 8px; }
-  .holdings-table td.h-actions { grid-column: 1 / -1; justify-content: flex-end; gap: 6px; padding-top: 6px; }
-  .holdings-table td.h-code::before, .holdings-table td.h-actions::before { content: none; }
 
   /* 리밸런싱 — 밴드 카드·계산 행 줄바꿈 허용 */
   .rebal-band-card { flex-wrap: wrap; }
@@ -394,19 +401,27 @@
 
     <div class="ma-card ma-asset-card" id="maAssetHero">
       <div class="ma-asset-head">
-        <div>
+        <div style="min-width:0;">
           <div class="ma-asset-label">전체 자산</div>
           <div class="ma-asset-value-row">
             <span class="ma-asset-value" id="maTotalAssetValue">***,***,***원</span>
-            <span class="ma-asset-change" id="maAssetPeriodChange"></span>
+          </div>
+          <div class="ma-asset-sub">
+            <span class="ma-asset-change" id="maHeroChange"></span>
           </div>
         </div>
-        <div class="ma-asset-periods">
-          <button class="ma-period-btn active" onclick="setHistoryPeriod(30,this)">1개월</button>
-          <button class="ma-period-btn" onclick="setHistoryPeriod(90,this)">3개월</button>
-          <button class="ma-period-btn" onclick="setHistoryPeriod(365,this)">1년</button>
-          <button class="ma-period-btn" onclick="setHistoryPeriod(0,this)">전체</button>
+        <div class="ma-metric-toggle">
+          <button class="mt-btn active" onclick="setMetricMode('today',this)">오늘</button>
+          <button class="mt-btn" onclick="setMetricMode('period',this)">기간</button>
         </div>
+      </div>
+      <div class="ma-period-chips" id="maPeriodChips" style="display:none;">
+        <button class="ma-period-btn" onclick="setHistoryPeriod(7,this)">1주</button>
+        <button class="ma-period-btn active" onclick="setHistoryPeriod(30,this)">1개월</button>
+        <button class="ma-period-btn" onclick="setHistoryPeriod(90,this)">3개월</button>
+        <button class="ma-period-btn" onclick="setHistoryPeriod(180,this)">6개월</button>
+        <button class="ma-period-btn" onclick="setHistoryPeriod(365,this)">1년</button>
+        <button class="ma-period-btn" onclick="setHistoryPeriod(1095,this)">3년</button>
       </div>
       <div class="ma-asset-chart">
         <canvas id="maHistoryChart"></canvas>
@@ -573,6 +588,11 @@
       </div>
 
       <div class="input-row">
+        <label>매수일 <span style="font-size:0.75rem;color:var(--text-muted);">(선택)</span></label>
+        <input type="date" id="holdingBuyDate" class="calc-input">
+      </div>
+
+      <div class="input-row">
         <label>계좌 유형</label>
         <div class="rebal-options">
           <label class="rebal-option"><input type="radio" name="holdingAccount" value="일반" checked><span class="rebal-label">일반</span></label>
@@ -667,9 +687,12 @@
 let holdings = [];
 let groups   = [];
 let prices   = {};
+let prevClose = {};
 let manualCodes = [];
 let weightChart = null;
 let hideAmounts = true;
+let _metricMode = 'today';      // 'today' | 'period'
+let _maPeriodLabel = '1개월';
 
 // JS 렌더용 아이콘 (Jinja 매크로는 JS에서 못 써 별도 정의 — duotone 결 동일)
 const _SS = 'class="bic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"';
@@ -681,6 +704,7 @@ const MAICON = {
   layers: `<svg ${_SS}><path d="m12 3 9 5-9 5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5"/></svg>`,
   alert:  `<svg ${_SS}><path d="M12 3 2 20h20zM12 10v4M12 17.5h.01"/></svg>`,
   check:  `<svg ${_SS}><path d="M20 6 9 17l-5-5"/></svg>`,
+  chev:   `<svg ${_SS} style="width:16px;height:16px;"><path d="m6 9 6 6 6-6"/></svg>`,
 };
 function _cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
@@ -690,21 +714,63 @@ function fmtKRW(v) {
   return (v < 0 ? '-' : '') + '₩' + Math.abs(Math.round(v)).toLocaleString();
 }
 function fmtPct(v) { return (v*100).toFixed(1)+'%'; }
+function fmtSignedPct(v) { return (v>=0?'+':'')+(v*100).toFixed(2)+'%'; }
+function fmtSignedKRW(v) {
+  if (hideAmounts) return '***';
+  return (v>=0?'+':'-')+'₩'+Math.abs(Math.round(v)).toLocaleString();
+}
+function _holdDays(d) {
+  if (!d) return null;
+  const t = Date.parse(d);
+  if (isNaN(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+}
 function updateAssetHeroTotal(value) {
   const el = document.getElementById('maTotalAssetValue');
   if (el) el.textContent = fmtKRW(value || 0);
 }
-function updateAssetHeroChange(values) {
-  const el = document.getElementById('maAssetPeriodChange');
+
+// 오늘± 총액(현재가 vs 직전 거래일 종가, KRW). 수동가격 종목 제외.
+function _todayChange() {
+  let cur = 0, prev = 0, ok = false;
+  holdings.forEach(h => {
+    if (manualCodes.includes(h.code)) return;
+    const c = prices[h.code], p = prevClose[h.code];
+    if (c == null || p == null) return;
+    cur += c * h.quantity; prev += p * h.quantity; ok = true;
+  });
+  if (!ok || !prev) return null;
+  return { diff: cur - prev, pct: (cur - prev) / prev };
+}
+
+// 히어로 하단 메트릭 1개만 표시 — 토글(_metricMode)에 따라 오늘 또는 기간.
+// values = 현재 선택 기간으로 자른 자산추이 윈도우(기간 모드일 때).
+let _lastHistWindow = null;
+function updateHeroMetric(values) {
+  if (values) _lastHistWindow = values;
+  const el = document.getElementById('maHeroChange');
   if (!el) return;
-  if (!values || values.length < 2 || !values[0]) {
-    el.textContent = '';
-    el.className = 'ma-asset-change';
-    return;
+  let lab, diff, pct;
+  if (_metricMode === 'today') {
+    const t = _todayChange();
+    if (!t) { el.innerHTML = ''; el.className = 'ma-asset-change'; return; }
+    lab = '오늘'; diff = t.diff; pct = t.pct;
+  } else {
+    const v = _lastHistWindow;
+    if (!v || v.length < 2 || !v[0]) { el.innerHTML = ''; el.className = 'ma-asset-change'; return; }
+    lab = _maPeriodLabel; diff = v[v.length - 1] - v[0]; pct = diff / v[0];
   }
-  const change = (values[values.length - 1] - values[0]) / values[0];
-  el.textContent = (change >= 0 ? '+' : '') + (change * 100).toFixed(2) + '%';
-  el.className = 'ma-asset-change ' + (change >= 0 ? 'up' : 'down');
+  el.innerHTML = `<span class="lab">${lab}</span>${fmtSignedKRW(diff)} (${fmtSignedPct(pct)})`;
+  el.className = 'ma-asset-change ' + (pct >= 0 ? 'up' : 'down');
+}
+
+function setMetricMode(mode, btn) {
+  _metricMode = mode;
+  document.querySelectorAll('.mt-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('maPeriodChips').style.display = (mode === 'period') ? 'flex' : 'none';
+  updateHeroMetric();
+  renderHoldings();
 }
 
 // ── 탭 ──
@@ -727,6 +793,7 @@ async function loadAll() {
   holdings    = data.holdings || [];
   groups      = data.groups   || [];
   prices      = data.prices   || {};
+  prevClose   = data.prev_close || {};
   manualCodes = data.manual_codes || [];
   hideAmounts = data.hide_amounts !== false;
   const toggle = document.getElementById('hideAmountToggle');
@@ -734,6 +801,7 @@ async function loadAll() {
   _syncHideLabel();
   renderHoldings();
   renderSummary();
+  updateHeroMetric();
   renderGroupOptions();
   loadAttribution();
 }
@@ -820,6 +888,7 @@ async function savePrivacySetting() {
   _syncHideLabel();
   renderHoldings();
   renderSummary();
+  updateHeroMetric();
   if (_historyData) renderHistoryChart(_maHistoryDays);
   if (document.getElementById('tab-rebalance').style.display !== 'none') renderRebalance();
   await fetch('/api/myassets/settings', {
@@ -829,65 +898,82 @@ async function savePrivacySetting() {
   });
 }
 
-// ── 보유 종목 테이블 ──
+// ── 보유 종목 = 한 줄 카드 (탭하면 펼침) ──
 function renderHoldings() {
   const wrap = document.getElementById('holdingsTableWrap');
   if (!holdings.length) {
     wrap.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">보유 종목이 없습니다. + 종목 추가를 눌러 시작하세요</div>';
     return;
   }
-
   const totalValue = holdings.reduce((s, h) => s + (prices[h.code] || 0) * h.quantity, 0);
 
-  wrap.innerHTML = `
-    <table class="holdings-table">
-      <thead><tr>
-        <th>종목</th><th>그룹</th><th>계좌</th><th>수량</th>
-        <th>현재가</th><th>평가금액</th><th>비중</th><th>수익률</th><th></th>
-      </tr></thead>
-      <tbody>
-        ${holdings.map(h => {
-          const cur  = prices[h.code] || 0;
-          const val  = cur * h.quantity;
-          const wt   = totalValue > 0 ? val / totalValue : 0;
-          const ret  = h.avg_price > 0 ? (cur - h.avg_price) / h.avg_price : null;
-          const gc   = h.group_color || '#90A4AE';
-          const isManual = manualCodes.includes(h.code);
-          return `<tr>
-            <td class="h-code"><span style="cursor:pointer;" title="종목 상세 보기" onclick="location.href='/symbol/'+encodeURIComponent('${h.code}')"><b>${h.name || h.code}</b>${h.name && h.name !== h.code ? ` <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">${h.code}</span>` : ''} <span style="font-size:0.7rem;color:var(--blue);font-weight:600;">›</span></span></td>
-            <td class="h-group" data-label="그룹">
-              <select onchange="quickSetGroup(${h.id}, this.value)"
-                style="border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.75rem;background:var(--card);cursor:pointer;max-width:100px;color:var(--text);">
-                <option value="">그룹 없음</option>
-                ${groups.map(g => `<option value="${g.id}" ${h.group_id===g.id?'selected':''}>${g.name}</option>`).join('' )}
-              </select>
-            </td>
-            <td data-label="계좌" style="color:var(--text-muted);font-size:0.78rem;">${h.account_type}</td>
-            <td data-label="수량">${h.quantity.toLocaleString()}</td>
-            <td data-label="현재가" style="white-space:nowrap;">
-              ${fmtKRW(cur)}
-              ${isManual ? '<span title="수동 입력 가격" style="font-size:0.62rem;font-weight:800;color:var(--blue);background:var(--blue-pale);border-radius:4px;padding:1px 5px;margin-left:4px;">수동</span>' : ''}
-              <button class="icon-btn" style="width:22px;height:22px;margin-left:2px;" title="수동 가격 입력" onclick="setManual(${h.id}, ${cur})">${MAICON.pencil}</button>
-              ${isManual ? `<button class="icon-btn" style="width:22px;height:22px;" title="자동 시세로 복귀" onclick="clearManual(${h.id})">${MAICON.undo}</button>` : ''}
-            </td>
-            <td data-label="평가금액"><b>${fmtKRW(val)}</b></td>
-            <td data-label="비중">
-              <div style="min-width:60px;">
-                <span style="font-size:0.8rem;">${fmtPct(wt)}</span>
-                <div class="weight-progress"><div class="weight-fill" style="width:${(wt*100).toFixed(1)}%;background:${gc}"></div></div>
-              </div>
-            </td>
-            <td class="h-return" data-label="수익률" style="font-weight:700;color:${ret===null?'var(--text-muted)':ret>=0?'var(--up)':'var(--down)'}">
-              ${ret===null?'—':(ret>=0?'+':'')+fmtPct(ret)}
-            </td>
-            <td class="h-actions">
-              <button class="icon-btn" onclick="openEditHolding(${h.id})" title="수정">${MAICON.pencil}</button>
-              <button class="icon-btn danger" onclick="deleteHolding(${h.id})" title="삭제">${MAICON.trash}</button>
-            </td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>`;
+  wrap.innerHTML = `<div class="hold-list">${holdings.map(h => {
+    const cur = prices[h.code] || 0;
+    const val = cur * h.quantity;
+    const wt  = totalValue > 0 ? val / totalValue : 0;
+    const isManual = manualCodes.includes(h.code);
+    const ret = h.avg_price > 0 ? (cur - h.avg_price) / h.avg_price : null;
+    const _p  = prevClose[h.code];
+    const todayPct = (!isManual && cur && _p) ? (cur - _p) / _p : null;
+    const gc  = h.group_color || '#90A4AE';
+    const holdDays = _holdDays(h.buy_date);
+
+    // 행 수익 표시 = 토글 따라 하나만. 오늘 모드→오늘±, 기간 모드→수익률(평단 누적)
+    let retHtml;
+    if (_metricMode === 'today') {
+      retHtml = (todayPct === null)
+        ? `<span class="hc-ret flat">오늘 —</span>`
+        : `<span class="hc-ret ${todayPct>=0?'up':'down'}">오늘 ${fmtSignedPct(todayPct)}</span>`;
+    } else {
+      retHtml = (ret === null)
+        ? `<span class="hc-ret flat">—</span>`
+        : `<span class="hc-ret ${ret>=0?'up':'down'}">${ret>=0?'+':''}${fmtPct(ret)}</span>`;
+    }
+
+    const grpDot = h.group_name ? `<span class="hc-gdot" style="background:${gc}" title="${h.group_name}"></span>` : '';
+    const detail = [
+      `계좌 <b>${h.account_type}</b>`,
+      `수량 <b>${h.quantity.toLocaleString()}</b>`,
+      `현재가 <b>${fmtKRW(cur)}</b>${isManual?' <span style="color:var(--blue);font-weight:700;">(수동)</span>':''}`,
+      `평단 <b>${h.avg_price>0?fmtKRW(h.avg_price):'—'}</b>`,
+      holdDays!==null ? `매수 <b>${h.buy_date}</b> · 보유 ${holdDays}일` : '',
+    ].filter(Boolean).join(' · ');
+
+    return `<div class="hold-card" id="hold-${h.id}" onclick="toggleHold(${h.id})">
+      <div class="hc-top">
+        <div class="hc-name">${grpDot}${h.name || h.code}${h.name && h.name!==h.code ? `<span class="hc-code">${h.code}</span>`:''}</div>
+        <div class="hc-val">${fmtKRW(val)}</div>
+      </div>
+      <div class="hc-meta">
+        <span class="hc-wt">${fmtPct(wt)}</span>
+        <span style="color:var(--ds-hairline);">·</span>
+        ${retHtml}
+        <span class="hc-chev">${MAICON.chev}</span>
+      </div>
+      <div class="hc-exp" id="exp-${h.id}" hidden onclick="event.stopPropagation();">
+        <div class="hc-detail">${detail}</div>
+        <div class="hc-actions">
+          <select class="grp-sel" onchange="quickSetGroup(${h.id}, this.value)">
+            <option value="">그룹 없음</option>
+            ${groups.map(g => `<option value="${g.id}" ${h.group_id===g.id?'selected':''}>${g.name}</option>`).join('')}
+          </select>
+          <button onclick="openEditHolding(${h.id})">${MAICON.pencil} 수정</button>
+          <button onclick="setManual(${h.id}, ${cur})">현재가</button>
+          ${isManual?`<button onclick="clearManual(${h.id})">자동시세</button>`:''}
+          <button class="danger" onclick="deleteHolding(${h.id})">${MAICON.trash} 삭제</button>
+          <a href="/symbol/${encodeURIComponent(h.code)}">상세 ›</a>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function toggleHold(id) {
+  const card = document.getElementById('hold-'+id);
+  const exp  = document.getElementById('exp-'+id);
+  if (!exp || !card) return;
+  if (exp.hasAttribute('hidden')) { exp.removeAttribute('hidden'); card.classList.add('open'); }
+  else { exp.setAttribute('hidden',''); card.classList.remove('open'); }
 }
 
 // ── 요약 + 차트 ──
@@ -1215,6 +1301,7 @@ function openAddHolding() {
   document.getElementById('holdingCodeSelected').textContent = '';
   document.getElementById('holdingQty').value       = '1';
   document.getElementById('holdingAvgPrice').value  = '0';
+  document.getElementById('holdingBuyDate').value   = '';
   document.getElementById('holdingGroup').value     = '';
   document.querySelector('input[name="holdingAccount"][value="일반"]').checked = true;
   document.getElementById('modalHoldingTitle').textContent = '종목 추가';
@@ -1230,6 +1317,7 @@ function openEditHolding(id) {
   document.getElementById('holdingCodeSelected').textContent = h.code;
   document.getElementById('holdingQty').value       = h.quantity;
   document.getElementById('holdingAvgPrice').value  = h.avg_price;
+  document.getElementById('holdingBuyDate').value   = h.buy_date || '';
   document.getElementById('holdingGroup').value     = h.group_id || '';
   const acc = document.querySelector(`input[name="holdingAccount"][value="${h.account_type}"]`);
   if (acc) acc.checked = true;
@@ -1249,6 +1337,7 @@ async function saveHolding() {
       avg_price:    parseFloat(document.getElementById('holdingAvgPrice').value)||0,
       account_type: document.querySelector('input[name="holdingAccount"]:checked').value,
       group_id:     document.getElementById('holdingGroup').value || null,
+      buy_date:     document.getElementById('holdingBuyDate').value || null,
     })
   });
   closeModal('modalHolding');
@@ -1265,6 +1354,7 @@ async function quickSetGroup(holdingId, groupId) {
       quantity: h.quantity, avg_price: h.avg_price,
       account_type: h.account_type,
       group_id: groupId || null,
+      buy_date: h.buy_date || null,
     })
   });
   await loadAll();
@@ -1608,6 +1698,7 @@ async function loadPortfolioHistory(days) {
 
 function setHistoryPeriod(days, btn) {
   _maHistoryDays = days;
+  if (btn) _maPeriodLabel = btn.textContent.trim();
   document.querySelectorAll('.ma-period-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   if (_historyData) renderHistoryChart(days);
@@ -1617,7 +1708,8 @@ function renderHistoryChart(days) {
   const data = _historyData;
   if (!data || data.empty || !data.labels || !data.values || !data.labels.length) {
     document.getElementById('maHistoryEmpty').style.display = 'flex';
-    updateAssetHeroChange(null);
+    _lastHistWindow = null;
+    updateHeroMetric();
     return;
   }
   document.getElementById('maHistoryEmpty').style.display = 'none';
@@ -1629,7 +1721,7 @@ function renderHistoryChart(days) {
     values = values.slice(-days);
   }
   updateAssetHeroTotal(values[values.length - 1] || 0);
-  updateAssetHeroChange(values);
+  updateHeroMetric(values);
 
   const ctx = document.getElementById('maHistoryChart').getContext('2d');
   const _brand = _cssVar('--brand') || '#0052ff';

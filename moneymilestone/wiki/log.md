@@ -1,5 +1,19 @@
 # Log
 
+## [2026-06-24] FEAT | 내 자산 모바일 클린 개편 — 한 줄 카드 + 오늘/기간 토글 + 매수일 (오너)
+
+- **배경**: 도미노·더리치 벤치. 1차 시도(셀렉터+오늘±를 기존 테이블에 욱여넣음)는 **모바일에서 더 지저분** — 카드가 5줄짜리라 종목 수십개면 배당까지 스크롤 지옥(8종목에 페이지 5053px), 히어로에 오늘+기간 알약 동시노출. **오너 지적 받고 1차 배포분 revert**(0fee784) 후 프레젠테이션 전면 재설계.
+- **보유 종목 = 한 줄 카드 + 탭 펼침**(`.hold-list`/`.hold-card`): 평소엔 `종목 | 평가액` + `비중 · 수익(토글값)` 한 줄. 탭하면 펼쳐져 계좌·수량·현재가·평단·매수일·보유일 + 그룹select·수정·현재가·삭제·상세 버튼. **구 9열 테이블/모바일 reflow 폐기**. 페이지 5053→3422px.
+- **오늘/기간 토글**(`.ma-metric-toggle`, `_metricMode`): 히어로 하단에 메트릭 **1개만** 표시. 오늘=오늘±(칩 숨김), 기간=기간 누적±(칩 노출). 행 수익도 토글 따라 오늘±↔수익률(평단). `updateHeroMetric` 단일화(구 updateAssetHeroChange 대체).
+- **기간 칩**: 1주/1개월/3개월/6개월/1년/3년. **"전체" 칩 제거**(3년이 데이터 상한이라 무의미). 기존 `_compute_portfolio_history`(3년 보유역산) 재사용 — 셀렉터가 차트+누적± 동시 구동.
+- **오늘±**: 백엔드 `_prev_close_krw_map`(app.py, `_search_attach_prices` SQL 재사용, price_daily/index_daily 직전 종가, US ×환율) → `myassets_data` `prev_close`. 수동가격 종목 제외.
+- **매수일**: `holdings.buy_date` 컬럼+ALTER 마이그레, `upsert_holding`/API/모달 input, 펼침에 "보유 N일". `quickSetGroup`도 buy_date 보존.
+- 변경: `modules/auth_manager.py`·`app.py`·`templates/myassets.html`. 웹전용(Capacitor 자동반영).
+- 검증: 로컬 8종목 시드 Playwright 라이트/다크 모바일 — 한 줄 카드·토글 전환(오늘↔기간)·칩(1주~3년)·펼침 상세/버튼·매수일·콘솔에러 0. 페이지높이 3422px 확인.
+- 배포: push(main). 1차분은 revert로 prod 깨끗이 복구 후 이 클린본 단일 배포. [[reference-prod-deploy-access]]
+
+_작성: Claude_
+
 ## [2026-06-23] FIX | intraday 오틱 필터 + 모든 지수/원자재/환율 차트 장중 20분 신선도 (오너)
 
 - **intraday 오틱 필터**: `get_intraday_data`가 `price_hourly` 읽은 뒤 `_drop_isolated_price_spikes`(일봉과 동일 isolated-revert, 임계 4.0) 적용 — 시간봉 bad tick도 read-time 제거·self-heal. 기존엔 일봉(`get_price`)만 필터됐음. 7배 시간봉 시나리오 drop 확인.

@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-24] FEAT | 내 자산 — 절세계좌 해외종목 경고 + mmConfirm 충돌 픽스 (오너)
+
+- **절세계좌 해외종목 경고(A안)**: ISA·연금저축·IRP에 **해외 상장 종목**(6자리 아님 & KRX_GOLD 아님 = US·크립토 등) 담으면 브랜드 확인모달 경고("○○ 계좌엔 해외 상장 종목을 담을 수 없어요 … 기록용으로 그대로 저장할까요?"), **저장은 허용**(트래커라 차단 안 함). `saveHolding`→조건 검사→`_doSaveHolding` 분리, `_isDomesticListed`/`_RESTRICTED_ACCOUNTS`. (실제 제도: 절세계좌는 국내 상장만, 국내상장 S&P ETF는 6자리라 통과)
+- **⚠️ mmConfirm 전역 이름 충돌 픽스**: myassets의 `mmConfirm(msg,sub,onYes)`가 **base.html의 전역 `mmConfirm(msg,opts)`(푸시 기능, 업데이트 106)와 충돌** → base 것이 덮어써 myassets 확인모달이 **무력화돼 있었음**(삭제 확인 포함). myassets 함수를 `maConfirm`으로 리네임해 분리. **삭제 확인모달도 이 김에 복구**. mmConfirm에 variant(danger/warn)·yesLabel 옵션 추가.
+- 변경: `templates/myassets.html`. 검증: Playwright — SPY+ISA/QQQ+연금→경고+"그대로 저장"시 계좌 추가 저장 확인, 069500+ISA·SPY+일반→경고없음, 삭제 확인모달 복구, 콘솔에러 0.
+- 배포: push(main). [[reference-prod-deploy-access]] [[project-push-notifications]]
+
+_작성: Claude_
+
 ## [2026-06-24] FIX | 내 자산 모바일 가로 오버플로우 (오너)
 
 - **증상**: 모바일 내 자산 화면 좌우 스크롤(390뷰포트서 scrollW 475).

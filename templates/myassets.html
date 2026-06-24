@@ -328,6 +328,7 @@
 .confirm-box { width: 360px; max-width: 90vw; text-align: center; }
 .confirm-ic { width: 48px; height: 48px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
 .confirm-ic.danger { background: var(--down-tint); color: var(--down); }
+.confirm-ic.warn { background: var(--brand-tint); color: var(--brand-text); }
 .confirm-ic svg { width: 26px; height: 26px; }
 .confirm-msg { font-size: 0.95rem; font-weight: 700; color: var(--ds-ink); }
 .confirm-sub { font-size: 0.82rem; color: var(--ds-muted); margin-top: 6px; line-height: 1.5; }
@@ -690,7 +691,7 @@
   <!-- 삭제 확인 다이얼로그 -->
   <div class="modal-overlay" id="modalConfirm">
     <div class="modal-box confirm-box">
-      <div class="confirm-ic danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"/></svg></div>
+      <div class="confirm-ic danger" id="confirmIc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"/></svg></div>
       <div class="confirm-msg" id="confirmMsg">삭제할까요?</div>
       <div class="confirm-sub" id="confirmSub"></div>
       <div class="modal-actions" style="justify-content:center;margin-top:18px;">
@@ -1382,14 +1383,33 @@ function openEditHolding(id) {
   openModal('modalHolding');
 }
 
+// 국내 상장 = 6자리 코드 또는 KRX 금현물. 그 외 = 해외 상장(US·크립토 등)
+function _isDomesticListed(code) { return /^\d{6}$/.test(code) || code === 'KRX_GOLD'; }
+// ISA·연금저축·IRP는 해외 상장 종목 보유 불가(실제 제도) → 경고만, 저장은 허용
+const _RESTRICTED_ACCOUNTS = ['ISA', '연금저축', 'IRP'];
+
 async function saveHolding() {
-  const code = document.getElementById('holdingCode').value;
+  const code    = document.getElementById('holdingCode').value;
   if (!code) { alert('종목을 선택해주세요.'); return; }
+  const account = document.querySelector('input[name="holdingAccount"]:checked').value;
+  if (_RESTRICTED_ACCOUNTS.includes(account) && !_isDomesticListed(code)) {
+    maConfirm(
+      `${account} 계좌엔 해외 상장 종목을 담을 수 없어요`,
+      `${account}는 국내 상장 종목만 보유 가능해요(해외 상장 ETF·주식 불가). 기록용으로 그대로 저장할까요?`,
+      _doSaveHolding,
+      { variant: 'warn', yesLabel: '그대로 저장' }
+    );
+    return;
+  }
+  await _doSaveHolding();
+}
+
+async function _doSaveHolding() {
   await fetch('/api/myassets/holding', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
       id:           document.getElementById('holdingId').value || null,
-      code,
+      code:         document.getElementById('holdingCode').value,
       quantity:     parseFloat(document.getElementById('holdingQty').value)||0,
       avg_price:    parseFloat(document.getElementById('holdingAvgPrice').value)||0,
       account_type: document.querySelector('input[name="holdingAccount"]:checked').value,
@@ -1403,7 +1423,14 @@ async function saveHolding() {
 
 // ── 확인 다이얼로그 (confirm() 대체) ──
 let _confirmCb = null;
-function mmConfirm(msg, sub, onYes) {
+function maConfirm(msg, sub, onYes, opts = {}) {
+  const variant = opts.variant || 'danger';   // 'danger'(삭제) | 'warn'(경고)
+  const ic = document.getElementById('confirmIc');
+  ic.className = 'confirm-ic ' + variant;
+  ic.innerHTML = variant === 'danger' ? MAICON.trash : MAICON.alert;
+  const yes = document.getElementById('confirmYes');
+  yes.textContent = opts.yesLabel || (variant === 'danger' ? '삭제' : '확인');
+  yes.className = variant === 'danger' ? 'btn-danger' : 'btn-primary';
   document.getElementById('confirmMsg').textContent = msg;
   document.getElementById('confirmSub').textContent = sub || '';
   _confirmCb = onYes;
@@ -1417,7 +1444,7 @@ document.getElementById('confirmYes').addEventListener('click', async () => {
 
 function deleteHolding(id) {
   const h = holdings.find(x => x.id === id);
-  mmConfirm('이 종목을 삭제할까요?',
+  maConfirm('이 종목을 삭제할까요?',
     h ? `${h.name || h.code} 보유 내역이 삭제됩니다.` : '',
     async () => {
       await fetch('/api/myassets/holding/'+id, { method: 'DELETE' });
@@ -1464,7 +1491,7 @@ async function saveGroup() {
 
 function deleteGroup(id) {
   const g = groups.find(x => x.id === id);
-  mmConfirm('이 그룹을 삭제할까요?',
+  maConfirm('이 그룹을 삭제할까요?',
     `${g ? '"' + g.name + '" ' : ''}그룹만 삭제되고 종목은 그대로 유지됩니다.`,
     async () => {
       await fetch('/api/myassets/group/'+id, { method: 'DELETE' });

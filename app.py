@@ -630,52 +630,6 @@ def _search_attach_prices(items):
         print(f"[search price] {e}")
 
 
-def _prev_close_krw_map(codes, usdkrw):
-    """보유 종목 → 직전 거래일 종가(KRW). 오늘± 계산용.
-    price_daily(주식/ETF) + index_daily(KRX_GOLD). US는 ×usdkrw로 KRW 정규화.
-    '직전 거래일' = 오늘보다 이전 날짜의 최신 종가 → 현재가(라이브) 대비 오늘 등락 산출."""
-    import sqlite3 as _sq
-    from datetime import date as _date
-    out = {}
-    if not codes:
-        return out
-    today = _date.today().isoformat()
-
-    if 'KRX_GOLD' in codes:
-        try:
-            ic  = _sq.connect(str(INDEX_DB_PATH))
-            row = ic.execute(
-                "SELECT close FROM index_daily WHERE code='KRX_GOLD' AND date<? ORDER BY date DESC LIMIT 1",
-                (today,)
-            ).fetchone()
-            ic.close()
-            if row and row[0] is not None:
-                out['KRX_GOLD'] = float(row[0])
-        except Exception:
-            pass
-
-    px_codes = [c for c in codes if c != 'KRX_GOLD']
-    if px_codes and PRICE_DB_PATH.exists():
-        try:
-            pc = _sq.connect(str(PRICE_DB_PATH))
-            ph = ','.join('?' * len(px_codes))
-            rows = pc.execute(f"""
-                SELECT p.code, p.close FROM price_daily p
-                INNER JOIN (SELECT code, MAX(date) mx FROM price_daily
-                    WHERE code IN ({ph}) AND date<? AND close IS NOT NULL GROUP BY code) m
-                ON p.code=m.code AND p.date=m.mx
-            """, (*px_codes, today)).fetchall()
-            pc.close()
-            for code, close in rows:
-                if close is None:
-                    continue
-                is_kr = portfolio_engine.loader.is_kr_etf(code)
-                out[code] = float(close) if is_kr else float(close) * usdkrw
-        except Exception:
-            pass
-    return out
-
-
 @app.route('/api/search')
 @limiter.limit("60 per minute")
 def search():
@@ -2387,16 +2341,10 @@ def myassets_data():
     prices = {k: (v if (isinstance(v, (int, float)) and _math.isfinite(v)) else None)
               for k, v in prices.items()}
 
-    # ── 오늘± 계산용: 직전 거래일 종가(KRW) ──
-    prev_close = _prev_close_krw_map(codes, usdkrw)
-    prev_close = {k: (v if (isinstance(v, (int, float)) and _math.isfinite(v)) else None)
-                  for k, v in prev_close.items()}
-
     return jsonify({
         'holdings': holdings,
         'groups': groups,
         'prices': prices,
-        'prev_close': prev_close,
         'manual_codes': manual_codes,
         'as_of': _dt.utcnow().isoformat(),
         'hide_amounts': _hide_amounts_for_user(uid),
@@ -2443,7 +2391,6 @@ def myassets_save_holding():
         account_type = body.get('account_type', '일반'),
         group_id     = body.get('group_id') or None,
         holding_id   = body.get('id') or None,
-        buy_date     = body.get('buy_date') or None,
     )
     return jsonify({'ok': True})
 

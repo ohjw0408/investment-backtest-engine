@@ -139,6 +139,8 @@
 }
 .ma-asset-change.up { display: inline-flex; background: var(--up-tint); color: var(--up); }
 .ma-asset-change.down { display: inline-flex; background: var(--down-tint); color: var(--down); }
+.ma-asset-change .lab { font-weight: 600; opacity: .72; margin-right: 5px; }
+.ma-asset-sub { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; min-height: 4px; }
 .ma-asset-periods { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .ma-asset-chart { position: relative; height: 210px; padding: 8px 16px 16px; }
 .ma-asset-chart canvas { width: 100% !important; height: 100% !important; }
@@ -398,13 +400,19 @@
           <div class="ma-asset-label">전체 자산</div>
           <div class="ma-asset-value-row">
             <span class="ma-asset-value" id="maTotalAssetValue">***,***,***원</span>
+          </div>
+          <div class="ma-asset-sub">
+            <span class="ma-asset-change" id="maAssetTodayChange"></span>
             <span class="ma-asset-change" id="maAssetPeriodChange"></span>
           </div>
         </div>
         <div class="ma-asset-periods">
+          <button class="ma-period-btn" onclick="setHistoryPeriod(7,this)">1주</button>
           <button class="ma-period-btn active" onclick="setHistoryPeriod(30,this)">1개월</button>
           <button class="ma-period-btn" onclick="setHistoryPeriod(90,this)">3개월</button>
+          <button class="ma-period-btn" onclick="setHistoryPeriod(180,this)">6개월</button>
           <button class="ma-period-btn" onclick="setHistoryPeriod(365,this)">1년</button>
+          <button class="ma-period-btn" onclick="setHistoryPeriod(1095,this)">3년</button>
           <button class="ma-period-btn" onclick="setHistoryPeriod(0,this)">전체</button>
         </div>
       </div>
@@ -573,6 +581,11 @@
       </div>
 
       <div class="input-row">
+        <label>매수일 <span style="font-size:0.75rem;color:var(--text-muted);">(선택)</span></label>
+        <input type="date" id="holdingBuyDate" class="calc-input">
+      </div>
+
+      <div class="input-row">
         <label>계좌 유형</label>
         <div class="rebal-options">
           <label class="rebal-option"><input type="radio" name="holdingAccount" value="일반" checked><span class="rebal-label">일반</span></label>
@@ -667,9 +680,11 @@
 let holdings = [];
 let groups   = [];
 let prices   = {};
+let prevClose = {};
 let manualCodes = [];
 let weightChart = null;
 let hideAmounts = true;
+let _maPeriodLabel = '1개월';
 
 // JS 렌더용 아이콘 (Jinja 매크로는 JS에서 못 써 별도 정의 — duotone 결 동일)
 const _SS = 'class="bic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"';
@@ -690,20 +705,56 @@ function fmtKRW(v) {
   return (v < 0 ? '-' : '') + '₩' + Math.abs(Math.round(v)).toLocaleString();
 }
 function fmtPct(v) { return (v*100).toFixed(1)+'%'; }
+function fmtSignedPct(v) { return (v>=0?'+':'')+(v*100).toFixed(2)+'%'; }
+function _holdDays(d) {
+  if (!d) return null;
+  const t = Date.parse(d);
+  if (isNaN(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+}
+function fmtSignedKRW(v) {
+  if (hideAmounts) return '***';
+  return (v>=0?'+':'-')+'₩'+Math.abs(Math.round(v)).toLocaleString();
+}
 function updateAssetHeroTotal(value) {
   const el = document.getElementById('maTotalAssetValue');
   if (el) el.textContent = fmtKRW(value || 0);
 }
+// 기간 누적± (히스토리 윈도우 기준 — 보유역산)
 function updateAssetHeroChange(values) {
   const el = document.getElementById('maAssetPeriodChange');
   if (!el) return;
   if (!values || values.length < 2 || !values[0]) {
-    el.textContent = '';
+    el.innerHTML = '';
     el.className = 'ma-asset-change';
     return;
   }
-  const change = (values[values.length - 1] - values[0]) / values[0];
-  el.textContent = (change >= 0 ? '+' : '') + (change * 100).toFixed(2) + '%';
+  const diff   = values[values.length - 1] - values[0];
+  const change = diff / values[0];
+  el.innerHTML = `<span class="lab">${_maPeriodLabel}</span>${fmtSignedKRW(diff)} (${fmtSignedPct(change)})`;
+  el.className = 'ma-asset-change ' + (change >= 0 ? 'up' : 'down');
+}
+// 오늘± (현재가 vs 직전 거래일 종가, KRW). 수동가격 종목은 제외(일중 변동 불명).
+function updateAssetHeroToday() {
+  const el = document.getElementById('maAssetTodayChange');
+  if (!el) return;
+  let curTotal = 0, prevTotal = 0, ok = false;
+  holdings.forEach(h => {
+    if (manualCodes.includes(h.code)) return;
+    const cur = prices[h.code], prev = prevClose[h.code];
+    if (cur == null || prev == null) return;
+    curTotal  += cur  * h.quantity;
+    prevTotal += prev * h.quantity;
+    ok = true;
+  });
+  if (!ok || !prevTotal) {
+    el.innerHTML = '';
+    el.className = 'ma-asset-change';
+    return;
+  }
+  const diff   = curTotal - prevTotal;
+  const change = diff / prevTotal;
+  el.innerHTML = `<span class="lab">오늘</span>${fmtSignedKRW(diff)} (${fmtSignedPct(change)})`;
   el.className = 'ma-asset-change ' + (change >= 0 ? 'up' : 'down');
 }
 
@@ -727,6 +778,7 @@ async function loadAll() {
   holdings    = data.holdings || [];
   groups      = data.groups   || [];
   prices      = data.prices   || {};
+  prevClose   = data.prev_close || {};
   manualCodes = data.manual_codes || [];
   hideAmounts = data.hide_amounts !== false;
   const toggle = document.getElementById('hideAmountToggle');
@@ -734,6 +786,7 @@ async function loadAll() {
   _syncHideLabel();
   renderHoldings();
   renderSummary();
+  updateAssetHeroToday();
   renderGroupOptions();
   loadAttribution();
 }
@@ -820,6 +873,7 @@ async function savePrivacySetting() {
   _syncHideLabel();
   renderHoldings();
   renderSummary();
+  updateAssetHeroToday();
   if (_historyData) renderHistoryChart(_maHistoryDays);
   if (document.getElementById('tab-rebalance').style.display !== 'none') renderRebalance();
   await fetch('/api/myassets/settings', {
@@ -853,8 +907,11 @@ function renderHoldings() {
           const ret  = h.avg_price > 0 ? (cur - h.avg_price) / h.avg_price : null;
           const gc   = h.group_color || '#90A4AE';
           const isManual = manualCodes.includes(h.code);
+          const _tPrev   = prevClose[h.code];
+          const todayPct = (!isManual && cur && _tPrev) ? (cur - _tPrev) / _tPrev : null;
+          const holdDays = _holdDays(h.buy_date);
           return `<tr>
-            <td class="h-code"><span style="cursor:pointer;" title="종목 상세 보기" onclick="location.href='/symbol/'+encodeURIComponent('${h.code}')"><b>${h.name || h.code}</b>${h.name && h.name !== h.code ? ` <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">${h.code}</span>` : ''} <span style="font-size:0.7rem;color:var(--blue);font-weight:600;">›</span></span></td>
+            <td class="h-code"><span style="cursor:pointer;" title="종목 상세 보기" onclick="location.href='/symbol/'+encodeURIComponent('${h.code}')"><b>${h.name || h.code}</b>${h.name && h.name !== h.code ? ` <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem;">${h.code}</span>` : ''} <span style="font-size:0.7rem;color:var(--blue);font-weight:600;">›</span></span>${holdDays===null?'':`<div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;" title="매수일 ${h.buy_date}">보유 ${holdDays}일</div>`}</td>
             <td class="h-group" data-label="그룹">
               <select onchange="quickSetGroup(${h.id}, this.value)"
                 style="border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.75rem;background:var(--card);cursor:pointer;max-width:100px;color:var(--text);">
@@ -877,8 +934,9 @@ function renderHoldings() {
                 <div class="weight-progress"><div class="weight-fill" style="width:${(wt*100).toFixed(1)}%;background:${gc}"></div></div>
               </div>
             </td>
-            <td class="h-return" data-label="수익률" style="font-weight:700;color:${ret===null?'var(--text-muted)':ret>=0?'var(--up)':'var(--down)'}">
-              ${ret===null?'—':(ret>=0?'+':'')+fmtPct(ret)}
+            <td class="h-return" data-label="수익률" style="font-weight:700;">
+              <div style="color:${ret===null?'var(--text-muted)':ret>=0?'var(--up)':'var(--down)'}">${ret===null?'—':(ret>=0?'+':'')+fmtPct(ret)}</div>
+              ${todayPct===null?'':`<div style="font-size:0.68rem;font-weight:600;margin-top:2px;color:${todayPct>=0?'var(--up)':'var(--down)'}">오늘 ${fmtSignedPct(todayPct)}</div>`}
             </td>
             <td class="h-actions">
               <button class="icon-btn" onclick="openEditHolding(${h.id})" title="수정">${MAICON.pencil}</button>
@@ -1215,6 +1273,7 @@ function openAddHolding() {
   document.getElementById('holdingCodeSelected').textContent = '';
   document.getElementById('holdingQty').value       = '1';
   document.getElementById('holdingAvgPrice').value  = '0';
+  document.getElementById('holdingBuyDate').value   = '';
   document.getElementById('holdingGroup').value     = '';
   document.querySelector('input[name="holdingAccount"][value="일반"]').checked = true;
   document.getElementById('modalHoldingTitle').textContent = '종목 추가';
@@ -1230,6 +1289,7 @@ function openEditHolding(id) {
   document.getElementById('holdingCodeSelected').textContent = h.code;
   document.getElementById('holdingQty').value       = h.quantity;
   document.getElementById('holdingAvgPrice').value  = h.avg_price;
+  document.getElementById('holdingBuyDate').value   = h.buy_date || '';
   document.getElementById('holdingGroup').value     = h.group_id || '';
   const acc = document.querySelector(`input[name="holdingAccount"][value="${h.account_type}"]`);
   if (acc) acc.checked = true;
@@ -1249,6 +1309,7 @@ async function saveHolding() {
       avg_price:    parseFloat(document.getElementById('holdingAvgPrice').value)||0,
       account_type: document.querySelector('input[name="holdingAccount"]:checked').value,
       group_id:     document.getElementById('holdingGroup').value || null,
+      buy_date:     document.getElementById('holdingBuyDate').value || null,
     })
   });
   closeModal('modalHolding');
@@ -1265,6 +1326,7 @@ async function quickSetGroup(holdingId, groupId) {
       quantity: h.quantity, avg_price: h.avg_price,
       account_type: h.account_type,
       group_id: groupId || null,
+      buy_date: h.buy_date || null,
     })
   });
   await loadAll();
@@ -1608,6 +1670,7 @@ async function loadPortfolioHistory(days) {
 
 function setHistoryPeriod(days, btn) {
   _maHistoryDays = days;
+  if (btn) _maPeriodLabel = btn.textContent.trim();
   document.querySelectorAll('.ma-period-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   if (_historyData) renderHistoryChart(days);

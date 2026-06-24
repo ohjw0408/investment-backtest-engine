@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-24] FEAT | 내 자산 오늘±·기간 누적± 셀렉터 + 매수일 입력 (오너)
+
+- **동기**: 도미노·더리치 대비 내 자산 첫인상이 빈약 — 일일수익·기간별 수익 부재. 평단(`avg_price`)은 이미 저장되나 매수 시점 미저장.
+- **오늘±**: 히어로 총액 + 각 보유행에 일일 등락(현재가 vs 직전 거래일 종가, KRW). 백엔드 `_prev_close_krw_map`(`app.py`, `_search_attach_prices` SQL 패턴 재사용)이 `price_daily`(주식/ETF)+`index_daily`(KRX_GOLD) 직전 종가 반환, US는 ×환율. `myassets_data` JSON에 `prev_close` 추가. 수동가격 종목은 일중 변동 불명이라 오늘± 제외.
+- **기간 누적± 셀렉터**: 히어로 칩 **1주/1개월/3개월/6개월/1년/3년/전체**. 기존 `setHistoryPeriod`+`_compute_portfolio_history`(3년 시계열, 현 수량×과거가=보유역산) 재사용 — 한 셀렉터가 차트 범위 + 누적±(₩/%) 동시 구동. **스냅샷 미구현**(보유역산이라 스토리지 0·종목 삭제 시 흔적 0). 5년은 데이터 3년 한계로 보류.
+- **매수일**: `holdings.buy_date TEXT` 컬럼(+`init_holdings_db` ALTER 마이그레, manual_price 패턴) + `upsert_holding`/API 배선. 추가/편집 모달에 날짜 input. 보유행에 "보유 N일" 표시(정보용, 누적± 계산엔 미사용=별개 숫자). ⚠️ `quickSetGroup`(그룹 드롭다운)도 buy_date 보존하도록 배선(미전달 시 None으로 지워짐 방지).
+- 변경: `modules/auth_manager.py`·`app.py`·`templates/myassets.html`. 앱(Capacitor)=원격 co.kr 로드라 웹변경 자동반영, 네이티브 빌드 불필요.
+- 검증: 로컬 시드(SPY·069500·SCHD, avg+buy_date) Playwright 라이트/다크 모바일 — 히어로 오늘+₩106,500(+1.63%)·기간 칩별 재계산(1주 -1.70%/6개월 +49.64%/3년 +118.71%)·행 오늘±·보유일·모달 매수일 채움·콘솔에러 0. 타겟만(전체 pytest 미실행).
+- ⏳ **미배포** — 오너 확인 후 push(prod 반영). [[reference-prod-deploy-access]]
+
+_작성: Claude_
+
 ## [2026-06-23] FIX | intraday 오틱 필터 + 모든 지수/원자재/환율 차트 장중 20분 신선도 (오너)
 
 - **intraday 오틱 필터**: `get_intraday_data`가 `price_hourly` 읽은 뒤 `_drop_isolated_price_spikes`(일봉과 동일 isolated-revert, 임계 4.0) 적용 — 시간봉 bad tick도 read-time 제거·self-heal. 기존엔 일봉(`get_price`)만 필터됐음. 7배 시간봉 시나리오 drop 확인.

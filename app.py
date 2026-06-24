@@ -262,7 +262,9 @@ p{font-size:0.88rem;color:#546E7A;line-height:1.6;margin-bottom:20px}
     redirect_uri = url_for('google_callback', _external=True)
     # Capacitor 앱 플로우: 시스템 브라우저에서 로그인 후 딥링크로 토큰 핸드오프(WebView 세션 분리 회피)
     session['oauth_app'] = (request.args.get('app') == '1')
-    return google.authorize_redirect(redirect_uri)
+    # prompt=select_account: 구글이 단일 로그인 계정을 자동선택하지 않고 항상 계정 선택창을 띄움
+    # → 사용자가 다른 계정으로 전환 가능 (없으면 묻지 않고 자동 통과돼 계정 못 바꿈)
+    return google.authorize_redirect(redirect_uri, prompt='select_account')
 
 
 # ── OAuth 앱 핸드오프 토큰 (시스템 브라우저 ↔ WebView 세션 브리지, redis 120s) ──

@@ -43,6 +43,7 @@
 .ma-tab:hover { border-color: var(--ds-muted); color: var(--ds-ink); }
 .ma-tab.active { background: var(--ds-ink); color: var(--ds-canvas); border-color: var(--ds-ink); }
 .ma-tab.active .si-ic, .ma-tab.active .ic { color: var(--ds-canvas); }
+.ma-mtabs { display: none; }
 
 /* 카드 — 헤어라인 + 그림자(전경 분리) */
 .ma-card { background: var(--ds-canvas); border-radius: var(--r-xl); border: 1px solid var(--ds-hairline);
@@ -336,8 +337,14 @@
 
 @media (max-width: 768px) {
   .ma-wrap { padding: 14px 12px; max-width: 100%; }
-  .ma-tabs { width: 100%; overflow-x: auto; }
-  .ma-tab { flex: 1; padding: 9px 6px; text-align: center; white-space: nowrap; font-size: 0.78rem; }
+  /* 데스크톱 4탭 숨기고 모바일 6탭 노출 */
+  .ma-tabs { display: none; }
+  .ma-mtabs { display: flex; gap: 6px; margin-bottom: 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .ma-mtab { flex: 1 1 0; min-width: 0; padding: 9px 4px; text-align: center; white-space: nowrap;
+    font-size: 0.82rem; font-weight: 700; font-family: inherit; cursor: pointer;
+    background: transparent; color: var(--ds-muted);
+    border: 1.5px solid var(--ds-hairline); border-radius: var(--r-pill); }
+  .ma-mtab.active { background: var(--ds-ink); color: var(--ds-canvas); border-color: var(--ds-ink); }
   .ma-card { padding: 14px; }
   .ma-asset-card { padding: 0; }
   .ma-asset-head { padding: 16px 14px 0; flex-direction: column; }
@@ -399,9 +406,19 @@
     <button class="ma-tab" onclick="showTab('groups')">{{ mi('layers') }} 그룹 관리</button>
   </div>
 
+  <!-- 모바일 전용 탭바 (≤768px) -->
+  <div class="ma-mtabs" id="maMobileTabs">
+    <button class="ma-mtab active" data-mtab="overview" onclick="mShowTab('overview')">현황</button>
+    <button class="ma-mtab" data-mtab="holdings" onclick="mShowTab('holdings')">종목</button>
+    <button class="ma-mtab" data-mtab="weight" onclick="mShowTab('weight')">비중</button>
+    <button class="ma-mtab" data-mtab="dividend" onclick="mShowTab('dividend')">배당</button>
+    <button class="ma-mtab" data-mtab="rebal" onclick="mShowTab('rebal')">리밸</button>
+    <button class="ma-mtab" data-mtab="groups" onclick="mShowTab('groups')">그룹</button>
+  </div>
+
   <!-- 자산 현황 탭 -->
   <div id="tab-overview">
-    <div class="ma-card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div class="ma-card" data-mtab="overview" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div style="display:flex;align-items:center;gap:12px;">
         <span style="width:38px;height:38px;border-radius:var(--r-md);background:var(--brand-tint);color:var(--brand-text);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
           <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c5 0 9 5 9 8a12 12 0 0 1-1.7 2.7M6.6 6.6C3.9 8.2 2 11 2 12c0 1.4 4 7 10 7a9 9 0 0 0 3.6-.7"/><path d="M14.1 14.1a3 3 0 0 1-4.2-4.2M2 2l20 20"/></svg>
@@ -418,7 +435,7 @@
       </label>
     </div>
 
-    <div class="ma-card ma-asset-card" id="maAssetHero">
+    <div class="ma-card ma-asset-card" id="maAssetHero" data-mtab="overview">
       <div class="ma-asset-head">
         <div style="min-width:0;">
           <div class="ma-asset-label">전체 자산</div>
@@ -448,7 +465,7 @@
       </div>
     </div>
 
-    <div class="ma-card">
+    <div class="ma-card" data-mtab="holdings">
       <div class="ma-card-title" style="flex-wrap:wrap;gap:8px;">
         <span style="display:inline-flex;gap:7px;align-items:center;">{{ mi('briefcase') }} 보유 종목</span>
         <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -466,7 +483,7 @@
       </div>
     </div>
 
-    <div class="ma-card">
+    <div class="ma-card" data-mtab="weight">
       <div class="ma-card-title">{{ mi('pie') }} 자산 구성</div>
       <div id="groupHint"></div>
       <div id="summaryGrid" class="summary-grid"></div>
@@ -475,14 +492,14 @@
       </div>
     </div>
 
-    <div class="ma-card" id="attrCard" style="display:none;">
+    <div class="ma-card" id="attrCard" data-mtab="overview" style="display:none;">
       <div class="ma-card-title">{{ mi('shield') }} 상승 견인 · 하락 방어</div>
       <div id="attrBody" style="font-size:0.92rem;line-height:1.7;"></div>
       <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">* 최근 6년·보유 비중 기준. 종목 기여 = 비중 × 수익. 시세 15분 지연.</div>
     </div>
 
     <!-- 배당금 -->
-    <div class="ma-card" id="divCard">
+    <div class="ma-card" id="divCard" data-mtab="dividend">
       <div class="ma-card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
         <span style="display:inline-flex;gap:7px;align-items:center;">{{ mi('coins') }} 배당금</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -512,7 +529,7 @@
   </div>
 
   <!-- 리밸런싱 탭 -->
-  <div id="tab-rebalance" style="display:none;">
+  <div id="tab-rebalance" data-mtab="rebal" style="display:none;">
     <div class="ma-intro">{{ mi('scale') }} <b>리밸런싱</b>은 그룹별 <b>목표 비중</b>에서 얼마나 벗어났는지 보여줍니다. 목표보다 많은 그룹은 <b style="color:var(--down)">매도</b>, 적은 그룹은 <b style="color:var(--up)">매수</b>해 균형을 맞추세요. 목표 비중은 <b>그룹 관리</b> 탭에서 설정합니다.</div>
     <div class="ma-card">
       <div class="rb-band">
@@ -545,7 +562,7 @@
   </div>
 
   <!-- 추가매수 탭 -->
-  <div id="tab-purchase" style="display:none;">
+  <div id="tab-purchase" data-mtab="rebal" style="display:none;">
     <div class="ma-intro">{{ mi('plus') }} 새로 투자할 금액을 입력하면, <b>매도 없이</b> 목표 비중에 가까워지도록 <b>어느 그룹에 얼마씩</b> 넣을지 제안합니다. (목표 대비 부족한 그룹에 우선 배분)</div>
     <div class="ma-card">
       <div class="ma-card-title">{{ mi('plus') }} 추가 투자금액</div>
@@ -567,7 +584,7 @@
   </div>
 
   <!-- 그룹 관리 탭 -->
-  <div id="tab-groups" style="display:none;">
+  <div id="tab-groups" data-mtab="groups" style="display:none;">
     <div class="ma-intro">{{ mi('layers') }} 종목을 <b>그룹</b>(예: 국내주식·미국주식·채권·금)으로 묶고 각 그룹의 <b>목표 비중</b>을 정하면, 리밸런싱·추가매수가 이 기준으로 계산됩니다. 목표 비중 합계는 <b>100%</b>를 권장합니다.</div>
     <div class="ma-card">
       <div class="ma-card-title">
@@ -808,6 +825,8 @@ function setRowMetric(mode, btn) {
 
 // ── 탭 ──
 function showTab(name) {
+  // 모바일에서는 6탭 컨트롤러로 위임 (데스크톱 4탭 → 모바일 탭 매핑)
+  if (_isMobile()) { mShowTab(_DESK2M[name] || 'overview'); return; }
   ['overview','rebalance','purchase','groups'].forEach(t => {
     document.getElementById('tab-'+t).style.display = t===name ? 'block' : 'none';
   });
@@ -818,6 +837,42 @@ function showTab(name) {
   if (name === 'purchase')  calcPurchase();
   if (name === 'groups')    renderGroups();
 }
+
+// ── 모바일 전용 6탭 (≤768px). 카드 단위 인라인 display 제어, 데스크톱 DOM·showTab 보존 ──
+let _attrHasData = false;
+let _mReady = false;  // 차트 인스턴스 준비 후 true (숨김탭 차트는 보일 때 resize 필요)
+const _DESK2M = { overview:'overview', rebalance:'rebal', purchase:'rebal', groups:'groups' };
+function _isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
+function _mActive() { const b = document.querySelector('.ma-mtab.active'); return b ? b.dataset.mtab : 'overview'; }
+function mShowTab(name) {
+  if (!_isMobile()) {
+    // 데스크톱: 모바일 인라인 잔재 제거 → 데스크톱 기본(현황 탭)으로 환원
+    ['rebalance','purchase','groups'].forEach(t => document.getElementById('tab-'+t).style.display = 'none');
+    document.getElementById('tab-overview').style.display = '';
+    document.querySelectorAll('#tab-overview [data-mtab]').forEach(el => {
+      if (el.id !== 'attrCard') el.style.display = '';
+    });
+    document.getElementById('attrCard').style.display = _attrHasData ? '' : 'none';
+    document.querySelectorAll('.ma-tab').forEach((b,i) => b.classList.toggle('active', i === 0));
+    return;
+  }
+  document.querySelectorAll('.ma-mtab').forEach(b => b.classList.toggle('active', b.dataset.mtab === name));
+  document.querySelectorAll('[data-mtab]:not(.ma-mtab)').forEach(el => {
+    const active = el.dataset.mtab === name;
+    if (el.id === 'attrCard') { el.style.display = (active && _attrHasData) ? '' : 'none'; return; }
+    el.style.display = active ? '' : 'none';
+  });
+  // 숨김 상태에서 그려진 차트는 캔버스 크기가 0 → 탭이 보일 때 재렌더(재생성)
+  if (_mReady) {
+    if (name === 'weight')   renderSummary();
+    if (name === 'dividend') renderDivYear();
+    if (name === 'overview' && _maHistoryChart) _maHistoryChart.resize();
+  }
+  if (name === 'rebal')  { renderRebalance(); calcPurchase(); }
+  if (name === 'groups') renderGroups();
+}
+mShowTab('overview');  // 초기 분류
+window.addEventListener('resize', () => mShowTab(_isMobile() ? _mActive() : 'overview'));
 
 // ── 데이터 로드 ──
 async function loadAll() {
@@ -846,7 +901,7 @@ async function loadAttribution() {
   if (!card) return;
   try {
     const j = await (await fetch('/api/myassets/attribution', { cache: 'no-store' })).json();
-    if (!j.ok || !j.attribution) { card.style.display = 'none'; return; }
+    if (!j.ok || !j.attribution) { _attrHasData = false; card.style.display = 'none'; return; }
     const a = j.attribution;
     const up = a.up_driver, dn = a.down_defender;
     let html = '';
@@ -862,8 +917,10 @@ async function loadAttribution() {
         html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 가장 잘 버텼어요 <span style="color:var(--text-muted);font-size:0.82rem;">(포폴이 빠질 때 <b style="color:var(--blue)">${dc.toFixed(1)}배</b>만)</span>`;
     }
     body.innerHTML = html || '데이터가 부족해요.';
-    card.style.display = '';
-  } catch (e) { card.style.display = 'none'; }
+    _attrHasData = true;
+    // 모바일선 현황 탭일 때만 노출(다른 탭이면 숨김 유지)
+    card.style.display = (_isMobile() && _mActive() !== 'overview') ? 'none' : '';
+  } catch (e) { _attrHasData = false; card.style.display = 'none'; }
 }
 
 function maEsc(s) {
@@ -1530,7 +1587,7 @@ function selectHoldingCode(code, name) {
 
 // 외부 클릭으로 닫기 비활성화
 
-loadAll().then(() => loadPortfolioHistory(30));
+loadAll().then(() => { loadPortfolioHistory(30); _mReady = true; });
 loadDividends();
 
 // ── 배당금: 연도 선택 + 월별 막대(드릴다운) + 배당 일정 캘린더 ──

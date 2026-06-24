@@ -178,6 +178,24 @@
 .hc-actions button.danger { color: var(--down); border-color: color-mix(in srgb, var(--down) 40%, transparent); }
 .hc-actions .grp-sel { padding: 6px 10px; border: 1px solid var(--ds-hairline); border-radius: var(--r-pill);
   background: var(--ds-canvas); color: var(--ds-body); font-size: .78rem; font-family: inherit; cursor: pointer; }
+.hc-badge { font-size: .68rem; font-weight: 700; color: var(--ds-body); background: var(--ds-soft);
+  border-radius: var(--r-pill); padding: 1px 7px; margin-left: 6px; }
+.hc-acct { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  font-size: .78rem; color: var(--ds-body); padding: 7px 0; border-bottom: 1px dashed var(--ds-hairline); }
+.hc-acct:last-of-type { border-bottom: none; }
+.hc-acct b { color: var(--ds-ink); }
+.hc-acct-act { display: flex; gap: 6px; flex-shrink: 0; }
+.hc-acct-act button { font-size: .74rem; font-weight: 600; padding: 4px 11px; border-radius: var(--r-pill);
+  border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body); cursor: pointer; font-family: inherit; }
+.hc-acct-act button.danger { color: var(--down); border-color: color-mix(in srgb, var(--down) 40%, transparent); }
+
+/* 그룹 안내 (그룹 미설정 사용자) */
+.grp-hint { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; background: var(--brand-tint);
+  color: var(--brand-text); border-radius: var(--r-md); padding: 11px 14px; font-size: .82rem; line-height: 1.5; margin-bottom: 14px; }
+.grp-hint b { font-weight: 700; }
+.grp-hint svg { width: 18px; height: 18px; flex-shrink: 0; }
+.grp-hint button { margin-left: auto; font-size: .8rem; font-weight: 700; padding: 6px 14px; border-radius: var(--r-pill);
+  border: none; background: var(--brand); color: var(--on-brand); cursor: pointer; font-family: inherit; white-space: nowrap; }
 .ma-asset-chart { position: relative; height: 210px; padding: 8px 16px 16px; }
 .ma-asset-chart canvas { width: 100% !important; height: 100% !important; }
 #maHistoryEmpty { position: absolute; inset: 8px 16px 16px; display: none; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
@@ -430,9 +448,13 @@
     </div>
 
     <div class="ma-card">
-      <div class="ma-card-title">
+      <div class="ma-card-title" style="flex-wrap:wrap;gap:8px;">
         <span style="display:inline-flex;gap:7px;align-items:center;">{{ mi('briefcase') }} 보유 종목</span>
-        <span style="display:inline-flex;gap:8px;align-items:center;">
+        <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="ma-metric-toggle" id="holdMetricToggle">
+            <button class="mt-btn" onclick="setRowMetric('today',this)">오늘</button>
+            <button class="mt-btn active" onclick="setRowMetric('total',this)">전체</button>
+          </span>
           <button id="refreshHoldingsBtn" class="icon-btn" title="최신 시세로 새로고침 (서버 캐시 15분)" onclick="refreshHoldings()">{{ mi('refresh') }}</button>
           <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="openAddHolding()">+ 종목 추가</button>
         </span>
@@ -445,6 +467,7 @@
 
     <div class="ma-card">
       <div class="ma-card-title">{{ mi('pie') }} 자산 구성</div>
+      <div id="groupHint"></div>
       <div id="summaryGrid" class="summary-grid"></div>
       <div style="position:relative;height:260px;">
         <canvas id="weightChart"></canvas>
@@ -691,7 +714,8 @@ let prevClose = {};
 let manualCodes = [];
 let weightChart = null;
 let hideAmounts = true;
-let _metricMode = 'today';      // 'today' | 'period'
+let _metricMode = 'today';      // 히어로(전체 자산): 'today' | 'period'
+let _rowMetric  = 'total';      // 보유 종목 행: 'today'(오늘±) | 'total'(평단 전체수익률)
 let _maPeriodLabel = '1개월';
 
 // JS 렌더용 아이콘 (Jinja 매크로는 JS에서 못 써 별도 정의 — duotone 결 동일)
@@ -764,12 +788,20 @@ function updateHeroMetric(values) {
   el.className = 'ma-asset-change ' + (pct >= 0 ? 'up' : 'down');
 }
 
+// 히어로(전체 자산) 토글 — 자산 메트릭만 (행 미관여)
 function setMetricMode(mode, btn) {
   _metricMode = mode;
-  document.querySelectorAll('.mt-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#maAssetHero .mt-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   document.getElementById('maPeriodChips').style.display = (mode === 'period') ? 'flex' : 'none';
   updateHeroMetric();
+}
+
+// 보유 종목 토글 — 행 수익 표시만 (오늘± ↔ 평단 전체수익률)
+function setRowMetric(mode, btn) {
+  _rowMetric = mode;
+  document.querySelectorAll('#holdMetricToggle .mt-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
   renderHoldings();
 }
 
@@ -898,29 +930,42 @@ async function savePrivacySetting() {
   });
 }
 
-// ── 보유 종목 = 한 줄 카드 (탭하면 펼침) ──
+// ── 보유 종목 = 종목별 한 줄 카드(계좌 합산) + 탭하면 계좌별 펼침 ──
 function renderHoldings() {
   const wrap = document.getElementById('holdingsTableWrap');
   if (!holdings.length) {
     wrap.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">보유 종목이 없습니다. + 종목 추가를 눌러 시작하세요</div>';
     return;
   }
-  const totalValue = holdings.reduce((s, h) => s + (prices[h.code] || 0) * h.quantity, 0);
 
-  wrap.innerHTML = `<div class="hold-list">${holdings.map(h => {
-    const cur = prices[h.code] || 0;
-    const val = cur * h.quantity;
+  // 같은 종목 = 계좌 넘어 보기만 합산 (데이터는 계좌별 유지)
+  const agg = {};
+  holdings.forEach(h => {
+    const a = agg[h.code] || (agg[h.code] = {
+      code: h.code, name: h.name, group_name: h.group_name, group_color: h.group_color,
+      qty: 0, cost: 0, rows: [],
+    });
+    a.qty  += h.quantity;
+    a.cost += (h.avg_price || 0) * h.quantity;
+    a.rows.push(h);
+  });
+  const items = Object.values(agg);
+  const totalValue = items.reduce((s, a) => s + (prices[a.code] || 0) * a.qty, 0);
+
+  wrap.innerHTML = `<div class="hold-list">${items.map((a, i) => {
+    const cur = prices[a.code] || 0;
+    const val = cur * a.qty;
     const wt  = totalValue > 0 ? val / totalValue : 0;
-    const isManual = manualCodes.includes(h.code);
-    const ret = h.avg_price > 0 ? (cur - h.avg_price) / h.avg_price : null;
-    const _p  = prevClose[h.code];
+    const isManual = manualCodes.includes(a.code);
+    const avg = a.qty > 0 ? a.cost / a.qty : 0;            // 가중 평단
+    const ret = avg > 0 ? (cur - avg) / avg : null;        // 평단 기준 전체수익률
+    const _p  = prevClose[a.code];
     const todayPct = (!isManual && cur && _p) ? (cur - _p) / _p : null;
-    const gc  = h.group_color || '#90A4AE';
-    const holdDays = _holdDays(h.buy_date);
+    const gc  = a.group_color || '#90A4AE';
 
-    // 행 수익 표시 = 토글 따라 하나만. 오늘 모드→오늘±, 기간 모드→수익률(평단 누적)
+    // 행 수익 = 보유종목 토글(_rowMetric) 따라. today→오늘±, total→평단 전체수익률
     let retHtml;
-    if (_metricMode === 'today') {
+    if (_rowMetric === 'today') {
       retHtml = (todayPct === null)
         ? `<span class="hc-ret flat">오늘 —</span>`
         : `<span class="hc-ret ${todayPct>=0?'up':'down'}">오늘 ${fmtSignedPct(todayPct)}</span>`;
@@ -930,47 +975,49 @@ function renderHoldings() {
         : `<span class="hc-ret ${ret>=0?'up':'down'}">${ret>=0?'+':''}${fmtPct(ret)}</span>`;
     }
 
-    const grpDot = h.group_name ? `<span class="hc-gdot" style="background:${gc}" title="${h.group_name}"></span>` : '';
-    const detail = [
-      `계좌 <b>${h.account_type}</b>`,
-      `수량 <b>${h.quantity.toLocaleString()}</b>`,
-      `현재가 <b>${fmtKRW(cur)}</b>${isManual?' <span style="color:var(--blue);font-weight:700;">(수동)</span>':''}`,
-      `평단 <b>${h.avg_price>0?fmtKRW(h.avg_price):'—'}</b>`,
-      holdDays!==null ? `매수 <b>${h.buy_date}</b> · 보유 ${holdDays}일` : '',
-    ].filter(Boolean).join(' · ');
+    const grpDot  = a.group_name ? `<span class="hc-gdot" style="background:${gc}" title="${a.group_name}"></span>` : '';
+    const acctBadge = a.rows.length > 1 ? `<span class="hc-badge">${a.rows.length}계좌</span>` : '';
 
-    return `<div class="hold-card" id="hold-${h.id}" onclick="toggleHold(${h.id})">
+    // 펼침 = 계좌별 분해 (각 계좌 수정/삭제)
+    const acctRows = a.rows.map(r => {
+      const hd = _holdDays(r.buy_date);
+      return `<div class="hc-acct">
+        <span><b>${r.account_type}</b> · ${r.quantity.toLocaleString()}주 · 평단 ${r.avg_price>0?fmtKRW(r.avg_price):'—'}${hd!==null?` · 보유 ${hd}일`:''}</span>
+        <span class="hc-acct-act">
+          <button onclick="openEditHolding(${r.id})">수정</button>
+          <button class="danger" onclick="deleteHolding(${r.id})">삭제</button>
+        </span>
+      </div>`;
+    }).join('');
+
+    return `<div class="hold-card" id="hold-${i}" onclick="toggleHold(${i})">
       <div class="hc-top">
-        <div class="hc-name">${grpDot}${h.name || h.code}${h.name && h.name!==h.code ? `<span class="hc-code">${h.code}</span>`:''}</div>
+        <div class="hc-name">${grpDot}${a.name || a.code}${a.name && a.name!==a.code ? `<span class="hc-code">${a.code}</span>`:''}${acctBadge}</div>
         <div class="hc-val">${fmtKRW(val)}</div>
       </div>
       <div class="hc-meta">
         <span class="hc-wt">${fmtPct(wt)}</span>
         <span style="color:var(--ds-hairline);">·</span>
         ${retHtml}
+        ${isManual?'<span class="hc-badge" style="color:var(--blue);">수동가</span>':''}
         <span class="hc-chev">${MAICON.chev}</span>
       </div>
-      <div class="hc-exp" id="exp-${h.id}" hidden onclick="event.stopPropagation();">
-        <div class="hc-detail">${detail}</div>
-        <div class="hc-actions">
-          <select class="grp-sel" onchange="quickSetGroup(${h.id}, this.value)">
-            <option value="">그룹 없음</option>
-            ${groups.map(g => `<option value="${g.id}" ${h.group_id===g.id?'selected':''}>${g.name}</option>`).join('')}
-          </select>
-          <button onclick="openEditHolding(${h.id})">${MAICON.pencil} 수정</button>
-          <button onclick="setManual(${h.id}, ${cur})">현재가</button>
-          ${isManual?`<button onclick="clearManual(${h.id})">자동시세</button>`:''}
-          <button class="danger" onclick="deleteHolding(${h.id})">${MAICON.trash} 삭제</button>
-          <a href="/symbol/${encodeURIComponent(h.code)}">상세 ›</a>
+      <div class="hc-exp" id="exp-${i}" hidden onclick="event.stopPropagation();">
+        <div class="hc-detail">현재가 <b>${fmtKRW(cur)}</b> · 평단 <b>${avg>0?fmtKRW(avg):'—'}</b> · 합계 <b>${a.qty.toLocaleString()}주</b></div>
+        ${acctRows}
+        <div class="hc-actions" style="margin-top:10px;">
+          <button onclick="setManual(${a.rows[0].id}, ${cur})">현재가 수동</button>
+          ${isManual?`<button onclick="clearManual(${a.rows[0].id})">자동시세</button>`:''}
+          <a href="/symbol/${encodeURIComponent(a.code)}">종목 상세 ›</a>
         </div>
       </div>
     </div>`;
   }).join('')}</div>`;
 }
 
-function toggleHold(id) {
-  const card = document.getElementById('hold-'+id);
-  const exp  = document.getElementById('exp-'+id);
+function toggleHold(i) {
+  const card = document.getElementById('hold-'+i);
+  const exp  = document.getElementById('exp-'+i);
   if (!exp || !card) return;
   if (exp.hasAttribute('hidden')) { exp.removeAttribute('hidden'); card.classList.add('open'); }
   else { exp.setAttribute('hidden',''); card.classList.remove('open'); }
@@ -983,12 +1030,22 @@ function renderSummary() {
   const totalReturn = totalCost > 0 ? (totalValue - totalCost) / totalCost : 0;
   updateAssetHeroTotal(totalValue);
 
+  const uniqCount = new Set(holdings.map(h => h.code)).size;
   document.getElementById('summaryGrid').innerHTML = [
     { label: '총 평가금액', value: fmtKRW(totalValue), cls: '' },
     { label: '총 매입금액', value: fmtKRW(totalCost), cls: '' },
     { label: '총 수익률',   value: (totalReturn>=0?'+':'')+fmtPct(totalReturn), cls: totalReturn>=0?'var(--up)':'var(--down)' },
-    { label: '보유 종목 수', value: holdings.length+'개', cls: '' },
+    { label: '보유 종목 수', value: uniqCount+'개', cls: '' },
   ].map(i=>`<div class="summary-item"><div class="summary-label">${i.label}</div><div class="summary-value" style="color:${i.cls||'var(--text)'}">${i.value}</div></div>`).join('');
+
+  // 그룹 미설정 사용자 안내 — 직접 묶어 관리 가능함을 노출
+  const hintEl = document.getElementById('groupHint');
+  if (hintEl) {
+    const hasGroup = holdings.some(h => h.group_id);
+    hintEl.innerHTML = (holdings.length && !hasGroup)
+      ? `<div class="grp-hint">${MAICON.layers}<span>종목을 <b>그룹</b>으로 묶으면 (예: 미국주식·금·채권) 자산군별 비중을 한눈에 볼 수 있어요.</span><button onclick="showTab('groups')">그룹 만들기 ›</button></div>`
+      : '';
+  }
 
   renderWeightChart(totalValue);
 }
@@ -1341,22 +1398,6 @@ async function saveHolding() {
     })
   });
   closeModal('modalHolding');
-  await loadAll();
-}
-
-async function quickSetGroup(holdingId, groupId) {
-  const h = holdings.find(h => h.id === holdingId);
-  if (!h) return;
-  await fetch('/api/myassets/holding', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      id: holdingId, code: h.code,
-      quantity: h.quantity, avg_price: h.avg_price,
-      account_type: h.account_type,
-      group_id: groupId || null,
-      buy_date: h.buy_date || null,
-    })
-  });
   await loadAll();
 }
 

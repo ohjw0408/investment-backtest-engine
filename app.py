@@ -2400,6 +2400,7 @@ def myassets_data():
         'manual_codes': manual_codes,
         'as_of': _dt.utcnow().isoformat(),
         'hide_amounts': _hide_amounts_for_user(uid),
+        'rebal_band': get_settings(uid).get('rebal_band'),
     })
 
 
@@ -2424,9 +2425,17 @@ def myassets_save_settings():
     uid = session['user_id']
     body = request.get_json(silent=True) or {}
     settings = get_settings(uid)
-    settings['hide_amounts'] = bool(body.get('hide_amounts', True))
+    # 제공된 키만 갱신 (밴드만 저장 시 hide_amounts 클로버 방지)
+    if 'hide_amounts' in body:
+        settings['hide_amounts'] = bool(body['hide_amounts'])
+    if 'rebal_band' in body:
+        try:
+            settings['rebal_band'] = min(20.0, max(0.5, float(body['rebal_band'])))
+        except (ValueError, TypeError):
+            pass
     save_settings(uid, settings)
-    return jsonify({'ok': True, 'hide_amounts': settings['hide_amounts']})
+    return jsonify({'ok': True, 'hide_amounts': settings.get('hide_amounts', True),
+                    'rebal_band': settings.get('rebal_band')})
 
 
 @app.route('/api/myassets/holding', methods=['POST'])

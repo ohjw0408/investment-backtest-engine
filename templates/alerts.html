@@ -11,10 +11,11 @@
 .al-card { border: 1px solid var(--ds-hairline); background: var(--ds-canvas); border-radius: var(--r-xl); padding: 20px; margin-top: 18px; }
 .al-card h3 { font-size: var(--fs-title); font-weight: 600; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
 .al-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
-.al-field { display: flex; flex-direction: column; gap: 4px; }
+.al-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .al-field label { font-size: 0.72rem; color: var(--ds-muted); font-weight: 600; }
 .al-field select, .al-field input { border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-ink);
-  border-radius: var(--r-md); padding: 9px 12px; font-size: 0.88rem; font-family: var(--font-sans); min-width: 120px; }
+  border-radius: var(--r-md); padding: 9px 12px; font-size: 0.88rem; font-family: var(--font-sans); min-width: 120px;
+  max-width: 100%; box-sizing: border-box; }
 .al-field select:focus, .al-field input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-tint); }
 .al-btn { background: var(--brand); color: var(--on-brand); border: none; border-radius: var(--r-pill); padding: 10px 20px;
   font-size: 0.86rem; font-weight: 600; cursor: pointer; font-family: var(--font-sans); }
@@ -27,13 +28,13 @@
   padding: 11px 13px; background: var(--ds-soft); }
 .al-item.off { opacity: 0.5; }
 .al-item-main { flex: 1; min-width: 0; }
-.al-item-t { font-size: 0.88rem; font-weight: 600; }
-.al-item-d { font-size: 0.74rem; color: var(--ds-muted); margin-top: 2px; }
-.al-pill { font-size: 0.66rem; font-weight: 600; padding: 3px 10px; border-radius: var(--r-pill); background: var(--brand-tint); color: var(--brand-text); }
+.al-item-t { font-size: 0.88rem; font-weight: 600; overflow-wrap: anywhere; }
+.al-item-d { font-size: 0.74rem; color: var(--ds-muted); margin-top: 2px; overflow-wrap: anywhere; }
+.al-pill { font-size: 0.66rem; font-weight: 600; padding: 3px 10px; border-radius: var(--r-pill); background: var(--brand-tint); color: var(--brand-text); flex-shrink: 0; white-space: nowrap; }
 .al-ev { border-left: 3px solid var(--brand); padding: 8px 12px; background: var(--ds-soft); border-radius: 0 var(--r-sm) var(--r-sm) 0; }
 .al-ev.read { border-left-color: var(--ds-hairline); opacity: 0.6; }
-.al-ev-t { font-size: 0.86rem; font-weight: 600; }
-.al-ev-b { font-size: 0.76rem; color: var(--ds-muted); margin-top: 2px; }
+.al-ev-t { font-size: 0.86rem; font-weight: 600; overflow-wrap: anywhere; }
+.al-ev-b { font-size: 0.76rem; color: var(--ds-muted); margin-top: 2px; overflow-wrap: anywhere; }
 .al-ev-time { font-size: 0.68rem; color: var(--ds-muted); margin-top: 4px; }
 .al-empty { color: var(--ds-muted); font-size: 0.84rem; padding: 14px 4px; }
 .al-x { background: none; border: none; color: var(--ds-muted); cursor: pointer; font-size: 1rem; padding: 4px; }
@@ -48,6 +49,7 @@
 .al-sr-item { padding: 9px 12px; cursor: pointer; font-size: 0.84rem; display: flex; gap: 8px;
   align-items: center; justify-content: space-between; }
 .al-sr-item:hover { background: var(--ds-soft); }
+.al-sr-item > span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .al-sr-code { color: var(--ds-muted); font-size: 0.74rem; flex-shrink: 0; }
 /* 타입 칩 */
 .al-types { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }

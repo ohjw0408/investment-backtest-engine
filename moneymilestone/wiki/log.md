@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-24] UX/FIX | 리밸 밴드 계정저장 + 알림설정 모바일이동 + 알림페이지 오버플로우 (오너)
+
+오너 4건 지시 후속:
+- **① 리밸런싱 경고 밴드 계정별 저장**(전엔 `_rebalBand` 로컬변수만 → 새로고침 5로 리셋). `user_settings.tax` dict에 `rebal_band` 추가: `/api/myassets/settings` POST를 **제공된 키만 병합**(밴드만 저장 시 hide_amounts 클로버 방지)+0.5~20 클램프, `/api/myassets/data` 응답에 `rebal_band` 반환. 프론트=loadAll에서 `syncRebalBand(data.rebal_band)` 복원, 슬라이더 `onchange`+프리셋 3종에 `saveRebalBand()`(드래그중 input마다 말고 release시 1회 POST). 검증: API POST/GET 왕복 10.0 유지·hide만 POST해도 밴드 보존 + Playwright 슬라이더10→리로드→10 유지.
+- **② 그룹 미설정 시 리밸런싱 = 정상**(오너 확인 요청): 오류·빈칸 아님. `renderRebalance`가 그룹/목표비중 없으면 **유도 안내** 빈상태(`.ma-empty` "아직 계산할 게 없어요 / 그룹 관리 탭에서 그룹 만들고 종목 넣은 뒤 목표 비중 설정하면 표시"). 변경 없음(보고만). ※추후 '그룹 관리 탭' 클릭=탭이동 링크화 가능.
+- **③ 알림 설정 버튼 모바일=풀페이지 이동**(바텀시트 `mmAlert.openAssets()`가 모바일서 부실 → 오너 "차라리 알림 탭 이동이 낫다"). `openAlertSettings()`: 모바일(≤768)=`location='/alerts'`, 데스크톱=기존 모달 유지. 검증: 모바일 클릭→/alerts, 데스크톱 클릭→모달(이동X).
+- **④ 알림 페이지 모바일 가로 오버플로우 픽스**(긴 종목명/코드): 360px+40자 무공백 코드서 **docOverflow 218px 재현**. `alerts.html` CSS 하드닝=`.al-item-t/.al-item-d/.al-ev-t/.al-ev-b` `overflow-wrap:anywhere`, `.al-pill` `flex-shrink:0;white-space:nowrap`, `.al-field` `min-width:0`+select/input `max-width:100%;box-sizing:border-box`, 검색드롭 `.al-sr-item>span:first-child` `min-width:0;overflow-wrap`. 검증: 동일 케이스 **218→0**.
+- 변경=`app.py`(settings 핸들러·data 응답)·`templates/myassets.html`·`templates/alerts.html`. 전부 모바일 Playwright 검증·콘솔에러0·6탭 회귀0. ⚠️ 미배포(오너 push 대기). [[reference-prod-deploy-access]]
+
 ## [2026-06-24] UX | 내 자산 모바일 6탭 재구성 (도미노식, 모바일/앱 전용) (오너)
 
 - 오너: 모바일서 배당·캘린더·비중이 한 화면에 너무 많아 안 보임 → **도미노(투자관리앱) 식으로 탭 분리**. **모바일(≤768px)·앱만**, 데스크톱 웹은 그대로(오너 결정 "웹은 딱히 바꾸지 말고").

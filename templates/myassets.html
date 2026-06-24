@@ -977,7 +977,6 @@ function renderHoldings() {
     }
 
     const grpDot  = a.group_name ? `<span class="hc-gdot" style="background:${gc}" title="${a.group_name}"></span>` : '';
-    const acctBadge = a.rows.length > 1 ? `<span class="hc-badge">${a.rows.length}계좌</span>` : '';
 
     // 펼침 = 계좌별 분해 (각 계좌 수정/삭제)
     const acctRows = a.rows.map(r => {
@@ -993,7 +992,7 @@ function renderHoldings() {
 
     return `<div class="hold-card" id="hold-${i}" onclick="toggleHold(${i})">
       <div class="hc-top">
-        <div class="hc-name">${grpDot}${a.name || a.code}${a.name && a.name!==a.code ? `<span class="hc-code">${a.code}</span>`:''}${acctBadge}</div>
+        <div class="hc-name">${grpDot}${a.name || a.code}</div>
         <div class="hc-val">${fmtKRW(val)}</div>
       </div>
       <div class="hc-meta">
@@ -1004,7 +1003,7 @@ function renderHoldings() {
         <span class="hc-chev">${MAICON.chev}</span>
       </div>
       <div class="hc-exp" id="exp-${i}" hidden onclick="event.stopPropagation();">
-        <div class="hc-detail">현재가 <b>${fmtKRW(cur)}</b> · 평단 <b>${avg>0?fmtKRW(avg):'—'}</b> · 합계 <b>${a.qty.toLocaleString()}주</b></div>
+        <div class="hc-detail">종목 <b>${a.code}</b> · 현재가 <b>${fmtKRW(cur)}</b> · 평단 <b>${avg>0?fmtKRW(avg):'—'}</b> · 합계 <b>${a.qty.toLocaleString()}주</b>${a.rows.length>1?` · <b>${a.rows.length}계좌</b>`:''}</div>
         ${acctRows}
         <div class="hc-actions" style="margin-top:10px;">
           <button onclick="setManual(${a.rows[0].id}, ${cur})">현재가 수동</button>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 다크 모드: 웹 navbar canvas(#0a0b0d)와 일치 -->
+    <color name="statusBarBg">#0a0b0d</color>
+</resources>

@@ -1,0 +1,21 @@
+{
+  "appId": "com.moneymilestone.app",
+  "appName": "Money Milestone",
+  "webDir": "www",
+  "server": {
+    "url": "https://moneymilestone.co.kr",
+    "androidScheme": "https",
+    "allowNavigation": [
+      "moneymilestone.co.kr",
+      "www.moneymilestone.co.kr",
+      "accounts.google.com",
+      "*.google.com",
+      "*.googleusercontent.com",
+      "*.gstatic.com"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "overrideUserAgent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+  }
+}

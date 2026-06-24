@@ -66,6 +66,14 @@ data/meta/cal_econ_cache.json
 node_modules/
 tests/_simple_rendered.html
 
+# Android 서명 키 — 절대 커밋 금지
+*.keystore
+*.jks
+mobile/android/keystore.properties
+
+# Firebase 클라 설정(공개 레포 노출 방지) — 빌드 시 로컬에 있어야 함
+mobile/android/app/google-services.json
+
 # Playwright 스크린샷 산출물
 tests/shots*/
 tests/e2e_multitax/results/shots/

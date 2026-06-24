@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 어두운 배경 → 밝은 상태바 아이콘 -->
+    <bool name="lightStatusBar">false</bool>
+</resources>

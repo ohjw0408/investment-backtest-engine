@@ -249,6 +249,7 @@
 .mm-macro-t { font-size: 13px; font-weight: 700; color: var(--ds-ink); }
 .mm-macro-d { font-size: 10.5px; color: var(--ds-muted); margin-top: 2px; }
 .mm-macro-sec-t { font-size: var(--fs-title); font-weight: 600; color: var(--ds-ink); margin: 2px 2px 12px; }
+.mm-macro-sec-t .macro-t-web { display: none; }
 .mobile-legal { padding: 18px 4px 6px; text-align: center; }
 .mobile-legal a { font-size: 12px; color: var(--ds-muted); text-decoration: none; }
 .mobile-legal .sep { color: var(--ds-hairline); margin: 0 8px; }
@@ -267,6 +268,13 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
 @media (max-width: 720px) {
   .feat-grid { grid-template-columns: 1fr; }
   .cta-grid { grid-template-columns: 1fr; }
+}
+/* 데스크톱 전용(비로그인 웹 홈) — 모바일 불변 */
+@media (min-width: 769px) {
+  .md-hero-title { font-size: 27px; }
+  .dashboard-grid:not(.is-auth) .mobile-macro { display: block; }
+  .mm-macro-sec-t .macro-t-app { display: none; }
+  .mm-macro-sec-t .macro-t-web { display: inline; }
 }
 </style>
 {% endblock %}
@@ -433,26 +441,11 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
     </div>
   </div>
 
-  <!-- ===== 비로그인 CTA 2카드 (각 장점 설명) ===== -->
-  <div class="cta-grid">
-    <a href="/auth/google" class="cta-card primary" onclick="return handleGoogleLogin(event)">
-      <div class="cta-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
-      <div class="cta-t">로그인하고 내 포트폴리오 만들기</div>
-      <div class="cta-d">보유 종목을 넣으면 실시간 시세·배당 일정·리밸런싱까지 자동으로 추적해드려요.</div>
-      <span class="cta-go">Google로 시작 →</span>
-    </a>
-    <a href="/calculator" class="cta-card ghost">
-      <div class="cta-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg></div>
-      <div class="cta-t">로그인 없이 먼저 써보기</div>
-      <div class="cta-d">가입 전에 투자계산기·백테스트로 30년 시뮬레이션을 지금 바로 돌려볼 수 있어요.</div>
-      <span class="cta-go">둘러보기 →</span>
-    </a>
-  </div>
   {% endif %}
 
   <!-- ===== 투자 도구 (기능 유도 — 로그인/비로그인 공용) ===== -->
   <div class="feat-sec">
-    <div class="feat-sec-title">투자, 어디서부터 막막하세요?</div>
+    <div class="feat-sec-title">투자, 어디서부터 시작하면 좋을까요?</div>
     <div class="feat-sec-sub">고민 하나 고르면, 맞는 도구로 안내해드려요</div>
     <div class="feat-grid">
       <a href="/simple" class="feat-tile">
@@ -514,7 +507,7 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
 
   <!-- ===== 거시경제 안내 (모바일 비로그인 — 시장지수 아래) ===== -->
   <div class="mobile-macro">
-    <div class="mm-macro-sec-t">시장을 더 넓게</div>
+    <div class="mm-macro-sec-t"><span class="macro-t-app">시장을 더 넓게</span><span class="macro-t-web">시장을 더 넓게 바라보기</span></div>
     <div class="mm-macro-grid">
       <a href="/macro" class="mm-macro-card">
         <div class="mm-macro-ic">{{ nicon('globe') }}</div>

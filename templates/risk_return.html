@@ -590,16 +590,32 @@ const RR_OV_QUICK = [['SYM:SPY','S&P500'],['SYM:069500','코스피200'],['SYM:GL
 function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function rrOvRecolor(){ rrOv.items.forEach((it,i)=>it.color = colorOf(i)); }
 
-function rrOvInit(){
+async function rrOvInit(){
   fetch('/api/macro/overview').then(r=>r.json())
     .then(d=>{ rrOv.macros = []; (d.categories||[]).forEach(c=>(c.series||[]).forEach(s=>rrOv.macros.push(s))); })
     .catch(()=>{ rrOv.macros = []; });
+  rrOvBindSearch();
+  // 포트폴리오 예시 비교 진입 → 겹쳐보기를 비교 대상 N개만(기본 SPY/금 등 클리어)
+  if (Array.isArray(window._rrExPreload) && window._rrExPreload.length){
+    const pre = window._rrExPreload; window._rrExPreload = null;
+    try {
+      const d = await fetch('/api/portfolio/index_series', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ portfolios: pre }) }).then(r=>r.json());
+      const series = d.series || [];
+      if (series.length){
+        rrOv.raw = {}; rrOv.items = [];
+        series.forEach(s=>{ rrOv.raw[s.key] = s; rrOv.items.push({key:s.key, label:s.label}); });
+        rrOvRecolor(); rrOv.start = null; rrOvSetDefaultRange();
+        rrOvRenderQuick(); rrOvRenderChips(); rrOvRenderCtrl(); rrOvDraw();
+        return;
+      }
+    } catch(e){}
+  }
   const n = rrPortfolios.length;
   if (n === 0) rrOv.items = [{key:'SYM:SPY',label:'S&P500'},{key:'SYM:069500',label:'코스피200'},{key:'SYM:GLD',label:'금'}];
   else if (n === 1) rrOv.items = [{key:'PF:'+rrPortfolios[0].id,label:rrPortfolios[0].name},{key:'SYM:SPY',label:'S&P500'}];
   else rrOv.items = [{key:'PF:'+rrPortfolios[0].id,label:rrPortfolios[0].name},{key:'PF:'+rrPortfolios[1].id,label:rrPortfolios[1].name},{key:'SYM:SPY',label:'S&P500'}];
   rrOvRecolor();
-  rrOvBindSearch();
   rrOvLoad();
 }
 
@@ -631,11 +647,17 @@ function rrOvRenderChips(){
 async function rrOvLoad(){
   rrOvRenderQuick(); rrOvRenderChips();
   if (!rrOv.items.length){ rrOvRenderCtrl(); rrOvDraw(); return; }
-  const keys = rrOv.items.map(it=>it.key).join(',');
-  try {
-    const d = await fetch(`/api/macro/multi?keys=${encodeURIComponent(keys)}`).then(r=>r.json());
-    rrOv.raw = {}; (d.series||[]).forEach(s=>rrOv.raw[s.key]=s);
-  } catch(e){ rrOv.raw = {}; }
+  // EX:(즉석 예시 포폴) 시계열은 macro/multi에 없음 → 보존하고 나머지만 조회
+  const kept = {};
+  rrOv.items.forEach(it=>{ if(it.key.startsWith('EX:') && rrOv.raw[it.key]) kept[it.key]=rrOv.raw[it.key]; });
+  const fetchKeys = rrOv.items.map(it=>it.key).filter(k=>!k.startsWith('EX:'));
+  if (fetchKeys.length){
+    try {
+      const d = await fetch(`/api/macro/multi?keys=${encodeURIComponent(fetchKeys.join(','))}`).then(r=>r.json());
+      (d.series||[]).forEach(s=>kept[s.key]=s);
+    } catch(e){}
+  }
+  rrOv.raw = kept;
   if (!rrOv.start) rrOvSetDefaultRange();   // 최초만 기본 구간(≤5년)
   rrOvRenderCtrl(); rrOvDraw();
 }
@@ -792,6 +814,8 @@ function rrApplyPreload(){
   sessionStorage.removeItem('mm_rr_preload');
   abPorts = pre.slice(0,5).map((p,i)=>({ name:p.name||`포트폴리오 ${i+1}`,
     items:(p.tickers||[]).filter(t=>t&&t.code).map(t=>({code:t.code,name:t.name||t.code,weight:+t.weight||0})) }));
+  // 추세 겹쳐보기도 비교 대상 포폴 N개만 보이게(rrOvInit이 읽어 기본 클리어 후 주입)
+  window._rrExPreload = abPorts.filter(p=>p.items.length).map(p=>({ name:p.name, tickers:p.items }));
   rrRenderBuilder();
   const note=document.getElementById('rrPreNote');
   if(note){ note.style.display='block';

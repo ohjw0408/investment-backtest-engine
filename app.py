@@ -555,10 +555,21 @@ def calendar_page():
 
 @app.route('/examples')
 def examples_page():
-    """포트폴리오 예시(추천 자산배분 템플릿) — 지역(미국/한국)별 성격 섹션 카드."""
+    """포트폴리오 예시(추천 자산배분 템플릿) — 지역(미국/한국)별 + 투자대가(13F) 카드."""
     from modules import portfolio_examples as pex
+    from modules.gurus import store as guru_store
     regions = [(r, pex.REGION_LABELS[r], pex.grouped(r)) for r in ('us', 'kr')]
-    return render_template('examples.html', regions=regions)
+    # 투자대가 탭 = guru 카드를 examples 카드와 동일 액션(분석/비교/저장)으로 직접 노출.
+    # data-tickers = 커버 보유 상위(비중 재정규화, 합~100) → examples.js 핸드오프 그대로 재사용.
+    gurus = []
+    for g in guru_store.list_gurus():
+        detail = guru_store.get_guru(g['slug'], limit=12)
+        if not detail or not detail.get('holdings'):
+            continue
+        gurus.append({**g, 'tickers': [
+            {'code': h['ticker'], 'name': h['name'], 'weight': h['weight_norm']}
+            for h in detail['holdings']]})
+    return render_template('examples.html', regions=regions, gurus=gurus)
 
 @app.route('/gurus')
 def gurus_page():
@@ -3099,6 +3110,26 @@ def api_macro_multi():
             if s:
                 out.append({'key': k, 'label': s['name_ko'], 'unit': s['unit'],
                             'points': s['points']})
+    return jsonify({'series': out})
+
+@app.route('/api/portfolio/index_series', methods=['POST'])
+@limiter.limit(HEAVY_LIMIT)
+def api_portfolio_index_series():
+    """즉석 포트폴리오 N개의 정규화 지수(시작=100) 시계열 — 추세 겹쳐보기용(포트폴리오 예시 비교 진입).
+       body: {portfolios:[{name, tickers:[{code,weight}]}]}. 키=EX:<index>. 로그인 불필요."""
+    body = request.get_json(silent=True) or {}
+    ports = body.get('portfolios') or []
+    out = []
+    for i, p in enumerate(ports[:6]):
+        if not isinstance(p, dict):
+            continue
+        tickers = [t for t in (p.get('tickers') or []) if isinstance(t, dict) and t.get('code')]
+        if not tickers:
+            continue
+        pts = _portfolio_index_series(tickers)
+        if pts:
+            out.append({'key': f'EX:{i}', 'label': str(p.get('name') or '포트폴리오'),
+                        'unit': '지수(시작=100)', 'points': pts})
     return jsonify({'series': out})
 
 @app.route('/api/risk-return', methods=['POST'])

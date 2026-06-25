@@ -21,7 +21,7 @@
 
 /* 카드 그리드 */
 .ex-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.ex-card { display: flex; flex-direction: column; padding: 16px 17px; border-radius: var(--r-xl, 16px);
+.ex-card { display: flex; flex-direction: column; min-width: 0; padding: 16px 17px; border-radius: var(--r-xl, 16px);
   background: var(--ds-canvas); border: 1px solid var(--ds-hairline); box-shadow: var(--ds-shadow); }
 [data-theme="dark"] .ex-card { background: var(--ds-dark-el); border-color: transparent; }
 .ex-card-head { display: flex; align-items: flex-start; gap: 8px; }
@@ -61,11 +61,12 @@
   font-size: 12px; color: var(--ds-body); line-height: 1.5; }
 .ex-note b { color: var(--ds-ink); font-weight: 700; }
 
-/* 투자대가 진입 패널 */
-.ex-guru { margin-top: 6px; padding: 24px 20px; border-radius: var(--r-xl, 16px); text-align: center;
-  background: var(--brand-tint); border: 1px solid color-mix(in srgb, var(--brand) 26%, transparent); }
-.ex-guru-t { font-size: 17px; font-weight: 800; color: var(--ds-ink); }
-.ex-guru-s { font-size: 13px; color: var(--ds-body); line-height: 1.55; margin: 8px auto 16px; max-width: 460px; }
+/* 투자대가 카드 (모노그램·stance) */
+.ex-mono { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 14px; color: #fff; letter-spacing: 0.5px; }
+.ex-gbar { flex: 0 0 64px; height: 7px; border-radius: var(--r-pill, 999px); margin-left: 8px;
+  background: color-mix(in srgb, var(--ds-ink) 8%, transparent); overflow: hidden; }
+.ex-gbar-fill { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--brand-bright), var(--brand)); }
 .ex-guru-btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 13.5px; font-weight: 700;
   padding: 11px 24px; border-radius: var(--r-pill, 999px); background: var(--brand); color: var(--on-brand); }
 
@@ -89,6 +90,9 @@
 {%- endmacro %}
 {% macro risk_label(r) -%}
 {% if r <= 2 %}매우 방어적{% elif r <= 4 %}방어적{% elif r <= 6 %}균형{% elif r <= 8 %}공격적{% else %}매우 공격적{% endif %}
+{%- endmacro %}
+{% macro gstance_color(s) -%}
+{% if s <= 2 %}#05b169{% elif s <= 4 %}#8bc34a{% elif s <= 6 %}#9aa0a6{% elif s <= 8 %}#ff9800{% else %}#cf202f{% endif %}
 {%- endmacro %}
 {% set seg_colors = ['#1f6feb','#2ea043','#e3873c','#8957e5','#c9433f','#1f9b9b','#d4a017','#6e7681'] %}
 
@@ -152,11 +156,52 @@
   {% endfor %}
 
   <div class="ex-panel" data-panel="guru">
-    <div class="ex-guru">
-      <div class="ex-guru-t">⭐ 투자대가의 포트폴리오</div>
-      <div class="ex-guru-s">워런 버핏·마이클 버리 등 전설적인 투자자들이 SEC 13F 공시 기준 실제로 무엇을 들고 있는지 확인하고, 똑같이 분석·저장해 보세요.</div>
-      <a class="ex-guru-btn" href="/gurus">투자대가 전체 보기 →</a>
+    <div class="ex-note" style="margin-top:18px;">
+      <span>⭐</span>
+      <span><b>전설적인 투자자들이 실제로 든 종목</b>(SEC 13F 공시 기준)을 그대로 분석·비교·저장해 보세요. <b>최대 45일 지연·미국 상장 롱만</b> 표시되며 투자자문이 아닙니다.</span>
     </div>
+    {% if gurus %}
+    <div class="ex-grid" style="margin-top:14px;">
+      {% for g in gurus %}
+      <div class="ex-card" data-ex-card data-slug="guru-{{ g.slug }}" data-name="{{ g.name_ko }}의 포트폴리오"
+        data-tickers='{{ g.tickers | tojson }}'>
+        <div class="ex-card-head">
+          <span class="ex-mono" style="background:{{ gstance_color(g.stance)|trim }}">{{ g.monogram }}</span>
+          <div style="min-width:0;">
+            <div class="ex-name">{{ g.name_ko }} <span style="font-weight:500;color:var(--ds-muted);font-size:12px;">{{ g.name }}</span></div>
+            <div class="ex-src">{{ g.fund }}</div>
+          </div>
+          <span class="ex-risk" style="margin-left:auto;" title="{{ g.stance_label }}">
+            <span class="ex-risk-dot" style="background:{{ gstance_color(g.stance)|trim }}"></span>{{ g.stance_label }}
+          </span>
+        </div>
+        {% if g.top %}
+        {% set gmx = (g.top|map(attribute='weight')|max) or 1 %}
+        <div class="ex-legend" style="margin-top:12px;">
+          {% for t in g.top %}
+          <div class="ex-leg-row">
+            <span class="ex-leg-name" style="flex:1;font-family:var(--font-mono);font-weight:700;">{{ t.ticker }} <span style="color:var(--ds-muted);font-weight:400;">{{ t.name }}</span></span>
+            <span class="ex-gbar"><span class="ex-gbar-fill" style="width:{{ (t.weight / gmx * 100)|round(0,'floor') }}%"></span></span>
+            <span class="ex-leg-w">{{ t.weight }}%</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="ex-desc">📄 <b style="color:var(--ds-body);">{{ g.period_label }}</b> 공시 기준 상위 보유. 분석·비교 시 커버 종목을 비중대로 담아요.</div>
+        <div class="ex-acts">
+          <button class="ex-btn ex-btn-primary" data-act="analyze" title="포트폴리오 분석으로 백테스트">📈 분석</button>
+          <button class="ex-btn" data-act="compare" title="포트폴리오 비교에 추가">⚖ 비교</button>
+          <button class="ex-btn ex-btn-ic" data-act="save" title="즐겨찾기 저장">⭐</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div style="text-align:center;margin-top:18px;">
+      <a class="ex-guru-btn" href="/gurus">투자대가 상세 전체 보기 →</a>
+    </div>
+    {% else %}
+    <div class="ex-note" style="margin-top:12px;">데이터를 준비 중입니다. 잠시 후 다시 확인해주세요.</div>
+    {% endif %}
   </div>
 </div>
 

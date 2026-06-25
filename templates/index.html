@@ -203,22 +203,26 @@
 .md-door .demo-overlay .dlock { width: 32px; height: 32px; margin-bottom: 1px; }
 .md-door .demo-overlay .dlock .ic { width: 17px; height: 17px; }
 
-/* 기둥2 리밸런싱 — 목표 vs 현재 2단 스택바(초과분 빨강) */
-.md-rebal { margin-top: 13px; }
-.md-rebal-row { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
-.md-rebal-tag { font-size: 11px; font-weight: 600; color: var(--ds-muted); width: 26px; flex-shrink: 0; }
-.md-rebal-bar { flex: 1; height: 12px; border-radius: var(--r-pill); overflow: hidden; display: flex; background: var(--ds-soft); }
-.md-rebal-bar .seg { height: 100%; }
-.md-rebal-bar .seg.stk { background: var(--brand); }
-.md-rebal-bar .seg.exc { background: var(--down); }
-.md-rebal-bar .seg.bnd { background: var(--ds-strong); }
-.md-rebal-num { font-family: var(--font-mono); font-size: 11.5px; font-weight: 600; color: var(--ds-ink); width: 50px; text-align: right; flex-shrink: 0; }
-.md-rebal-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 11px; }
-.md-rebal-legend { display: flex; align-items: center; gap: 11px; font-size: 11px; color: var(--ds-muted); }
-.md-rebal-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
-.md-rebal-legend i.stk { background: var(--brand); }
-.md-rebal-legend i.bnd { background: var(--ds-strong); }
-.md-rebal-chip { background: var(--down-tint); color: var(--down); font-weight: 700; font-size: 11px; padding: 3px 10px; border-radius: var(--r-pill); flex-shrink: 0; }
+/* 기둥2 리밸런싱 — 주식 비중 게이지(안전 ±5%p 밴드·목표 점선·현재 마커) */
+.md-gauge { margin-top: 15px; }
+.md-gauge-track { position: relative; height: 10px; border-radius: var(--r-pill); background: var(--ds-soft); }
+.md-gauge-safe { position: absolute; top: 0; bottom: 0; border-radius: 3px;
+  background: color-mix(in srgb, var(--up) 26%, transparent); }
+.md-gauge-target { position: absolute; top: -5px; bottom: -5px; width: 0;
+  border-left: 2px dashed var(--ds-ink); opacity: .5; }
+.md-gauge-cur { position: absolute; top: 50%; width: 15px; height: 15px; border-radius: var(--r-full);
+  background: var(--down); border: 3px solid var(--ds-canvas); transform: translate(-50%, -50%); box-shadow: var(--ds-shadow); }
+[data-theme="dark"] .md-gauge-cur { border-color: var(--ds-dark-el); }
+.md-gauge-scale { display: flex; justify-content: space-between; margin-top: 9px; font-size: 10px;
+  color: var(--ds-muted); font-family: var(--font-mono); }
+.md-gauge-scale .tgt { color: var(--ds-body); font-weight: 600; }
+.md-gauge-cap { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.md-gauge-cap-t { font-size: 12px; color: var(--ds-body); }
+.md-gauge-cap-t b { color: var(--ds-ink); font-weight: 700; font-family: var(--font-mono); }
+.md-gauge-cap-t i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px;
+  vertical-align: -1px; background: color-mix(in srgb, var(--up) 50%, transparent); }
+.md-rebal-chip { background: var(--down-tint); color: var(--down); font-weight: 700; font-size: 11px;
+  padding: 3px 10px; border-radius: var(--r-pill); flex-shrink: 0; }
 
 /* 기둥3 계산·시뮬 — 8개 도구 2열 그리드(아이콘+제목+한줄설명) */
 .md-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
@@ -335,26 +339,22 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
       </div>
     </a>
 
-    <!-- 기둥2: 리밸런싱 알림 (앱의 오리진) — 목표 vs 현재 2단 스택바 -->
+    <!-- 기둥2: 리밸런싱 알림 (앱의 오리진) — 주식 비중 게이지 -->
     <a href="/alerts" class="md-door">
       <div class="md-door-top">
-        <div class="md-door-label">리밸런싱 알림</div>
+        <div class="md-door-label">리밸런싱 알림 <span class="demo-badge">예시</span></div>
         <span class="md-arrow">›</span>
       </div>
-      <div class="md-rebal">
-        <div class="md-rebal-row">
-          <span class="md-rebal-tag">목표</span>
-          <div class="md-rebal-bar"><span class="seg stk" style="width:60%"></span><span class="seg bnd" style="width:40%"></span></div>
-          <span class="md-rebal-num">60 / 40</span>
+      <div class="md-gauge">
+        <div class="md-gauge-track">
+          <span class="md-gauge-safe" style="left:37.5%;width:25%"></span>
+          <span class="md-gauge-target" style="left:50%"></span>
+          <span class="md-gauge-cur" style="left:70%"></span>
         </div>
-        <div class="md-rebal-row">
-          <span class="md-rebal-tag">현재</span>
-          <div class="md-rebal-bar"><span class="seg stk" style="width:60%"></span><span class="seg exc" style="width:8%"></span><span class="seg bnd" style="width:32%"></span></div>
-          <span class="md-rebal-num">68 / 32</span>
-        </div>
-        <div class="md-rebal-foot">
-          <span class="md-rebal-legend"><span><i class="stk"></i>주식</span><span><i class="bnd"></i>채권</span></span>
-          <span class="md-rebal-chip">주식 +8%p · 리밸런싱 필요</span>
+        <div class="md-gauge-scale"><span>주식 40%</span><span class="tgt">목표 60%</span><span>80%</span></div>
+        <div class="md-gauge-cap">
+          <span class="md-gauge-cap-t"><i></i>안전 55–65% · 현재 <b>68%</b></span>
+          <span class="md-rebal-chip">+8%p · 리밸런싱 필요</span>
         </div>
       </div>
       <div class="md-door-sub">균형이 깨지면 먼저 알려드려요</div>

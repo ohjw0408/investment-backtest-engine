@@ -108,11 +108,15 @@
 .we-iconbtn:hover:not(:disabled) { background: var(--brand-tint); color: var(--brand-text); }
 .we-iconbtn:disabled { opacity: 0.3; cursor: default; }
 .we-del { color: var(--down); }
-.we-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.we-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-pill); padding: 4px 6px 4px 11px; font-size: var(--fs-cap); color: var(--ds-ink); }
-.we-chip-code { color: var(--ds-muted); font-size: 0.72rem; }
-.we-chip-x { cursor: pointer; border: none; background: var(--ds-strong); color: var(--ds-ink); border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; line-height: 1; }
-.we-chip-x:hover { background: var(--down); color: #fff; }
+/* 종목 목록(내 자산 보유종목처럼 행 단위로 줄맞춤) */
+.we-items { border: 1px solid var(--ds-hairline); border-radius: var(--r-md); background: var(--ds-canvas); overflow: hidden; }
+.we-item-row { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-top: 1px solid var(--ds-hairline); }
+.we-item-row:first-child { border-top: none; }
+.we-item-name { flex: 1; min-width: 0; font-size: var(--fs-sm); font-weight: 600; color: var(--ds-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.we-item-code { font-family: var(--font-mono); font-size: var(--fs-cap); color: var(--ds-muted); flex-shrink: 0; }
+.we-item-x { background: none; border: none; cursor: pointer; color: var(--ds-muted); font-size: 0.9rem; line-height: 1; padding: 4px 6px; flex-shrink: 0; border-radius: var(--r-sm); }
+.we-item-x:hover { color: var(--down); background: var(--ds-soft); }
+.we-item-empty { padding: 14px; font-size: var(--fs-cap); color: var(--ds-muted); text-align: center; }
 .we-add-item { margin-top: 10px; font-size: var(--fs-cap); font-weight: 600; color: var(--brand-text); background: var(--brand-tint); border: none; border-radius: var(--r-sm); padding: 6px 12px; cursor: pointer; }
 .we-add-widget { width: 100%; padding: 11px; border: 1px dashed var(--ds-hairline); border-radius: var(--r-md); background: transparent; color: var(--ds-muted); font-weight: 600; cursor: pointer; font-family: var(--font-sans); }
 .we-add-widget:hover { border-color: var(--brand); color: var(--brand-text); }
@@ -196,26 +200,17 @@
           </div>
         </div>
 
-        <div class="tax-card" id="card-pension">
+        <div class="tax-card active" id="card-pension">
           <div class="tax-card-header">
             <span class="tax-card-icon">🏦</span>
             <div><div class="tax-card-title">연금 계좌 (IRP/연금저축)</div><div class="tax-card-sub">운용 중 과세 이연, 수령 시 3.3~5.5%</div></div>
-            <button class="tax-toggle" id="toggle-pension" onclick="toggleAccount('pension')"></button>
           </div>
-          <div class="tax-card-body" id="body-pension">
+          <div class="tax-card-body show" id="body-pension">
             <div class="input-row">
               <label>연금 수령 예정 나이</label>
               <div class="input-group" style="max-width:120px;"><input type="number" id="pensionAge" class="calc-input" value="65" min="55" max="90" step="1"><span class="unit">세</span></div>
               <div class="input-hint">55~69세: 5.5% / 70~79세: 4.4% / 80세+: 3.3%</div>
             </div>
-          </div>
-        </div>
-
-        <div class="tax-card" id="card-harvest">
-          <div class="tax-card-header">
-            <span class="tax-card-icon">✂️</span>
-            <div><div class="tax-card-title">절세매매 (손익통산)</div><div class="tax-card-sub">연말 손실 실현으로 양도세 절감 (해외주식 연 250만 공제)</div></div>
-            <button class="tax-toggle" id="toggle-harvest" onclick="toggleAccount('harvest')"></button>
           </div>
         </div>
         </div><!-- /tax-grid -->
@@ -415,7 +410,6 @@ function setPanel(name) {
 
 // ── 세금 설정 (설정에 편입 — 구 /tax-settings 이식) ──
 const TAX_STORAGE_KEY = 'domino_tax_settings';
-const taxState = { pension: false, harvest: false };
 function taxFmtKRW(v) {
   if (v == null || isNaN(v)) return '—';
   const abs = Math.abs(v), uk = Math.floor(abs/1e8), man = Math.floor((abs%1e8)/1e4);
@@ -424,19 +418,12 @@ function taxFmtKRW(v) {
   if (abs>=1e4) return '₩'+Math.floor(abs/1e4).toLocaleString()+'만';
   return '₩'+Math.round(abs).toLocaleString();
 }
-function toggleAccount(name) {
-  taxState[name] = !taxState[name];
-  document.getElementById('toggle-'+name).classList.toggle('on', taxState[name]);
-  document.getElementById('card-'+name).classList.toggle('active', taxState[name]);
-  const body = document.getElementById('body-'+name); if (body) body.classList.toggle('show', taxState[name]);
-}
 async function saveTaxSettings() {
   const settings = {
     earned_income: parseFloat(document.getElementById('earnedIncome').value) || 0,
     age:           parseInt(document.getElementById('userAge').value) || 40,
     pension_age:   parseInt(document.getElementById('pensionAge').value) || 65,
     isa_type:      document.querySelector('input[name="isaType"]:checked')?.value || 'none',
-    accounts:      { ...taxState },
   };
   localStorage.setItem(TAX_STORAGE_KEY, JSON.stringify(settings));
   const st = document.getElementById('taxStatus');
@@ -451,7 +438,6 @@ function taxApply(s) {
   if (s.age) document.getElementById('userAge').value = s.age;
   if (s.pension_age) document.getElementById('pensionAge').value = s.pension_age;
   const radio = document.querySelector(`input[name="isaType"][value="${s.isa_type||'none'}"]`); if (radio) radio.checked = true;
-  if (s.accounts) ['pension','harvest'].forEach(n => { if (s.accounts[n] && !taxState[n]) toggleAccount(n); });
   document.getElementById('earnedIncomeHint').textContent = s.earned_income ? taxFmtKRW(s.earned_income) : '';
 }
 (async function loadTaxSettings() {
@@ -514,10 +500,13 @@ function weRender() {
         <button class="we-iconbtn" onclick="weMove(${i},1)" ${i === _weWidgets.length - 1 ? 'disabled' : ''} title="아래로">▼</button>
         <button class="we-iconbtn we-del" onclick="weRemoveWidget(${i})" ${_weWidgets.length <= 1 ? 'disabled' : ''} title="삭제">✕</button>
       </div>
-      <div class="we-chips">
-        ${(w.items || []).map((it, j) => `
-          <span class="we-chip">${weEsc(it.name)} <span class="we-chip-code">${weEsc(it.code)}</span>
-            <button class="we-chip-x" onclick="weRemoveItem(${i},${j})">✕</button></span>`).join('')}
+      <div class="we-items">
+        ${(w.items || []).length ? (w.items || []).map((it, j) => `
+          <div class="we-item-row">
+            <span class="we-item-name">${weEsc(it.name)}</span>
+            <span class="we-item-code">${weEsc(it.code)}</span>
+            <button class="we-item-x" onclick="weRemoveItem(${i},${j})" title="삭제">✕</button>
+          </div>`).join('') : '<div class="we-item-empty">아직 종목이 없어요. 아래에서 추가하세요.</div>'}
       </div>
       <button class="we-add-item" onclick="weOpenModal(${i})">+ 종목 추가</button>
     </div>`).join('');
@@ -615,7 +604,6 @@ async function weSave() {
 </script>
 <script>
 // 캘린더 설정
-const CAL_GROUPS = [['holdings', '💼 내 자산'], ['portfolios', '⭐ 내 포트폴리오'], ['watchlist', '👀 관심목록']];
 function calEsc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 (async () => {
   let r;
@@ -629,15 +617,17 @@ function calEsc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<
     `<label class="set-chk"><input type="checkbox" class="cal-econ" value="${e.id}" ${enabled.has(e.id) ? 'checked' : ''}> ${e.label}</label>`).join('');
   document.getElementById('calShowEarn').checked = cfg.show_earnings !== false;
   document.getElementById('calShowDiv').checked = cfg.show_dividend !== false;
-  // 소스/개별 종목
+  // 소스/개별 종목 — 내 자산·관심목록 + 저장 포트폴리오 각각 별도 그룹
   const src = cfg.sources || {}, excl = new Set(cfg.excluded || []), sym = r.symbols || {};
+  const labels = r.group_labels || {}, order = r.group_order || Object.keys(sym);
   let html = '';
-  for (const [g, label] of CAL_GROUPS) {
+  for (const g of order) {
     const items = sym[g] || [];
     if (!items.length) continue;
+    const label = labels[g] || g;
     html += `<div class="set-src-card">
       <label class="set-chk" style="font-weight:700;background:transparent;border:none;padding:0;">
-        <input type="checkbox" class="cal-src" data-g="${g}" ${src[g] !== false ? 'checked' : ''}> ${label} <span style="color:var(--ds-muted);font-weight:400">(${items.length})</span></label>
+        <input type="checkbox" class="cal-src" data-g="${calEsc(g)}" ${src[g] !== false ? 'checked' : ''}> ${calEsc(label)} <span style="color:var(--ds-muted);font-weight:400">(${items.length})</span></label>
       <div class="set-chk-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-top:10px;">
         ${items.map(it => `<label class="set-chk"><input type="checkbox" class="cal-sym" value="${calEsc(it.code)}" ${excl.has(it.code) ? '' : 'checked'}> ${calEsc(it.name)}</label>`).join('')}
       </div></div>`;

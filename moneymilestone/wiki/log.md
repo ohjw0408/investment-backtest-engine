@@ -3859,3 +3859,12 @@ _작성: Claude_
 - **⚠️ 보류 — 알림에 캘린더 일정(경제지표·실적·통화정책·배당락) 추가**: alert_engine은 가격기반 룰만(daily_pct/target/new_high·low/rebalance). 날짜이벤트 알림은 패러다임 달라 alert_store(룰 종류)+alert_runner(매일 D-day 발화)+beat+UI 신규 필요 = 큰 작업, celery 발화엔진 건드림(잘못 시 prod 알림 사고). 다음 단독 작업으로 설계·구현 예정.
 
 _작성: Claude_
+
+## 2026-06-25 — 설정 정리: 세금 간소화 + 홈위젯 목록화 + 캘린더 소스 포폴별 분리
+
+오너 피드백 3건(설정 UI).
+- **세금 설정 간소화**: 절세매매(card-harvest) 카드 완전 제거(시뮬에서 토글로 적용하는 거라 설정 프로필 불필요). 연금계좌 on/off 토글 제거 → 항상 펼침, **연금 수령 나이 입력만** 남김. JS: taxState·toggleAccount·accounts 저장/복원 전부 제거. 로그인 HTML grep로 card-harvest/toggle-pension 없음·pensionAge 있음 확인.
+- **홈 화면 설정 목록화**: 위젯 종목이 칩(flex wrap)이라 삐져나오고 정렬 안 됐음 → **내 자산 보유종목처럼 행 단위 목록**(.we-items/.we-item-row: 종목명 좌측·코드 우측·✕, 행 구분선). weRender 재작성 + CSS. Playwright 강제렌더 스샷(라이트/다크 5행) — 줄맞춤·삐짐 없음 확인.
+- **캘린더 소스 포폴별 분리**: 저장 포트폴리오를 'portfolios' 하나로 묶던 것 → **각 포폴이 별도 그룹**(pf:<id>). 백엔드 `_calendar_grouped` 3-tuple(groups·names·labels) OrderedDict(holdings→pf:*→watchlist), `_calendar_user_codes`/config GET·SAVE/default 동적 소스 키, alerts 종목수집 2곳 3-tuple+동적순회. 프론트 calSymbols 렌더 group_order/group_labels 순회(CAL_GROUPS 상수 제거). 검증: config API group_order=['holdings','pf:12','watchlist']·labels OK, 소스토글 라운드트립(pf:12 off=4·on=16종목).
+
+_작성: Claude_

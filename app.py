@@ -661,9 +661,9 @@ def alerts_page():
     uid = session.get('user_id')
     symbols = []
     if uid:
-        groups, names = _calendar_grouped(uid)
+        groups, names, _ = _calendar_grouped(uid)
         seen = set()
-        for g in ('holdings', 'portfolios', 'watchlist'):
+        for g in groups:
             for c in groups.get(g, []):
                 if c not in seen:
                     seen.add(c)
@@ -1948,7 +1948,7 @@ def alerts_context():
     uid = session.get('user_id')
     if not uid:
         return jsonify({'logged_in': False, 'holdings': [], 'portfolios': [], 'watchlist': []})
-    groups, names = _calendar_grouped(uid)
+    groups, names, _ = _calendar_grouped(uid)
     def _syms(codes):
         return [{'code': c, 'name': names.get(c, c)} for c in codes]
     portfolios = []
@@ -2811,24 +2811,35 @@ def _resolve_names(codes):
     return out
 
 def _calendar_grouped(uid):
-    """사용자 종목을 소스별로 그룹화 + 이름맵. {holdings,portfolios,watchlist}."""
-    groups = {'holdings': [], 'portfolios': [], 'watchlist': []}
+    """사용자 종목 소스별 그룹화 + 이름맵 + 그룹 라벨.
+    holdings(내 자산) · pf:<id>(저장 포트폴리오 각각) · watchlist(관심목록)."""
+    from collections import OrderedDict
+    groups = OrderedDict()
+    groups['holdings'] = []
     names = {}
+    labels = {'holdings': '💼 내 자산', 'watchlist': '👀 관심목록'}
     try:
         for h in get_holdings(uid):
             if h.get('code'):
                 groups['holdings'].append(str(h['code']))
     except Exception:
         pass
+    # 저장 포트폴리오 — 각각 별도 그룹(종류별로 나눠 표시)
     try:
         for pf in get_portfolios(uid):
+            gk = 'pf:%s' % pf['id']
+            codes = []
             for t in pf.get('tickers', []):
                 if isinstance(t, dict) and t.get('code'):
-                    c = str(t['code']); groups['portfolios'].append(c)
+                    c = str(t['code']); codes.append(c)
                     if t.get('name'):
                         names.setdefault(c, t['name'])
+            if codes:
+                groups[gk] = codes
+                labels[gk] = '⭐ ' + (pf.get('name') or '포트폴리오')
     except Exception:
         pass
+    groups['watchlist'] = []
     try:
         for w in (get_home_widgets(uid) or []):
             for it in (w.get('items') or []):
@@ -2840,15 +2851,15 @@ def _calendar_grouped(uid):
         pass
     for k in groups:
         groups[k] = list(dict.fromkeys(groups[k]))
-    return groups, names
+    return groups, names, labels
 
 def _calendar_user_codes(uid, cfg):
-    """설정(소스 on/off + 개별 제외) 적용해 종목 코드 수집."""
-    groups, _ = _calendar_grouped(uid)
+    """설정(소스 on/off + 개별 제외) 적용해 종목 코드 수집. 소스=동적 그룹(holdings·pf:id·watchlist)."""
+    groups, _, _ = _calendar_grouped(uid)
     src = cfg.get('sources') or {}
     excl = set(cfg.get('excluded') or [])
     codes = []
-    for g in ('holdings', 'portfolios', 'watchlist'):
+    for g in groups:
         if src.get(g, True):
             codes += groups[g]
     return [c for c in dict.fromkeys(codes) if c not in excl][:60]
@@ -2857,7 +2868,7 @@ def _default_calendar_config():
     from modules import market_calendar
     return {'econ': list(market_calendar.CAL_RELEASES.keys()),
             'show_earnings': True, 'show_dividend': True,
-            'sources': {'holdings': True, 'portfolios': True, 'watchlist': True},
+            'sources': {},
             'excluded': []}
 
 @app.route('/api/calendar')
@@ -2871,7 +2882,7 @@ def api_calendar():
                         'logged_in': False, 'symbol_count': 0})
     cfg = get_calendar_config(uid) or _default_calendar_config()
     codes = _calendar_user_codes(uid, cfg)
-    _, names = _calendar_grouped(uid)
+    _, names, _ = _calendar_grouped(uid)
     ev = market_calendar.events_for(codes, portfolio_engine.loader,
                                     econ_ids=set(cfg.get('econ', [])),
                                     show_earnings=cfg.get('show_earnings', True),
@@ -2887,7 +2898,7 @@ def api_calendar_config_get():
     out = {'config': cfg, 'logged_in': bool(uid),
            'available_econ': [{'id': rid, 'label': lbl} for rid, lbl in market_calendar.CAL_RELEASES.items()]}
     if uid:
-        groups, names = _calendar_grouped(uid)
+        groups, names, labels = _calendar_grouped(uid)
         try:
             from modules.dividend_history import _load_names
             allc = [c for g in groups for c in groups[g]]
@@ -2901,6 +2912,8 @@ def api_calendar_config_get():
             pass
         out['symbols'] = {g: [{'code': c, 'name': names.get(c, c)} for c in groups[g]]
                           for g in groups}
+        out['group_labels'] = labels
+        out['group_order'] = list(groups.keys())
     return jsonify(out)
 
 @app.route('/api/calendar/config', methods=['POST'])
@@ -2915,7 +2928,8 @@ def api_calendar_config_save():
         'econ': [i for i in (body.get('econ') or []) if i in valid_ids],
         'show_earnings': bool(body.get('show_earnings', True)),
         'show_dividend': bool(body.get('show_dividend', True)),
-        'sources': {g: bool(src.get(g, True)) for g in ('holdings', 'portfolios', 'watchlist')},
+        # 동적 소스 키(holdings·watchlist·pf:<id>) — 길이 제한만, 키 형식은 느슨하게 허용
+        'sources': {str(g)[:40]: bool(v) for g, v in src.items()},
         'excluded': [str(c) for c in (body.get('excluded') or [])][:200],
     }
     save_calendar_config(session['user_id'], cfg)

@@ -3016,12 +3016,18 @@ def api_macro_curve(curve_id):
         return jsonify({'error': 'not found'}), 404
     return jsonify(data)
 
-def _portfolio_index_series(tickers, years=6):
+def _price_daily_conn():
+    import sqlite3 as _sqlite
+    from modules.price_loader import DB_PATH as _PRICE_DB
+    return _sqlite.connect(str(_PRICE_DB))
+
+
+def _portfolio_index_series(tickers, years=6, conn=None):
     """저장 포트폴리오 → 비중 고정 정규화 지수(시작=100) 일별 시계열. 오버레이 추세 비교용.
-       비중 합으로 정규화, 종목별 종가를 시작일=100으로 환산해 가중합 → 통화 무관."""
+       비중 합으로 정규화, 종목별 종가를 시작일=100으로 환산해 가중합 → 통화 무관.
+       conn: 호출자가 연 price_daily 연결(여러 포폴 1요청서 공유). None이면 자체 개폐."""
     from datetime import datetime, timedelta
-    from concurrent.futures import ThreadPoolExecutor
-    cutoff = (datetime.now() - timedelta(days=int(years * 365))).strftime('%Y-%m-%d')
+    start = (datetime.now() - timedelta(days=int(years * 365))).strftime('%Y-%m-%d')
     wsum = sum(float(t.get('weight') or 0) for t in tickers) or 1.0
 
     valid = []
@@ -3033,25 +3039,30 @@ def _portfolio_index_series(tickers, years=6):
     if not valid:
         return []
 
-    # P2-1: 보유종목마다 get_symbol_data(~2s, I/O 지배)를 순차 호출하던 것(10종목=~20s) →
-    # ThreadPool 병렬(I/O-bound라 1코어도 이득). 데이터 출처·종가 동일 → 가중합 지수곡선 불변.
-    def _fetch(cw):
-        code, w = cw
-        try:
-            d = portfolio_engine.loader.get_symbol_data(code)
-            m = {p['date']: p['close'] for p in d.get('prices', [])
-                 if p.get('close') and p['date'] >= cutoff}
-            return (code, w, m) if m else None
-        except Exception:
-            return None
-
-    with ThreadPoolExecutor(max_workers=min(8, len(valid))) as ex:
-        fetched = list(ex.map(_fetch, valid))
+    # 가격 = 백필 price_daily DB를 '직접' 조회(raw 종가, FX 미적용 — 시작=100 정규화라 무관).
+    # ⚠️ loader.conn(공유 sqlite)을 Flask 요청 스레드서 여러 번 쓰거나, 포폴마다 새 연결을 개폐하면
+    #    상태 충돌/락으로 일부 조회가 비어 common 교집합이 소실 → [] 버그. 1요청 1연결 공유로 격리.
+    #    (get_price/get_symbol_data 경로는 추가로 매 호출 yfinance 최신분 보충 → 배치 rate-limit 취약.)
+    #    DB는 직전영업일까지 백필돼 추세 비교엔 충분하고, sqlite라 빠르고 안정적.
+    own = conn is None
+    if own:
+        conn = _price_daily_conn()
     series = {}
-    for r in fetched:
-        if r:
-            code, w, m = r
-            series[code] = (w, m)
+    try:
+        for code, w in valid:
+            c = code.rsplit('.', 1)[0] if code.endswith(('.KS', '.KQ')) else code
+            try:
+                rows = conn.execute(
+                    "SELECT date, close FROM price_daily WHERE code=? AND date>=? ORDER BY date",
+                    (c, start)).fetchall()
+                m = {r[0]: float(r[1]) for r in rows if r[1] and float(r[1]) > 0}
+                if m:
+                    series[code] = (w, m)
+            except Exception:
+                continue
+    finally:
+        if own:
+            conn.close()
     if not series:
         return []
     common = None
@@ -3120,16 +3131,20 @@ def api_portfolio_index_series():
     body = request.get_json(silent=True) or {}
     ports = body.get('portfolios') or []
     out = []
-    for i, p in enumerate(ports[:6]):
-        if not isinstance(p, dict):
-            continue
-        tickers = [t for t in (p.get('tickers') or []) if isinstance(t, dict) and t.get('code')]
-        if not tickers:
-            continue
-        pts = _portfolio_index_series(tickers)
-        if pts:
-            out.append({'key': f'EX:{i}', 'label': str(p.get('name') or '포트폴리오'),
-                        'unit': '지수(시작=100)', 'points': pts})
+    conn = _price_daily_conn()   # 1요청 1연결 — 포폴 N개가 공유(연결 반복 개폐 시 락/빈결과 회피)
+    try:
+        for i, p in enumerate(ports[:6]):
+            if not isinstance(p, dict):
+                continue
+            tickers = [t for t in (p.get('tickers') or []) if isinstance(t, dict) and t.get('code')]
+            if not tickers:
+                continue
+            pts = _portfolio_index_series(tickers, conn=conn)
+            if pts:
+                out.append({'key': f'EX:{i}', 'label': str(p.get('name') or '포트폴리오'),
+                            'unit': '지수(시작=100)', 'points': pts})
+    finally:
+        conn.close()
     return jsonify({'series': out})
 
 @app.route('/api/risk-return', methods=['POST'])

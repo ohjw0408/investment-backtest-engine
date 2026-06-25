@@ -8,7 +8,11 @@
 - **③ 공격형 단일종목 보강**(오너: "snp 100%·나스닥 100%는 대충"). 100%▶혼합: `us-allstock` VTI100→**글로벌 주식**(VTI65/VXUS25/SGOV10), `us-nasdaq100` QQQ100→**기술·반도체 성장**(QQQ60/SOXX25/SGOV15), `kr-kospi`→코스피200 코어(069500 90/단기채153130 10), `krus-sp500`·`krus-nasdaq`→90/단기채10.
 - **④ 배당형 단일종목 보강**(오너: "100% 한 종목은 포트폴리오 아니다, 회사채·국채라도 섞어라"). `us-coveredcall` JEPQ100→JEPQ70/SHY15/**LQD15(우량회사채)**, `us-schd` SCHD100→SCHD75/LQD15/SHY10(이름 "배당성장+채권"), `kr-dividend-growth`→211900 70/국고채365780 30, `krus-schd`→446720 70/365780 30, `krus-coveredcall`→441680 70/365780 30. 신규 US 티커 SGOV·SOXX·LQD·VXUS 엔진 지원 확인(백테 sync: 기술반도체 CAGR27.6%·MDD-25.6%, 커버드콜혼합 22%·-13%).
 - **검증(Playwright)**: 라이트/다크/모바일 — us카드16·guru카드10(액션통일)·**겹쳐보기=비교포폴 2개만(영구·60/40)·기본클리어**·**오버플로0**(guru 2열 grid가 footer 밀던 것 `.ex-card{min-width:0}`로 픽스)·콘솔0. 비교 핸드오프 E2E PASS.
-- ⚠️ 로컬: index_series는 콜드심볼(allweather DBC 등) 첫 호출 시 dev서버 로더 이슈로 간헐 빈배열 — 헬퍼는 fresh 프로세스서 정상(1505pt), prod 워엄캐시서 무관(`_portfolio_index_series`는 PF: 겹쳐보기서 이미 사용 중). 변경=`app.py`·`portfolio_examples.json`·`templates/examples.html`·`risk_return.html`·`static/js/examples.js`.
+- 변경=`app.py`·`portfolio_examples.json`·`templates/examples.html`·`risk_return.html`·`static/js/examples.js`.
+
+### 후속 픽스 (같은 날) — index_series 데이터원 견고화
+- 디버깅 중 `_portfolio_index_series`(추세 겹쳐보기 시계열, PF: 저장포폴·예시 공용)가 **`get_symbol_data`(US 종목을 yfinance 라이브로 매번 조회)** 를 쓰던 걸 발견 → 종목 多 배치 시 yfinance rate-limit으로 일부 비어 common 교집합 소실 위험. **백필 `price_daily` DB 직접 조회로 교체**(raw 종가, FX 미적용=시작100 정규화라 무관, 1요청 1연결 공유, ThreadPool 제거). yfinance 무의존·빠르고 안정. 검증: 3포폴×11종 fetch도 3 series 정상(test_client·실브라우저 UTF-8).
+- ⚠️ 삽질 교훈: **Git Bash `curl -d`에 한글 JSON 직접 넣으면 인코딩 깨져 `request.get_json`=None**(루프 미실행→빈배열). 서버는 정상. 한글 페이로드는 `--data-binary @file`(UTF-8 파일)로 테스트할 것. [[reference-prod-deploy-access]]
 
 ## [2026-06-26] FEAT | 포트폴리오 예시 `/examples` (분석탭) — P2~P5 (오너 autopilot)
 

@@ -86,14 +86,13 @@
   </div>
 
   <div class="gd-bt-row">
-    <button class="gd-btn" id="gdBtBtn" data-slug="{{ g.slug }}">📈 이 포트폴리오 백테스트</button>
+    <button class="gd-btn" id="gdBtBtn" data-slug="{{ g.slug }}">📈 포트폴리오 분석하기</button>
     <span class="gd-yrs" id="gdYrs">
       <button class="gd-yr" data-y="1">1년</button>
       <button class="gd-yr on" data-y="3">3년</button>
       <button class="gd-yr" data-y="5">5년</button>
     </span>
   </div>
-  <div id="gdBtResult"></div>
 
   <table class="gd-table">
     <thead>
@@ -124,7 +123,6 @@
 <script>
 (function () {
   const btn = document.getElementById('gdBtBtn');
-  const result = document.getElementById('gdBtResult');
   const yrs = document.getElementById('gdYrs');
   if (!btn) return;
   const slug = btn.dataset.slug;
@@ -138,43 +136,33 @@
     years = parseInt(b.dataset.y, 10);
   });
 
-  const pct = (x) => (x * 100).toFixed(1) + '%';
-  const won = (x) => '₩' + Math.round(x).toLocaleString();
-
+  // 클릭 → 13F 상위 종목을 비중대로 담아 '포트폴리오 분석' 탭으로 넘기고 자동 실행
   btn.addEventListener('click', async function () {
     btn.disabled = true;
-    result.innerHTML = '<div class="gd-bt-card"><div class="gd-bt-loading">백테스트 실행 중…</div></div>';
+    const orig = btn.innerHTML;
+    btn.innerHTML = '⏳ 불러오는 중…';
     try {
-      const r = await fetch('/api/gurus/' + slug + '/backtest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ years: years }),
-      });
+      const r = await fetch('/api/gurus/' + slug + '/portfolio');
       const d = await r.json();
-      if (d.error || !d.metrics) {
-        result.innerHTML = '<div class="gd-bt-card"><div class="gd-bt-err">' +
-          (d.message || '백테스트를 완료하지 못했습니다.') + '</div></div>';
-        return;
+      if (!r.ok || !d.tickers || !d.tickers.length) {
+        if (typeof mmToast === 'function') mmToast(d.message || '분석할 종목이 없습니다.', 'err');
+        btn.disabled = false; btn.innerHTML = orig; return;
       }
-      const m = d.metrics;
-      const trCls = m.total_return >= 0 ? 'up' : 'down';
-      const cgCls = m.cagr >= 0 ? 'up' : 'down';
-      result.innerHTML =
-        '<div class="gd-bt-card">' +
-          '<div class="gd-bt-head"><b>' + d.period.years + '년</b> 백테스트 · 상위 ' + d.n_holdings +
-          '개 종목 고정비중 · 연 1회 리밸런싱 가정 (' + d.period.start + ' ~ ' + d.period.end + ')</div>' +
-          '<div class="gd-bt-metrics">' +
-            '<div class="gd-bt-m"><div class="k">총 수익률</div><div class="v ' + trCls + '">' + pct(m.total_return) + '</div></div>' +
-            '<div class="gd-bt-m"><div class="k">연평균(CAGR)</div><div class="v ' + cgCls + '">' + pct(m.cagr) + '</div></div>' +
-            '<div class="gd-bt-m"><div class="k">최대낙폭(MDD)</div><div class="v down">' + pct(m.mdd) + '</div></div>' +
-            '<div class="gd-bt-m"><div class="k">기말 평가액</div><div class="v">' + won(m.end_value) + '</div></div>' +
-          '</div>' +
-          '<div class="gd-bt-note">초기 1,000만원 · 배당 재투자 가정. 13F 상위 종목을 공시 비중대로 보유했다고 가정한 모의 결과이며, 실제 펀드 성과·세금·수수료와 다릅니다. 투자자문이 아닙니다.</div>' +
-        '</div>';
+      const end = new Date();
+      const start = new Date(); start.setFullYear(start.getFullYear() - years);
+      const fmt = (x) => x.toISOString().split('T')[0];
+      sessionStorage.setItem('mm_bt_preload', JSON.stringify({
+        tickers:    d.tickers,            // [{code, name, weight(0~1)}]
+        start_date: fmt(start),
+        end_date:   fmt(end),
+        rebal_mode: 'yearly',             // 13F 연 1회 리밸런싱 가정
+        autorun:    true,
+        source:     'guru:' + slug,
+      }));
+      location.href = '/backtest';
     } catch (e) {
-      result.innerHTML = '<div class="gd-bt-card"><div class="gd-bt-err">오류가 발생했습니다. 잠시 후 다시 시도해주세요.</div></div>';
-    } finally {
-      btn.disabled = false;
+      if (typeof mmToast === 'function') mmToast('오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'err');
+      btn.disabled = false; btn.innerHTML = orig;
     }
   });
 })();

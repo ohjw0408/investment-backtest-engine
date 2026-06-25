@@ -567,6 +567,28 @@ def guru_detail_page(slug):
         abort(404)
     return render_template('guru_detail.html', g=g)
 
+@app.route('/api/gurus/<slug>/portfolio')
+def guru_portfolio(slug):
+    """대가 상위 보유(커버, 비중 재정규화) → 포트폴리오 분석 탭 프리로드용 종목 리스트."""
+    from flask import jsonify, abort
+    from modules.gurus import store
+
+    g = store.get_guru(slug, limit=12)  # guru_backtest와 동일 구성
+    if not g:
+        abort(404)
+    holds = g['holdings']
+    if not holds:
+        return jsonify({'error': 'no_holdings', 'message': '분석할 보유 종목이 없습니다.'}), 400
+
+    total = sum(h['weight_norm'] for h in holds) or 1.0
+    tickers = [{'code': h['ticker'], 'name': h['name'],
+                'weight': round(h['weight_norm'] / total, 4)} for h in holds]
+    # 비중 합 정확히 1.0 보장(반올림 오차 마지막 종목에 흡수) → 분석 폼 100% 검증 통과
+    if tickers:
+        tickers[-1]['weight'] = round(1.0 - sum(t['weight'] for t in tickers[:-1]), 4)
+    return jsonify({'name': g['name'], 'tickers': tickers})
+
+
 @app.route('/api/gurus/<slug>/backtest', methods=['POST'])
 def guru_backtest(slug):
     """대가 상위 보유(커버)로 고정비중 포폴 구성 → 백테스트(연1회 리밸 가정)."""

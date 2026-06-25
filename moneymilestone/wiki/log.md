@@ -3795,3 +3795,13 @@ _작성: Claude_
 - **이제 P1·P2·P3·P4 완료. 잔여 P5만**(분기 자동갱신 워크플로 + 새공시 알림, ⚠️prod/CI OPENFIGI_API_KEY 시크릿 등록 필요).
 
 _작성: Claude_
+
+## 2026-06-25 — 사이드바/모바일 시장 메뉴 보강 + 사이드바 고정 + 대가 분석 핸드오프
+
+- **사이드바**: 시장 섹션에 "투자대가의 포트폴리오"(/gurus) 추가, "종목 검색"을 자산→시장으로 이동(상단탭 시장 드롭다운과 동일 구성). 아이콘 trend-up.
+- **사이드바 고정**: `.sidebar` `position:sticky; top:60px(navbar); max-height:calc(100vh-60px); overflow-y:auto`. 스크롤해도 화면 고정. 모바일(≤1024px)은 기존 fixed 드로어 미디어쿼리가 override → 영향 없음.
+- **모바일 /market**: mk-links에 투자대가 포트폴리오·종목 검색 링크 추가, 하단탭 시장 active 매칭에 /gurus 포함.
+- **대가 분석 핸드오프(오너 요청)**: guru_detail "이 포트폴리오 백테스트"(인라인 결과) → "포트폴리오 분석하기"로 변경. 클릭 시 `/api/gurus/<slug>/portfolio`(상위12 커버, 비중 재정규화·합 정확히 1.0)로 종목 받아 sessionStorage `mm_bt_preload` 저장 후 `/backtest`로 이동. 백테 페이지 DOMContentLoaded가 preload 감지→`btRestoreForm`로 종목·기간(1/3/5년)·연리밸 자동 채움→`runBacktest()` 자동 실행(진행 퍼센트 게이지→완료 시 결과 뷰). 인라인 결과 카드 제거.
+- 검증: Playwright 라이트/다크 — 사이드바 투자대가/검색 링크·sticky·스크롤 후 top=60 PASS, 대가→분석하기→/backtest 이동·종목 12개 자동적재·비중 100%·연리밸·3년기간·진행게이지 표시 PASS, 콘솔에러 0. ⚠️ 백테 완료 렌더는 Celery 워커+Redis 필요(이 환경엔 미가동) — submit/poll·결과렌더는 기존 검증코드 그대로(불변).
+
+_작성: Claude_

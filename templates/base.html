@@ -246,11 +246,17 @@
       {{ nicon('compare') }} 포트폴리오 비교
     </a>
     <div class="sidebar-label">시장</div>
+    <a class="sidebar-item {% if request.path.startswith('/gurus') %}active{% endif %}" href="/gurus">
+      {{ nicon('trend-up') }} 투자대가의 포트폴리오
+    </a>
     <a class="sidebar-item {% if request.path.startswith('/macro') %}active{% endif %}" href="/macro">
       {{ nicon('globe') }} 거시지표
     </a>
     <a class="sidebar-item {% if request.path.startswith('/calendar') %}active{% endif %}" href="/calendar">
       {{ nicon('calendar') }} 증시 캘린더
+    </a>
+    <a class="sidebar-item {% if request.path.startswith('/search') %}active{% endif %}" href="/search">
+      {{ nicon('search') }} 종목 검색
     </a>
     <div class="sidebar-label">자산</div>
     <a class="sidebar-item {% if request.path.startswith('/myportfolios') %}active{% endif %}" href="/myportfolios">
@@ -258,9 +264,6 @@
     </a>
     <a class="sidebar-item {% if request.path.startswith('/myassets') %}active{% endif %}" href="/myassets">
       {{ nicon('briefcase') }} 내 자산
-    </a>
-    <a class="sidebar-item {% if request.path.startswith('/search') %}active{% endif %}" href="/search">
-      {{ nicon('search') }} 종목 검색
     </a>
     <a class="sidebar-item {% if request.path.startswith('/alerts') %}active{% endif %}" href="/alerts">
       {{ nicon('bell') }} 알림
@@ -292,7 +295,7 @@
 <nav class="mm-tabbar" aria-label="하단 탭">
   <a class="mm-tab {% if request.path == '/' %}active{% endif %}" href="/">{{ nicon('home') }}<span>홈</span></a>
   <a class="mm-tab {% if request.path.startswith(('/tools','/calculator','/simple','/dividend-target','/retirement','/tax-switch','/backtest','/risk-return')) %}active{% endif %}" href="/tools">{{ nicon('chart') }}<span>분석</span></a>
-  <a class="mm-tab {% if request.path.startswith(('/market','/macro','/calendar')) %}active{% endif %}" href="/market">{{ nicon('globe') }}<span>시장</span></a>
+  <a class="mm-tab {% if request.path.startswith(('/market','/macro','/calendar','/gurus')) %}active{% endif %}" href="/market">{{ nicon('globe') }}<span>시장</span></a>
   <a class="mm-tab {% if request.path.startswith(('/myassets','/myportfolios')) %}active{% endif %}" href="/myassets">{{ nicon('wallet') }}<span>내 자산</span></a>
   <a class="mm-tab {% if request.path.startswith('/search') %}active{% endif %}" href="/search">{{ nicon('search') }}<span>검색</span></a>
   <a class="mm-tab {% if request.path.startswith('/settings') %}active{% endif %}" href="/settings">{{ nicon('gear') }}<span>설정</span></a>

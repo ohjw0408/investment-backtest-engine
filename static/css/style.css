@@ -249,6 +249,12 @@ a { text-decoration: none; color: inherit; }
   border-right: 1px solid var(--ds-hairline);
   box-shadow: inset -10px 0 18px -14px rgba(0,0,0,0.18);
   padding: 20px 0;
+  /* 스크롤해도 사이드바 고정 (navbar 높이 60px 아래에 붙음) */
+  position: sticky;
+  top: 60px;
+  align-self: flex-start;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
 }
 
 .sidebar-label {

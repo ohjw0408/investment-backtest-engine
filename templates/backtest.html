@@ -1414,6 +1414,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btBandNoteVal').textContent = e.target.value + '%';
   });
 
+  // 외부(투자대가 등)에서 넘어온 프리로드 → 폼 채우고 자동 실행(진행 게이지 → 결과 뷰)
+  const preloadRaw = btStateStore.getItem('mm_bt_preload');
+  if (preloadRaw) {
+    btStateStore.removeItem('mm_bt_preload');
+    try {
+      const p = JSON.parse(preloadRaw);
+      if (p && p.tickers && p.tickers.length) {
+        btRestoreForm(p);
+        if (p.autorun) { runBacktest(); return; }
+      }
+    } catch(e) {}
+  }
+
   const taskSaved = btStateStore.getItem(BT_TASK_KEY);
   if (taskSaved) {
     let state;

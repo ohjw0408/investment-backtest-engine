@@ -3882,3 +3882,12 @@ _작성: Claude_
   - ⚠️ prod: 배포 후 **celery beat 재시작**(새 스케줄) + 워커 재배포(runner 포함). 푸시는 FCM 키 있을 때만. cal_alert_prefs 앱시작 자동생성.
 
 _작성: Claude_
+
+## 2026-06-26 — 포트폴리오 예시(추천 템플릿) P0·P1
+
+신규 `/examples` "포트폴리오 예시"(분석 탭) — 일반 투자자용 검증된 자산배분 전략 시작점. 철학=잃지않는 자산배분(고위험 레버리지❌). 플랜=`포트폴리오예시_plan.md`. 메모리=project-portfolio-examples.
+- **P0 실사**: 미국16종+한국ETF 종목마스터 등재·가격 확인. /risk-return `abPorts` 프리로드 연동 가능 확인. 한국 ETF 대표코드 확정.
+- **P1 데이터**: `data/meta/portfolio_examples.json`(29전략: 미국16·한국13, region·category·risk·tickers, 비중합100·slug유니크 검증) + `modules/portfolio_examples.py` 로더. 커밋 99222c0.
+- **잔여 P2~P5**: 페이지(/examples 지역탭+성격섹션+카드 액션3버튼)·핸드오프(분석→백테 mm_bt_preload·비교→risk-return abPorts·저장 mmSaveGuru)·네비(분석에 추가·시장서 투자대가 편입, 홈광고카드·/gurus 유지)·검증.
+
+_작성: Claude_

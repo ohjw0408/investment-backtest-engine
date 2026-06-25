@@ -3774,3 +3774,15 @@ _작성: Claude_
 - 별건: 투자대가 포트폴리오(13F) 기능 플랜 신설 `투자대가_포트폴리오_plan.md`. 오너 확정: 탭명 "투자대가의 포트폴리오"(/gurus)·이미지 모노그램 시작·OpenFIGI키 발급예정.
 
 _작성: Claude_
+
+## 2026-06-25 — 투자대가 포트폴리오(13F) 기능 P1·P2·P4 완성 (P3·P5 잔여)
+
+신규 시장 탭 "투자대가의 포트폴리오"(`/gurus`). SEC 13F 공시 기반 대가 10명 포트폴리오.
+- **P1 데이터**(c991bcc): `modules/gurus/`(registry 10명 CIK·stance / edgar 13F파서 / figi OpenFIGI CUSIP→티커) + `scripts/build_guru_db.py` → `data/meta/guru_holdings.db`(seed, symbol_master 패턴 추적). 파서 단위테스트 `tests/test_guru_13f_parser.py` PASS. Buffett AAPL22%·AXP17%·KO12% 실제 13F 일치. 2년↑ 미공시 stale 자동제외(전원 통과).
+- **P2 페이지**(0cd178c): `/gurus` 목록+상세, `store.py`. 모노그램 아바타·낙관↔비관 스펙트럼·한계배너(45일지연·미국롱만)·공시분기/제출일 표시·상위보유 미니바·보유 테이블(13F비중+재정규화). base.html 시장메뉴 추가.
+- **P4 홈 카드**(a6d4c93): 시장지수 위 "투자 대가들의 포트폴리오 보러가기" 프로모(웹·앱 공용, "고민되세요?…" 헤더 + 모노그램 스펙트럼).
+- 검증: Playwright 1280/390 라이트·다크 전부, 콘솔에러 0.
+- **잔여**: P3(상세 백테스트 연결 — 현재 버튼 disabled "준비 중"), P5(분기 자동갱신 워크플로 + 새공시 알림). ⚠️ prod/CI에 `OPENFIGI_API_KEY` 시크릿 등록 필요(오너). 로컬은 .env 완료.
+- 별건: 웹 홈 데스크톱 macro 카드 확대+설명(e5cbbd4), 히어로 웹노출·로고주황(966aee0), CTA제거·거시탭노출(8689ada).
+
+_작성: Claude_

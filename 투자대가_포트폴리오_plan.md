@@ -113,10 +113,10 @@
 ## 단계 (Phase)
 
 - ✅ **P1 데이터 완료(2026-06-25)**: `modules/gurus/`(registry·edgar·figi) + `scripts/build_guru_db.py` + `data/meta/guru_holdings.db`(10명 빌드). 파서 단위테스트 `tests/test_guru_13f_parser.py` PASS. Buffett AAPL22%·AXP17%·KO12% 등 실제 13F 일치 확인. staleness 2년 안전망(전원 통과).
-- **P2 페이지**: `/gurus` 목록+상세(한계 배너·보유 테이블·도넛). 모노그램 아바타.
-- **P3 백테 연결**: 상세 "백테스트" → backtest_logic, 결과 렌더.
-- **P4 홈 카드**: 시장지수 위 진입 카드(웹·앱), Playwright 라이트/다크·모바일 검증.
-- **P5 자동화**: `guru-resync-13f.yml` 분기 워크플로(빌드→커밋) + 새 공시 인앱 알림.
+- ✅ **P2 페이지 완료(2026-06-25)**: 라우트 `/gurus`(목록)·`/gurus/<slug>`(상세) app.py + `modules/gurus/store.py`. 목록=모노그램·낙관↔비관 스펙트럼·한계배너·공시일·상위보유 미니바(상대스케일). 상세=보유 테이블(비중13F+재정규화바)·메타·면책. base.html 시장메뉴 추가. Playwright 라이트/다크/모바일 검증, 콘솔에러 0.
+- ⏸ **P3 백테 연결(미착수, 오너 보류)**: 상세 "백테스트" 버튼 현재 **disabled "준비 중"**. backtest_logic 연결·결과 렌더 남음.
+- ✅ **P4 홈 카드 완료(2026-06-25)**: index.html 시장지수 위 "투자 대가들의 포트폴리오 보러가기" 프로모(웹·앱 공용 1블록, 헤더 "고민되세요?…" + WB/RD/MB 모노그램). Playwright 검증.
+- **P5 자동화(미착수)**: `guru-resync-13f.yml` 분기 워크플로(빌드→커밋) + 새 공시 인앱 알림. ⚠️ prod/CI에 `OPENFIGI_API_KEY` 시크릿 등록 필요(오너).
 - **(보류) 이미지 고도화**: 오너 위험판단 후 사진/일러스트 여부.
 
 ## 검증

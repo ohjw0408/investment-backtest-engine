@@ -76,7 +76,8 @@
 .acct-sw input:checked + .acct-sw-tr { background: var(--brand); }
 .acct-sw input:checked + .acct-sw-tr:before { transform: translateX(18px); }
 /* PC: 위젯 카드 멀티컬럼 그리드 / 모바일: 단일 컬럼 */
-#weList { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; align-items: start; }
+/* 위젯 = 세로 1열 스택(한 줄에 하나씩, 위↕아래 순서 직관적·높이 mismatch 없음) */
+#weList { display: flex; flex-direction: column; gap: 14px; }
 .we-widget { margin-bottom: 0; }
 @media (max-width: 768px) {
   .settings-wrap { max-width: 760px; }

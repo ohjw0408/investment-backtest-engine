@@ -3805,3 +3805,15 @@ _작성: Claude_
 - 검증: Playwright 라이트/다크 — 사이드바 투자대가/검색 링크·sticky·스크롤 후 top=60 PASS, 대가→분석하기→/backtest 이동·종목 12개 자동적재·비중 100%·연리밸·3년기간·진행게이지 표시 PASS, 콘솔에러 0. ⚠️ 백테 완료 렌더는 Celery 워커+Redis 필요(이 환경엔 미가동) — submit/poll·결과렌더는 기존 검증코드 그대로(불변).
 
 _작성: Claude_
+
+## 2026-06-25 — 배경 대비 강화(라이트/다크) + 사이드바 줄바꿈/캐시버스트 + 홈 대가카드 리디자인
+
+오너 피드백 반영(디자인).
+- **배경 대비(토큰)**: 카드(--ds-canvas)가 페이지(--ds-soft)와 너무 비슷해 안 떠 보이던 문제. surface ladder 조정 — 라이트 `--ds-soft #f7f7f7→#eaedf3`(페이지 한톤↓), 다크는 ladder 정상화 `--ds-canvas #0a0b0d→#16181d`(카드 elevated↑)·`--ds-soft #0f1115→#0a0b0e`(페이지 최암)·`--ds-dark-el #16181c→#1c1f25`. **하드코딩 아님 — 토큰 중앙값만 수정**, 전 페이지 자동 반영.
+- **main-content bg override 정리**: alerts·calendar·macro·market·tools·search가 `.main-content{background:var(--ds-canvas)}`로 페이지=카드색이라 대비 무력화 → 전부 `var(--ds-soft)`로. index·myassets 다크 override(canvas→soft)도 수정.
+- **사이드바 줄바꿈**: "투자대가의 포트폴리오" 196px 폭서 "오" 삐져나옴 → `투자대가의<br>포트폴리오` 2줄(line-height 1.25). span height 35px=2줄 확인.
+- **사이드바 고정 캐시버스트**: 직전 커밋의 sticky가 "아직 사라짐" = CSS `?v=20260618ds` 캐시 미갱신 탓. style.css·components.css `?v=20260625bg`로 bump → sticky 즉시 적용.
+- **홈 대가 프로모카드 리디자인**: 높이 ~3배(min-height 184px), brand 그라데이션(radial+linear, accent 색 따라감)·글로우 장식·아바타 4인(44px)·SEC 13F 배지·큰 헤드라인("월가 전설들은 지금 무엇을 들고 있을까?")·상세설명(버핏/버리/애크만/달리오·클릭 백테스트·분기 갱신)·CTA 필. head 카피는 카드 내부로 흡수.
+- 검증: Playwright 라이트/다크 — 홈카드 높이≥180·그라데이션·상세·CTA·배경≠카드 PASS, 사이드바 2줄·sticky·스크롤 고정 PASS, macro 배경≠카드 대비 PASS, 다크 스윕(backtest·myassets·search·settings) 콘솔에러 0·렌더 정상. 스샷 육안 확인 완료.
+
+_작성: Claude_

@@ -3786,3 +3786,12 @@ _작성: Claude_
 - 별건: 웹 홈 데스크톱 macro 카드 확대+설명(e5cbbd4), 히어로 웹노출·로고주황(966aee0), CTA제거·거시탭노출(8689ada).
 
 _작성: Claude_
+
+## 2026-06-25 — 투자대가 P3 백테스트 연결 완료 (fd9df03)
+
+- `/api/gurus/<slug>/backtest`: 상위 12개 커버 종목 고정비중(재정규화) → `run_backtest_logic`(연1회 리밸·배당재투자·초기1000만, 1/3/5년 선택). 시세부족 graceful 에러.
+- `guru_detail.html`: 백테 버튼 활성화 + 기간 토글 + 결과 카드(총수익·CAGR·MDD·기말 평가액) + 가정/면책.
+- 검증: API Buffett(3y CAGR20%·총수익72.5%)·Burry·Terry·Dalio OK. Playwright 클릭→렌더 라이트/다크, 콘솔에러0.
+- **이제 P1·P2·P3·P4 완료. 잔여 P5만**(분기 자동갱신 워크플로 + 새공시 알림, ⚠️prod/CI OPENFIGI_API_KEY 시크릿 등록 필요).
+
+_작성: Claude_

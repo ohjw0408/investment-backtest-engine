@@ -16,6 +16,7 @@ import requests
 BASE = Path(__file__).resolve().parent.parent
 FRED_KEY_FILE = BASE / "data" / "meta" / "fred_api_key.txt"
 ECON_CACHE_FILE = BASE / "data" / "meta" / "cal_econ_cache.json"
+EARN_CACHE_FILE = BASE / "data" / "meta" / "cal_earn_cache.json"
 POLICY_FILE = BASE / "data" / "meta" / "policy_meetings.json"
 POLICY_TITLES = {"fomc": "🇺🇸 FOMC (기준금리 결정)", "bok": "🇰🇷 한은 금통위 (기준금리)"}
 
@@ -35,6 +36,35 @@ CAL_RELEASES = {
 _econ_cache = {}    # {today: [events]}
 _earn_cache = {}    # {(code, today): [events]}
 _div_cache = {}     # {(codes_key, today): [events]}
+_earn_disk_loaded = None   # 디스크캐시 로드한 날짜
+
+
+def _load_earn_disk():
+    """실적(yfinance) 디스크캐시(오늘자)를 메모리에 주입 — 서버 재시작·매일 첫 호출 시 yfinance 재조회 회피."""
+    global _earn_disk_loaded
+    tk = datetime.date.today().isoformat()
+    if _earn_disk_loaded == tk:
+        return
+    _earn_disk_loaded = tk
+    try:
+        if EARN_CACHE_FILE.exists():
+            disk = json.loads(EARN_CACHE_FILE.read_text(encoding="utf-8"))
+            if disk.get("date") == tk:
+                for code, evs in (disk.get("earn") or {}).items():
+                    _earn_cache[(code, tk)] = evs
+    except Exception:
+        pass
+
+
+def _save_earn_disk():
+    """오늘자 실적 메모리캐시를 디스크에 저장(메인스레드 1회 — 병렬 쓰기 race 없음)."""
+    tk = datetime.date.today().isoformat()
+    try:
+        earn = {code: evs for (code, d), evs in _earn_cache.items() if d == tk}
+        EARN_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        EARN_CACHE_FILE.write_text(json.dumps({"date": tk, "earn": earn}), encoding="utf-8")
+    except Exception:
+        pass
 
 
 def _fred_key():
@@ -215,10 +245,12 @@ def events_for(codes, loader=None, econ_ids=None, show_earnings=True, show_divid
         except Exception:
             pass
     if show_earnings and codes:
+        _load_earn_disk()   # 디스크캐시 주입 → 캐시된 종목은 yfinance 스킵
         # 종목별 yfinance 실적조회 병렬화 (순차 = N×네트워크 지연)
         with ThreadPoolExecutor(max_workers=min(8, len(codes))) as ex:
             for res in ex.map(lambda c: earnings_events(c, names.get(c)), codes):
                 out.extend(res)
+        _save_earn_disk()   # 새로 조회된 실적 디스크 영속화
     if show_dividend and loader is not None and codes:
         out.extend(dividend_events(loader, codes, names))
     seen, uniq = set(), []

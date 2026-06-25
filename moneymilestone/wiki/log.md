@@ -3850,3 +3850,12 @@ _작성: Claude_
 - 검증: 전 16탭 curl mm-hero 렌더 확인(myportfolios는 로그인게이트라 로그인 시 표시). Playwright 라이트 5탭 콘솔에러 0 + 스샷(calculator/home/gurus), 다크 gurus 스샷 — 헤더 통일 육안 확인. 로그인 홈 DOM 순서 in-process 확정.
 
 _작성: Claude_
+
+## 2026-06-25 — 홈 order 픽스 + 설정 컨텍스트 진입 + 캘린더 실적 디스크캐시
+
+- **홈 guru-promo 위치(재요청)**: 직전엔 DOM만 옮겼으나 홈은 flex `order`로 재배치(is-auth) → guru-promo가 order 미지정(0)이라 시각상 최상단으로 떴음. order 부여: portfolioCard1·widgetCard2·actionCard3·**guru-promo4**·feat-sec5. md-hero는 order 미지정(0)=최상단 유지. 시각순서=md-hero→내포폴→시장지수→다음할일→투자대가→도구. in-process로 order값+DOM 확정.
+- **설정 컨텍스트 진입**: settings는 이미 탭패널(setPanel: tax/home/cal/account)인데 진입 시 항상 tax. URL 해시로 진입 패널 결정(setPanel이 hash도 동기화). 진입점: 캘린더 '표시 설정'→`/settings#cal`, 홈 위젯톱니→`/settings#home`. Playwright 9/9 PASS(#cal→cal·#home→home·#account→account·기본 tax, 콘솔0). 계정 외부진입점은 없어 인프라만.
+- **캘린더 속도(조사+개선)**: 병목=실적(yfinance Ticker.get_earnings_dates) 종목별, 메모리캐시만이라 재시작·매일 첫 호출 시 재조회. econ(FRED)은 이미 디스크캐시·policy는 로컬·배당은 로컬가격엔진이라 빠름. → **실적 디스크캐시 추가**(`cal_earn_cache.json`, 일단위): events_for 진입 시 `_load_earn_disk`로 메모리 주입(캐시종목 yfinance 스킵), 병렬조회 후 `_save_earn_disk`(메인스레드 1회=race 없음). 라운드트립 단위 PASS. (후속 제안: celery beat 새벽 캐시워밍 + 프론트 econ 선렌더/종목이벤트 후속로드)
+- **⚠️ 보류 — 알림에 캘린더 일정(경제지표·실적·통화정책·배당락) 추가**: alert_engine은 가격기반 룰만(daily_pct/target/new_high·low/rebalance). 날짜이벤트 알림은 패러다임 달라 alert_store(룰 종류)+alert_runner(매일 D-day 발화)+beat+UI 신규 필요 = 큰 작업, celery 발화엔진 건드림(잘못 시 prod 알림 사고). 다음 단독 작업으로 설계·구현 예정.
+
+_작성: Claude_

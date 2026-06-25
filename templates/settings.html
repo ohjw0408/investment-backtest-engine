@@ -405,7 +405,13 @@ async function confirmDelete() {
 function setPanel(name) {
   document.querySelectorAll('.set-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.spanel === name));
   document.querySelectorAll('.set-panel').forEach(p => p.classList.toggle('active', p.dataset.spanel === name));
+  if (history.replaceState) history.replaceState(null, '', '#' + name);
 }
+// 진입 시 URL 해시로 패널 결정 (#tax/#home/#cal/#account) — 각 탭에서 맞는 설정으로 바로 진입
+(function () {
+  var h = (location.hash || '').replace('#', '');
+  if (['tax', 'home', 'cal', 'account'].indexOf(h) >= 0) setPanel(h);
+})();
 
 // ── 세금 설정 (설정에 편입 — 구 /tax-settings 이식) ──
 const TAX_STORAGE_KEY = 'domino_tax_settings';

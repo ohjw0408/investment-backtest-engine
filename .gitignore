@@ -58,6 +58,8 @@ data/meta/*.txt
 data/meta/cal_econ_cache.json
 
 *.db
+!data/meta/symbol_master.db
+!data/meta/guru_holdings.db
 
 .env
 # ----------------------------

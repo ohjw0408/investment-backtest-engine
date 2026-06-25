@@ -69,6 +69,10 @@
 - **가정 명시**: "13F 상위 N 종목을 공시 비중대로 보유·주기 리밸런싱 가정. 실제 펀드 성과와 다름."
 - 미커버/미매핑 종목 비중은 현금 또는 비례 재정규화(택1, 기본=재정규화) — UI에 주석.
 
+### 3.5 공시 신선도 (오너 지시 2026-06-25)
+- **갱신일자 항상 노출**: 목록 카드·상세·홈카드에 "YYYY Qn 공시 기준 (제출 YYYY-MM-DD)" 표기(혼동 방지). 데이터=`gurus.latest_period` + `filings.filed`.
+- **죽은 필러 자동 제외**: `gurus.stale` — 최신 분기 대비 **2년(>730일) 미공시**만 제외(안전망). 1~2분기 지연(예: Scion/Burry 9개월)은 **정상 유지**. UI 기본목록 = `WHERE stale=0`.
+
 ## 4. 화면 (탭 내부 — 모바일·웹 결 맞춤)
 
 라우트 `/gurus`. 기존 페이지 디자인 토큰·공용 컴포넌트 재사용([[feedback-design-archetype-not-reskin]]).
@@ -108,7 +112,7 @@
 
 ## 단계 (Phase)
 
-- **P1 데이터**: EDGAR 13F fetcher + 파서 + OpenFIGI 매핑 + `guru_holdings.db` seed 빌더(스크립트). 골든 대가 3명으로 검증.
+- ✅ **P1 데이터 완료(2026-06-25)**: `modules/gurus/`(registry·edgar·figi) + `scripts/build_guru_db.py` + `data/meta/guru_holdings.db`(10명 빌드). 파서 단위테스트 `tests/test_guru_13f_parser.py` PASS. Buffett AAPL22%·AXP17%·KO12% 등 실제 13F 일치 확인. staleness 2년 안전망(전원 통과).
 - **P2 페이지**: `/gurus` 목록+상세(한계 배너·보유 테이블·도넛). 모노그램 아바타.
 - **P3 백테 연결**: 상세 "백테스트" → backtest_logic, 결과 렌더.
 - **P4 홈 카드**: 시장지수 위 진입 카드(웹·앱), Playwright 라이트/다크·모바일 검증.

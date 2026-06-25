@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}투자대가의 포트폴리오 — Money Milestone{% endblock %}
+{% block meta_desc %}워런 버핏·마이클 버리 등 투자 대가들의 최신 포트폴리오(SEC 13F 공시 기준)를 낙관↔비관 성향순으로. 보유 종목과 비중을 한눈에.{% endblock %}
+
+{% block head %}
+<style>
+.gr-wrap { max-width: 960px; margin: 0 auto; padding: 22px 18px 40px; }
+.gr-hero-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--logo); }
+.gr-hero-title { font-size: 25px; font-weight: 700; letter-spacing: -0.4px; color: var(--ds-ink); margin-top: 6px; }
+.gr-hero-sub { font-size: 13.5px; color: var(--ds-muted); margin-top: 8px; line-height: 1.55; }
+
+/* 한계 배너 */
+.gr-disclaimer { display: flex; gap: 9px; align-items: flex-start; margin-top: 16px; padding: 12px 14px;
+  border-radius: var(--r-lg, 12px); background: var(--ds-soft); border: 1px solid var(--ds-hairline);
+  font-size: 12px; color: var(--ds-body); line-height: 1.5; }
+.gr-disclaimer b { color: var(--ds-ink); font-weight: 700; }
+
+/* 스펙트럼 범례 */
+.gr-legend { display: flex; align-items: center; gap: 8px; margin: 18px 2px 14px; font-size: 11.5px; color: var(--ds-muted); }
+.gr-legend-bar { flex: 1; height: 6px; border-radius: var(--r-pill, 999px);
+  background: linear-gradient(90deg, #05b169, #8bc34a, #b5b5b5, #ff9800, #cf202f); }
+
+/* 카드 그리드 */
+.gr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.gr-card { display: block; text-decoration: none; padding: 16px 17px; border-radius: var(--r-xl, 16px);
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline); box-shadow: var(--ds-shadow); transition: box-shadow .15s, transform .15s; }
+.gr-card:hover { box-shadow: var(--ds-shadow-lg); transform: translateY(-1px); }
+[data-theme="dark"] .gr-card { background: var(--ds-dark-el); border-color: transparent; }
+.gr-card-top { display: flex; align-items: center; gap: 11px; }
+.gr-avatar { flex-shrink: 0; width: 44px; height: 44px; border-radius: var(--r-full, 50%); display: flex; align-items: center;
+  justify-content: center; font-weight: 800; font-size: 15px; color: #fff; letter-spacing: 0.5px; }
+.gr-name { font-size: 15px; font-weight: 700; color: var(--ds-ink); }
+.gr-fund { font-size: 11.5px; color: var(--ds-muted); margin-top: 1px; }
+.gr-stance { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--ds-body); }
+.gr-dot { width: 9px; height: 9px; border-radius: 50%; }
+.gr-arrow { margin-left: auto; align-self: flex-start; color: var(--ds-muted); font-size: 18px; }
+
+.gr-period { font-size: 11px; color: var(--ds-muted); margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--ds-hairline); }
+.gr-period b { color: var(--ds-body); font-weight: 600; }
+.gr-tops { margin-top: 9px; display: flex; flex-direction: column; gap: 5px; }
+.gr-top-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.gr-top-tic { font-weight: 700; color: var(--ds-ink); min-width: 46px; font-family: var(--font-mono); }
+.gr-top-bar { flex: 1; height: 5px; border-radius: var(--r-pill, 999px); background: var(--ds-soft); overflow: hidden; }
+.gr-top-fill { height: 100%; border-radius: inherit; background: var(--brand); }
+.gr-top-w { font-size: 11px; color: var(--ds-muted); min-width: 38px; text-align: right; font-family: var(--font-mono); }
+
+@media (max-width: 640px) { .gr-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% macro stance_color(s) -%}
+{% if s <= 2 %}#05b169{% elif s <= 4 %}#8bc34a{% elif s <= 6 %}#9aa0a6{% elif s <= 8 %}#ff9800{% else %}#cf202f{% endif %}
+{%- endmacro %}
+<div class="gr-wrap">
+  <div class="gr-hero-eyebrow">Money Milestone</div>
+  <div class="gr-hero-title">투자대가의 포트폴리오</div>
+  <div class="gr-hero-sub">고민되세요? 전설적인 투자자들이 실제로 무엇을 들고 있는지 확인해보세요.<br>SEC 13F 공시 기준, 시장 <b style="color:#05b169">낙관</b> → <b style="color:#cf202f">비관</b> 성향순.</div>
+
+  <div class="gr-disclaimer">
+    <span>⚠️</span>
+    <span><b>13F 공시 기준 — 참고용입니다.</b> 미국 기관의 분기별 공시로 <b>최대 45일 지연</b>되며, <b>미국 상장 롱(매수) 주식만</b> 표시됩니다(공매도·옵션·채권·해외자산 제외). 실제 현재 보유와 다를 수 있고, 투자자문·매매권유가 아닙니다.</span>
+  </div>
+
+  <div class="gr-legend">
+    <span>🟢 낙관·매수 중심</span>
+    <span class="gr-legend-bar"></span>
+    <span>방어·현금 비관 🔴</span>
+  </div>
+
+  {% if gurus %}
+  <div class="gr-grid">
+    {% for g in gurus %}
+    <a class="gr-card" href="/gurus/{{ g.slug }}">
+      <div class="gr-card-top">
+        <span class="gr-avatar" style="background:{{ stance_color(g.stance)|trim }}">{{ g.monogram }}</span>
+        <div>
+          <div class="gr-name">{{ g.name }}</div>
+          <div class="gr-fund">{{ g.fund }}</div>
+          <div class="gr-stance"><span class="gr-dot" style="background:{{ stance_color(g.stance)|trim }}"></span>{{ g.stance_label }}</div>
+        </div>
+        <span class="gr-arrow">›</span>
+      </div>
+      {% if g.top %}
+      {% set mx = (g.top|map(attribute='weight')|max) or 1 %}
+      <div class="gr-tops">
+        {% for t in g.top %}
+        <div class="gr-top-row">
+          <span class="gr-top-tic">{{ t.ticker }}</span>
+          <span class="gr-top-bar"><span class="gr-top-fill" style="width:{{ (t.weight / mx * 100)|round(0, 'floor') }}%"></span></span>
+          <span class="gr-top-w">{{ t.weight }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="gr-period">📄 <b>{{ g.period_label }}</b> 공시 기준{% if g.filed %} · 제출 {{ g.filed }}{% endif %}</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="gr-disclaimer" style="margin-top:24px;">데이터를 준비 중입니다. 잠시 후 다시 확인해주세요.</div>
+  {% endif %}
+</div>
+{% endblock %}

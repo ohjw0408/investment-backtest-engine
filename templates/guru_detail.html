@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}{{ g.name }} 포트폴리오 — Money Milestone{% endblock %}
+{% block meta_desc %}{{ g.name }}({{ g.fund }})의 최신 포트폴리오 — SEC 13F 공시 기준 보유 종목과 비중.{% endblock %}
+
+{% block head %}
+<style>
+.gd-wrap { max-width: 860px; margin: 0 auto; padding: 18px 18px 44px; }
+.gd-back { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ds-muted); text-decoration: none; margin-bottom: 14px; }
+.gd-back:hover { color: var(--ds-ink); }
+.gd-head { display: flex; align-items: center; gap: 14px; }
+.gd-avatar { flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full, 50%); display: flex; align-items: center;
+  justify-content: center; font-weight: 800; font-size: 19px; color: #fff; letter-spacing: 0.5px; }
+.gd-name { font-size: 21px; font-weight: 700; color: var(--ds-ink); }
+.gd-fund { font-size: 13px; color: var(--ds-muted); margin-top: 2px; }
+.gd-stance { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--ds-body); }
+.gd-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+.gd-disclaimer { display: flex; gap: 9px; align-items: flex-start; margin-top: 16px; padding: 12px 14px;
+  border-radius: var(--r-lg, 12px); background: var(--ds-soft); border: 1px solid var(--ds-hairline);
+  font-size: 12px; color: var(--ds-body); line-height: 1.5; }
+.gd-disclaimer b { color: var(--ds-ink); font-weight: 700; }
+
+.gd-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 16px; font-size: 12.5px; color: var(--ds-muted); }
+.gd-meta b { color: var(--ds-ink); font-weight: 700; font-family: var(--font-mono); }
+
+.gd-btn { display: inline-flex; align-items: center; gap: 7px; margin-top: 16px; padding: 11px 18px; border: none;
+  border-radius: var(--r-lg, 12px); background: var(--brand); color: var(--on-brand, #fff); font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.gd-btn:disabled { opacity: .55; cursor: default; }
+
+#gdBtResult { margin-top: 16px; }
+
+.gd-table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+.gd-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--ds-muted); text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--ds-hairline); }
+.gd-table th.num, .gd-table td.num { text-align: right; }
+.gd-table td { padding: 11px 10px; border-bottom: 1px solid var(--ds-hairline); font-size: 13px; color: var(--ds-ink); vertical-align: middle; }
+.gd-tic { font-weight: 700; font-family: var(--font-mono); }
+.gd-co { color: var(--ds-muted); font-size: 12px; }
+.gd-wbar-wrap { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.gd-wbar { width: 90px; height: 6px; border-radius: var(--r-pill, 999px); background: var(--ds-soft); overflow: hidden; }
+.gd-wbar > span { display: block; height: 100%; background: var(--brand); border-radius: inherit; }
+.gd-w { font-family: var(--font-mono); min-width: 44px; text-align: right; }
+.gd-note { font-size: 11.5px; color: var(--ds-muted); margin-top: 12px; line-height: 1.5; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set sc = '#05b169' if g.stance <= 2 else ('#8bc34a' if g.stance <= 4 else ('#9aa0a6' if g.stance <= 6 else ('#ff9800' if g.stance <= 8 else '#cf202f'))) %}
+<div class="gd-wrap">
+  <a class="gd-back" href="/gurus">‹ 투자대가의 포트폴리오</a>
+
+  <div class="gd-head">
+    <span class="gd-avatar" style="background:{{ sc }}">{{ g.monogram }}</span>
+    <div>
+      <div class="gd-name">{{ g.name }}</div>
+      <div class="gd-fund">{{ g.fund }}</div>
+      <div class="gd-stance"><span class="gd-dot" style="background:{{ sc }}"></span>{{ g.stance_label }}</div>
+    </div>
+  </div>
+
+  <div class="gd-disclaimer">
+    <span>⚠️</span>
+    <span><b>{{ g.period_label }} 공시 기준{% if g.filed %} (제출 {{ g.filed }}){% endif %}.</b> SEC 13F는 미국 상장 롱(매수) 주식만 분기 공시(최대 45일 지연)하며, 공매도·옵션·채권·해외자산은 포함되지 않습니다. 실제 현재 보유와 다를 수 있고, 투자자문이 아닙니다.</span>
+  </div>
+
+  <div class="gd-meta">
+    <span>공시 종목 <b>{{ g.n_total }}</b>개</span>
+    <span>국내 시세 커버 <b>{{ g.n_covered }}</b>개</span>
+    <span>커버 비중 <b>{{ g.covered_weight }}%</b></span>
+  </div>
+
+  <button class="gd-btn" id="gdBtBtn" data-slug="{{ g.slug }}">📈 이 포트폴리오 백테스트</button>
+  <div id="gdBtResult"></div>
+
+  <table class="gd-table">
+    <thead>
+      <tr><th style="width:34px">#</th><th>종목</th><th class="num">비중(13F)</th><th class="num" style="width:150px">포트폴리오 내 비중</th></tr>
+    </thead>
+    <tbody>
+      {% set mxw = (g.holdings|map(attribute='weight_norm')|max) or 1 %}
+      {% for h in g.holdings %}
+      <tr>
+        <td class="num gd-co">{{ h.rank }}</td>
+        <td><span class="gd-tic">{{ h.ticker }}</span> <span class="gd-co">{{ h.name }}</span></td>
+        <td class="num gd-w">{{ h.weight }}%</td>
+        <td class="num">
+          <span class="gd-wbar-wrap">
+            <span class="gd-wbar"><span style="width:{{ (h.weight_norm / mxw * 100)|round(0, 'floor') }}%"></span></span>
+            <span class="gd-w">{{ h.weight_norm }}%</span>
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="gd-note">‘비중(13F)’ = 전체 공시 대비 비중. ‘포트폴리오 내 비중’ = 국내 시세 커버 종목만 100%로 재정규화(백테스트 기준). 상위 {{ g.holdings|length }}개 표시.</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// P3에서 백테스트 연결 예정
+document.getElementById('gdBtBtn')?.addEventListener('click', function () {
+  // placeholder — P3 wiring
+});
+</script>
+{% endblock %}

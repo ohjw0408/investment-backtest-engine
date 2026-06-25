@@ -553,6 +553,20 @@ def macro_page():
 def calendar_page():
     return render_template('calendar.html')
 
+@app.route('/gurus')
+def gurus_page():
+    from modules.gurus import store
+    return render_template('gurus.html', gurus=store.list_gurus())
+
+@app.route('/gurus/<slug>')
+def guru_detail_page(slug):
+    from flask import abort
+    from modules.gurus import store
+    g = store.get_guru(slug)
+    if not g:
+        abort(404)
+    return render_template('guru_detail.html', g=g)
+
 @app.route('/myportfolios')
 def myportfolios():
     return render_template('myportfolios.html')

@@ -159,8 +159,9 @@
       </div>
     </div>
     <div class="mmnav-grp">
-      <button class="mmnav-link mmnav-trigger {% if request.path.startswith(('/macro','/calendar','/search')) %}active{% endif %}" type="button">시장 <span class="mmnav-caret">▾</span></button>
+      <button class="mmnav-link mmnav-trigger {% if request.path.startswith(('/macro','/calendar','/search','/gurus')) %}active{% endif %}" type="button">시장 <span class="mmnav-caret">▾</span></button>
       <div class="mmnav-menu">
+        <a href="/gurus">투자대가의 포트폴리오</a>
         <a href="/macro">거시지표</a>
         <a href="/calendar">증시 캘린더</a>
         <a href="/search">종목 검색</a>

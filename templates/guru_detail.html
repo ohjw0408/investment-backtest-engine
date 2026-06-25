@@ -9,7 +9,7 @@
 .gd-back:hover { color: var(--ds-ink); }
 .gd-head { display: flex; align-items: center; gap: 14px; }
 .gd-avatar { flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full, 50%); display: flex; align-items: center;
-  justify-content: center; font-weight: 800; font-size: 19px; color: #fff; letter-spacing: 0.5px; }
+  justify-content: center; font-weight: 800; font-size: 19px; color: #fff; letter-spacing: 0.5px; overflow: hidden; }
 .gd-name { font-size: 21px; font-weight: 700; color: var(--ds-ink); }
 .gd-name-en { font-weight: 500; color: var(--ds-muted); font-size: 14px; }
 .gd-fund { font-size: 13px; color: var(--ds-muted); margin-top: 2px; }
@@ -84,7 +84,7 @@
   <a class="gd-back" href="/gurus">‹ 투자대가의 포트폴리오</a>
 
   <div class="gd-head">
-    <span class="gd-avatar" style="background:{{ sc }}">{{ g.monogram }}</span>
+    <span class="gd-avatar" data-gavatar="{{ g.slug }}" style="background:{{ sc }}">{{ g.monogram }}</span>
     <div>
       <div class="gd-name">{{ g.name_ko }} <span class="gd-name-en">({{ g.name }})</span></div>
       <div class="gd-fund">{{ g.fund }}</div>
@@ -146,6 +146,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/guru_avatar.js') }}?v=20260625"></script>
 <script src="{{ url_for('static', filename='js/guru_fav.js') }}?v=20260625"></script>
 <script>
 (function () {

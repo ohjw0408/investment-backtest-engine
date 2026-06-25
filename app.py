@@ -567,6 +567,52 @@ def guru_detail_page(slug):
         abort(404)
     return render_template('guru_detail.html', g=g)
 
+@app.route('/api/gurus/<slug>/backtest', methods=['POST'])
+def guru_backtest(slug):
+    """대가 상위 보유(커버)로 고정비중 포폴 구성 → 백테스트(연1회 리밸 가정)."""
+    import datetime
+    from flask import jsonify, request, abort
+    from modules.gurus import store
+    import backtest_logic
+
+    g = store.get_guru(slug, limit=12)  # 상위 12개 커버 종목(비중 지배적)
+    if not g:
+        abort(404)
+    holds = g['holdings']
+    if not holds:
+        return jsonify({'error': 'no_holdings', 'message': '백테스트할 보유 종목이 없습니다.'}), 400
+
+    years = 3
+    if request.is_json and request.json:
+        years = int(request.json.get('years', 3))
+    years = years if years in (1, 3, 5) else 3
+
+    total = sum(h['weight_norm'] for h in holds) or 1.0
+    tickers = [{'code': h['ticker'], 'weight': h['weight_norm'] / total} for h in holds]
+
+    end = datetime.date.today()
+    start = end.replace(year=end.year - years)
+    body = {
+        'tickers': tickers,
+        'start_date': start.isoformat(),
+        'end_date': end.isoformat(),
+        'initial_capital': 10_000_000,
+        'monthly_contribution': 0,
+        'dividend_mode': 'reinvest',
+        'rebal_mode': 'yearly',
+    }
+    try:
+        res = backtest_logic.run_backtest_logic(body)
+    except Exception as e:
+        return jsonify({'error': 'backtest_failed',
+                        'message': '일부 종목의 시세가 부족해 백테스트를 완료하지 못했습니다.',
+                        'detail': str(e)[:200]}), 200
+    return jsonify({
+        'metrics': res.get('metrics', {}),
+        'period': {'start': start.isoformat(), 'end': end.isoformat(), 'years': years},
+        'n_holdings': len(tickers),
+    })
+
 @app.route('/myportfolios')
 def myportfolios():
     return render_template('myportfolios.html')

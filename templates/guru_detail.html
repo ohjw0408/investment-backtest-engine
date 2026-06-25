@@ -26,8 +26,24 @@
 .gd-btn { display: inline-flex; align-items: center; gap: 7px; margin-top: 16px; padding: 11px 18px; border: none;
   border-radius: var(--r-lg, 12px); background: var(--brand); color: var(--on-brand, #fff); font-size: 13.5px; font-weight: 700; cursor: pointer; }
 .gd-btn:disabled { opacity: .55; cursor: default; }
+.gd-bt-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.gd-yrs { display: inline-flex; gap: 4px; }
+.gd-yr { padding: 7px 12px; border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body);
+  border-radius: var(--r-md, 8px); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.gd-yr.on { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); }
 
 #gdBtResult { margin-top: 16px; }
+.gd-bt-card { padding: 16px 18px; border-radius: var(--r-xl, 16px); background: var(--ds-soft); border: 1px solid var(--ds-hairline); }
+.gd-bt-head { font-size: 12.5px; color: var(--ds-muted); margin-bottom: 12px; }
+.gd-bt-head b { color: var(--ds-ink); font-weight: 700; }
+.gd-bt-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.gd-bt-m { }
+.gd-bt-m .k { font-size: 11px; color: var(--ds-muted); }
+.gd-bt-m .v { font-size: 18px; font-weight: 700; font-family: var(--font-mono); margin-top: 3px; }
+.gd-bt-m .v.up { color: var(--up); } .gd-bt-m .v.down { color: var(--down); }
+.gd-bt-note { font-size: 11px; color: var(--ds-muted); margin-top: 12px; line-height: 1.5; }
+.gd-bt-loading, .gd-bt-err { font-size: 13px; color: var(--ds-muted); padding: 14px; text-align: center; }
+@media (max-width: 560px) { .gd-bt-metrics { grid-template-columns: repeat(2, 1fr); } }
 
 .gd-table { width: 100%; border-collapse: collapse; margin-top: 18px; }
 .gd-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--ds-muted); text-transform: uppercase;
@@ -69,7 +85,14 @@
     <span>커버 비중 <b>{{ g.covered_weight }}%</b></span>
   </div>
 
-  <button class="gd-btn" id="gdBtBtn" data-slug="{{ g.slug }}" disabled>📈 이 포트폴리오 백테스트 (준비 중)</button>
+  <div class="gd-bt-row">
+    <button class="gd-btn" id="gdBtBtn" data-slug="{{ g.slug }}">📈 이 포트폴리오 백테스트</button>
+    <span class="gd-yrs" id="gdYrs">
+      <button class="gd-yr" data-y="1">1년</button>
+      <button class="gd-yr on" data-y="3">3년</button>
+      <button class="gd-yr" data-y="5">5년</button>
+    </span>
+  </div>
   <div id="gdBtResult"></div>
 
   <table class="gd-table">
@@ -99,9 +122,61 @@
 
 {% block scripts %}
 <script>
-// P3에서 백테스트 연결 예정
-document.getElementById('gdBtBtn')?.addEventListener('click', function () {
-  // placeholder — P3 wiring
-});
+(function () {
+  const btn = document.getElementById('gdBtBtn');
+  const result = document.getElementById('gdBtResult');
+  const yrs = document.getElementById('gdYrs');
+  if (!btn) return;
+  const slug = btn.dataset.slug;
+  let years = 3;
+
+  yrs.addEventListener('click', function (e) {
+    const b = e.target.closest('.gd-yr');
+    if (!b) return;
+    yrs.querySelectorAll('.gd-yr').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    years = parseInt(b.dataset.y, 10);
+  });
+
+  const pct = (x) => (x * 100).toFixed(1) + '%';
+  const won = (x) => '₩' + Math.round(x).toLocaleString();
+
+  btn.addEventListener('click', async function () {
+    btn.disabled = true;
+    result.innerHTML = '<div class="gd-bt-card"><div class="gd-bt-loading">백테스트 실행 중…</div></div>';
+    try {
+      const r = await fetch('/api/gurus/' + slug + '/backtest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ years: years }),
+      });
+      const d = await r.json();
+      if (d.error || !d.metrics) {
+        result.innerHTML = '<div class="gd-bt-card"><div class="gd-bt-err">' +
+          (d.message || '백테스트를 완료하지 못했습니다.') + '</div></div>';
+        return;
+      }
+      const m = d.metrics;
+      const trCls = m.total_return >= 0 ? 'up' : 'down';
+      const cgCls = m.cagr >= 0 ? 'up' : 'down';
+      result.innerHTML =
+        '<div class="gd-bt-card">' +
+          '<div class="gd-bt-head"><b>' + d.period.years + '년</b> 백테스트 · 상위 ' + d.n_holdings +
+          '개 종목 고정비중 · 연 1회 리밸런싱 가정 (' + d.period.start + ' ~ ' + d.period.end + ')</div>' +
+          '<div class="gd-bt-metrics">' +
+            '<div class="gd-bt-m"><div class="k">총 수익률</div><div class="v ' + trCls + '">' + pct(m.total_return) + '</div></div>' +
+            '<div class="gd-bt-m"><div class="k">연평균(CAGR)</div><div class="v ' + cgCls + '">' + pct(m.cagr) + '</div></div>' +
+            '<div class="gd-bt-m"><div class="k">최대낙폭(MDD)</div><div class="v down">' + pct(m.mdd) + '</div></div>' +
+            '<div class="gd-bt-m"><div class="k">기말 평가액</div><div class="v">' + won(m.end_value) + '</div></div>' +
+          '</div>' +
+          '<div class="gd-bt-note">초기 1,000만원 · 배당 재투자 가정. 13F 상위 종목을 공시 비중대로 보유했다고 가정한 모의 결과이며, 실제 펀드 성과·세금·수수료와 다릅니다. 투자자문이 아닙니다.</div>' +
+        '</div>';
+    } catch (e) {
+      result.innerHTML = '<div class="gd-bt-card"><div class="gd-bt-err">오류가 발생했습니다. 잠시 후 다시 시도해주세요.</div></div>';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
 </script>
 {% endblock %}

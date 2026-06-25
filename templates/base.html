@@ -34,6 +34,14 @@
 {%- elif n == 'sliders' -%}<svg {{ A|safe }}><circle cx="8" cy="8" r="2.2" {{ F|safe }}/><circle cx="16" cy="16" r="2.2" {{ F|safe }}/><path {{ S|safe }} d="M4 8h2M10.2 8H20M4 16h3.8M18.2 16H20"/><circle cx="8" cy="8" r="2.2" {{ S|safe }}/><circle cx="16" cy="16" r="2.2" {{ S|safe }}/></svg>
 {%- endif -%}
 {%- endmacro -%}
+{# ── 공용 페이지 헤더: 주황 "Money Milestone" 워드마크 + 제목(+서브). 전 탭 통일 ── #}
+{%- macro mm_hero(title, sub='') -%}
+<header class="mm-hero">
+  <div class="mm-hero-eyebrow">Money Milestone</div>
+  <h1 class="mm-hero-title">{{ title }}</h1>
+  {% if sub %}<p class="mm-hero-sub">{{ sub|safe }}</p>{% endif %}
+</header>
+{%- endmacro -%}
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -127,6 +135,13 @@
      넉넉한 하단 패딩으로 탭바 위까지 스크롤되게 */
   html.is-app .sidebar { padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important; box-sizing: border-box; }
   /* 앱: 상단 햄버거는 유지(전체메뉴), 하단탭이 주 네비 */
+  /* ===== 공용 페이지 헤더 (mm_hero 매크로) — 전 탭 통일 ===== */
+  .mm-hero { margin: 0 0 22px; }
+  .mm-hero-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--logo); }
+  .mm-hero-title { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.2; color: var(--ds-ink); margin: 6px 0 0; }
+  .mm-hero-sub { font-size: 13px; color: var(--ds-muted); margin: 8px 0 0; line-height: 1.55; }
+  .mm-hero-sub b { color: var(--ds-body); font-weight: 700; }
+  @media (max-width: 560px) { .mm-hero-title { font-size: 22px; } }
   </style>
   {% block head %}{% endblock %}
 </head>

@@ -332,6 +332,13 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
 {% block content %}
 <div class="dashboard-grid{% if user %} is-auth{% endif %}">
 
+  <!-- ===== 브랜드 히어로 (로그인·비로그인 공용 — 항상 최상단, 로그인해도 유지) ===== -->
+  <div class="md-hero">
+    <div class="md-hero-eyebrow">Money Milestone</div>
+    <div class="md-hero-title">자산배분 투자자를 위한<br><b>올인원 투자 동반자</b></div>
+    <div class="md-hero-sub">자산 추적 · 리밸런싱 알림 · 30년 시뮬레이션을 한 곳에서</div>
+  </div>
+
   {% if user %}
   <!-- ===== 포트폴리오 카드 (로그인) ===== -->
   <div class="card portfolio-card" id="portfolioCard">
@@ -369,13 +376,6 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
   </div>
 
   {% else %}
-  <!-- ===== 홍보 히어로 (비로그인 공용 — 웹·앱 모두 노출) ===== -->
-  <div class="md-hero">
-    <div class="md-hero-eyebrow">Money Milestone</div>
-    <div class="md-hero-title">자산배분 투자자를 위한<br><b>올인원 투자 동반자</b></div>
-    <div class="md-hero-sub">자산 추적 · 리밸런싱 알림 · 30년 시뮬레이션을 한 곳에서</div>
-  </div>
-
   <!-- ===== 모바일 압축 3도어 (비로그인 · ≤768/앱 — 데스크톱은 아래 데모카드 유지) ===== -->
   <div class="mobile-doors">
 
@@ -493,6 +493,29 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
 
   {% endif %}
 
+  <!-- ===== 투자대가 진입 프로모 (로그인 시 '다음 할 일' 아래로) ===== -->
+  <a class="guru-promo" href="/gurus">
+    <div class="guru-promo-card">
+      <div class="guru-promo-top">
+        <div class="guru-promo-avatars">
+          <span class="guru-promo-av" data-gavatar="warren-buffett" style="background:#8bc34a">WB</span>
+          <span class="guru-promo-av" data-gavatar="ray-dalio" style="background:#ff9800">RD</span>
+          <span class="guru-promo-av" data-gavatar="michael-burry" style="background:#cf202f">MB</span>
+          <span class="guru-promo-av" data-gavatar="bill-ackman" style="background:#0052ff">BA</span>
+        </div>
+        <span class="guru-promo-badge">★ SEC 13F 공시</span>
+      </div>
+      <div class="guru-promo-main">
+        <div class="guru-promo-t">월가 전설들은 지금 무엇을 들고 있을까?</div>
+        <div class="guru-promo-d">워런 버핏 · 마이클 버리 · 빌 애크만 · 레이 달리오 등 세계적 투자 대가들이 SEC에 공시한 <b>실제 보유 종목과 비중</b>을 그대로 확인하세요. 마음에 드는 포트폴리오는 <b>클릭 한 번으로 백테스트</b>까지 — 분기마다 자동 업데이트됩니다.</div>
+      </div>
+      <div class="guru-promo-foot">
+        <span class="guru-promo-stats">투자 대가 <b>10인</b> · 13F 공시 기준</span>
+        <span class="guru-promo-cta">포트폴리오 보러가기 ›</span>
+      </div>
+    </div>
+  </a>
+
   <!-- ===== 투자 도구 (기능 유도 — 로그인/비로그인 공용) ===== -->
   <div class="feat-sec">
     <div class="feat-sec-title">투자, 어디서부터 시작하면 좋을까요?</div>
@@ -536,29 +559,6 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
       </a>
     </div>
   </div>
-
-  <!-- ===== 투자대가 진입 프로모 (웹·앱 공용 — 시장지수 위) ===== -->
-  <a class="guru-promo" href="/gurus">
-    <div class="guru-promo-card">
-      <div class="guru-promo-top">
-        <div class="guru-promo-avatars">
-          <span class="guru-promo-av" data-gavatar="warren-buffett" style="background:#8bc34a">WB</span>
-          <span class="guru-promo-av" data-gavatar="ray-dalio" style="background:#ff9800">RD</span>
-          <span class="guru-promo-av" data-gavatar="michael-burry" style="background:#cf202f">MB</span>
-          <span class="guru-promo-av" data-gavatar="bill-ackman" style="background:#0052ff">BA</span>
-        </div>
-        <span class="guru-promo-badge">★ SEC 13F 공시</span>
-      </div>
-      <div class="guru-promo-main">
-        <div class="guru-promo-t">월가 전설들은 지금 무엇을 들고 있을까?</div>
-        <div class="guru-promo-d">워런 버핏 · 마이클 버리 · 빌 애크만 · 레이 달리오 등 세계적 투자 대가들이 SEC에 공시한 <b>실제 보유 종목과 비중</b>을 그대로 확인하세요. 마음에 드는 포트폴리오는 <b>클릭 한 번으로 백테스트</b>까지 — 분기마다 자동 업데이트됩니다.</div>
-      </div>
-      <div class="guru-promo-foot">
-        <span class="guru-promo-stats">투자 대가 <b>10인</b> · 13F 공시 기준</span>
-        <span class="guru-promo-cta">포트폴리오 보러가기 ›</span>
-      </div>
-    </div>
-  </a>
 
   <!-- ===== 홈 위젯 (시장지수 / 관심목록) ===== -->
   <div class="card market-card" id="widgetCard">

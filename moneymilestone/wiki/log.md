@@ -3840,3 +3840,13 @@ _작성: Claude_
 - 검증: Playwright 라이트/다크 — 카드 아바타 SVG 10+·이니셜 텍스트 제거·홈 프로모 4개·콘솔에러 0 PASS. 스샷 육안: 10인 전부 distinct한 컬러풀 추상 아바타(버핏 청/황, 리루 핑크, 막스 보라 등), 홈 프로모 겹친 4아바타 프리미엄.
 
 _작성: Claude_
+
+## 2026-06-25 — 전 탭 헤더 통일(주황 "Money Milestone" 워드마크+제목) + 홈 재배치
+
+오너: gurus 탭 상단 브랜드 헤더 마음에 듦 → 전 탭·웹·앱 통일.
+- **공용 매크로** `mm_hero(title, sub)` base.html(nicon 옆). 주황 `Money Milestone` eyebrow + 제목 + 서브(|safe). CSS는 base.html 전역 `<style>`(.mm-hero*, 토큰 기반 → 다크 자동). 자식 템플릿서 nicon처럼 사용.
+- **적용 16탭**: calculator·dividend_target·simple·tax_switch·retirement·backtest·risk_return·macro·calendar·search·gurus·tools·alerts·settings·myportfolios·myassets. 기존 제각각 제목(bt-hero-head 중앙정렬·이모지 title·calc-title 등)을 mm_hero 좌측정렬 브랜드 헤더로 교체. gurus는 gr-hero→mm_hero(동일 패턴 흡수). myassets는 헤더 없어 신규 추가. myportfolios는 mpCount(id) 보존 위해 헤더 위로 분리. 레거시 title CSS는 미사용으로 잔존(무해).
+- **홈 재배치**(오너 2건): ① md-hero(브랜드 로고+문구)를 else→if/else 공용 최상단으로 → **로그인해도 유지**. ② guru-promo를 feat-sec 위→`{% endif %}` 직후로 이동 → 로그인 시 **'다음 할 일' 카드 밑**. 확정 순서(test_client) = md-hero→portfolioCard→actionCard→guru-promo→feat-sec.
+- 검증: 전 16탭 curl mm-hero 렌더 확인(myportfolios는 로그인게이트라 로그인 시 표시). Playwright 라이트 5탭 콘솔에러 0 + 스샷(calculator/home/gurus), 다크 gurus 스샷 — 헤더 통일 육안 확인. 로그인 홈 DOM 순서 in-process 확정.
+
+_작성: Claude_

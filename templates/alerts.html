@@ -63,8 +63,7 @@
 
 {% block content %}
 <div class="al-wrap">
-  <div class="al-title">🔔 알림</div>
-  <div class="al-sub">보유·관심 종목의 가격 변동·신고가/신저가·리밸런싱을 감시해 알려드려요. 시세는 15분 지연.</div>
+  {{ mm_hero('알림', '보유·관심 종목의 가격 변동·신고가/신저가·리밸런싱을 감시해 알려드려요. 시세는 15분 지연.') }}
 
   {% if not user %}
   <div class="al-card"><div class="al-login">알림은 로그인 후 사용할 수 있어요.</div></div>

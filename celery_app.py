@@ -59,4 +59,9 @@ celery.conf.beat_schedule = {
         'task': 'tasks.evaluate_alerts',
         'schedule': crontab(minute='*/15', hour='0-6,13-20', day_of_week='mon-fri'),
     },
+    # 증시 캘린더 일정 알림 — 매일 08:00 KST(=23:00 UTC). 당일 일정 묶음 1건.
+    'evaluate-calendar-alerts': {
+        'task': 'tasks.evaluate_calendar_alerts',
+        'schedule': crontab(hour=23, minute=0),
+    },
 }

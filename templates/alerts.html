@@ -58,6 +58,15 @@
   cursor: pointer; font-family: var(--font-sans); transition: border-color .12s, background .12s, color .12s; }
 .al-chip:hover { border-color: var(--brand); }
 .al-chip.on { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+/* 증시 캘린더 알림 */
+.ca-master { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.92rem; color: var(--ds-ink); }
+.ca-kinds { display: flex; flex-wrap: wrap; gap: 8px; }
+.ca-chk { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-md); cursor: pointer; font-size: 0.84rem; color: var(--ds-body); background: var(--ds-canvas); }
+.ca-chk:hover { border-color: var(--brand); }
+.ca-subtitle { font-size: 0.8rem; font-weight: 700; color: var(--ds-ink); margin: 0 0 8px; }
+.ca-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.ca-src-card { border: 1px solid var(--ds-hairline); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 10px; background: var(--ds-canvas); }
 </style>
 {% endblock %}
 
@@ -123,6 +132,33 @@
       <button class="al-btn" id="alRebCreate">리밸런싱 알림 추가</button>
     </div>
     <div class="al-err" id="alRebErr"></div>
+  </div>
+
+  <!-- 증시 캘린더 알림 -->
+  <div class="al-card">
+    <h3>📅 증시 캘린더 알림</h3>
+    <div class="al-sub" style="margin-bottom:12px;">매일 아침 8시, 그날 있는 일정(경제지표·실적·통화정책·배당락)을 알려드려요. 대상은 아래에서 <b>알림 전용</b>으로 골라요(캘린더 설정과 별개).</div>
+    <label class="ca-master"><input type="checkbox" id="caEnabled"> <b>증시 일정 알림 받기</b></label>
+    <div id="caBody" style="display:none;margin-top:16px;">
+      <div class="ca-kinds">
+        <label class="ca-chk"><input type="checkbox" id="caEcon"> 경제지표</label>
+        <label class="ca-chk"><input type="checkbox" id="caPolicy"> 통화정책</label>
+        <label class="ca-chk"><input type="checkbox" id="caEarn"> 실적 발표</label>
+        <label class="ca-chk"><input type="checkbox" id="caDiv"> 배당락</label>
+      </div>
+      <div id="caEconWrap" style="margin-top:16px;">
+        <div class="ca-subtitle">알림받을 경제지표</div>
+        <div id="caEconList" class="ca-grid"></div>
+      </div>
+      <div id="caSymWrap" style="margin-top:16px;">
+        <div class="ca-subtitle">실적·배당락 대상 종목</div>
+        <div id="caSymbols"></div>
+      </div>
+      <div class="al-row" style="margin-top:16px;align-items:center;">
+        <button class="al-btn" id="caSave">저장</button>
+        <span id="caStatus" class="al-sub" style="margin-left:10px;"></span>
+      </div>
+    </div>
   </div>
 
   <!-- 내 알림 -->
@@ -312,6 +348,65 @@ $('alReadAll').addEventListener('click', async () => {
 
 loadRules();
 loadEvents();
+
+// ── 증시 캘린더 알림 ──
+(function () {
+  const enabled = $('caEnabled'), body = $('caBody');
+  const kEcon = $('caEcon'), kPol = $('caPolicy'), kEarn = $('caEarn'), kDiv = $('caDiv');
+  const econWrap = $('caEconWrap'), symWrap = $('caSymWrap');
+  if (!enabled) return;
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function sync() {
+    body.style.display = enabled.checked ? 'block' : 'none';
+    econWrap.style.display = kEcon.checked ? 'block' : 'none';
+    symWrap.style.display = (kEarn.checked || kDiv.checked) ? 'block' : 'none';
+  }
+  [enabled, kEcon, kPol, kEarn, kDiv].forEach(el => el.addEventListener('change', sync));
+
+  (async function () {
+    let r;
+    try { r = await (await fetch('/api/alerts/calendar-prefs', { cache: 'no-store' })).json(); }
+    catch (e) { return; }
+    if (!r.logged_in) return;
+    const p = r.prefs || {};
+    enabled.checked = !!p.enabled;
+    kEcon.checked = p.show_econ !== false; kPol.checked = p.show_policy !== false;
+    kEarn.checked = p.show_earnings !== false; kDiv.checked = p.show_dividend !== false;
+    const ids = new Set(p.econ_ids || []);
+    $('caEconList').innerHTML = (r.available_econ || []).map(e =>
+      `<label class="ca-chk"><input type="checkbox" class="ca-econ" value="${e.id}" ${ids.has(e.id) ? 'checked' : ''}> ${esc(e.label)}</label>`).join('');
+    const src = p.sources || {}, excl = new Set(p.excluded || []), sym = r.symbols || {},
+          labels = r.group_labels || {}, order = r.group_order || [];
+    let html = '';
+    for (const g of order) {
+      const items = sym[g] || [];
+      if (!items.length) continue;
+      html += `<div class="ca-src-card">
+        <label class="ca-chk" style="font-weight:700;border:none;background:none;padding:0;">
+          <input type="checkbox" class="ca-src" data-g="${esc(g)}" ${src[g] !== false ? 'checked' : ''}> ${esc(labels[g] || g)} <span style="color:var(--ds-muted);font-weight:400">(${items.length})</span></label>
+        <div class="ca-grid" style="margin-top:10px;">
+          ${items.map(it => `<label class="ca-chk"><input type="checkbox" class="ca-sym" value="${esc(it.code)}" ${excl.has(it.code) ? '' : 'checked'}> ${esc(it.name)}</label>`).join('')}
+        </div></div>`;
+    }
+    $('caSymbols').innerHTML = html || '<div class="al-sub">대상 종목이 없어요. 내 자산·포트폴리오·관심목록에 종목을 추가하세요.</div>';
+    sync();
+  })();
+
+  $('caSave').addEventListener('click', async function () {
+    const sources = {};
+    document.querySelectorAll('.ca-src').forEach(s => sources[s.dataset.g] = s.checked);
+    const excluded = [...document.querySelectorAll('.ca-sym:not(:checked)')].map(s => s.value);
+    const econ_ids = [...document.querySelectorAll('.ca-econ:checked')].map(c => +c.value);
+    const payload = { enabled: enabled.checked, show_econ: kEcon.checked, show_policy: kPol.checked,
+      show_earnings: kEarn.checked, show_dividend: kDiv.checked, econ_ids, sources, excluded };
+    const st = $('caStatus'); st.textContent = '저장 중…';
+    try {
+      const res = await fetch('/api/alerts/calendar-prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      st.textContent = res.ok ? '저장됐어요. 매일 아침 8시에 알려드려요.' : '저장 실패';
+      st.style.color = res.ok ? 'var(--up)' : 'var(--down)';
+    } catch (e) { st.textContent = '저장 실패'; }
+  });
+})();
 </script>
 {% endif %}
 {% endblock %}

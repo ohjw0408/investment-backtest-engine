@@ -2935,6 +2935,56 @@ def api_calendar_config_save():
     save_calendar_config(session['user_id'], cfg)
     return jsonify({'ok': True, 'config': cfg})
 
+@app.route('/api/alerts/calendar-prefs')
+def api_cal_alert_prefs_get():
+    """증시 캘린더 일정 알림 설정 + 선택지(경제지표·종목 소스). 알림 전용(캘린더 설정과 독립)."""
+    from modules import market_calendar
+    from modules.alerts import alert_store
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'logged_in': False})
+    out = {'logged_in': True, 'prefs': alert_store.get_cal_alert_prefs(uid),
+           'available_econ': [{'id': rid, 'label': lbl} for rid, lbl in market_calendar.CAL_RELEASES.items()]}
+    groups, names, labels = _calendar_grouped(uid)
+    try:
+        from modules.dividend_history import _load_names
+        allc = [c for g in groups for c in groups[g]]
+        loaded = _load_names(allc)
+        for c in allc:
+            if not names.get(c):
+                nm = loaded.get(c.upper())
+                if nm:
+                    names[c] = nm
+    except Exception:
+        pass
+    out['symbols'] = {g: [{'code': c, 'name': names.get(c, c)} for c in groups[g]] for g in groups}
+    out['group_labels'] = labels
+    out['group_order'] = list(groups.keys())
+    return jsonify(out)
+
+@app.route('/api/alerts/calendar-prefs', methods=['POST'])
+def api_cal_alert_prefs_save():
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    from modules import market_calendar
+    from modules.alerts import alert_store
+    body = request.get_json(silent=True) or {}
+    valid_ids = set(market_calendar.CAL_RELEASES.keys())
+    src = body.get('sources') or {}
+    prefs = {
+        'enabled': bool(body.get('enabled')),
+        'show_econ': bool(body.get('show_econ', True)),
+        'show_earnings': bool(body.get('show_earnings', True)),
+        'show_policy': bool(body.get('show_policy', True)),
+        'show_dividend': bool(body.get('show_dividend', True)),
+        'econ_ids': [i for i in (body.get('econ_ids') or []) if i in valid_ids],
+        'sources': {str(g)[:40]: bool(v) for g, v in src.items()},
+        'excluded': [str(c) for c in (body.get('excluded') or [])][:200],
+    }
+    alert_store.save_cal_alert_prefs(uid, prefs)
+    return jsonify({'ok': True, 'prefs': prefs})
+
 @app.route('/api/macro/curves')
 def api_macro_curves():
     from modules import macro_loader

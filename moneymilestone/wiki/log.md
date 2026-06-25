@@ -3868,3 +3868,17 @@ _작성: Claude_
 - **캘린더 소스 포폴별 분리**: 저장 포트폴리오를 'portfolios' 하나로 묶던 것 → **각 포폴이 별도 그룹**(pf:<id>). 백엔드 `_calendar_grouped` 3-tuple(groups·names·labels) OrderedDict(holdings→pf:*→watchlist), `_calendar_user_codes`/config GET·SAVE/default 동적 소스 키, alerts 종목수집 2곳 3-tuple+동적순회. 프론트 calSymbols 렌더 group_order/group_labels 순회(CAL_GROUPS 상수 제거). 검증: config API group_order=['holdings','pf:12','watchlist']·labels OK, 소스토글 라운드트립(pf:12 off=4·on=16종목).
 
 _작성: Claude_
+
+## 2026-06-25 — 홈위젯 편집기 1열 스택 + 증시 캘린더 일정 알림 신설
+
+- **홈위젯 편집기 칸 안 맞음 재수정**: `#weList`가 minmax(330px) 가로 2열이라 카드 높이 mismatch·순서(▲▼) 비직관 → flex column 1열 스택. 데스크톱·모바일 실렌더 + ▲ 순서변경 클릭 확인.
+- **증시 캘린더 일정 알림(P1~P5)**: 오너결정 = 당일아침 1회·알림전용 종목/지표(캘린더와 독립)·08:00 KST. 플랜=`캘린더알림_plan.md`.
+  - store: `cal_alert_prefs`(user 1:1, enabled·show_econ/earnings/policy/dividend·econ_ids·sources·excluded·last_sent_date) CRUD(alert_store).
+  - runner: `modules/alerts/calendar_alert_runner.py`(워커전용) — enabled 사용자별 알림종목(prefs소스, auth_manager 직접) + events_for → 오늘(KST) 종류필터 → 묶음1건 add_event+push, last_sent_date 중복방지.
+  - task+beat: tasks.evaluate_calendar_alerts + celery_app `crontab(hour=23,min=0)`=08:00 KST 매일.
+  - API: GET/POST `/api/alerts/calendar-prefs`(prefs+available_econ+동적 symbols).
+  - UI: alerts.html "📅 증시 캘린더 알림" 카드(마스터+종류4토글+경제지표 개별+알림전용 종목소스, settings 캘린더 동일패턴).
+  - 검증: store/API/runner 발화(오늘 2건 묶음)/중복방지 in-process PASS, UI 마크업+렌더스크립트 문법 OK. 시각 prod 확인.
+  - ⚠️ prod: 배포 후 **celery beat 재시작**(새 스케줄) + 워커 재배포(runner 포함). 푸시는 FCM 키 있을 때만. cal_alert_prefs 앱시작 자동생성.
+
+_작성: Claude_

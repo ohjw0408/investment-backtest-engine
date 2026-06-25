@@ -342,6 +342,24 @@ def evaluate_alerts():
 
 
 @celery.task
+def evaluate_calendar_alerts():
+    """매일 08:00 KST Celery Beat — 증시 캘린더 일정 알림(당일 일정 묶음 1건). 장 무관."""
+    try:
+        from modules.alerts.calendar_alert_runner import run_calendar_alerts
+        from modules.price_loader import PriceLoader
+        from modules import auth_manager
+        auth_manager.init_db()
+        from modules.alerts import alert_store
+        alert_store.init_alerts_db()
+        fired = run_calendar_alerts(PriceLoader())
+        print(f"[evaluate_calendar_alerts] {fired} users notified")
+        return {"status": "ok", "fired": fired}
+    except Exception as e:
+        print(f"[evaluate_calendar_alerts] 오류: {e}")
+        raise
+
+
+@celery.task
 def refresh_index_ohlc():
     """장중 주기 실행(Celery Beat) — 시장지수 index_ohlc를 당일까지 갱신.
 

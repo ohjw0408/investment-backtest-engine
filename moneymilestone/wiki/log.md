@@ -3750,3 +3750,11 @@ _작성: Claude_
 - 테스트: `tests/test_track_g_multi_account.py` L0~L3 4/4 PASS, 기존 Gate 2a/2b/2c 12/12 PASS, JS syntax PASS, 브라우저 UI 스모크 PASS.
 
 _작성: Codex_
+
+## 2026-06-25 — 홈 홍보 히어로 웹 노출 + 로고 주황
+
+- `templates/index.html`: 앱 비로그인 홈의 홍보 히어로(`md-hero` — "Money Milestone" eyebrow + "올인원 투자 동반자" + 서브문구)를 `mobile-doors` 밖 형제로 이동. 전엔 `mobile-doors`(데스크톱 `display:none`) 자식이라 웹에서 안 보였음 → 이제 비로그인 **웹·앱 공용** 노출.
+- `.md-hero-eyebrow` 색 `var(--brand-text)`(파랑) → `var(--logo)`(#ff6a00 주황). "Money Milestone" 문구만 로고색 적용, 타이틀 그라데는 브랜드색 유지. `--logo`는 :root만 정의(다크 오버라이드 없음) → 라이트/다크 동일 주황.
+- 검증: 로컬 서버 + Playwright 1280px 비로그인, 라이트·다크 양 테마 hero 노출 + eyebrow `rgb(255,106,0)` 확인, 레이아웃 보존, 콘솔에러 0.
+
+_작성: Claude_

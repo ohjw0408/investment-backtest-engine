@@ -176,7 +176,7 @@
 /* 히어로 — eyebrow + 타이틀 + 서브 계층 */
 .md-hero { padding: 4px 2px 2px; }
 .md-hero-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--brand-text); }
+  color: var(--logo); }
 .md-hero-title { font-size: 23px; font-weight: 700; letter-spacing: -0.6px; line-height: 1.28;
   color: var(--ds-ink); margin-top: 7px; }
 .md-hero-title b { background: linear-gradient(90deg, var(--brand), var(--brand-bright, var(--brand)));
@@ -311,13 +311,15 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
   </div>
 
   {% else %}
+  <!-- ===== 홍보 히어로 (비로그인 공용 — 웹·앱 모두 노출) ===== -->
+  <div class="md-hero">
+    <div class="md-hero-eyebrow">Money Milestone</div>
+    <div class="md-hero-title">자산배분 투자자를 위한<br><b>올인원 투자 동반자</b></div>
+    <div class="md-hero-sub">자산 추적 · 리밸런싱 알림 · 30년 시뮬레이션을 한 곳에서</div>
+  </div>
+
   <!-- ===== 모바일 압축 3도어 (비로그인 · ≤768/앱 — 데스크톱은 아래 데모카드 유지) ===== -->
   <div class="mobile-doors">
-    <div class="md-hero">
-      <div class="md-hero-eyebrow">Money Milestone</div>
-      <div class="md-hero-title">자산배분 투자자를 위한<br><b>올인원 투자 동반자</b></div>
-      <div class="md-hero-sub">자산 추적 · 리밸런싱 알림 · 30년 시뮬레이션을 한 곳에서</div>
-    </div>
 
     <!-- 기둥1: 자산 관리 (데모 포폴 느낌 유지 — 자물쇠·그라데·유도문구 오버레이) -->
     <a href="/myassets" class="md-door">

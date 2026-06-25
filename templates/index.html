@@ -250,6 +250,7 @@
 .mm-macro-d { font-size: 10.5px; color: var(--ds-muted); margin-top: 2px; }
 .mm-macro-sec-t { font-size: var(--fs-title); font-weight: 600; color: var(--ds-ink); margin: 2px 2px 12px; }
 .mm-macro-sec-t .macro-t-web { display: none; }
+.mm-macro-sec-sub { display: none; font-size: var(--fs-cap); color: var(--ds-muted); margin: -6px 2px 14px; }
 .mobile-legal { padding: 18px 4px 6px; text-align: center; }
 .mobile-legal a { font-size: 12px; color: var(--ds-muted); text-decoration: none; }
 .mobile-legal .sep { color: var(--ds-hairline); margin: 0 8px; }
@@ -275,6 +276,13 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
   .dashboard-grid:not(.is-auth) .mobile-macro { display: block; }
   .mm-macro-sec-t .macro-t-app { display: none; }
   .mm-macro-sec-t .macro-t-web { display: inline; }
+  .mm-macro-sec-sub { display: block; }
+  .dashboard-grid:not(.is-auth) .mm-macro-grid { gap: 12px; }
+  .dashboard-grid:not(.is-auth) .mm-macro-card { padding: 20px 22px; gap: 14px; }
+  .dashboard-grid:not(.is-auth) .mm-macro-ic { width: 46px; height: 46px; }
+  .dashboard-grid:not(.is-auth) .mm-macro-ic .si-ic { width: 24px; height: 24px; }
+  .dashboard-grid:not(.is-auth) .mm-macro-t { font-size: 16px; }
+  .dashboard-grid:not(.is-auth) .mm-macro-d { font-size: 13px; margin-top: 4px; }
 }
 </style>
 {% endblock %}
@@ -508,6 +516,7 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
   <!-- ===== 거시경제 안내 (모바일 비로그인 — 시장지수 아래) ===== -->
   <div class="mobile-macro">
     <div class="mm-macro-sec-t"><span class="macro-t-app">시장을 더 넓게</span><span class="macro-t-web">시장을 더 넓게 바라보기</span></div>
+    <div class="mm-macro-sec-sub">개별 종목 너머의 거시 흐름과 일정까지, 투자 판단에 필요한 큰 그림을 한눈에</div>
     <div class="mm-macro-grid">
       <a href="/macro" class="mm-macro-card">
         <div class="mm-macro-ic">{{ nicon('globe') }}</div>

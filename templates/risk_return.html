@@ -166,7 +166,10 @@
     <div id="rrPfList" class="rr-pf-list"><span style="color:var(--text-muted);font-size:0.82rem;">⏳ 불러오는 중...</span></div>
     {% else %}
     <div class="rr-card-title">⭐ 내 포트폴리오 만들기 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 여러 개 만들어 서로 비교 · 로그인하면 저장</span></div>
+    {% endif %}
+    <div id="rrPreNote" style="display:none;"></div>
     <div id="rrBuilder"></div>
+    {% if not user %}
     <button class="btn-primary" id="rrAddPort" style="margin-top:10px;background:var(--ds-strong,#eef);color:var(--blue);font-weight:700;padding:9px 16px;border-radius:9px;font-size:0.86rem;">+ 포트폴리오 추가</button>
     {% endif %}
 
@@ -333,11 +336,14 @@ async function rrCompare(){
   status.style.display = 'block'; status.textContent = '⏳ 산출 중...';
   btn.disabled = true;
   try {
+    // 즉석 빌더에 포폴이 있으면(비로그인 or 예시 프리로드) portfolios 모드, 아니면 저장 포폴 id 모드
+    const adhoc = rrBuildPortfolios();
+    const useAdhoc = adhoc.length > 0 || !RR_AUTH;
     const res = await fetch('/api/portfolio/compare', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(RR_AUTH
-        ? { portfolio_ids: [...rrSelected], benchmarks: rrBench }
-        : { portfolios: rrBuildPortfolios(), benchmarks: rrBench }),
+      body: JSON.stringify(useAdhoc
+        ? { portfolios: adhoc, benchmarks: rrBench }
+        : { portfolio_ids: [...rrSelected], benchmarks: rrBench }),
     });
     const data = await res.json();
     if (!res.ok) { status.textContent = data.error || '산출에 실패했어요.'; return; }
@@ -779,9 +785,25 @@ function rrRenderBuilder(){
 document.addEventListener('click', e=>{ if(!e.target.closest('#rrBuilder .rr-search-wrap')) document.querySelectorAll('#rrBuilder .rr-dropdown').forEach(d=>d.style.display='none'); });
 (function(){ const a=document.getElementById('rrAddPort'); if(a) a.addEventListener('click', ()=>{ abPorts.push({name:`포트폴리오 ${abPorts.length+1}`, items:[]}); rrRenderBuilder(); }); })();
 
+// ── 포트폴리오 예시에서 넘어온 프리로드 → 즉석 빌더에 주입(portfolios 모드로 비교) ──
+function rrApplyPreload(){
+  let pre=null; try{ pre=JSON.parse(sessionStorage.getItem('mm_rr_preload')||'null'); }catch(e){}
+  if(!Array.isArray(pre)||!pre.length) return false;
+  sessionStorage.removeItem('mm_rr_preload');
+  abPorts = pre.slice(0,5).map((p,i)=>({ name:p.name||`포트폴리오 ${i+1}`,
+    items:(p.tickers||[]).filter(t=>t&&t.code).map(t=>({code:t.code,name:t.name||t.code,weight:+t.weight||0})) }));
+  rrRenderBuilder();
+  const note=document.getElementById('rrPreNote');
+  if(note){ note.style.display='block';
+    note.innerHTML='<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:8px;">📥 <b style="color:var(--ds-ink,inherit);">포트폴리오 예시</b>에서 '+abPorts.length+'개를 가져왔어요. 비중·종목을 조정한 뒤 아래 <b>정밀 비교하기</b>를 누르세요.</div>'; }
+  if (typeof mmToast==='function') mmToast('포트폴리오 예시 '+abPorts.length+'개를 가져왔어요.', 'ok');
+  return true;
+}
+
 // init
 rrRenderChips();
+const _rrPre = rrApplyPreload();
 if (RR_AUTH) { rrLoadPortfolios().then(rrOvInit); }
-else { rrRenderBuilder(); rrOvInit(); }
+else { if(!_rrPre) rrRenderBuilder(); rrOvInit(); }
 </script>
 {% endblock %}

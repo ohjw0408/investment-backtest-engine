@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-26] FEAT | 포트폴리오 예시 `/examples` (분석탭) — P2~P5 (오너 autopilot)
+
+- **신규 `/examples`** "포트폴리오 예시" 페이지(분석 탭). 검증된 자산배분 템플릿 29종(미국16·한국13)을 골라 바로 분석·비교·저장. 철학=잃지 않는 자산배분. 플랜=`포트폴리오예시_plan.md`(P0·P1은 06-26 선완료, 이번에 P2~P5).
+- **P2 페이지**(`templates/examples.html` + `app.py` `/examples` 라우트 + `modules.portfolio_examples.grouped()` 재사용): mm_hero + 지역탭[🇺🇸미국·🇰🇷한국·⭐투자대가] + 성격섹션(방어/헷지/배당/공격) 카드그리드. **전략카드**=이름·출처·위험도칩(1~10 컬러닷)·구성 스택바·범례(티커명+코드+비중%)·한줄설명·**액션3종**. 투자대가 탭=`/gurus` 진입 패널(편입 느낌, /gurus 상세 재사용).
+- **P3 핸드오프**(`static/js/examples.js`): ①**분석**→`mm_bt_preload`(비중 0~1, 5년창, autorun)→`/backtest`. ②**비교**→`mm_rr_preload` 누적(최대5)+플로팅 "N개 담음·비교하기" 바→`/risk-return`. ③**저장**→`/api/portfolio/save`(비로그인=토스트→OAuth, mmSaveGuru 동일 패턴). **risk_return.html 프리로드 연동**: `rrApplyPreload()`가 예시를 즉석 빌더(`abPorts`)에 주입+안내노트, `rrCompare`를 abPorts 있으면 `portfolios`(ad-hoc) 모드로 분기(로그인무관, 백엔드 기존 지원). 빌더 `#rrBuilder`를 항상 DOM에 존재하도록 이동.
+- **P4 네비**: 분석 드롭다운+사이드바+`/tools` 허브에 "포트폴리오 예시" 추가. **시장에서 "투자대가의 포트폴리오" 제거**(상단 드롭다운·사이드바·`/market`·모바일 하단탭). **유지**: 홈 guru-promo 카드 + `/gurus` 페이지(링크 타겟). 모바일 하단탭 투자대가=분석탭으로 active 정리.
+- **P5 검증(Playwright)**: 라이트/다크/모바일390 — 카드29·지역탭전환·오버플로0·**콘솔에러0**. **비교 핸드오프 E2E**=예시2개 담기→플로팅바→/risk-return 빌더 주입→정밀비교 실제 실행(11지표 표+산점도 렌더). **분석 핸드오프**=/backtest autorun 발화·페이로드 유효(sync 엔진 `/api/backtest/run` SPY60/TLT40 = CAGR 12.04%·MDD -19.24% 검증). 네비=예시링크 노출·투자대가 드롭다운 제거 확인.
+- ⚠️ **로컬 한계**: `/api/backtest/submit`(celery `.delay()`)는 로컬 워커 부재로 500 → autorun 결과뷰는 로컬서 미표시(수동 백테 동일, **prod 무관**). 저장 로그인 클릭은 로컬 세션쿠키 시크릿 불일치로 미실행, mmSaveGuru 등가+스키마 일치로 검증.
+- ⚠️ **관찰(기존 동작)**: 비교탭은 max 공통구간(예: 2000~) 사용 → 영구포폴 등 신생ETF 포함 전략은 합성백필 아티팩트로 CAGR 과대(81%) 표시. 핸드오프 무관, 비교엔진 기존 거동. 분석탭은 5년창이라 정상.
+- ⚠️ **미배포**(로컬 only). prod 반영 = git push(자동 배포). 변경=`app.py`·`templates/examples.html`(신규)·`static/js/examples.js`(신규)·`templates/risk_return.html`·`base.html`·`tools.html`·`market.html`.
+- **잔여(소): 투자대가 카드 "비교에 추가" 버튼**(plan §81, 대가카드에도 3액션 통일) — 이번엔 examples 카드만 적용, /gurus 카드는 분석·저장 유지. 오너 결정 시 후속.
+
 ## [2026-06-25] FEAT | 모바일 비로그인 홈 = 압축 3도어 (출시준비 플랜 §2) (오너)
 
 - `templates/index.html` 비로그인 분기에 **모바일 압축 3도어**(`.mobile-doors`) 신설. **≤768px에서만** 노출(`@media + .dashboard-grid:not(.is-auth)`), 데스크톱은 기존 데모카드·CTA·feat-grid 그대로 = **회귀0**.

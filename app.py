@@ -553,6 +553,13 @@ def macro_page():
 def calendar_page():
     return render_template('calendar.html')
 
+@app.route('/examples')
+def examples_page():
+    """포트폴리오 예시(추천 자산배분 템플릿) — 지역(미국/한국)별 성격 섹션 카드."""
+    from modules import portfolio_examples as pex
+    regions = [(r, pex.REGION_LABELS[r], pex.grouped(r)) for r in ('us', 'kr')]
+    return render_template('examples.html', regions=regions)
+
 @app.route('/gurus')
 def gurus_page():
     from modules.gurus import store

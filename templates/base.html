@@ -167,16 +167,16 @@
       </div>
     </div>
     <div class="mmnav-grp">
-      <button class="mmnav-link mmnav-trigger {% if request.path.startswith(('/backtest','/risk-return')) %}active{% endif %}" type="button">분석 <span class="mmnav-caret">▾</span></button>
+      <button class="mmnav-link mmnav-trigger {% if request.path.startswith(('/backtest','/risk-return','/examples','/gurus')) %}active{% endif %}" type="button">분석 <span class="mmnav-caret">▾</span></button>
       <div class="mmnav-menu">
+        <a href="/examples">포트폴리오 예시</a>
         <a href="/backtest">포트폴리오 분석</a>
         <a href="/risk-return">포트폴리오 비교</a>
       </div>
     </div>
     <div class="mmnav-grp">
-      <button class="mmnav-link mmnav-trigger {% if request.path.startswith(('/macro','/calendar','/search','/gurus')) %}active{% endif %}" type="button">시장 <span class="mmnav-caret">▾</span></button>
+      <button class="mmnav-link mmnav-trigger {% if request.path.startswith(('/macro','/calendar','/search')) %}active{% endif %}" type="button">시장 <span class="mmnav-caret">▾</span></button>
       <div class="mmnav-menu">
-        <a href="/gurus">투자대가의 포트폴리오</a>
         <a href="/macro">거시지표</a>
         <a href="/calendar">증시 캘린더</a>
         <a href="/search">종목 검색</a>
@@ -254,6 +254,9 @@
       {{ nicon('retire') }} 은퇴 설계
     </a>
     <div class="sidebar-label">분석</div>
+    <a class="sidebar-item {% if request.path.startswith('/examples') %}active{% endif %}" href="/examples">
+      {{ nicon('trend-up') }} 포트폴리오 예시
+    </a>
     <a class="sidebar-item {% if request.path.startswith('/backtest') %}active{% endif %}" href="/backtest">
       {{ nicon('chart') }} 포트폴리오 분석
     </a>
@@ -261,9 +264,6 @@
       {{ nicon('compare') }} 포트폴리오 비교
     </a>
     <div class="sidebar-label">시장</div>
-    <a class="sidebar-item {% if request.path.startswith('/gurus') %}active{% endif %}" href="/gurus">
-      {{ nicon('trend-up') }} <span style="line-height:1.25;">투자대가의<br>포트폴리오</span>
-    </a>
     <a class="sidebar-item {% if request.path.startswith('/macro') %}active{% endif %}" href="/macro">
       {{ nicon('globe') }} 거시지표
     </a>
@@ -309,8 +309,8 @@
 <!-- ===== 앱 하단 탭바 (Capacitor 앱에서만 표시) ===== -->
 <nav class="mm-tabbar" aria-label="하단 탭">
   <a class="mm-tab {% if request.path == '/' %}active{% endif %}" href="/">{{ nicon('home') }}<span>홈</span></a>
-  <a class="mm-tab {% if request.path.startswith(('/tools','/calculator','/simple','/dividend-target','/retirement','/tax-switch','/backtest','/risk-return')) %}active{% endif %}" href="/tools">{{ nicon('chart') }}<span>분석</span></a>
-  <a class="mm-tab {% if request.path.startswith(('/market','/macro','/calendar','/gurus')) %}active{% endif %}" href="/market">{{ nicon('globe') }}<span>시장</span></a>
+  <a class="mm-tab {% if request.path.startswith(('/tools','/calculator','/simple','/dividend-target','/retirement','/tax-switch','/backtest','/risk-return','/examples','/gurus')) %}active{% endif %}" href="/tools">{{ nicon('chart') }}<span>분석</span></a>
+  <a class="mm-tab {% if request.path.startswith(('/market','/macro','/calendar')) %}active{% endif %}" href="/market">{{ nicon('globe') }}<span>시장</span></a>
   <a class="mm-tab {% if request.path.startswith(('/myassets','/myportfolios')) %}active{% endif %}" href="/myassets">{{ nicon('wallet') }}<span>내 자산</span></a>
   <a class="mm-tab {% if request.path.startswith('/search') %}active{% endif %}" href="/search">{{ nicon('search') }}<span>검색</span></a>
   <a class="mm-tab {% if request.path.startswith('/settings') %}active{% endif %}" href="/settings">{{ nicon('gear') }}<span>설정</span></a>

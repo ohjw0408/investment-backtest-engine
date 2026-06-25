@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}포트폴리오 예시 — Money Milestone{% endblock %}
+{% block meta_desc %}영구 포트폴리오·올웨더·60/40·SCHD 등 검증된 자산배분 전략 29종. 미국·한국 상장 ETF로 바로 분석·비교·저장하세요. 비중·종목은 자유롭게 바꿀 수 있어요.{% endblock %}
+
+{% block head %}
+<style>
+.ex-wrap { max-width: 960px; margin: 0 auto; padding: 22px 18px 64px; }
+
+/* 지역 탭 */
+.ex-tabs { display: flex; gap: 6px; margin: 18px 0 6px; background: var(--ds-soft); padding: 5px; border-radius: var(--r-pill, 999px); }
+.ex-tab { flex: 1; text-align: center; padding: 9px 10px; border-radius: var(--r-pill, 999px); border: none; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 700; color: var(--ds-muted); background: transparent; transition: background .14s, color .14s; }
+.ex-tab.on { background: var(--ds-canvas); color: var(--ds-ink); box-shadow: var(--ds-shadow); }
+[data-theme="dark"] .ex-tab.on { background: var(--ds-dark-el); }
+
+.ex-panel { display: none; }
+.ex-panel.on { display: block; }
+
+/* 성격 섹션 */
+.ex-sec-title { font-size: 14px; font-weight: 800; color: var(--ds-ink); margin: 24px 2px 12px; }
+
+/* 카드 그리드 */
+.ex-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ex-card { display: flex; flex-direction: column; padding: 16px 17px; border-radius: var(--r-xl, 16px);
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline); box-shadow: var(--ds-shadow); }
+[data-theme="dark"] .ex-card { background: var(--ds-dark-el); border-color: transparent; }
+.ex-card-head { display: flex; align-items: flex-start; gap: 8px; }
+.ex-name { font-size: 15px; font-weight: 800; color: var(--ds-ink); line-height: 1.25; }
+.ex-src { font-size: 11.5px; color: var(--ds-muted); margin-top: 2px; }
+.ex-risk { flex-shrink: 0; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700;
+  padding: 4px 9px; border-radius: var(--r-pill, 999px); border: 1px solid var(--ds-hairline); color: var(--ds-body); white-space: nowrap; }
+.ex-risk-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* 구성 스택바 + 범례 */
+.ex-bar { display: flex; height: 9px; border-radius: var(--r-pill, 999px); overflow: hidden; margin-top: 12px;
+  background: color-mix(in srgb, var(--ds-ink) 8%, transparent); }
+.ex-bar-seg { height: 100%; }
+.ex-legend { margin-top: 9px; display: flex; flex-direction: column; gap: 5px; }
+.ex-leg-row { display: flex; align-items: center; gap: 7px; font-size: 11.5px; }
+.ex-leg-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.ex-leg-name { color: var(--ds-body); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-leg-w { margin-left: auto; font-family: var(--font-mono); font-weight: 600; color: var(--ds-ink); flex-shrink: 0; }
+
+.ex-desc { font-size: 12px; color: var(--ds-muted); line-height: 1.5; margin-top: 11px; }
+
+/* 액션 3종 */
+.ex-acts { display: flex; gap: 6px; margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--ds-hairline); }
+.ex-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-size: 11.5px; font-weight: 700;
+  padding: 8px 6px; border-radius: var(--r-pill, 999px); cursor: pointer; font-family: inherit; white-space: nowrap;
+  border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body); transition: background .12s, color .12s, border-color .12s; }
+[data-theme="dark"] .ex-btn { background: var(--ds-dark-el); }
+.ex-btn:hover { border-color: var(--brand); color: var(--brand-text); }
+.ex-btn-primary { border-color: var(--brand); background: var(--brand-tint); color: var(--brand-text); }
+.ex-btn-primary:hover { background: var(--brand); color: var(--on-brand); }
+.ex-btn.added { border-color: var(--up); color: var(--up); }
+.ex-btn-ic { flex: 0 0 auto; width: 36px; }
+
+/* 안내 배너 */
+.ex-note { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; padding: 11px 14px;
+  border-radius: var(--r-lg, 12px); background: var(--ds-soft); border: 1px solid var(--ds-hairline);
+  font-size: 12px; color: var(--ds-body); line-height: 1.5; }
+.ex-note b { color: var(--ds-ink); font-weight: 700; }
+
+/* 투자대가 진입 패널 */
+.ex-guru { margin-top: 6px; padding: 24px 20px; border-radius: var(--r-xl, 16px); text-align: center;
+  background: var(--brand-tint); border: 1px solid color-mix(in srgb, var(--brand) 26%, transparent); }
+.ex-guru-t { font-size: 17px; font-weight: 800; color: var(--ds-ink); }
+.ex-guru-s { font-size: 13px; color: var(--ds-body); line-height: 1.55; margin: 8px auto 16px; max-width: 460px; }
+.ex-guru-btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 13.5px; font-weight: 700;
+  padding: 11px 24px; border-radius: var(--r-pill, 999px); background: var(--brand); color: var(--on-brand); }
+
+/* 비교 플로팅 바 */
+.ex-cmpbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 60; display: none;
+  align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: var(--r-pill, 999px);
+  background: var(--ds-ink); color: var(--ds-canvas); box-shadow: var(--ds-shadow-lg); font-size: 13px; }
+.ex-cmpbar.on { display: flex; }
+.ex-cmpbar b { font-weight: 800; }
+.ex-cmpbar-go { display: inline-flex; align-items: center; gap: 5px; font-weight: 800; font-size: 12.5px; cursor: pointer;
+  padding: 8px 16px; border-radius: var(--r-pill, 999px); border: none; font-family: inherit; background: var(--brand); color: var(--on-brand); }
+.ex-cmpbar-clear { background: none; border: none; color: var(--ds-canvas); opacity: .7; cursor: pointer; font-size: 16px; line-height: 1; padding: 4px; }
+
+@media (max-width: 640px) { .ex-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% macro risk_color(r) -%}
+{% if r <= 2 %}#05b169{% elif r <= 4 %}#8bc34a{% elif r <= 6 %}#9aa0a6{% elif r <= 8 %}#ff9800{% else %}#cf202f{% endif %}
+{%- endmacro %}
+{% macro risk_label(r) -%}
+{% if r <= 2 %}매우 방어적{% elif r <= 4 %}방어적{% elif r <= 6 %}균형{% elif r <= 8 %}공격적{% else %}매우 공격적{% endif %}
+{%- endmacro %}
+{% set seg_colors = ['#1f6feb','#2ea043','#e3873c','#8957e5','#c9433f','#1f9b9b','#d4a017','#6e7681'] %}
+
+<div class="ex-wrap">
+  {{ mm_hero('포트폴리오 예시', '검증된 자산배분 전략을 골라 바로 분석·비교하세요. 비중·종목은 자유롭게 바꿀 수 있어요.') }}
+
+  <div class="ex-note">
+    <span>🎨</span>
+    <span><b>빈 도화지는 막막하지만 색칠공부는 쉽죠.</b> 아래는 잃지 않는 데 집중한 <b>자산배분 스케치</b>예요. 마음에 드는 걸 골라 분석·비교한 뒤, 비중과 종목을 내 식대로 바꾸면 됩니다.</span>
+  </div>
+
+  <div class="ex-tabs" id="exTabs">
+    {% for rid, rlabel, _ in regions %}
+    <button class="ex-tab {% if loop.first %}on{% endif %}" data-region="{{ rid }}">{{ rlabel }}</button>
+    {% endfor %}
+    <button class="ex-tab" data-region="guru">⭐ 투자대가</button>
+  </div>
+
+  {% for rid, rlabel, groups in regions %}
+  <div class="ex-panel {% if loop.first %}on{% endif %}" data-panel="{{ rid }}">
+    {% for cat, clabel, items in groups %}
+    <div class="ex-sec-title">{{ clabel }}</div>
+    <div class="ex-grid">
+      {% for s in items %}
+      <div class="ex-card" data-ex-card data-slug="{{ s.slug }}" data-name="{{ s.name }}"
+        data-tickers='{{ s.tickers | tojson }}'>
+        <div class="ex-card-head">
+          <div>
+            <div class="ex-name">{{ s.name }}</div>
+            <div class="ex-src">{{ s.source }}</div>
+          </div>
+          <span class="ex-risk" title="위험도 {{ s.risk }}/10">
+            <span class="ex-risk-dot" style="background:{{ risk_color(s.risk)|trim }}"></span>{{ risk_label(s.risk)|trim }}
+          </span>
+        </div>
+        <div class="ex-bar">
+          {% for t in s.tickers %}
+          <span class="ex-bar-seg" style="width:{{ t.weight }}%;background:{{ seg_colors[loop.index0 % 8] }}"></span>
+          {% endfor %}
+        </div>
+        <div class="ex-legend">
+          {% for t in s.tickers %}
+          <div class="ex-leg-row">
+            <span class="ex-leg-dot" style="background:{{ seg_colors[loop.index0 % 8] }}"></span>
+            <span class="ex-leg-name">{{ t.name }} <span style="color:var(--ds-muted);font-size:10.5px;">{{ t.code }}</span></span>
+            <span class="ex-leg-w">{{ t.weight }}%</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="ex-desc">{{ s.desc }}</div>
+        <div class="ex-acts">
+          <button class="ex-btn ex-btn-primary" data-act="analyze" title="포트폴리오 분석으로 백테스트">📈 분석</button>
+          <button class="ex-btn" data-act="compare" title="포트폴리오 비교에 추가">⚖ 비교</button>
+          <button class="ex-btn ex-btn-ic" data-act="save" title="즐겨찾기 저장">⭐</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <div class="ex-panel" data-panel="guru">
+    <div class="ex-guru">
+      <div class="ex-guru-t">⭐ 투자대가의 포트폴리오</div>
+      <div class="ex-guru-s">워런 버핏·마이클 버리 등 전설적인 투자자들이 SEC 13F 공시 기준 실제로 무엇을 들고 있는지 확인하고, 똑같이 분석·저장해 보세요.</div>
+      <a class="ex-guru-btn" href="/gurus">투자대가 전체 보기 →</a>
+    </div>
+  </div>
+</div>
+
+<div class="ex-cmpbar" id="exCmpBar">
+  <span><b id="exCmpN">0</b>개 담음</span>
+  <button class="ex-cmpbar-go" id="exCmpGo">📊 비교하기</button>
+  <button class="ex-cmpbar-clear" id="exCmpClear" title="비우기">✕</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/examples.js') }}?v=20260626"></script>
+{% endblock %}

@@ -53,8 +53,8 @@ html[data-theme="dark"] {
   --logo:#ff6a00;
   --brand:#0052ff; --brand-hover:#003ecc; --brand-bright:#4a7dff;
   --brand-tint:#eaf0ff; --brand-text:#0052ff; --on-brand:#ffffff;
-  /* surface ladder (light) — page(soft)와 card(canvas) 대비 강화 → 카드 전경 분리 */
-  --ds-canvas:#ffffff; --ds-soft:#eaedf3; --ds-strong:#dde2ea; --ds-hairline:#d4d9e2;
+  /* surface ladder (light) — 채도 낮춘 중립 그레이(파란기 제거), 명암으로 카드 분리 */
+  --ds-canvas:#ffffff; --ds-soft:#ededec; --ds-strong:#e4e4e2; --ds-hairline:#dcdcda;
   --ds-ink:#0a0b0d; --ds-body:#5b616e; --ds-muted:#7c828a;
   --ds-dark:#0a0b0d; --ds-dark-el:#1c1f25;
   /* semantics */
@@ -250,13 +250,17 @@ a { text-decoration: none; color: inherit; }
   border-right: 1px solid var(--ds-hairline);
   box-shadow: inset -10px 0 18px -14px rgba(0,0,0,0.18);
   padding: 20px 0;
-  /* 스크롤해도 사이드바 고정 (navbar 높이 60px 아래에 붙음) */
+  /* 스크롤해도 사이드바 고정 + 항상 뷰포트 끝까지 채움(잘림 방지) */
   position: sticky;
   top: 60px;
   align-self: flex-start;
-  max-height: calc(100vh - 60px);
+  height: calc(100vh - 60px);
   overflow-y: auto;
 }
+/* 사이드바 스크롤바 슬림 (항목이 뷰포트보다 많을 때만 노출) */
+.sidebar::-webkit-scrollbar { width: 8px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--ds-hairline); border-radius: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
 
 .sidebar-label {
   font-size: 0.68rem;
@@ -824,6 +828,7 @@ img, canvas, svg, video { max-width: 100%; }
   .sidebar {
     position: fixed;
     left: 0; top: 0; bottom: 0;
+    height: auto;          /* 데스크톱 고정높이 해제 → 드로어는 top/bottom으로 풀높이 */
     width: 250px;
     z-index: 300;
     transform: translateX(-100%);

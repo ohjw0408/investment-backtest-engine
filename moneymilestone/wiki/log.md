@@ -3817,3 +3817,16 @@ _작성: Claude_
 - 검증: Playwright 라이트/다크 — 홈카드 높이≥180·그라데이션·상세·CTA·배경≠카드 PASS, 사이드바 2줄·sticky·스크롤 고정 PASS, macro 배경≠카드 대비 PASS, 다크 스윕(backtest·myassets·search·settings) 콘솔에러 0·렌더 정상. 스샷 육안 확인 완료.
 
 _작성: Claude_
+
+## 2026-06-25 — 사이드바 풀높이 + 라이트 중립배경 + 대가 비중바/한글이름/카드/즐겨찾기
+
+오너 디자인 피드백 6건.
+- **사이드바 잘림 해소**: `max-height`→`height: calc(100vh-60px)` → 항상 뷰포트 끝까지 채움(배경 끊김 제거). 항목 넘치면 슬림 스크롤바. 모바일(≤1024) 드로어는 `height:auto`로 풀높이 유지.
+- **라이트 배경 중립화**: 파란기 돌던 `--ds-soft #eaedf3`→`#ededec`(채도↓ 명암 위주). strong/hairline도 중립 그레이. 다크는 유지.
+- **대가 비중바 버그 픽스**: `/gurus` 카드 미니바 `.gr-top-fill`이 inline `<span>`이라 `width:%` 무시 → 항상 길이 0(무채색 트랙만 보임). `display:block` 추가 → 비중 비례 길이 복원. 색=brand 그라데이션(밝은→진한). 상세표 `.gd-wbar`도 그라데이션·8px·트랙 ink-tint로 명암 양모드 가시화.
+- **한글 이름**: `store._NAMES_KO`(slug→한글) + `name_ko()`. list_gurus/get_guru에 `name_ko` 추가. 템플릿 `워런 버핏 (Warren Buffett)` 표기(카드·상세).
+- **상세 보유종목 카드화**: 배경 직접 나열 → `.gd-card`(canvas/dark-el·헤어라인·그림자)로 감싸고 "보유 종목 (N)" 타이틀.
+- **즐겨찾기 저장**: 신규 `static/js/guru_fav.js` `mmSaveGuru(slug,nameKo,btn)` — `/api/me` 로그인확인(비로그인=토스트+로그인유도) → `/api/gurus/<slug>/portfolio`(비중 %변환) → 기존 `/api/portfolio/save`(동명 덮어쓰기). 이름="<한글>의 포트폴리오". 카드별 ⭐저장 버튼 + 상단 안내배너 + 상세 ⭐버튼·안내. 신규 엔드포인트 무, 기존 저장 API 재사용.
+- 검증: Playwright 라이트/다크 — 한글(영문) 이름·비중바 길이>0(147px)·그라데이션·카드저장버튼10+·안내배너·상세 보유카드·상세바·사이드바 뷰포트끝(bottom≥940) 전부 PASS, 콘솔에러 0. 저장 플로우 Flask test_client e2e: 로그인→저장 200→리스트에 '워런 버핏의 포트폴리오'(12종목·비중합100%) 확인.
+
+_작성: Claude_

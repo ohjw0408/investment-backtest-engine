@@ -14,6 +14,24 @@ def _conn():
 
 _Q = {"03": "1분기", "06": "2분기", "09": "3분기", "12": "4분기"}
 
+# 대가 한글 이름 (slug → 한글). 템플릿은 "한글(English)"로 표기.
+_NAMES_KO = {
+    "terry-smith": "테리 스미스",
+    "bill-ackman": "빌 애크먼",
+    "li-lu": "리 루",
+    "david-tepper": "데이비드 테퍼",
+    "warren-buffett": "워런 버핏",
+    "druckenmiller": "스탠리 드러켄밀러",
+    "howard-marks": "하워드 막스",
+    "ray-dalio": "레이 달리오",
+    "seth-klarman": "세스 클라먼",
+    "michael-burry": "마이클 버리",
+}
+
+
+def name_ko(slug, fallback=""):
+    return _NAMES_KO.get(slug, fallback)
+
 
 def period_label(period):
     """'2026-03-31' → '2026년 1분기'."""
@@ -43,7 +61,7 @@ def list_gurus(top=4):
             "WHERE cik=? AND covered=1 ORDER BY rank LIMIT ?", (g["cik"], top)
         ).fetchall()
         out.append({
-            "slug": g["slug"], "name": g["name"], "fund": g["fund"],
+            "slug": g["slug"], "name": g["name"], "name_ko": name_ko(g["slug"], g["name"]), "fund": g["fund"],
             "stance": g["stance"], "stance_label": g["stance_label"],
             "monogram": g["monogram"], "period": g["latest_period"],
             "period_label": period_label(g["latest_period"]), "filed": g["filed"],
@@ -81,7 +99,7 @@ def get_guru(slug, limit=25):
             "weight_norm": round(r["weight"] / cov_total * 100, 1),
         })
     return {
-        "slug": g["slug"], "name": g["name"], "fund": g["fund"],
+        "slug": g["slug"], "name": g["name"], "name_ko": name_ko(g["slug"], g["name"]), "fund": g["fund"],
         "stance": g["stance"], "stance_label": g["stance_label"], "monogram": g["monogram"],
         "period": g["latest_period"], "period_label": period_label(g["latest_period"]),
         "filed": g["filed"],

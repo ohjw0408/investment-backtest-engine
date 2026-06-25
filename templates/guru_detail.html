@@ -11,6 +11,7 @@
 .gd-avatar { flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--r-full, 50%); display: flex; align-items: center;
   justify-content: center; font-weight: 800; font-size: 19px; color: #fff; letter-spacing: 0.5px; }
 .gd-name { font-size: 21px; font-weight: 700; color: var(--ds-ink); }
+.gd-name-en { font-weight: 500; color: var(--ds-muted); font-size: 14px; }
 .gd-fund { font-size: 13px; color: var(--ds-muted); margin-top: 2px; }
 .gd-stance { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--ds-body); }
 .gd-dot { width: 10px; height: 10px; border-radius: 50%; }
@@ -45,7 +46,22 @@
 .gd-bt-loading, .gd-bt-err { font-size: 13px; color: var(--ds-muted); padding: 14px; text-align: center; }
 @media (max-width: 560px) { .gd-bt-metrics { grid-template-columns: repeat(2, 1fr); } }
 
-.gd-table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+/* 즐겨찾기 저장 */
+.gd-fav-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.gd-save { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: var(--r-lg, 12px);
+  border: 1px solid var(--brand); background: var(--brand-tint); color: var(--brand-text); font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: background .12s, color .12s; }
+.gd-save:hover { background: var(--brand); color: var(--on-brand); }
+.gd-save.saved { background: var(--up); border-color: var(--up); color: #fff; }
+.gd-fav-hint { font-size: 12px; color: var(--ds-muted); }
+
+/* 보유 종목 카드 래퍼 */
+.gd-card { background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-xl, 16px);
+  box-shadow: var(--ds-shadow); padding: 8px 20px 18px; margin-top: 18px; }
+[data-theme="dark"] .gd-card { background: var(--ds-dark-el); border-color: transparent; }
+.gd-card-title { font-size: 14px; font-weight: 700; color: var(--ds-ink); padding-top: 14px; }
+
+.gd-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
 .gd-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--ds-muted); text-transform: uppercase;
   letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--ds-hairline); }
 .gd-table th.num, .gd-table td.num { text-align: right; }
@@ -53,8 +69,10 @@
 .gd-tic { font-weight: 700; font-family: var(--font-mono); }
 .gd-co { color: var(--ds-muted); font-size: 12px; }
 .gd-wbar-wrap { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
-.gd-wbar { width: 90px; height: 6px; border-radius: var(--r-pill, 999px); background: var(--ds-soft); overflow: hidden; }
-.gd-wbar > span { display: block; height: 100%; background: var(--brand); border-radius: inherit; }
+.gd-wbar { width: 90px; height: 8px; border-radius: var(--r-pill, 999px);
+  background: color-mix(in srgb, var(--ds-ink) 8%, transparent); overflow: hidden; }
+.gd-wbar > span { display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-bright), var(--brand)); }
 .gd-w { font-family: var(--font-mono); min-width: 44px; text-align: right; }
 .gd-note { font-size: 11.5px; color: var(--ds-muted); margin-top: 12px; line-height: 1.5; }
 </style>
@@ -68,7 +86,7 @@
   <div class="gd-head">
     <span class="gd-avatar" style="background:{{ sc }}">{{ g.monogram }}</span>
     <div>
-      <div class="gd-name">{{ g.name }}</div>
+      <div class="gd-name">{{ g.name_ko }} <span class="gd-name-en">({{ g.name }})</span></div>
       <div class="gd-fund">{{ g.fund }}</div>
       <div class="gd-stance"><span class="gd-dot" style="background:{{ sc }}"></span>{{ g.stance_label }}</div>
     </div>
@@ -94,32 +112,41 @@
     </span>
   </div>
 
-  <table class="gd-table">
-    <thead>
-      <tr><th style="width:34px">#</th><th>종목</th><th class="num">비중(13F)</th><th class="num" style="width:150px">포트폴리오 내 비중</th></tr>
-    </thead>
-    <tbody>
-      {% set mxw = (g.holdings|map(attribute='weight_norm')|max) or 1 %}
-      {% for h in g.holdings %}
-      <tr>
-        <td class="num gd-co">{{ h.rank }}</td>
-        <td><span class="gd-tic">{{ h.ticker }}</span> <span class="gd-co">{{ h.name }}</span></td>
-        <td class="num gd-w">{{ h.weight }}%</td>
-        <td class="num">
-          <span class="gd-wbar-wrap">
-            <span class="gd-wbar"><span style="width:{{ (h.weight_norm / mxw * 100)|round(0, 'floor') }}%"></span></span>
-            <span class="gd-w">{{ h.weight_norm }}%</span>
-          </span>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <div class="gd-note">‘비중(13F)’ = 전체 공시 대비 비중. ‘포트폴리오 내 비중’ = 국내 시세 커버 종목만 100%로 재정규화(백테스트 기준). 상위 {{ g.holdings|length }}개 표시.</div>
+  <div class="gd-fav-row">
+    <button class="gd-save" onclick="mmSaveGuru('{{ g.slug }}','{{ g.name_ko }}',this)">⭐ 즐겨찾기 저장</button>
+    <span class="gd-fav-hint">로그인하면 ‘{{ g.name_ko }}의 포트폴리오’로 저장돼요</span>
+  </div>
+
+  <div class="gd-card">
+    <div class="gd-card-title">보유 종목 ({{ g.holdings|length }})</div>
+    <table class="gd-table">
+      <thead>
+        <tr><th style="width:34px">#</th><th>종목</th><th class="num">비중(13F)</th><th class="num" style="width:150px">포트폴리오 내 비중</th></tr>
+      </thead>
+      <tbody>
+        {% set mxw = (g.holdings|map(attribute='weight_norm')|max) or 1 %}
+        {% for h in g.holdings %}
+        <tr>
+          <td class="num gd-co">{{ h.rank }}</td>
+          <td><span class="gd-tic">{{ h.ticker }}</span> <span class="gd-co">{{ h.name }}</span></td>
+          <td class="num gd-w">{{ h.weight }}%</td>
+          <td class="num">
+            <span class="gd-wbar-wrap">
+              <span class="gd-wbar"><span style="width:{{ (h.weight_norm / mxw * 100)|round(0, 'floor') }}%"></span></span>
+              <span class="gd-w">{{ h.weight_norm }}%</span>
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="gd-note">‘비중(13F)’ = 전체 공시 대비 비중. ‘포트폴리오 내 비중’ = 국내 시세 커버 종목만 100%로 재정규화(백테스트 기준). 상위 {{ g.holdings|length }}개 표시.</div>
+  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/guru_fav.js') }}?v=20260625"></script>
 <script>
 (function () {
   const btn = document.getElementById('gdBtBtn');

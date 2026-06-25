@@ -30,19 +30,37 @@
 .gr-avatar { flex-shrink: 0; width: 44px; height: 44px; border-radius: var(--r-full, 50%); display: flex; align-items: center;
   justify-content: center; font-weight: 800; font-size: 15px; color: #fff; letter-spacing: 0.5px; }
 .gr-name { font-size: 15px; font-weight: 700; color: var(--ds-ink); }
+.gr-name-en { font-weight: 500; color: var(--ds-muted); font-size: 12px; }
 .gr-fund { font-size: 11.5px; color: var(--ds-muted); margin-top: 1px; }
 .gr-stance { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--ds-body); }
 .gr-dot { width: 9px; height: 9px; border-radius: 50%; }
 .gr-arrow { margin-left: auto; align-self: flex-start; color: var(--ds-muted); font-size: 18px; }
 
-.gr-period { font-size: 11px; color: var(--ds-muted); margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--ds-hairline); }
-.gr-period b { color: var(--ds-body); font-weight: 600; }
-.gr-tops { margin-top: 9px; display: flex; flex-direction: column; gap: 5px; }
+.gr-tops { margin-top: 11px; display: flex; flex-direction: column; gap: 7px; }
 .gr-top-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .gr-top-tic { font-weight: 700; color: var(--ds-ink); min-width: 46px; font-family: var(--font-mono); }
-.gr-top-bar { flex: 1; height: 5px; border-radius: var(--r-pill, 999px); background: var(--ds-soft); overflow: hidden; }
-.gr-top-fill { height: 100%; border-radius: inherit; background: var(--brand); }
-.gr-top-w { font-size: 11px; color: var(--ds-muted); min-width: 38px; text-align: right; font-family: var(--font-mono); }
+.gr-top-bar { flex: 1; height: 8px; border-radius: var(--r-pill, 999px);
+  background: color-mix(in srgb, var(--ds-ink) 8%, transparent); overflow: hidden; }
+.gr-top-fill { display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-bright), var(--brand)); }
+.gr-top-w { font-size: 11px; color: var(--ds-body); min-width: 38px; text-align: right; font-family: var(--font-mono); font-weight: 600; }
+
+/* 푸터: 공시정보 + 즐겨찾기 저장 */
+.gr-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--ds-hairline); }
+.gr-period { font-size: 11px; color: var(--ds-muted); min-width: 0; }
+.gr-period b { color: var(--ds-body); font-weight: 600; }
+.gr-save { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700;
+  padding: 6px 11px; border-radius: var(--r-pill); border: 1px solid var(--brand); background: var(--brand-tint);
+  color: var(--brand-text); cursor: pointer; font-family: inherit; white-space: nowrap; transition: background .12s, color .12s; }
+.gr-save:hover { background: var(--brand); color: var(--on-brand); }
+.gr-save.saved { background: var(--up); border-color: var(--up); color: #fff; }
+
+/* 즐겨찾기 안내 배너 */
+.gr-fav-promo { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; padding: 11px 14px;
+  border-radius: var(--r-lg); background: var(--brand-tint); border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  font-size: 12.5px; color: var(--ds-body); line-height: 1.5; }
+.gr-fav-promo b { color: var(--brand-text); font-weight: 700; }
 
 @media (max-width: 640px) { .gr-grid { grid-template-columns: 1fr; } }
 </style>
@@ -68,6 +86,8 @@
     <span>방어·현금 비관 🔴</span>
   </div>
 
+  <div class="gr-fav-promo">⭐ <span><b>로그인하면</b> 마음에 드는 대가의 포트폴리오를 <b>즐겨찾기로 저장</b>하고, 내 포트폴리오에서 백테스트까지 돌려볼 수 있어요.</span></div>
+
   {% if gurus %}
   <div class="gr-grid">
     {% for g in gurus %}
@@ -75,7 +95,7 @@
       <div class="gr-card-top">
         <span class="gr-avatar" style="background:{{ stance_color(g.stance)|trim }}">{{ g.monogram }}</span>
         <div>
-          <div class="gr-name">{{ g.name }}</div>
+          <div class="gr-name">{{ g.name_ko }} <span class="gr-name-en">({{ g.name }})</span></div>
           <div class="gr-fund">{{ g.fund }}</div>
           <div class="gr-stance"><span class="gr-dot" style="background:{{ stance_color(g.stance)|trim }}"></span>{{ g.stance_label }}</div>
         </div>
@@ -93,7 +113,11 @@
         {% endfor %}
       </div>
       {% endif %}
-      <div class="gr-period">📄 <b>{{ g.period_label }}</b> 공시 기준{% if g.filed %} · 제출 {{ g.filed }}{% endif %}</div>
+      <div class="gr-foot">
+        <span class="gr-period">📄 <b>{{ g.period_label }}</b> 공시{% if g.filed %} · 제출 {{ g.filed }}{% endif %}</span>
+        <button class="gr-save" title="즐겨찾기 저장"
+          onclick="event.preventDefault();event.stopPropagation();mmSaveGuru('{{ g.slug }}','{{ g.name_ko }}',this)">⭐ 저장</button>
+      </div>
     </a>
     {% endfor %}
   </div>
@@ -101,4 +125,8 @@
   <div class="gr-disclaimer" style="margin-top:24px;">데이터를 준비 중입니다. 잠시 후 다시 확인해주세요.</div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/guru_fav.js') }}?v=20260625"></script>
 {% endblock %}

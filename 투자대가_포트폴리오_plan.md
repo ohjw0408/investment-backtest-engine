@@ -10,18 +10,24 @@
 1. ✅ **탭 이름 = "투자대가의 포트폴리오"** (라우트 `/gurus`).
 2. ✅ **이미지 = 모노그램으로 시작** (식별가능 얼굴=사진·AI 모두 퍼블리시티권 위험, §5). 사진은 추후 재검토.
 3. ✅ **OpenFIGI 무료 API 키 = 오너 발급 예정** (CUSIP→티커 매핑).
-4. **대가 리스트(초기 8~12명)** — 13F 제출하는 미국 기관만 가능. 기본 후보(오너 가감):
-   - Warren Buffett (Berkshire Hathaway, CIK 0001067983)
-   - Michael Burry (Scion Asset Mgmt)
-   - Bill Ackman (Pershing Square)
-   - David Tepper (Appaloosa)
-   - Stanley Druckenmiller (Duquesne)
-   - Howard Marks (Oaktree)
-   - Seth Klarman (Baupost)
-   - Terry Smith / Ray Dalio(Bridgewater) / Li Lu(Himalaya) 등에서 선별
-   - ⚠️ 한국 대가 = 13F 같은 공시 없음 → **제외**.
-3. **이미지 방식** — §5 참고. 기본안 = **모노그램(무위험)**, 사진/AI는 오너 위험판단.
-4. **OpenFIGI API 키** — CUSIP→티커 매핑용 무료 키 1개 발급 필요(오너). 대안 §2 참고.
+4. ✅ **대가 10명 확정** — 13F 제출 미국 기관만 가능. **낙관↔비관 스펙트럼 순 정렬**(초보 가독, `stance` 필드로 UI 정렬):
+
+   | 순 | 이름 | 펀드 | 성향 |
+   |---|---|---|---|
+   | 1 | Terry Smith | Fundsmith | 🟢 강낙관 (퀄리티 롱온리) |
+   | 2 | Bill Ackman | Pershing Square | 🟢 낙관 (집중·행동주의) |
+   | 3 | Li Lu | Himalaya Capital | 🟢 낙관 (가치·집중) |
+   | 4 | David Tepper | Appaloosa | 🟡 낙관-전술 |
+   | 5 | Warren Buffett | Berkshire (CIK 0001067983) | 🟡 온건낙관 (현재 현금多) |
+   | 6 | Stanley Druckenmiller | Duquesne | ⚪ 중립-유연 매크로 |
+   | 7 | Howard Marks | Oaktree | 🟠 신중 (사이클·크레딧) |
+   | 8 | Ray Dalio | Bridgewater | 🟠 신중-매크로 |
+   | 9 | Seth Klarman | Baupost | 🔴 비관 (현금·안전마진) |
+   | 10 | Michael Burry | Scion | 🔴 강비관 (폭락 베팅) |
+
+   - ⚠️ 성향 = **알려진 시장관/철학** 기준. 13F는 미국 롱주식만 → 성향 라벨 ≠ 13F 보유(예: Burry 풋은 13F에 일부만). UI 면책 표기.
+   - ⚠️ **Peter Lynch / 마젤란 제외**: 린치 1990 운용은퇴, 본인 명의 현 보유 없음. 마젤란 13F는 FMR LLC(피델리티 전체 합산) 제출이라 분리 불가. (원하면 보유내역 없는 "철학 소개" 교육카드로만)
+   - ⚠️ 한국 대가 = 13F 공시 없음 → 제외.
 
 ---
 
@@ -42,13 +48,16 @@
 13F는 티커가 아니라 **CUSIP**을 줌. 우리 엔진은 티커 기준 → 매핑 필요.
 
 1. CIK별 최신 13F-HR fetch → 정보테이블 XML 파싱 → (CUSIP, 발행사명, 금액, 주식수) 리스트
-2. **CUSIP→티커 매핑**: **OpenFIGI API**(무료 키, `POST /v3/mapping`, ID_CUSIP→ticker). 배치 100건/req.
+2. **CUSIP→티커 매핑**: **OpenFIGI API**(무료 키, `POST /v3/mapping`, ID_CUSIP→ticker, 헤더 `X-OPENFIGI-APIKEY`). 배치 100건/req.
+   - ✅ 키 = 로컬 `.env`의 `OPENFIGI_API_KEY`(gitignored, 추적X). 작동검증 완료(037833100→AAPL, 2026-06-25).
+   - ⚠️ **시크릿 배포**: 값은 repo에 절대 커밋 금지. prod 워커 env + GitHub Action(`guru-resync-13f.yml`) repo secret `OPENFIGI_API_KEY`를 **오너가 별도 등록** 필요(값 아닌 이름만 문서화). 키없음=graceful no-op.
    - 대안(키 없이): SEC `company_tickers.json` + CUSIP 사전(불완전) → 매핑 실패분은 "미매핑"으로 표시하고 비중 계산서 제외.
 3. 매핑된 티커를 **`symbol_master`**(data/meta/symbol_master.db)와 대조 → 우리 가격엔진 커버리지 확인. 미커버 종목은 별도 표기.
 4. 비중 = 13F 보고금액 / 총합(매핑 성공분). 상위 N(기본 15) + 기타.
 
 **저장 — 새 SQLite seed DB**: `data/meta/guru_holdings.db` (git 추적 seed).
-- 테이블: `gurus`(cik, name, fund, slug, monogram), `filings`(cik, period, filed_at, accession), `holdings`(accession, cusip, ticker, name, shares, value, weight)
+- 테이블: `gurus`(cik, name, fund, slug, monogram, **stance** 1~10 낙관→비관 정렬순, stance_label), `filings`(cik, period, filed_at, accession), `holdings`(accession, cusip, ticker, name, shares, value, weight)
+  - 목록 기본정렬 = `stance ASC` (낙관 왼쪽 → 비관 오른쪽). UI에 스펙트럼 범례 + 면책.
 - ⚠️ **prod beat는 deploy 시 reset-hard로 되돌아감**([[reference-prod-deploy-access]], [[reference-symbol-master-seed-db]]) → 런타임 갱신 영속 안 됨.
   **갱신 = GitHub Action(분기)에서 빌드→커밋→배포**로만. `resync-symbols.yml` 패턴 재사용.
   - 워크플로 `guru-resync-13f.yml`: 분기(1·4·7·10월 중순 cron) EDGAR 폴 → 새 filing 있으면 DB 재빌드 → commit.

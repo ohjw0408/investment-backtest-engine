@@ -251,6 +251,25 @@
 .mm-macro-sec-t { font-size: var(--fs-title); font-weight: 600; color: var(--ds-ink); margin: 2px 2px 12px; }
 .mm-macro-sec-t .macro-t-web { display: none; }
 .mm-macro-sec-sub { display: none; font-size: var(--fs-cap); color: var(--ds-muted); margin: -6px 2px 14px; }
+
+/* 홈 — 투자대가 진입 프로모 (웹·앱 공용, 시장지수 위) */
+.guru-promo { display: block; text-decoration: none; margin-top: var(--sp-base); }
+.guru-promo-head { font-size: 13px; color: var(--ds-muted); margin: 0 2px 10px; line-height: 1.5; }
+.guru-promo-head b { color: var(--ds-ink); font-weight: 700; }
+.guru-promo-card { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--r-xl);
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline); box-shadow: var(--ds-shadow);
+  transition: box-shadow .15s, transform .15s; }
+.guru-promo-card:hover { box-shadow: var(--ds-shadow-lg); transform: translateY(-1px); }
+[data-theme="dark"] .guru-promo-card { background: var(--ds-dark-el); border-color: transparent; }
+.guru-promo-avatars { display: flex; flex-shrink: 0; }
+.guru-promo-av { width: 36px; height: 36px; border-radius: var(--r-full, 50%); display: flex; align-items: center;
+  justify-content: center; font-weight: 800; font-size: 12px; color: #fff; border: 2px solid var(--ds-canvas); margin-left: -10px; }
+[data-theme="dark"] .guru-promo-av { border-color: var(--ds-dark-el); }
+.guru-promo-av:first-child { margin-left: 0; }
+.guru-promo-main { flex: 1; min-width: 0; }
+.guru-promo-t { font-size: 15px; font-weight: 700; color: var(--ds-ink); }
+.guru-promo-d { font-size: 12px; color: var(--ds-muted); margin-top: 2px; }
+.guru-promo-go { flex-shrink: 0; color: var(--brand); font-weight: 700; font-size: 19px; }
 .mobile-legal { padding: 18px 4px 6px; text-align: center; }
 .mobile-legal a { font-size: 12px; color: var(--ds-muted); text-decoration: none; }
 .mobile-legal .sep { color: var(--ds-hairline); margin: 0 8px; }
@@ -494,6 +513,23 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
       </a>
     </div>
   </div>
+
+  <!-- ===== 투자대가 진입 프로모 (웹·앱 공용 — 시장지수 위) ===== -->
+  <a class="guru-promo" href="/gurus">
+    <div class="guru-promo-head">고민되세요? <b>투자 대가들의 선택</b>을 확인해보세요</div>
+    <div class="guru-promo-card">
+      <div class="guru-promo-avatars">
+        <span class="guru-promo-av" style="background:#8bc34a">WB</span>
+        <span class="guru-promo-av" style="background:#ff9800">RD</span>
+        <span class="guru-promo-av" style="background:#cf202f">MB</span>
+      </div>
+      <div class="guru-promo-main">
+        <div class="guru-promo-t">투자 대가들의 포트폴리오 보러가기</div>
+        <div class="guru-promo-d">버핏·버리 등 13F 공시 기준 보유 종목·비중을 한눈에</div>
+      </div>
+      <span class="guru-promo-go">›</span>
+    </div>
+  </a>
 
   <!-- ===== 홈 위젯 (시장지수 / 관심목록) ===== -->
   <div class="card market-card" id="widgetCard">

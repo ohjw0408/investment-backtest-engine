@@ -562,14 +562,16 @@ def examples_page():
     # 투자대가 탭 = guru 카드를 examples 카드와 동일 액션(분석/비교/저장)으로 직접 노출.
     # 카드 클릭 시 상세 모달(보유 종목 표·공시 메타)을 인라인으로 띄움 → 별도 상세 페이지 제거.
     # data-tickers = 커버 보유 상위(비중 재정규화, 합~100) → examples.js 핸드오프 그대로 재사용.
+    # limit=30 = 포트폴리오 분석 백엔드 종목 상한(app.py 1~30). 커버 보유 전부를 분석에 싣기 위함
+    # (예: 테리 스미스). 12개로 자르던 것 제거 → 표시·핸드오프 모두 상위 30개.
     gurus = []
     for g in guru_store.list_gurus():
-        detail = guru_store.get_guru(g['slug'], limit=25)
+        detail = guru_store.get_guru(g['slug'], limit=30)
         if not detail or not detail.get('holdings'):
             continue
         gurus.append({**g, **detail, 'tickers': [
             {'code': h['ticker'], 'name': h['name'], 'weight': h['weight_norm']}
-            for h in detail['holdings'][:12]]})
+            for h in detail['holdings']]})
     return render_template('examples.html', regions=regions, gurus=gurus)
 
 @app.route('/gurus')

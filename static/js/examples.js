@@ -52,7 +52,7 @@
       start_date: fmt(start),
       end_date: fmt(end),
       rebal_mode: 'yearly',
-      autorun: true,
+      autorun: false,  // 폼만 채우고 분석 화면 표시(자동 실행 X) — 오너 지시
       source: 'example:' + card.dataset.slug,
     }));
     location.href = '/backtest';

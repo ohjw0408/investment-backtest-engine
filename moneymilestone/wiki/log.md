@@ -1,5 +1,12 @@
 # Log
 
+## [2026-06-26] FIX | 분석 핸드오프 — 대가 종목 12→30개 + autorun 제거 (오너 지시)
+
+- **① 대가 종목 12개 상한 → 30개**(테리 스미스 등 다종목이 다 안 들어가던 문제). 뿌리=`examples` 라우트가 guru tickers를 `detail['holdings'][:12]`로 잘랐음. `get_guru(slug, limit=30)` + `[:12]` 제거 → 표시·핸드오프 모두 상위 30개. **30=포트폴리오 분석 백엔드 종목 상한**(app.py 1~30 검증). 커버 30개 초과분(테리=34커버 중 4개)은 비중 미미·"나머지 현금" 처리되어 실행 정상.
+- **② 분석 버튼 autorun 제거**: `examples.js` analyze() `autorun:true`→`false`. `backtest.html` 프리로드 핸들러에 `else { btShowInput(); return; }` 추가 → 폼만 채우고 **입력 화면만** 표시(자동 실행 X, 직전 결과 캐시 무시). 다른 호출자의 autorun은 보존(하위호환).
+- 검증(Playwright): 테리 스미스 분석→/backtest 입력뷰, 종목 30개 로드, progress·result 미표시, 콘솔0.
+- 변경=`app.py`·`templates/backtest.html`·`static/js/examples.js`.
+
 ## [2026-06-26] UX | 포트폴리오 예시 — 카드 클릭 상세 모달 통합 + 오색 멀티에셋 짬뽕 (오너 지시)
 
 오너 3건 반영(전부 로컬 검증, push 대기):

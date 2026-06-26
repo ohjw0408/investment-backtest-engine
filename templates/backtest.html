@@ -1411,7 +1411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btBandNoteVal').textContent = e.target.value + '%';
   });
 
-  // 외부(투자대가 등)에서 넘어온 프리로드 → 폼 채우고 자동 실행(진행 게이지 → 결과 뷰)
+  // 외부(투자대가·예시 등)에서 넘어온 프리로드 → 폼 채움. autorun이면 자동 실행, 아니면 입력 화면만.
   const preloadRaw = btStateStore.getItem('mm_bt_preload');
   if (preloadRaw) {
     btStateStore.removeItem('mm_bt_preload');
@@ -1420,6 +1420,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (p && p.tickers && p.tickers.length) {
         btRestoreForm(p);
         if (p.autorun) { runBacktest(); return; }
+        btShowInput(); return;  // 프리로드만: 폼 채우고 입력 화면 표시(자동 실행 X, 직전 결과 캐시 무시)
       }
     } catch(e) {}
   }

@@ -594,7 +594,7 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
       track.style.transform = 'translateX(-' + (i * 100) + '%)';
       dots.forEach(function (d, j) { d.classList.toggle('on', j === i); });
     }
-    function start() { stop(); if (!paused) timer = setInterval(function () { go(i + 1); }, 3000); }
+    function start() { stop(); if (!paused) timer = setInterval(function () { go(i + 1); }, 7000); }
     function stop() { if (timer) { clearInterval(timer); timer = null; } }
     document.getElementById('hcNext').addEventListener('click', function () { go(i + 1); start(); });
     dots.forEach(function (d) { d.addEventListener('click', function () { go(+d.dataset.i); start(); }); });

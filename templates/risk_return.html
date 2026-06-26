@@ -128,6 +128,11 @@
 .rr-lp-table th:first-child, .rr-lp-table td:first-child { text-align: left; }
 .rr-lp-table th { color: var(--text-muted); font-weight: 600; font-size: 0.72rem; }
 .rr-cta-sticky { position: sticky; bottom: 12px; z-index: 20; }
+.rr-acc-tb { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.rr-tb-btn { font-size: 0.74rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--card); color: var(--text-muted); }
+.rr-tb-btn:hover { background: var(--bg); color: var(--text); }
+.rr-tb-hint { font-size: 0.7rem; color: var(--text-muted); }
 </style>
 {% endblock %}
 
@@ -437,6 +442,7 @@ function rrRenderAccordions(data){
       </div>
       <div class="rr-acc-wrap"><div class="rr-acc-body">
         <div class="rr-acc-desc">${m.desc}</div>
+        <div class="rr-acc-tb" id="rrTB_${m.key}"></div>
         ${m.roll
           ? `<div class="rr-acc-2"><div class="rr-acc-chart"><canvas id="rrAcc_${m.key}"></canvas></div>`
             + `<div id="rrLP_${m.key}"></div></div>`
@@ -463,12 +469,34 @@ function rrAccDraw(key){
   else if (m.div) { rrAccCharts[key] = rrYearLineChart(cv, items, it=>(it.annual_div||[]).map(a=>[a.year, a.dyield])); }
   else { rrAccCharts[key] = rrYearLineChart(cv, items, it=>(it.annual||[]).map(a=>[a.year, m.get(a)])); }
   if (m.roll) rrRenderLossProb(key, items);
+  rrAccToolbar(key);
 }
 
-function _rrYearAxis(opts){
+// 기간 선택 버튼 + 드래그 줌 안내 툴바
+const RR_PRESETS = [['전체',null,null],['닷컴',2000,2002],['금융위기',2007,2009],['코로나',2020,2021],["'22 긴축",2022,2023]];
+function rrAccToolbar(key){
+  const tb = document.getElementById('rrTB_'+key);
+  const ch = rrAccCharts[key];
+  if (!tb || !ch) return;
+  tb.innerHTML = RR_PRESETS.map(([lbl,s,e])=>
+    `<button class="rr-tb-btn" onclick="rrAccZoom('${key}',${s},${e})">${esc(lbl)}</button>`).join('')
+    + `<span class="rr-tb-hint">· 그래프를 가로로 드래그해도 확대돼요</span>`;
+}
+function rrAccZoom(key, s, e){
+  const ch = rrAccCharts[key]; if(!ch) return;
+  const yrs = ch._years || [];
+  if (s==null){ if(ch.resetZoom) ch.resetZoom(); ch.options.scales.x.min=undefined; ch.options.scales.x.max=undefined; ch.update(); return; }
+  let i0 = yrs.findIndex(y=>y>=s), i1 = -1;
+  for (let i=yrs.length-1;i>=0;i--){ if(yrs[i]<=e){ i1=i; break; } }
+  if (i0<0 || i1<0 || i1<i0){ if(typeof mmToast==='function') mmToast('그 기간 데이터가 없어요.','warn'); return; }
+  ch.options.scales.x.min = i0; ch.options.scales.x.max = i1; ch.update();
+}
+
+function _rrYearAxis(){
   return { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
     plugins:{ legend:{display:true, labels:{font:{size:11}, usePointStyle:true, boxWidth:8, color:'var(--text-muted)'}},
-      tooltip:{callbacks:{label:c=> c.parsed.y==null?null:`${c.dataset.label}: ${c.parsed.y>=0?'+':''}${c.parsed.y.toFixed(1)}%`}} },
+      tooltip:{callbacks:{label:c=> c.parsed.y==null?null:`${c.dataset.label}: ${c.parsed.y>=0?'+':''}${c.parsed.y.toFixed(1)}%`}},
+      zoom:{ zoom:{ drag:{enabled:true, backgroundColor:'rgba(25,118,210,0.15)'}, mode:'x' } } },
     scales:{ x:{ticks:{font:{size:10}},grid:{display:false}},
       y:{ticks:{font:{size:10},callback:v=>v+'%'}} } };
 }
@@ -485,8 +513,9 @@ function rrYearLineChart(cv, items, pairsOf){
     return { label:it.name, data:ys, borderColor:col, backgroundColor:col,
       borderWidth:2, pointRadius:0, tension:.1, spanGaps:true };
   });
-  return new Chart(cv.getContext('2d'), { type:'line',
+  const ch = new Chart(cv.getContext('2d'), { type:'line',
     data:{labels:years.map(String), datasets}, options:_rrYearAxis() });
+  ch._years = years; return ch;
 }
 
 function rrDivGrowthChart(cv, items){
@@ -501,8 +530,9 @@ function rrDivGrowthChart(cv, items){
     return { label:it.name + (it.divgrowth&&it.divgrowth.cagr!=null?` (연 ${(it.divgrowth.cagr*100).toFixed(1)}%)`:''),
       data:ys, borderColor:col, backgroundColor:col, borderWidth:2, pointRadius:0, tension:.1, spanGaps:true };
   });
-  return new Chart(cv.getContext('2d'), { type:'line',
+  const ch = new Chart(cv.getContext('2d'), { type:'line',
     data:{labels:years.map(String), datasets}, options:_rrYearAxis() });
+  ch._years = years; return ch;
 }
 
 function rrRenderLossProb(key, items){
@@ -523,7 +553,7 @@ function rrRenderLossProb(key, items){
       return `<td style="color:${c};font-weight:600;">${(lp*100).toFixed(1)}%</td>`;
     }).join('') + '</tr>';
   });
-  html += '</tbody></table></div><div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">전체기간·거치식·배당재투자 기준(추정 데이터 포함).</div>';
+  html += '</tbody></table></div><div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">상장 후 실데이터·거치식·배당재투자 기준. “—”=표본 부족(이력이 그 기간보다 짧음).</div>';
   host.innerHTML = html;
 }
 

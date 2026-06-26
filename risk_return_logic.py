@@ -116,28 +116,71 @@ def _metrics_full(returns: pd.Series, spy_returns=None, div_yield=None):
     }
 
 
-def _annual_risk_return(daily_r):
-    """일별 수익률 → 연도별 {year, ret, vol, mdd}. 좌측 겹침 라인용(공통기간 기준)."""
-    r = daily_r.dropna()
+def _annual_from_points(pts):
+    """TR 인덱스([[date,val,(syn)]]) → 연도별 {year, ret, vol, mdd}.
+       각 항목 자기 가용기간 기준(공통 겹침기간 비종속). 비현실 값(|연수익|>300%)은
+       데이터 글리치로 보고 그 해 제외(차트 폭주 방지)."""
+    if not pts or len(pts) < 2:
+        return []
+    s = pd.Series({pd.Timestamp(d): v for d, v, *_ in pts}).sort_index()
+    r = s.pct_change().dropna()
     r = r[np.isfinite(r)]
     if not len(r):
         return []
+    last_year = r.index[-1].year
     out = []
     for yr, g in r.groupby(r.index.year):
         if len(g) < 5:
             continue
         ret = float((1.0 + g).prod() - 1.0)
+        if abs(ret) > 3.0:           # 300%↑ = 데이터 글리치, 그 해 스킵
+            continue
         vol = float(g.std() * np.sqrt(252.0)) if len(g) > 1 else 0.0
         cum = (1.0 + g).cumprod()
         mdd = float((cum / cum.cummax() - 1.0).min())
-        out.append({"year": int(yr), "ret": round(ret, 6), "vol": round(vol, 6), "mdd": round(mdd, 6)})
+        row = {"year": int(yr), "ret": round(ret, 6), "vol": round(vol, 6), "mdd": round(mdd, 6)}
+        if yr == last_year and len(g) < 230:   # 진행 중인 올해(거래일 부족) = 부분연도
+            row["partial"] = True
+        out.append(row)
     return out
 
 
-def _annual_dividends(weights, series, start, end):
+def _item_deep(tickers):
+    """항목(포폴/벤치) TR 인덱스 빌드 → (annual, rolling_return).
+       ⚠️ 합성 백필(vol=0)이 손상된 종목(SHY/IEF 등 2008 0.00~190 진동)이 있어
+       비교 심화는 **실데이터(syn=0)만** 사용(공통기간 비종속·합성 글리치 차단).
+       (분석탭 롤링은 결정#1로 합성 포함+회색 — 비교는 N개 겹침이라 글리치에 더 취약해 실데이터.)"""
+    try:
+        from modules.tr_index import build_portfolio_tr_index
+        from modules import rolling
+        pts = build_portfolio_tr_index(tickers)
+    except Exception:
+        return [], None
+    real = [p for p in pts if not (len(p) > 2 and p[2])]   # syn=0만
+    if len(real) < 2:
+        real = pts                                          # 실데이터 거의 없으면 전체 fallback
+    annual = _annual_from_points(real)
+    rr = None
+    if len(real) >= 13:
+        rr = {
+            "horizons": rolling.DEFAULT_HORIZONS,
+            "horizon_table": {str(h): v for h, v in rolling.horizon_table(real).items()},
+            "syn_overall": 0.0,
+        }
+    return annual, rr
+
+
+def _annual_dividends(weights, series):
     """포폴 연도별 배당: dyield(연 배당수익률) + dindex(첫해=100 정규화 배당액 흐름).
-       weights={code:w}. 배당성장률·배당 아코디언 라인용."""
-    years = list(range(start.year, end.year + 1))
+       weights={code:w}. 각 종목 자기 가용기간 전체(공통기간 비종속)."""
+    yrs = []
+    for code in weights:
+        s = series.get(code)
+        if s and len(s[0]):
+            yrs += [int(s[0].index[0].year), int(s[0].index[-1].year)]
+    if not yrs:
+        return []
+    years = list(range(min(yrs), max(yrs) + 1))
     dyield, damt = {}, {}
     for code, w in weights.items():
         s = series.get(code)
@@ -179,23 +222,6 @@ def _dividend_growth(annual_div):
         if span >= 1 and v0 > 0:
             cagr = round((v1 / v0) ** (1.0 / span) - 1.0, 4)
     return {"cagr": cagr, "yoy": yoy}
-
-
-def _rolling_return_table(tickers):
-    """전체기간·거치식·배당재투자 TR 인덱스 기반 수익률 롤링 분포(P2 엔진 재사용, 결정#7)."""
-    try:
-        from modules.tr_index import build_portfolio_tr_index
-        from modules import rolling
-        pts = build_portfolio_tr_index(tickers)
-        if len(pts) < 13:
-            return None
-        return {
-            "horizons": rolling.DEFAULT_HORIZONS,
-            "horizon_table": {str(h): v for h, v in rolling.horizon_table(pts).items()},
-            "syn_overall": round(sum(1 for _d, _v, s in pts if s) / len(pts), 4),
-        }
-    except Exception:
-        return None
 
 
 def compute_comparison(portfolios, benchmarks, loader, data_end=None):
@@ -270,22 +296,20 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
         dy = sum(yld.get(c, 0.0) * w for c, w in weights.items())
         m = _metrics_full(pr, spy_r, dy)
         if m:
-            annual = _annual_risk_return(pr)
-            div_y = _annual_dividends(weights, series, common_start, common_end)
             tk = [{"code": c, "weight": w * 100.0} for c, w in weights.items()]
+            annual, rr = _item_deep(tk)
+            div_y = _annual_dividends(weights, series)
             items.append({"kind": "portfolio", "name": name, **m,
                           "annual": annual, "annual_div": div_y,
-                          "divgrowth": _dividend_growth(div_y),
-                          "rolling_return": _rolling_return_table(tk)})
+                          "divgrowth": _dividend_growth(div_y), "rolling_return": rr})
     for b in bench_list:
         m = _metrics_full(rets_c[b["code"]], spy_r, yld.get(b["code"], 0.0))
         if m:
-            annual = _annual_risk_return(rets_c[b["code"]])
-            div_y = _annual_dividends({b["code"]: 1.0}, series, common_start, common_end)
+            annual, rr = _item_deep([{"code": b["code"], "weight": 100.0}])
+            div_y = _annual_dividends({b["code"]: 1.0}, series)
             items.append({"kind": "benchmark", "name": b["name"], "code": b["code"], **m,
                           "annual": annual, "annual_div": div_y,
-                          "divgrowth": _dividend_growth(div_y),
-                          "rolling_return": _rolling_return_table([{"code": b["code"], "weight": 100.0}])})
+                          "divgrowth": _dividend_growth(div_y), "rolling_return": rr})
 
     years = round((common_end - common_start).days / 365.25, 2)
     period = {

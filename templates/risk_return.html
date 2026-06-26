@@ -699,19 +699,38 @@ function rrOvRenderCtrl(){
       <button class="qr${rrOv.activeY===5?' on':''}" data-y="5">5년</button>
       <button class="qr${rrOv.activeY===10?' on':''}" data-y="10">10년</button>
       <button class="qr${rrOv.activeY===0?' on':''}" data-y="0">전체</button></span>
+    <span class="grp">🔍 사건확대:
+      <button class="qr ev" data-range="2000-01-01:2002-12-31">닷컴</button>
+      <button class="qr ev" data-range="2007-06-01:2009-06-30">금융위기</button>
+      <button class="qr ev" data-range="2020-01-01:2020-12-31">코로나</button>
+      <button class="qr ev" data-range="2022-01-01:2022-12-31">'22 긴축</button>
+      <button class="qr" id="rrOvZoomReset" title="확대 초기화(기본 5년)">↺ 초기화</button></span>
     <span class="grp">표시:
       <label><input type="radio" name="rrovm" value="norm" ${rrOv.mode==='norm'?'checked':''}>정규화(시작=100)</label>
       <label><input type="radio" name="rrovm" value="raw" ${rrOv.mode==='raw'?'checked':''}>원값(개별축)</label></span>
+    <span class="rr-ov-zoomhint" style="font-size:0.72rem;color:var(--text-muted);">💡 그래프를 <b>드래그</b>하면 그 구간만 확대돼요.</span>
     ${over5?'<span class="rr-ov-warn">⚠ 5년 초과 + 정규화는 작은 차이가 과장돼 보여요</span>':''}`;
   document.getElementById('rrOvStart').addEventListener('change',e=>{ rrOv.start=e.target.value; rrOv.activeY=-1; rrOvRenderCtrl(); rrOvDraw(); });
   document.getElementById('rrOvEnd').addEventListener('change',e=>{ rrOv.end=e.target.value; rrOv.activeY=-1; rrOvRenderCtrl(); rrOvDraw(); });
   el.querySelectorAll('input[name=rrovm]').forEach(r=>r.addEventListener('change',e=>{ rrOv.mode=e.target.value; rrOvRenderCtrl(); rrOvDraw(); }));
-  el.querySelectorAll('.qr').forEach(b=>b.addEventListener('click',()=>{
+  el.querySelectorAll('.qr[data-y]').forEach(b=>b.addEventListener('click',()=>{
     const yrs=+b.dataset.y; rrOv.activeY=yrs; const {mn,mx}=rrOvSeriesBounds(); rrOv.end=mx;
     if (yrs===0) rrOv.start=mn;
     else if (mx){ const d=new Date(mx); d.setFullYear(d.getFullYear()-yrs); rrOv.start=d.toISOString().slice(0,10); }
     rrOvRenderCtrl(); rrOvDraw();
   }));
+  // 사건 프리셋 확대 — 가용 데이터 범위로 클램프, 데이터 없으면 무시
+  el.querySelectorAll('.ev').forEach(b=>b.addEventListener('click',()=>{
+    const [s,e]=b.dataset.range.split(':'); const {mn,mx}=rrOvSeriesBounds();
+    const st=(mn&&s<mn)?mn:s, en=(mx&&e>mx)?mx:e;
+    if (mx&&st>mx || mn&&en<mn || st>=en){ if(typeof mmToast==='function') mmToast('그 시기엔 표시할 데이터가 없어요.','err'); return; }
+    rrOv.start=st; rrOv.end=en; rrOv.activeY=-1; rrOvRenderCtrl(); rrOvDraw();
+  }));
+  const zr=document.getElementById('rrOvZoomReset');
+  if (zr) zr.addEventListener('click',()=>{ if(rrOv.chart&&rrOv.chart.resetZoom) try{rrOv.chart.resetZoom();}catch(_){}
+    rrOv.activeY=5; const {mn,mx}=rrOvSeriesBounds(); rrOv.end=mx;
+    if(mx){ const d=new Date(mx); d.setFullYear(d.getFullYear()-5); const cap=d.toISOString().slice(0,10); rrOv.start=(mn&&mn>cap)?mn:cap; }
+    rrOvRenderCtrl(); rrOvDraw(); });
 }
 
 function rrOvMedian(a){ const b=[...a].sort((x,y)=>x-y); const n=b.length; if(!n) return 0;
@@ -762,7 +781,8 @@ function rrOvDraw(){
   if (rrOv.chart) rrOv.chart.destroy();
   rrOv.chart=new Chart(canvas.getContext('2d'),{ type:'line', data:{labels,datasets},
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-      plugins:{ legend:{labels:{color:txt,font:{size:11}}} }, scales } });
+      plugins:{ legend:{labels:{color:txt,font:{size:11}}},
+        zoom:{ zoom:{ drag:{enabled:true, backgroundColor:'rgba(31,111,235,0.15)', borderColor:'rgba(31,111,235,0.45)', borderWidth:1}, mode:'x' } } }, scales } });
 }
 
 function rrOvBindSearch(){

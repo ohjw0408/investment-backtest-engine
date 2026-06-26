@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-26] UX | 포트폴리오 예시 — 카드 클릭 상세 모달 통합 + 오색 멀티에셋 짬뽕 (오너 지시)
+
+오너 3건 반영(전부 로컬 검증, push 대기):
+- **① 투자대가 상세보기 페이지 제거 → 카드 클릭 인라인 모달**. `templates/guru_detail.html`·`gurus.html` 삭제. `/gurus`·`/gurus/<slug>` 라우트 = `/examples?tab=guru`로 **301 리다이렉트**(옛 링크·홈 프로모·북마크 보존). `examples` 라우트가 `get_guru(slug, 25)` 전체 상세를 카드 data-* 속성에 동봉(보유 25행·공시 메타·모노그램·stance). guru 탭 하단 "전체 보기" 버튼 제거(중복).
+- **② 미국·한국 예시 카드도 클릭 → 상세 모달**. 예시 카드에 data-source/desc/risk 동봉. `examples.js`에 단일 모달(`#exModal`) 렌더: 예시=구성 스택바+범례+설명, 대가=13F 면책+공시메타+보유표(13F비중 vs 포트폴리오내 정규화바). 모달 하단 액션 3종(분석/비교/저장)=활성카드 대상으로 기존 핸드오프 재사용. 닫기=X·백드롭·Esc. `?tab=guru`/`#guru` 딥링크로 탭 자동선택.
+- **③ 오색 멀티에셋(짬뽕) 신규** — 미국·한국 둘 다, defensive 그룹 최상단. **배당·성장·금·채권·현금 올인원**. US=SCHD25/QQQ20/SOXX10/GLD15/TLT20/SGOV10. KR(국내상장)=TIGER코스피고배당210780 25/KODEX200 069500 30/KODEX골드132030 15/ACE국고채10년365780 20/KODEX단기채153130 10. 합 100·risk5(균형).
+- **검증(Playwright 라이트/다크)**: US·KR 오색카드 각1·예시모달(구성6세그+액션3)·대가모달(보유25행+면책+메타3)·비교바·X/Esc 닫기·`?tab=guru` 자동선택 전부 PASS, **콘솔에러 0**.
+- **⚠️ 잔여 정리 필요**: `static/js/guru_fav.js`(mmSaveGuru) + `/api/gurus/<slug>/portfolio`·`/api/gurus/<slug>/backtest` 라우트는 삭제된 상세 페이지 전용이라 **이제 호출자 없음**(고아). 무해해서 보존, 오너 판단으로 정리 가능. `guru_avatar.js`는 홈 프로모가 계속 사용→유지.
+- 변경=`app.py`·`portfolio_examples.json`·`templates/examples.html`·`static/js/examples.js`, 삭제=`templates/guru_detail.html`·`gurus.html`.
+
 ## [2026-06-26] UX/DATA | 포트폴리오 예시 — 오너 피드백 4건 (투자대가 카드화·겹쳐보기·전략 보강)
 
 `/examples` 1차 배포 후 오너 지적 반영(전부 배포):

@@ -560,98 +560,24 @@ def examples_page():
     from modules.gurus import store as guru_store
     regions = [(r, pex.REGION_LABELS[r], pex.grouped(r)) for r in ('us', 'kr')]
     # 투자대가 탭 = guru 카드를 examples 카드와 동일 액션(분석/비교/저장)으로 직접 노출.
+    # 카드 클릭 시 상세 모달(보유 종목 표·공시 메타)을 인라인으로 띄움 → 별도 상세 페이지 제거.
     # data-tickers = 커버 보유 상위(비중 재정규화, 합~100) → examples.js 핸드오프 그대로 재사용.
     gurus = []
     for g in guru_store.list_gurus():
-        detail = guru_store.get_guru(g['slug'], limit=12)
+        detail = guru_store.get_guru(g['slug'], limit=25)
         if not detail or not detail.get('holdings'):
             continue
-        gurus.append({**g, 'tickers': [
+        gurus.append({**g, **detail, 'tickers': [
             {'code': h['ticker'], 'name': h['name'], 'weight': h['weight_norm']}
-            for h in detail['holdings']]})
+            for h in detail['holdings'][:12]]})
     return render_template('examples.html', regions=regions, gurus=gurus)
 
 @app.route('/gurus')
-def gurus_page():
-    from modules.gurus import store
-    return render_template('gurus.html', gurus=store.list_gurus())
-
 @app.route('/gurus/<slug>')
-def guru_detail_page(slug):
-    from flask import abort
-    from modules.gurus import store
-    g = store.get_guru(slug)
-    if not g:
-        abort(404)
-    return render_template('guru_detail.html', g=g)
-
-@app.route('/api/gurus/<slug>/portfolio')
-def guru_portfolio(slug):
-    """대가 상위 보유(커버, 비중 재정규화) → 포트폴리오 분석 탭 프리로드용 종목 리스트."""
-    from flask import jsonify, abort
-    from modules.gurus import store
-
-    g = store.get_guru(slug, limit=12)  # guru_backtest와 동일 구성
-    if not g:
-        abort(404)
-    holds = g['holdings']
-    if not holds:
-        return jsonify({'error': 'no_holdings', 'message': '분석할 보유 종목이 없습니다.'}), 400
-
-    total = sum(h['weight_norm'] for h in holds) or 1.0
-    tickers = [{'code': h['ticker'], 'name': h['name'],
-                'weight': round(h['weight_norm'] / total, 4)} for h in holds]
-    # 비중 합 정확히 1.0 보장(반올림 오차 마지막 종목에 흡수) → 분석 폼 100% 검증 통과
-    if tickers:
-        tickers[-1]['weight'] = round(1.0 - sum(t['weight'] for t in tickers[:-1]), 4)
-    return jsonify({'name': g['name'], 'tickers': tickers})
-
-
-@app.route('/api/gurus/<slug>/backtest', methods=['POST'])
-def guru_backtest(slug):
-    """대가 상위 보유(커버)로 고정비중 포폴 구성 → 백테스트(연1회 리밸 가정)."""
-    import datetime
-    from flask import jsonify, request, abort
-    from modules.gurus import store
-    import backtest_logic
-
-    g = store.get_guru(slug, limit=12)  # 상위 12개 커버 종목(비중 지배적)
-    if not g:
-        abort(404)
-    holds = g['holdings']
-    if not holds:
-        return jsonify({'error': 'no_holdings', 'message': '백테스트할 보유 종목이 없습니다.'}), 400
-
-    years = 3
-    if request.is_json and request.json:
-        years = int(request.json.get('years', 3))
-    years = years if years in (1, 3, 5) else 3
-
-    total = sum(h['weight_norm'] for h in holds) or 1.0
-    tickers = [{'code': h['ticker'], 'weight': h['weight_norm'] / total} for h in holds]
-
-    end = datetime.date.today()
-    start = end.replace(year=end.year - years)
-    body = {
-        'tickers': tickers,
-        'start_date': start.isoformat(),
-        'end_date': end.isoformat(),
-        'initial_capital': 10_000_000,
-        'monthly_contribution': 0,
-        'dividend_mode': 'reinvest',
-        'rebal_mode': 'yearly',
-    }
-    try:
-        res = backtest_logic.run_backtest_logic(body)
-    except Exception as e:
-        return jsonify({'error': 'backtest_failed',
-                        'message': '일부 종목의 시세가 부족해 백테스트를 완료하지 못했습니다.',
-                        'detail': str(e)[:200]}), 200
-    return jsonify({
-        'metrics': res.get('metrics', {}),
-        'period': {'start': start.isoformat(), 'end': end.isoformat(), 'years': years},
-        'n_holdings': len(tickers),
-    })
+def gurus_page(slug=None):
+    # 투자대가 상세는 포트폴리오 예시의 투자대가 탭(모달)으로 통합 — 옛 링크/북마크는 그쪽으로 보냄.
+    from flask import redirect, url_for
+    return redirect(url_for('examples_page', tab='guru'), code=301)
 
 @app.route('/myportfolios')
 def myportfolios():

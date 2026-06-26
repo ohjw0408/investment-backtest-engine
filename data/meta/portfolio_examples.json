@@ -1,6 +1,10 @@
 {
   "_meta": "포트폴리오 예시(추천 템플릿). region=us|kr, category=defensive|hedge|aggressive|dividend, risk=1(방어)~10(공격). tickers weight 합=100.",
   "strategies": [
+    { "slug": "us-multiasset", "region": "us", "category": "defensive", "risk": 5,
+      "name": "오색 멀티에셋", "source": "배당·성장·금·채권·현금 올인원",
+      "desc": "배당주·성장주·금·국채·현금을 한 그릇에 담은 올인원 자산배분. 어느 한 국면에도 치우치지 않게 5가지 색을 고루 섞었어요.",
+      "tickers": [{"code":"SCHD","name":"미국 배당다우존스","weight":25},{"code":"QQQ","name":"나스닥100","weight":20},{"code":"SOXX","name":"미국 반도체","weight":10},{"code":"GLD","name":"금","weight":15},{"code":"TLT","name":"미국 장기국채","weight":20},{"code":"SGOV","name":"초단기국채(현금성)","weight":10}] },
     { "slug": "us-permanent", "region": "us", "category": "defensive", "risk": 2,
       "name": "영구 포트폴리오", "source": "Harry Browne",
       "desc": "주식·장기국채·금·현금 25%씩. 호황·불황·인플레·디플레 모든 국면에 대비하는 전천후 균형.",
@@ -69,6 +73,10 @@
       "desc": "배당주·채권·리츠로 안정적 현금흐름과 분산을 동시에.",
       "tickers": [{"code":"SCHD","name":"미국 배당다우존스","weight":50},{"code":"TLT","name":"미국 장기국채","weight":30},{"code":"VNQ","name":"미국 리츠","weight":20}] },
 
+    { "slug": "kr-multiasset", "region": "kr", "category": "defensive", "risk": 5,
+      "name": "오색 멀티에셋 (국내상장)", "source": "배당·성장·금·채권·현금 올인원",
+      "desc": "국내 상장 ETF만으로 배당주·성장주·금·국채·현금을 고루 담은 올인원 자산배분. 연금·ISA 계좌로 5가지 색을 한 번에.",
+      "tickers": [{"code":"210780","name":"TIGER 코스피고배당","weight":25},{"code":"069500","name":"KODEX 200","weight":30},{"code":"132030","name":"KODEX 골드선물(H)","weight":15},{"code":"365780","name":"ACE 국고채10년","weight":20},{"code":"153130","name":"KODEX 단기채권","weight":10}] },
     { "slug": "kr-6040", "region": "kr", "category": "defensive", "risk": 4,
       "name": "한국 60/40", "source": "국내 자산배분",
       "desc": "코스피200 60·국고채10년 40. 국내 상장 ETF만으로 만드는 균형 포트폴리오.",

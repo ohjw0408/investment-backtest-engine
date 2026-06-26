@@ -67,8 +67,6 @@
 .ex-gbar { flex: 0 0 64px; height: 7px; border-radius: var(--r-pill, 999px); margin-left: 8px;
   background: color-mix(in srgb, var(--ds-ink) 8%, transparent); overflow: hidden; }
 .ex-gbar-fill { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--brand-bright), var(--brand)); }
-.ex-guru-btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 13.5px; font-weight: 700;
-  padding: 11px 24px; border-radius: var(--r-pill, 999px); background: var(--brand); color: var(--on-brand); }
 
 /* 비교 플로팅 바 */
 .ex-cmpbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 60; display: none;
@@ -79,6 +77,56 @@
 .ex-cmpbar-go { display: inline-flex; align-items: center; gap: 5px; font-weight: 800; font-size: 12.5px; cursor: pointer;
   padding: 8px 16px; border-radius: var(--r-pill, 999px); border: none; font-family: inherit; background: var(--brand); color: var(--on-brand); }
 .ex-cmpbar-clear { background: none; border: none; color: var(--ds-canvas); opacity: .7; cursor: pointer; font-size: 16px; line-height: 1; padding: 4px; }
+
+/* 카드 클릭 → 상세 (액션 버튼 외 영역) */
+.ex-card[data-ex-card] { cursor: pointer; }
+.ex-card[data-ex-card]:hover { border-color: var(--brand); }
+[data-theme="dark"] .ex-card[data-ex-card]:hover { border-color: var(--brand); }
+.ex-card .ex-acts { cursor: default; }
+
+/* 상세 모달 */
+.ex-modal { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 18px; }
+.ex-modal[hidden] { display: none; }
+.ex-modal-backdrop { position: absolute; inset: 0; background: color-mix(in srgb, var(--ds-ink) 55%, transparent); backdrop-filter: blur(2px); }
+.ex-modal-box { position: relative; z-index: 1; width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto;
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-xl, 16px);
+  box-shadow: var(--ds-shadow-lg); padding: 22px 22px 18px; }
+[data-theme="dark"] .ex-modal-box { background: var(--ds-dark-el); border-color: transparent; }
+.ex-modal-x { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer;
+  font-size: 15px; line-height: 1; color: var(--ds-muted); background: var(--ds-soft); }
+.ex-modal-x:hover { color: var(--ds-ink); }
+.ex-modal-head { display: flex; align-items: flex-start; gap: 12px; padding-right: 34px; }
+.exm-name { font-size: 19px; font-weight: 800; color: var(--ds-ink); line-height: 1.25; }
+.exm-name-en { font-weight: 500; color: var(--ds-muted); font-size: 13px; }
+.exm-sub { font-size: 12.5px; color: var(--ds-muted); margin-top: 3px; }
+.exm-badge { flex-shrink: 0; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700;
+  padding: 5px 10px; border-radius: var(--r-pill, 999px); border: 1px solid var(--ds-hairline); color: var(--ds-body); white-space: nowrap; }
+.exm-mono { flex-shrink: 0; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 16px; color: #fff; letter-spacing: 0.5px; }
+.exm-desc { font-size: 13px; color: var(--ds-body); line-height: 1.55; margin-top: 14px; }
+.exm-note { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; padding: 11px 13px;
+  border-radius: var(--r-lg, 12px); background: var(--ds-soft); border: 1px solid var(--ds-hairline);
+  font-size: 11.5px; color: var(--ds-body); line-height: 1.5; }
+.exm-note b { color: var(--ds-ink); font-weight: 700; }
+.exm-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 14px; font-size: 12px; color: var(--ds-muted); }
+.exm-meta b { color: var(--ds-ink); font-weight: 700; font-family: var(--font-mono); }
+.exm-sec { font-size: 12px; font-weight: 700; color: var(--ds-ink); margin: 16px 0 9px; }
+/* 모달 내 구성 범례 (examples) */
+.exm-legend { display: flex; flex-direction: column; gap: 7px; }
+/* 모달 내 보유 표 (guru) */
+.exm-table { width: 100%; border-collapse: collapse; }
+.exm-table th { text-align: left; font-size: 10.5px; font-weight: 600; color: var(--ds-muted); text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 6px 8px; border-bottom: 1px solid var(--ds-hairline); }
+.exm-table th.num, .exm-table td.num { text-align: right; }
+.exm-table td { padding: 9px 8px; border-bottom: 1px solid var(--ds-hairline); font-size: 12.5px; color: var(--ds-ink); vertical-align: middle; }
+.exm-tic { font-weight: 700; font-family: var(--font-mono); }
+.exm-co { color: var(--ds-muted); font-size: 11.5px; }
+.exm-w { font-family: var(--font-mono); }
+.exm-wbar-wrap { display: flex; align-items: center; gap: 7px; justify-content: flex-end; }
+.exm-wbar { width: 70px; height: 7px; border-radius: var(--r-pill, 999px);
+  background: color-mix(in srgb, var(--ds-ink) 8%, transparent); overflow: hidden; }
+.exm-wbar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--brand-bright), var(--brand)); }
+.ex-modal-acts { margin-top: 18px; }
 
 @media (max-width: 640px) { .ex-grid { grid-template-columns: 1fr; } }
 </style>
@@ -117,7 +165,9 @@
     <div class="ex-sec-title">{{ clabel }}</div>
     <div class="ex-grid">
       {% for s in items %}
-      <div class="ex-card" data-ex-card data-slug="{{ s.slug }}" data-name="{{ s.name }}"
+      <div class="ex-card" data-ex-card data-type="example" data-slug="{{ s.slug }}" data-name="{{ s.name }}"
+        data-source="{{ s.source }}" data-desc="{{ s.desc }}" data-risk="{{ s.risk }}"
+        data-riskcolor="{{ risk_color(s.risk)|trim }}" data-risklabel="{{ risk_label(s.risk)|trim }}"
         data-tickers='{{ s.tickers | tojson }}'>
         <div class="ex-card-head">
           <div>
@@ -163,7 +213,12 @@
     {% if gurus %}
     <div class="ex-grid" style="margin-top:14px;">
       {% for g in gurus %}
-      <div class="ex-card" data-ex-card data-slug="guru-{{ g.slug }}" data-name="{{ g.name_ko }}의 포트폴리오"
+      <div class="ex-card ex-card-click" data-ex-card data-type="guru" data-slug="guru-{{ g.slug }}" data-name="{{ g.name_ko }}의 포트폴리오"
+        data-nameko="{{ g.name_ko }}" data-nameen="{{ g.name }}" data-fund="{{ g.fund }}"
+        data-monogram="{{ g.monogram }}" data-stancecolor="{{ gstance_color(g.stance)|trim }}" data-stancelabel="{{ g.stance_label }}"
+        data-period="{{ g.period_label }}" data-filed="{{ g.filed or '' }}"
+        data-ntotal="{{ g.n_total }}" data-ncovered="{{ g.n_covered }}" data-covweight="{{ g.covered_weight }}"
+        data-holdings='{{ g.holdings | tojson }}'
         data-tickers='{{ g.tickers | tojson }}'>
         <div class="ex-card-head">
           <span class="ex-mono" style="background:{{ gstance_color(g.stance)|trim }}">{{ g.monogram }}</span>
@@ -196,12 +251,24 @@
       </div>
       {% endfor %}
     </div>
-    <div style="text-align:center;margin-top:18px;">
-      <a class="ex-guru-btn" href="/gurus">투자대가 상세 전체 보기 →</a>
-    </div>
     {% else %}
     <div class="ex-note" style="margin-top:12px;">데이터를 준비 중입니다. 잠시 후 다시 확인해주세요.</div>
     {% endif %}
+  </div>
+</div>
+
+<!-- 상세 모달 (카드 클릭 → 인라인 상세) -->
+<div class="ex-modal" id="exModal" hidden>
+  <div class="ex-modal-backdrop" data-exm-close></div>
+  <div class="ex-modal-box" role="dialog" aria-modal="true" aria-labelledby="exmTitle">
+    <button class="ex-modal-x" data-exm-close aria-label="닫기">✕</button>
+    <div class="ex-modal-head" id="exmHead"></div>
+    <div class="ex-modal-body" id="exmBody"></div>
+    <div class="ex-acts ex-modal-acts" id="exmActs">
+      <button class="ex-btn ex-btn-primary" data-act="analyze" title="포트폴리오 분석으로 백테스트">📈 분석</button>
+      <button class="ex-btn" data-act="compare" title="포트폴리오 비교에 추가">⚖ 비교</button>
+      <button class="ex-btn ex-btn-ic" data-act="save" title="즐겨찾기 저장">⭐</button>
+    </div>
   </div>
 </div>
 
@@ -213,5 +280,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/examples.js') }}?v=20260626"></script>
+<script src="{{ url_for('static', filename='js/examples.js') }}?v=20260626b"></script>
 {% endblock %}

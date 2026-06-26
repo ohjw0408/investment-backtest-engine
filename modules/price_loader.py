@@ -345,8 +345,10 @@ class PriceLoader:
             # get_price가 start<db_min 갭을 yfinance서 보충 적재(raw close 저장, FX 미적용=조회만)
             self.get_price(code, self.HISTORY_FAR_START, end, apply_fx=False)
         except Exception:
-            pass
-        # 더 과거가 없어도(신생주) 시도는 끝 → 완료로 마킹(매 로드 재시도 방지)
+            # 페치 실패(yfinance 오류·타임아웃) → 마킹하지 않음. 다음 접근에 재시도.
+            # (예외인데도 complete 마킹하면 얕은 데이터가 영구 고착돼 차트가 깨짐.)
+            return False
+        # 페치 성공(신생주라 더 과거가 없어도 정상 완료) → 완료로 마킹(매 로드 재시도 방지)
         self._mark_history_complete(code)
         return True
 
@@ -491,6 +493,10 @@ class PriceLoader:
         # (INSERT OR IGNORE라 한번 박히면 재페치로 안 고쳐지므로 입력 단계서 거른다. 단일일 증분
         #  페치는 이웃이 없어 못 거르니, purge_isolated_spikes 주기 태스크가 2차 안전망.)
         df = _drop_isolated_price_spikes(df)
+        # NaN close 행은 저장하지 않음 — 긴 구간 1회 다운로드 시 yfinance가 중간 구간을 NaN으로
+        # 돌려주면 INSERT OR IGNORE로 NULL close 행이 박히고(get_price는 내부 갭을 재페치 안 함)
+        # → 영구 NULL홀 → pct_change pad 점프의 근원. 입력 단계서 제거해 홀 자체를 막는다.
+        df = df.dropna(subset=["close"])
         price_df  = df[["code", "date", "open", "high", "low", "close", "volume"]]
         action_df = df[["code", "date", "dividend", "split"]]
         return price_df, action_df

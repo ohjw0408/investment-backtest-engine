@@ -1,5 +1,14 @@
 # Log
 
+## [2026-06-26] UX | 공용 날짜 선택기 — 네이티브 date picker 교체 (오너 지시)
+
+오너 불만: 분석/비교 등 모든 날짜 입력의 네이티브 달력이 구림(연도 스크롤 느림·연>월>일 다단계 클릭).
+- **신규 `static/js/mm_datepicker.js`**(무의존 vanilla, base.html 전역 로드 → 모든 페이지 적용). 네이티브 `<input type="date">`를 **연/월 드롭다운 + 날짜 그리드 팝업**으로 교체. 연도 select(min~max, 기본 1985~내년+1)·월 select·‹›월이동·날짜 클릭·"오늘" 버튼. **스크롤 없이 ≤3클릭** 선택.
+- 구현: 원소는 `type="date"` 유지(기존 CSS·`.value`=YYYY-MM-DD 그대로 → 호출 코드 변경 0), 네이티브 인디케이터 CSS로 숨기고 `readonly`+mousedown `preventDefault`로 네이티브 픽커 차단, 클릭 시 커스텀 팝업. 선택 시 `input`/`change` 이벤트 디스패치(리스너 호환). min/max 속성 있으면 범위밖 날짜 disable.
+- 적용 범위: 정적 입력은 초기 scan, **동적 삽입(포트폴리오 비교 오버레이 rrOvStart/End 등)은 MutationObserver**로 자동 변환. 대상=backtest(분석기간·기여도 구간)·risk_return(비교 오버레이)·myassets(매수일) 전부.
+- 검증(Playwright 라이트/다크): /backtest 날짜 클릭→팝업(연/월 select+31일 버튼), 2015/6월/10 선택→값 `2015-06-10`·팝업 닫힘, 재오픈 선택일 하이라이트, Esc 닫힘, 콘솔0.
+- 변경=`static/js/mm_datepicker.js`(신규)·`templates/base.html`(로드).
+
 ## [2026-06-26] FIX | 분석 핸드오프 — 대가 종목 12→30개 + autorun 제거 (오너 지시)
 
 - **① 대가 종목 12개 상한 → 30개**(테리 스미스 등 다종목이 다 안 들어가던 문제). 뿌리=`examples` 라우트가 guru tickers를 `detail['holdings'][:12]`로 잘랐음. `get_guru(slug, limit=30)` + `[:12]` 제거 → 표시·핸드오프 모두 상위 30개. **30=포트폴리오 분석 백엔드 종목 상한**(app.py 1~30 검증). 커버 30개 초과분(테리=34커버 중 4개)은 비중 미미·"나머지 현금" 처리되어 실행 정상.

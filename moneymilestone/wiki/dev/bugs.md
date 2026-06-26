@@ -153,3 +153,13 @@ tags: [dev, bug]
 | `modules/sim/tax_engine.py` 덮어씀 | ✅ 해결 | 파일 삭제됨(Phase 2c 정리). 2026-06-13 확인 |
 | T1~T4 수동 테스트 미완료 | ⚠️ 미확인 | T1 배너, T2 종합과세 패널, T4 ISA 풍차 체크박스 — 브라우저 직접 확인 필요 |
 | **GAP-DECUM-COMP — 인출(decum) 중 금융소득 종합과세 미모델링** | ✅ 해소 확인 (2026-06-12) — **감사 항목이 stale였음** | 오너 보류 해제 후 코드 점검 결과 C3.2(89c927a)부터 이미 모델링되어 있었음: `simulate_household_window`가 `TaxSessionState`를 전 계좌 공유 → 위탁 배당 gross(`TaxedDividendEngine`)·KR_FOREIGN 인출/리밸 매도차익(`_calc_cg_tax`)이 한 풀로 합산, 2천만 초과분 종합과세 가산(연도별 리셋·개인 합산 포함). 감사 주장("배당 2천만 초과해도 가산 안 함")은 코드 실상과 불일치. 검증 = `tests/test_decum_comprehensive.py` 4종(재현 등치·임계 미만 플랫·2계좌 개인합산·KRF 차익 풀 합산) 전부 PASS. 잔여 = `other_financial_income=0` 베이스라인(외부 금융소득) — 프런트가 해당 필드를 아예 안 보냄(수동입력 금지 설계) → 별도 항목 "other_financial_income 전탭 자동산출"에 귀속, decum 고유 갭 아님 |
+
+---
+
+## 2026-06-26 세션 (Claude) — 추세 겹쳐보기 포폴 지수 점프 + 데이터 NULL홀
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| 추세 겹쳐보기 — 워런 버핏 포폴 지수가 2021-06-25에 +85% 점프 | ① `price_daily`에 **내부 NULL홀**(KO/AXP/BAC/CVX/OXY/GOOGL의 2000~2020 close=NULL). 긴 구간 1회 다운로드 시 yfinance가 중간을 NaN으로 주면 `INSERT OR IGNORE`로 NULL행이 박히고 `get_price`는 내부 갭 재페치 안 함 → 영구 잔존. ② `_portfolio_index_series`가 `closes.pct_change()` 기본 `fill_method='pad'` → 홀을 forward-fill 후 변동률 → 홀 닫히는 날 +150~250% 가짜수익(AXP +249%) → 포폴 +85% 점프 | ① `app.py`: `pct_change(fill_method=None)` → 홀 종료일 NaN(그날 제외). ② `price_loader.fetch_from_api`: NaN close 행 저장 전 `dropna`(홀 근원 차단). ③ prod `price_daily` 전수 복구(홀 0행). 검증: 2021 최대 일변동 85%→4.25%, 라이브 API 점프 제거 | `4e990e2` `87299cf` | ✅ |
+| `ensure_full_history` — 페치 실패해도 `complete=1` 마킹 | `try/except: pass` 후 무조건 `_mark_history_complete` → yfinance 실패 시 얕은 데이터 영구 고착 | 예외 시 마킹 안 하고 `return False`(다음 접근 재시도) | `87299cf` | ✅ |
+| 추세 겹쳐보기 툴팁 — hover 시 같은 x인데 일부 시리즈만 표시 | 다운샘플로 시리즈마다 샘플 날짜 어긋남 → union 라벨에서 자기 포인트 없는 날 `null` → Chart.js `index` 툴팁이 null 데이터셋 스킵 | `rrOvFill` 보간(구간내 빈 라벨 날짜기준 선형보간, 선 모양 불변) + 공유 크로스헤어 툴팁(값 정렬) | `95ca52c` | ✅ (로직검증, 시각검증은 오너 육안) |

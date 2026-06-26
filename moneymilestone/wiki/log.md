@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-26] FIX | 추세 겹쳐보기 버핏 포폴 2021-06-25 +85% 점프 — NULL홀 + pct_change pad (오너)
+
+위 "버핏 2021" 후속. 플래그/지연백필로 1970 확장은 됐지만 **여전히 점프**. 더 깊은 원인 2겹:
+- **데이터 NULL홀**: 깊은 백필(긴 구간 1회 yf.download)이 중간을 NaN으로 받으면 `INSERT OR IGNORE`로 **NULL close 행**이 박힘 → `get_price`는 db_min~db_max 범위만 보고 **내부 갭 재페치 안 함** → KO/AXP/BAC/CVX/OXY/GOOGL 2000~2020 close=NULL 영구 잔존. `_ticker_series`가 close>0만 읽어 TR이 1999→2021 끊김.
+- **코드**: `_portfolio_index_series`의 `closes.pct_change()` 기본 `fill_method='pad'`가 홀을 forward-fill → 홀 닫히는 2021-06-25에 +150~250% 가짜수익(AXP +249%·OXY +218%) → 포폴 +85% 점프. (raw `pct_change(fill_method=None)` 재현은 매끈했던 게 단서.)
+- 수정: ① `app.py` `pct_change(fill_method=None)`(홀 종료일 NaN=그날 제외). ② `price_loader.fetch_from_api` NaN close `dropna`(홀 근원 차단). ③ `ensure_full_history` 예외 시 마킹 안 함(얕은데이터 고착 방지). ④ prod `price_daily` 전수 복구(버핏 6종목 수천행 + 잔여 15종목 56행 → NULL홀 **0**).
+- 검증(prod 라이브): 2021-06-25 +85%→+0.59%, 2021 최대 일변동 85%→4.25%, 전체 최대=1987 블랙먼데이 23%(진짜). 라이브 API 점프 제거 확인.
+- **툴팁**: 겹쳐보기 hover 시 같은 x인데 일부 시리즈만 뜨던 것(다운샘플 날짜 어긋남→null 데이터셋 스킵) → `rrOvFill` 선형보간 + 공유 크로스헤어 툴팁. ⚠️ 시각검증은 오너 육안(브라우저 익스텐션 미연결).
+- 커밋=`4e990e2`(pad)·`87299cf`(price_loader)·`95ca52c`(툴팁). 변경=`app.py`·`modules/price_loader.py`·`templates/risk_return.html`.
+
 ## [2026-06-26] FEAT | 심화분석 P0 — 롤링 엔진 + 총수익 인덱스 (오너)
 
 `포트폴리오_심화분석_plan.md` P0 완료(P2~P4 토대).

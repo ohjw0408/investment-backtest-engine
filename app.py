@@ -2950,12 +2950,14 @@ def _price_daily_conn():
     return _sqlite.connect(str(_PRICE_DB))
 
 
-def _portfolio_index_series(tickers, years=6, conn=None):
+def _portfolio_index_series(tickers, years=None, conn=None):
     """저장 포트폴리오 → 비중 고정 정규화 지수(시작=100) 일별 시계열. 오버레이 추세 비교용.
        비중 합으로 정규화, 종목별 종가를 시작일=100으로 환산해 가중합 → 통화 무관.
+       각 포인트 = [date, value, syn] (syn=1: 그 날 구성종목 중 합성 백필[volume=0]이 섞임 → 프런트서 점선).
+       years=None: 전체 기간(합성 백필 포함). 10년/전체 버튼이 실제 그 구간을 그릴 수 있게 컷오프 제거.
        conn: 호출자가 연 price_daily 연결(여러 포폴 1요청서 공유). None이면 자체 개폐."""
     from datetime import datetime, timedelta
-    start = (datetime.now() - timedelta(days=int(years * 365))).strftime('%Y-%m-%d')
+    start = (datetime.now() - timedelta(days=int(years * 365))).strftime('%Y-%m-%d') if years else '1900-01-01'
     wsum = sum(float(t.get('weight') or 0) for t in tickers) or 1.0
 
     valid = []
@@ -2986,14 +2988,19 @@ def _portfolio_index_series(tickers, years=6, conn=None):
             c = code.rsplit('.', 1)[0] if code.endswith(('.KS', '.KQ')) else code
             try:
                 rows = conn.execute(
-                    "SELECT date, close FROM price_daily WHERE code=? AND date>=? ORDER BY date",
+                    "SELECT date, close, volume FROM price_daily WHERE code=? AND date>=? ORDER BY date",
                     (c, start)).fetchall()
                 if not rows:
                     continue
-                dfx = _drop_isolated_price_spikes(_pd.DataFrame(rows, columns=['date', 'close']))
-                m = {r.date: float(r.close) for r in dfx.itertuples() if r.close and float(r.close) > 0}
+                dfx = _drop_isolated_price_spikes(_pd.DataFrame(rows, columns=['date', 'close', 'volume']))
+                m, syn = {}, {}
+                for r in dfx.itertuples():
+                    if r.close and float(r.close) > 0:
+                        m[r.date] = float(r.close)
+                        # volume=0/None = 합성 백필(상장 전 추정치) → 합성 플래그
+                        syn[r.date] = 1 if (r.volume is None or float(r.volume) == 0) else 0
                 if m:
-                    series[code] = (w, m)
+                    series[code] = (w, m, syn)
             except Exception:
                 continue
     finally:
@@ -3002,7 +3009,7 @@ def _portfolio_index_series(tickers, years=6, conn=None):
     if not series:
         return []
     common = None
-    for _, m in series.values():
+    for _, m, _syn in series.values():
         ks = set(m.keys())
         common = ks if common is None else (common & ks)
     dates = sorted(common or [])
@@ -3012,11 +3019,14 @@ def _portfolio_index_series(tickers, years=6, conn=None):
     out = []
     for dt in dates:
         val = 0.0
-        for _, (w, m) in series.items():
+        syn_any = 0
+        for _, (w, m, syn) in series.items():
             base = m.get(t0)
             if base:
                 val += w * (m[dt] / base) * 100.0
-        out.append([dt, round(val, 4)])
+            if syn.get(dt):
+                syn_any = 1
+        out.append([dt, round(val, 4), syn_any])
     return out
 
 

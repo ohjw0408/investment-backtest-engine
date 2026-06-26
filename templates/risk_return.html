@@ -156,6 +156,7 @@
       <div id="rrOvSpinner" class="rr-ov-spinner" style="display:none;"><span class="ds-spinner"></span></div>
     </div>
     <div id="rrOvEmpty" class="rr-empty" style="display:none;padding:30px 20px;">위에서 항목을 추가하면 추세 차트가 그려집니다.</div>
+    <div class="rr-ov-synhint" style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">┄┄ 점선 = 상장 전 <b>합성(추정)</b> 구간 · 시작이 늦은 포트는 진입 시점 다른 포트들의 중앙값으로 맞춰 그립니다.</div>
   </div>
 
   <!-- 포트폴리오 정밀 비교 (선택 + 결과) -->
@@ -675,7 +676,7 @@ function rrOvSeriesBounds(){
   let mn=null, mx=null;
   rrOv.items.forEach(it=>{ const s=rrOv.raw[it.key]; if(!s||!s.points.length) return;
     const a=s.points[0][0], b=s.points[s.points.length-1][0];
-    if(mn===null||a>mn) mn=a; if(mx===null||b>mx) mx=b; });   // mn=가장 늦은 시작(공통)
+    if(mn===null||a<mn) mn=a; if(mx===null||b>mx) mx=b; });   // mn=가장 이른 시작(전체 구간) — 늦게 시작하는 포트는 중앙값 규격화로 합류
   return {mn,mx};
 }
 function rrOvSetDefaultRange(){
@@ -713,6 +714,9 @@ function rrOvRenderCtrl(){
   }));
 }
 
+function rrOvMedian(a){ const b=[...a].sort((x,y)=>x-y); const n=b.length; if(!n) return 0;
+  return n%2 ? b[(n-1)/2] : (b[n/2-1]+b[n/2])/2; }
+
 function rrOvDraw(){
   const canvas=document.getElementById('rrOvChart'), empty=document.getElementById('rrOvEmpty');
   if (!rrOv.items.length){ if(rrOv.chart){rrOv.chart.destroy();rrOv.chart=null;} canvas.style.display='none'; empty.style.display='block'; return; }
@@ -723,20 +727,37 @@ function rrOvDraw(){
   const labels=[...dset].sort();
   const txt=cssVar('--text-muted')||'#888', grid=cssVar('--border')||'#e0e0e0';
   const datasets=[]; const scales={ x:{ type:'category', ticks:{color:txt,maxTicksLimit:8,autoSkip:true}, grid:{color:grid} } };
+  // 합성(추정) 구간 점선: 포인트의 3번째 값(syn=1)이면 그 세그먼트를 점선으로.
+  const dashSeg = synArr => ({ borderDash: ctx => (synArr[ctx.p0DataIndex] || synArr[ctx.p1DataIndex]) ? [5,4] : undefined });
   if (rrOv.mode==='norm'){
     scales.y={ ticks:{color:txt}, grid:{color:grid}, title:{display:true,text:'정규화 (시작=100)',color:txt} };
-    rrOv.items.forEach(it=>{ const s=rrOv.raw[it.key]; if(!s)return;
-      const m={}; s.points.forEach(p=>{ if(inR(p[0])) m[p[0]]=p[1]; });
-      const fd=labels.find(d=>m[d]!=null); const base=fd?m[fd]:null;
-      const data=labels.map(d=> (m[d]!=null && base) ? +(m[d]/base*100).toFixed(2) : null);
-      datasets.push({label:it.label,data,borderColor:it.color,backgroundColor:it.color,borderWidth:1.8,pointRadius:0,tension:0.1,spanGaps:true}); });
+    // 각 시리즈 = {원값맵 m, 합성맵 syn, 시작일 fd}. 시작이 늦은(중간 진입) 시리즈는 100이 아니라
+    // 진입일에 이미 그려지고 있는 다른 시리즈들의 그 날 정규화값 '중앙값'에 맞춰 시작(자연 합류).
+    const ser = rrOv.items.map(it=>{ const s=rrOv.raw[it.key]; if(!s) return null;
+      const m={}, syn={}; s.points.forEach(p=>{ if(inR(p[0])){ m[p[0]]=p[1]; syn[p[0]]=p[2]?1:0; } });
+      const fd=labels.find(d=>m[d]!=null);
+      return fd ? {it,m,syn,fd} : null; }).filter(Boolean);
+    const ordered=[...ser].sort((a,b)=> a.fd<b.fd?-1:(a.fd>b.fd?1:0));
+    const normMap={};
+    ordered.forEach(x=>{
+      const baseRaw=x.m[x.fd];
+      const peers=[]; ordered.forEach(y=>{ if(y!==x && normMap[y.it.key] && normMap[y.it.key][x.fd]!=null) peers.push(normMap[y.it.key][x.fd]); });
+      const anchor = peers.length ? rrOvMedian(peers) : 100;
+      const nm={}; labels.forEach(d=>{ if(x.m[d]!=null && baseRaw) nm[d]=+(x.m[d]/baseRaw*anchor).toFixed(2); });
+      normMap[x.it.key]=nm;
+    });
+    rrOv.items.forEach(it=>{ const x=ser.find(z=>z.it.key===it.key); if(!x)return; const nm=normMap[it.key];
+      const data=labels.map(d=> nm[d]!=null?nm[d]:null);
+      const synArr=labels.map(d=> x.syn[d]?1:0);
+      datasets.push({label:it.label,data,borderColor:it.color,backgroundColor:it.color,borderWidth:1.8,pointRadius:0,tension:0.1,spanGaps:true,segment:dashSeg(synArr)}); });
   } else {
     rrOv.items.forEach((it,i)=>{ const s=rrOv.raw[it.key]; if(!s)return;
-      const m={}; s.points.forEach(p=>{ if(inR(p[0])) m[p[0]]=p[1]; });
+      const m={},syn={}; s.points.forEach(p=>{ if(inR(p[0])){ m[p[0]]=p[1]; syn[p[0]]=p[2]?1:0; } });
       const ax='y'+i;
       scales[ax]={ position:i%2?'right':'left', ticks:{color:it.color,font:{size:10}}, grid:{drawOnChartArea:i===0,color:grid} };
       const data=labels.map(d=> m[d]!=null ? m[d] : null);
-      datasets.push({label:it.label+(s.unit?` (${s.unit})`:''),data,borderColor:it.color,backgroundColor:it.color,borderWidth:1.8,pointRadius:0,tension:0.1,spanGaps:true,yAxisID:ax}); });
+      const synArr=labels.map(d=> syn[d]?1:0);
+      datasets.push({label:it.label+(s.unit?` (${s.unit})`:''),data,borderColor:it.color,backgroundColor:it.color,borderWidth:1.8,pointRadius:0,tension:0.1,spanGaps:true,yAxisID:ax,segment:dashSeg(synArr)}); });
   }
   if (rrOv.chart) rrOv.chart.destroy();
   rrOv.chart=new Chart(canvas.getContext('2d'),{ type:'line', data:{labels,datasets},

@@ -62,8 +62,11 @@
 .rr-empty { text-align: center; padding: 50px 20px; color: var(--text-muted); }
 
 /* 추세 겹쳐보기 오버레이 */
-.rr-ov-spinner { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  background: color-mix(in srgb, var(--bg) 60%, transparent); border-radius: 12px; z-index: 3; }
+.rr-ov-spinner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: color-mix(in srgb, var(--bg) 75%, transparent); border-radius: 12px; z-index: 3; }
+.rr-ov-prog { width: 240px; max-width: 70%; height: 7px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.rr-ov-prog-bar { height: 100%; width: 0%; border-radius: 999px; background: var(--blue); transition: width .18s ease; }
+.rr-ov-prog-txt { font-size: 0.78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .rr-ov-quick { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
 .rr-ov-quick .lbl { font-size: 0.76rem; color: var(--text-muted); margin-right: 2px; }
 .rr-ov-qbtn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border: 1.5px solid var(--border); border-radius: 18px; background: var(--bg); color: var(--text); font-size: 0.78rem; font-weight: 600; cursor: pointer; font-family: inherit; }
@@ -153,7 +156,11 @@
     <div id="rrOvCtrl" class="rr-ov-ctrl"></div>
     <div class="rr-chart-wrap" style="height:380px;position:relative;">
       <canvas id="rrOvChart"></canvas>
-      <div id="rrOvSpinner" class="rr-ov-spinner" style="display:none;"><span class="ds-spinner"></span></div>
+      <div id="rrOvSpinner" class="rr-ov-spinner" style="display:none;">
+        <span class="ds-spinner"></span>
+        <div class="rr-ov-prog"><div class="rr-ov-prog-bar" id="rrOvProgBar"></div></div>
+        <div class="rr-ov-prog-txt" id="rrOvProgTxt">불러오는 중…</div>
+      </div>
     </div>
     <div id="rrOvEmpty" class="rr-empty" style="display:none;padding:30px 20px;">위에서 항목을 추가하면 추세 차트가 그려집니다.</div>
     <div class="rr-ov-synhint" style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">┄┄ 점선 = 상장 전 <b>합성(추정)</b> 구간 · 시작이 늦은 포트는 진입 시점 다른 포트들의 중앙값으로 맞춰 그립니다.</div>
@@ -601,23 +608,27 @@ async function rrOvInit(){
     .then(d=>{ rrOv.macros = []; (d.categories||[]).forEach(c=>(c.series||[]).forEach(s=>rrOv.macros.push(s))); })
     .catch(()=>{ rrOv.macros = []; });
   rrOvBindSearch();
-  // 포트폴리오 예시 비교 진입 → 겹쳐보기를 비교 대상 N개만(기본 SPY/금 등 클리어)
+  // 포트폴리오 예시 비교 진입 → 포폴별 병렬 요청 + 진행률 바
   if (Array.isArray(window._rrExPreload) && window._rrExPreload.length){
     const pre = window._rrExPreload; window._rrExPreload = null;
-    const spin0 = document.getElementById('rrOvSpinner'); if (spin0) spin0.style.display = 'flex';
-    try {
-      const d = await fetch('/api/portfolio/index_series', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ portfolios: pre }) }).then(r=>r.json());
-      const series = d.series || [];
-      if (series.length){
-        rrOv.raw = {}; rrOv.items = [];
-        series.forEach(s=>{ rrOv.raw[s.key] = s; rrOv.items.push({key:s.key, label:s.label}); });
-        rrOvRecolor(); rrOv.start = null; rrOvSetDefaultRange();
-        rrOvRenderQuick(); rrOvRenderChips(); rrOvRenderCtrl(); rrOvDraw();
-        return;
-      }
-    } catch(e){}
-    finally { if (spin0) spin0.style.display = 'none'; }
+    const results = new Array(pre.length);
+    let done = 0; rrOvProg(0, pre.length);
+    await Promise.all(pre.map(async (p, i) => {
+      try {
+        const d = await fetch('/api/portfolio/index_series', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ portfolios: [p] }) }).then(r=>r.json());
+        results[i] = (d.series || [])[0] || null;
+      } catch(e){ results[i] = null; }
+      done++; rrOvProg(done, pre.length);
+    }));
+    rrOvProg(-1);
+    rrOv.raw = {}; rrOv.items = [];
+    results.forEach((s, i) => { if (s){ const key='EX:'+i; rrOv.raw[key] = {...s, key, label: pre[i].name}; rrOv.items.push({key, label: pre[i].name}); } });
+    if (rrOv.items.length){
+      rrOvRecolor(); rrOv.start = null; rrOvSetDefaultRange();
+      rrOvRenderQuick(); rrOvRenderChips(); rrOvRenderCtrl(); rrOvDraw();
+      return;
+    }
   }
   const n = rrPortfolios.length;
   if (n === 0) rrOv.items = [{key:'SYM:SPY',label:'S&P500'},{key:'SYM:069500',label:'코스피200'},{key:'SYM:GLD',label:'금'}];
@@ -652,6 +663,17 @@ function rrOvRenderChips(){
   el.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>rrOvRemove(b.dataset.key)));
 }
 
+// 진행률 바 — done<0이면 숨김
+function rrOvProg(done, total){
+  const sp=document.getElementById('rrOvSpinner'); if(!sp) return;
+  if(done<0){ sp.style.display='none'; return; }
+  sp.style.display='flex';
+  const pct = total? Math.round(done/total*100):0;
+  const bar=document.getElementById('rrOvProgBar'), txt=document.getElementById('rrOvProgTxt');
+  if(bar) bar.style.width=pct+'%';
+  if(txt) txt.textContent=`불러오는 중… ${pct}% (${done}/${total})`;
+}
+
 async function rrOvLoad(){
   rrOvRenderQuick(); rrOvRenderChips();
   if (!rrOv.items.length){ rrOvRenderCtrl(); rrOvDraw(); return; }
@@ -659,14 +681,18 @@ async function rrOvLoad(){
   const kept = {};
   rrOv.items.forEach(it=>{ if(it.key.startsWith('EX:') && rrOv.raw[it.key]) kept[it.key]=rrOv.raw[it.key]; });
   const fetchKeys = rrOv.items.map(it=>it.key).filter(k=>!k.startsWith('EX:'));
-  const spin = document.getElementById('rrOvSpinner');
   if (fetchKeys.length){
-    if (spin) spin.style.display = 'flex';
-    try {
-      const d = await fetch(`/api/macro/multi?keys=${encodeURIComponent(fetchKeys.join(','))}`).then(r=>r.json());
-      (d.series||[]).forEach(s=>kept[s.key]=s);
-    } catch(e){}
-    finally { if (spin) spin.style.display = 'none'; }
+    // 키별 병렬(동시성 4) 요청 + 진행률 — 도착하는 대로 % 채움
+    let done=0; rrOvProg(0, fetchKeys.length);
+    const q=[...fetchKeys];
+    const worker = async () => { while(q.length){ const k=q.shift();
+      try { const d=await fetch(`/api/macro/multi?keys=${encodeURIComponent(k)}`).then(r=>r.json());
+        (d.series||[]).forEach(s=>kept[s.key]=s);
+      } catch(e){}
+      done++; rrOvProg(done, fetchKeys.length);
+    }};
+    await Promise.all([worker(),worker(),worker(),worker()]);
+    rrOvProg(-1);
   }
   rrOv.raw = kept;
   if (!rrOv.start) rrOvSetDefaultRange();   // 최초만 기본 구간(≤5년)

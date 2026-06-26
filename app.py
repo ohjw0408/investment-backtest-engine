@@ -2950,13 +2950,73 @@ def _price_daily_conn():
     return _sqlite.connect(str(_PRICE_DB))
 
 
-def _portfolio_index_series(tickers, years=None, conn=None):
+# ── 추세 겹쳐보기 시계열 캐시(일일) — 종목별·포폴결과 재계산 방지(공유종목 dedupe) ──
+_TS_DAY = None
+_TS_TKCACHE = {}    # (code, start) -> (close_map, syn_map)
+_TS_RESCACHE = {}   # signature -> downsampled points
+
+
+def _ts_day_guard():
+    global _TS_DAY, _TS_TKCACHE, _TS_RESCACHE
+    from datetime import date
+    today = date.today().isoformat()
+    if _TS_DAY != today:
+        _TS_DAY = today
+        _TS_TKCACHE = {}
+        _TS_RESCACHE = {}
+    return today
+
+
+def _ticker_series(conn, code, start):
+    """종목별 (close_map, syn_map) — 일일 캐시. 여러 포폴이 공유하는 종목(TLT·GLD 등) 1회만 계산."""
+    key = (code, start)
+    hit = _TS_TKCACHE.get(key)
+    if hit is not None:
+        return hit
+    import pandas as _pd
+    from modules.price_loader import _drop_isolated_price_spikes
+    c = code.rsplit('.', 1)[0] if code.endswith(('.KS', '.KQ')) else code
+    m, syn = {}, {}
+    try:
+        rows = conn.execute(
+            "SELECT date, close, volume FROM price_daily WHERE code=? AND date>=? ORDER BY date",
+            (c, start)).fetchall()
+        if rows:
+            dfx = _drop_isolated_price_spikes(_pd.DataFrame(rows, columns=['date', 'close', 'volume']))
+            for r in dfx.itertuples():
+                if r.close and float(r.close) > 0:
+                    m[r.date] = float(r.close)
+                    syn[r.date] = 1 if (r.volume is None or float(r.volume) == 0) else 0
+    except Exception:
+        pass
+    _TS_TKCACHE[key] = (m, syn)
+    return (m, syn)
+
+
+def _downsample_points(points, target):
+    """포인트 수가 target 초과 시 균등 다운샘플(전송·렌더·줌 redraw 비용↓). 버킷내 syn 있으면 보존."""
+    n = len(points)
+    if not target or n <= target:
+        return points
+    step = (n + target - 1) // target
+    out = []
+    for i in range(0, n, step):
+        bucket = points[i:i + step]
+        d, v, _ = bucket[-1]
+        out.append([d, v, 1 if any(p[2] for p in bucket) else 0])
+    if out and out[-1][0] != points[-1][0]:
+        out.append(points[-1])
+    return out
+
+
+def _portfolio_index_series(tickers, years=None, conn=None, downsample=1800):
     """저장 포트폴리오 → 비중 고정 정규화 지수(시작=100) 일별 시계열. 오버레이 추세 비교용.
-       비중 합으로 정규화, 종목별 종가를 시작일=100으로 환산해 가중합 → 통화 무관.
-       각 포인트 = [date, value, syn] (syn=1: 그 날 구성종목 중 합성 백필[volume=0]이 섞임 → 프런트서 점선).
-       years=None: 전체 기간(합성 백필 포함). 10년/전체 버튼이 실제 그 구간을 그릴 수 있게 컷오프 제거.
-       conn: 호출자가 연 price_daily 연결(여러 포폴 1요청서 공유). None이면 자체 개폐."""
+       각 포인트 = [date, value, syn] (syn=1: 그 날 합성 백필[volume=0] 섞임 → 프런트 점선).
+       years=None=전체기간. downsample=프런트 전송용 최대 포인트 수(0=무제한).
+       종목별·결과 일일 캐시로 가속(공유종목 dedupe + 재방문 즉시).
+       get_price와 동일한 _drop_isolated_price_spikes 적용(오틱 마스킹 정합)."""
     from datetime import datetime, timedelta
+    day = _ts_day_guard()
     start = (datetime.now() - timedelta(days=int(years * 365))).strftime('%Y-%m-%d') if years else '1900-01-01'
     wsum = sum(float(t.get('weight') or 0) for t in tickers) or 1.0
 
@@ -2969,40 +3029,20 @@ def _portfolio_index_series(tickers, years=None, conn=None):
     if not valid:
         return []
 
-    # 가격 = 백필 price_daily DB를 '직접' 조회(raw 종가, FX 미적용 — 시작=100 정규화라 무관).
-    # ⚠️ loader.conn(공유 sqlite)을 Flask 요청 스레드서 여러 번 쓰거나, 포폴마다 새 연결을 개폐하면
-    #    상태 충돌/락으로 일부 조회가 비어 common 교집합이 소실 → [] 버그. 1요청 1연결 공유로 격리.
-    #    (get_price/get_symbol_data 경로는 추가로 매 호출 yfinance 최신분 보충 → 배치 rate-limit 취약.)
-    #    DB는 직전영업일까지 백필돼 추세 비교엔 충분하고, sqlite라 빠르고 안정적.
-    # raw DB 직접 조회는 get_price(라인 ~596)의 고립 스파이크 필터를 안 거침 →
-    # 저장된 오틱(예: SPY 2026-06-17=346500, yfinance bad tick)이 그대로 노출돼 추세 차트에 델타 스파이크.
-    # get_price와 동일한 _drop_isolated_price_spikes를 여기서도 적용해 일관 처리.
-    import pandas as _pd
-    from modules.price_loader import _drop_isolated_price_spikes
+    sig = (tuple(sorted((c, round(w, 6)) for c, w in valid)), start, downsample, day)
+    cached = _TS_RESCACHE.get(sig)
+    if cached is not None:
+        return cached
+
     own = conn is None
     if own:
         conn = _price_daily_conn()
     series = {}
     try:
         for code, w in valid:
-            c = code.rsplit('.', 1)[0] if code.endswith(('.KS', '.KQ')) else code
-            try:
-                rows = conn.execute(
-                    "SELECT date, close, volume FROM price_daily WHERE code=? AND date>=? ORDER BY date",
-                    (c, start)).fetchall()
-                if not rows:
-                    continue
-                dfx = _drop_isolated_price_spikes(_pd.DataFrame(rows, columns=['date', 'close', 'volume']))
-                m, syn = {}, {}
-                for r in dfx.itertuples():
-                    if r.close and float(r.close) > 0:
-                        m[r.date] = float(r.close)
-                        # volume=0/None = 합성 백필(상장 전 추정치) → 합성 플래그
-                        syn[r.date] = 1 if (r.volume is None or float(r.volume) == 0) else 0
-                if m:
-                    series[code] = (w, m, syn)
-            except Exception:
-                continue
+            m, syn = _ticker_series(conn, code, start)
+            if m:
+                series[code] = (w, m, syn)
     finally:
         if own:
             conn.close()
@@ -3027,6 +3067,8 @@ def _portfolio_index_series(tickers, years=None, conn=None):
             if syn.get(dt):
                 syn_any = 1
         out.append([dt, round(val, 4), syn_any])
+    out = _downsample_points(out, downsample)
+    _TS_RESCACHE[sig] = out
     return out
 
 

@@ -4019,3 +4019,17 @@ _작성: Claude_
 - **잔여 P2~P5**: 페이지(/examples 지역탭+성격섹션+카드 액션3버튼)·핸드오프(분석→백테 mm_bt_preload·비교→risk-return abPorts·저장 mmSaveGuru)·네비(분석에 추가·시장서 투자대가 편입, 홈광고카드·/gurus 유지)·검증.
 
 _작성: Claude_
+
+## 2026-06-26 — 심화분석 P2 (분석탭 롤링/분포/낙폭/실질)
+
+`/backtest` 결과 하단 "심화 분석 — 언제 시작했든" 섹션. 단일경로 백테(시작운 의존)를 **전체기간 롤링 분포**로 보강. 플랜=`포트폴리오_심화분석_plan.md`(P2 ✅).
+
+- **공용 엔진**: 신규 `modules/tr_index.py` — Flask-free TR(배당재투자) 인덱스 빌더. app.py `_ticker_series`/`_portfolio_index_series` 검증 코어 미러(워커=celery에서도 `run_backtest_logic` 도므로 추출 필요). ⚠️불변식=`pct_change(fill_method=None)` NULL홀 가드 + split 곱 금지(분할조정 close). P0의 `modules/rolling.py`(horizon_table·rolling_cagr·drawdown·real_adjust) 재사용.
+- **백엔드**: `backtest_logic.compute_rolling_analysis(tickers)` — 단일=`body['tickers']`, 멀티계좌=계좌 자본가중 통합비중. 결과 dict `rolling`(horizon_table·rolling_cagr 1/3/5/10·drawdown·infl·syn_overall). metrics 불변(키만 추가).
+- **프론트**(backtest.html): ① 손실확률 요약표(`btHorizonTable`, 0근접 초록·≥30% 빨강) ② box-whisker(커스텀 `_btBoxPlugin`, 박스=p25~75/수염=p0~100/중앙값 가로선) ③ 롤링 CAGR 다선(범례토글, 1년 기본숨김, 시간축 어댑터 없어 날짜합집합 category) ④ 전체기간 underwater area + 최대낙폭/회복/최장침수 ⑥ 명목/실질 세그(`bt-seg` 신규 CSS) + 물가율 input(실질=CAGR 디플레이트 (1+nom)/(1+infl)-1, 프런트 처리). ⑤ 배당성장률=기존 `renderDividendGrowthChart` 충족(중복 미추가). 각 항목 쉬운 설명 동봉(§2A).
+- **합성 표기**(결정#1): syn_frac>0.5 행·박스 회색 + ⓘ(윈도우 합성%), syn_overall>0.6 골드 경고배너.
+- ⚠️ **데이터 기준 = 전체기간+합성 회색표기(오너 결정)**. SPY/TLT는 합성백필이 1928~ → 헤드라인 MDD -85.5%(1932 합성)·회복 18.6년·전행 회색. 실데이터한정(2003+, MDD -30%·손실확률 10년+ 0%·회색없음) 대안을 제시했으나 오너가 **전체기간+회색** 선택.
+- **검증**: 골든 `tests/test_tr_index.py` 4개(TR재투자·syn플래그·NULL홀가드·빈입력) + gate2a/2b·d4·rolling·phase1 회귀 PASS(metrics 불변) + Playwright(실제 `/api/backtest/run`→`renderBacktest` 경로, 라이트/다크 스샷 육안, 실질토글·물가율변경·명목복귀, 6행·3차트·통계 렌더, **콘솔에러0**).
+- **미배포** — 오너 push 대기. 다음=P3 비교탭 동급화(아코디언5 + UX 2모드 분기, 결정#9).
+
+_작성: Claude_

@@ -111,6 +111,13 @@
 .bt-switch-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.22); transition: transform .2s; }
 .bt-switch input:checked + .bt-switch-track { background: var(--brand); }
 .bt-switch input:checked + .bt-switch-track::after { transform: translateX(20px); }
+.bt-seg { display: inline-flex; border: 1.5px solid var(--ds-hairline); border-radius: var(--r-pill); overflow: hidden; }
+.bt-seg-btn { padding: 6px 14px; font-size: 0.8rem; font-weight: 700; color: var(--ds-muted); background: transparent; border: none; cursor: pointer; transition: background .15s, color .15s; }
+.bt-seg-btn.is-on { background: var(--brand); color: #fff; }
+.bt-htable th, .bt-htable td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--ds-hairline); white-space: nowrap; }
+.bt-htable th { color: var(--ds-muted); font-weight: 700; font-size: 0.76rem; }
+.bt-htable th:first-child, .bt-htable td:first-child { text-align: left; }
+.bt-htable tr.is-dim td { color: var(--ds-muted); opacity: 0.6; }
 
 .bt-fee-panel {
   display: none; margin-top: 12px; padding: 12px;
@@ -599,6 +606,75 @@
         <div id="btDivGrowthNote" style="font-size:0.74rem;color:var(--ds-muted);margin-top:8px;"></div>
       </div>
       </div><!-- /배당 2단 -->
+
+      <!-- ════════ 심화 분석 (롤링/분포) — 전체기간·거치식·배당재투자 기준 ════════ -->
+      <div id="btRollingSection" style="display:none;margin-top:24px;">
+
+        <div style="border-top:2px solid var(--ds-hairline);padding-top:20px;margin-bottom:4px;">
+          <div style="font-size:1.05rem;font-weight:800;color:var(--ds-ink);display:flex;align-items:center;gap:8px;">
+            <span class="bt-ico">{{ nicon('chart') }}</span> 심화 분석 — “언제 시작했든”
+          </div>
+          <div style="font-size:0.82rem;color:var(--ds-muted);margin-top:6px;line-height:1.6;">
+            위 결과는 <strong>한 번의 시작~끝</strong> 백테스트입니다. 시작 시점 운에 좌우되죠.
+            아래는 가능한 <strong>모든 시작 시점</strong>에서 N년씩 굴렸다면 어땠을지 — 거치식·배당 재투자·전체 가용 기간 기준의 통계입니다.
+            <span style="white-space:nowrap;">(내 적립·세금·리밸·선택 구간과 무관)</span>
+          </div>
+          <div id="btRollSynWarn" style="display:none;font-size:0.78rem;color:var(--gold-deep,#9a7a1a);background:var(--gold-pale);border:1px solid var(--gold);border-radius:var(--r-sm);padding:8px 11px;margin-top:10px;line-height:1.55;">
+            <strong>{{ '추정 데이터 비중 높음' }}</strong> — 가용 실데이터보다 과거는 통계적으로 추정한 가격입니다. 회색 막대·항목은 표본이 부족하거나 추정 의존이 커 참고만 하세요.
+          </div>
+          <!-- 명목 / 실질 토글 -->
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;">
+            <div class="bt-seg" role="group" aria-label="명목/실질 전환">
+              <button type="button" id="btRealNom" class="bt-seg-btn is-on" onclick="btSetReal(false)">명목</button>
+              <button type="button" id="btRealReal" class="bt-seg-btn" onclick="btSetReal(true)">실질(물가 반영)</button>
+            </div>
+            <label id="btInflWrap" style="display:none;align-items:center;gap:6px;font-size:0.8rem;color:var(--ds-muted);">
+              물가상승률
+              <input type="number" id="btInflInput" value="2" min="0" max="10" step="0.5"
+                     style="width:58px;padding:5px 8px;border:1.5px solid var(--ds-hairline);border-radius:var(--r-sm);background:var(--ds-soft);color:var(--ds-ink);font-size:0.8rem;"
+                     oninput="btOnInflChange()"> %/년
+            </label>
+            <span style="font-size:0.74rem;color:var(--ds-muted);">· 실질 = 물가를 뺀 “구매력” 기준 수익</span>
+          </div>
+        </div>
+
+        <!-- ① 기간별 손실확률 & 수익 분포 (킬러) + ② 오차막대 -->
+        <div class="bt-card" id="btHorizonCard">
+          <div class="bt-card-title"><span class="bt-ico">{{ nicon('shield') }}</span> 기간별 손실확률 &amp; 수익 분포 <span id="btRealBadge" style="display:none;font-weight:400;color:var(--ds-muted);font-size:0.74rem;">· 실질(물가 반영)</span></div>
+          <div style="font-size:0.8rem;color:var(--ds-muted);line-height:1.6;margin-bottom:14px;">
+            <strong>손실확률</strong> = 그 기간 동안 굴린 모든 경우 중 원금보다 손해 본 비율. 보통 <strong>기간이 길수록 0에 가까워집니다</strong> — 장기투자의 핵심.
+          </div>
+          <div style="overflow-x:auto;">
+            <table id="btHorizonTable" class="bt-htable" style="width:100%;border-collapse:collapse;font-size:0.82rem;min-width:480px;"></table>
+          </div>
+          <div class="bt-card-title" style="margin-top:22px;font-size:0.84rem;"><span class="bt-ico">{{ nicon('chart') }}</span> 연 수익률 분포 (오차막대)</div>
+          <div style="font-size:0.78rem;color:var(--ds-muted);line-height:1.6;margin-bottom:10px;">
+            막대=흔한 범위(가운데 50%), 가는 선=최악~최고, 가로선=중앙값. <strong>기간이 길수록 막대가 좁아지고 0(원금) 위로 올라갑니다.</strong>
+            퍼짐이 큰 건 “정답 없음, 성향” — 위로 뚫린 매력 vs 예측 가능한 안정, 취향입니다.
+          </div>
+          <div class="bt-chart-wrap"><canvas id="btBoxChart"></canvas></div>
+        </div>
+
+        <!-- ③ 롤링 CAGR 시계열 -->
+        <div class="bt-card" id="btRollCagrCard">
+          <div class="bt-card-title"><span class="bt-ico">{{ nicon('trend-up') }}</span> 롤링 수익률 (직전 N년 CAGR) <span id="btRollCagrRealBadge" style="display:none;font-weight:400;color:var(--ds-muted);font-size:0.74rem;">· 실질</span></div>
+          <div style="font-size:0.8rem;color:var(--ds-muted);line-height:1.6;margin-bottom:10px;">
+            각 시점에서 “직전 N년간 연평균 몇 %였나”. 선이 <strong>높고 평평할수록</strong> 시작 시점과 무관하게 꾸준했다는 뜻. 범례를 눌러 기간을 켜고 끌 수 있어요.
+          </div>
+          <div class="bt-chart-wrap"><canvas id="btRollCagrChart"></canvas></div>
+        </div>
+
+        <!-- ④ 낙폭(전체기간) + 회복 -->
+        <div class="bt-card" id="btUnderwaterCard">
+          <div class="bt-card-title"><span class="bt-ico">{{ nicon('trend-down') }}</span> 낙폭 &amp; 회복 (전체기간)</div>
+          <div style="font-size:0.8rem;color:var(--ds-muted);line-height:1.6;margin-bottom:10px;">
+            고점 대비 얼마나, 얼마나 오래 떨어져 있었나. <strong>0에 붙어 있을수록</strong> 마음 편한 자산. (낮고 짧을수록 좋음 — 취향 아님)
+          </div>
+          <div id="btUnderwaterStats" style="display:flex;gap:18px;flex-wrap:wrap;font-size:0.82rem;margin-bottom:12px;"></div>
+          <div class="bt-chart-wrap drawdown"><canvas id="btUnderwaterChart"></canvas></div>
+        </div>
+
+      </div><!-- /btRollingSection -->
 
       <!-- 종합과세 경고 + 분할매도 절세 패널 (Phase 2e) -->
       <div id="btSplitSalePanel" style="display:none;" class="bt-card">
@@ -1568,6 +1644,237 @@ function renderBacktest(data) {
   // 연간 배당금 + 배당 성장률 (낙폭 아래)
   renderAnnualDividendChart(data.annual_dividends, m.total_dividend);
   renderDividendGrowthChart(data.annual_dividends);
+
+  // 심화 분석 (롤링/분포) — P2
+  renderRolling(data.rolling);
+}
+
+// ════════ 심화 분석 (롤링/분포) — P2 ════════
+let _btRoll = null, _btRealOn = false, _btInfl = 0.02;
+
+function btDeflate(cagr) {
+  // 실질 CAGR = (1+명목)/(1+물가) - 1. cagr=소수, null 통과.
+  if (cagr === null || cagr === undefined) return cagr;
+  return _btRealOn ? (1 + cagr) / (1 + _btInfl) - 1 : cagr;
+}
+
+function renderRolling(roll) {
+  const sec = document.getElementById('btRollingSection');
+  ['btBox', 'btRollCagr', 'btUnderwater'].forEach(k => {
+    if (btCharts[k]) { btCharts[k].destroy(); btCharts[k] = null; }
+  });
+  _btRoll = roll;
+  if (!roll || !roll.horizon_table) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+
+  // 추정(합성) 의존 경고 — 전체 60% 초과 시
+  document.getElementById('btRollSynWarn').style.display = (roll.syn_overall > 0.6) ? 'block' : 'none';
+
+  _btInfl = (parseFloat(document.getElementById('btInflInput').value) || 2) / 100;
+  renderHorizonTable();
+  renderBoxChart();
+  renderRollCagrChart();
+  renderUnderwater(roll.drawdown);
+}
+
+function btSetReal(on) {
+  _btRealOn = on;
+  document.getElementById('btRealNom').classList.toggle('is-on', !on);
+  document.getElementById('btRealReal').classList.toggle('is-on', on);
+  document.getElementById('btInflWrap').style.display = on ? 'inline-flex' : 'none';
+  document.getElementById('btRealBadge').style.display = on ? 'inline' : 'none';
+  document.getElementById('btRollCagrRealBadge').style.display = on ? 'inline' : 'none';
+  if (!_btRoll) return;
+  renderHorizonTable();
+  renderBoxChart();
+  renderRollCagrChart();
+}
+
+function btOnInflChange() {
+  _btInfl = (parseFloat(document.getElementById('btInflInput').value) || 0) / 100;
+  if (_btRealOn && _btRoll) { renderHorizonTable(); renderBoxChart(); renderRollCagrChart(); }
+}
+
+function _btSynLevel(sf) { return (sf != null && sf > 0.5); }   // 추정 의존 큼
+
+function renderHorizonTable() {
+  const ht = _btRoll.horizon_table, hs = _btRoll.horizons;
+  const pctFmt = v => (v == null ? '—' : (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%');
+  let html = `<thead><tr><th>보유기간</th><th>손실확률</th><th>중앙 수익률</th><th>최악</th><th>최고</th><th>표본</th></tr></thead><tbody>`;
+  hs.forEach(h => {
+    const r = ht[String(h)] || {};
+    if (!r.n) {
+      html += `<tr class="is-dim"><td>${h}년</td><td colspan="5" style="text-align:left;">표본 부족 (가용 기간보다 깁니다)</td></tr>`;
+      return;
+    }
+    const dim = (_btSynLevel(r.syn_frac) || r.n < 10) ? ' class="is-dim"' : '';
+    const lp = r.loss_prob;
+    const lpColor = lp == null ? '' : (lp <= 0.001 ? 'color:var(--up);font-weight:700;' : (lp >= 0.3 ? 'color:var(--down);' : ''));
+    const pcts = r.pcts || {};
+    const worst = btDeflate(pcts['0']), best = btDeflate(pcts['100']);
+    const synBadge = _btSynLevel(r.syn_frac) ? ` <span title="이 기간 윈도우의 ${(r.syn_frac*100).toFixed(0)}%가 추정 데이터에 의존" style="opacity:.5;">ⓘ</span>` : '';
+    html += `<tr${dim}>`
+      + `<td>${h}년${synBadge}</td>`
+      + `<td style="${lpColor}">${lp == null ? '—' : (lp * 100).toFixed(1) + '%'}</td>`
+      + `<td>${pctFmt(btDeflate(r.median))}</td>`
+      + `<td style="color:var(--down);">${pctFmt(worst)}</td>`
+      + `<td style="color:var(--up);">${pctFmt(best)}</td>`
+      + `<td style="color:var(--ds-muted);">${r.n}</td>`
+      + `</tr>`;
+  });
+  html += `</tbody>`;
+  document.getElementById('btHorizonTable').innerHTML = html;
+}
+
+// 오차막대(box-whisker) — 박스=[p25,p75], 수염=[p0,p100], 중앙값 가로선. 커스텀 플러그인으로 그림.
+const _btBoxPlugin = {
+  id: 'btBoxWhisker',
+  afterDatasetsDraw(chart) {
+    const meta = chart._btBoxMeta;
+    if (!meta) return;
+    const { ctx, scales: { x, y } } = chart;
+    ctx.save();
+    meta.forEach((d, i) => {
+      if (d == null) return;
+      const cx = x.getPixelForValue(i);
+      const half = Math.min(x.width / chart.data.labels.length * 0.18, 14);
+      const col = d.dim ? _btMuted : _btBrand;
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+      // 수염 세로선 p0~p100
+      ctx.beginPath(); ctx.moveTo(cx, y.getPixelForValue(d.lo)); ctx.lineTo(cx, y.getPixelForValue(d.hi)); ctx.stroke();
+      // 위/아래 캡
+      [d.lo, d.hi].forEach(v => { const py = y.getPixelForValue(v); ctx.beginPath(); ctx.moveTo(cx - half, py); ctx.lineTo(cx + half, py); ctx.stroke(); });
+      // 중앙값 가로선(굵게)
+      const my = y.getPixelForValue(d.med); ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(cx - half * 1.25, my); ctx.lineTo(cx + half * 1.25, my); ctx.stroke();
+    });
+    ctx.restore();
+  }
+};
+
+function renderBoxChart() {
+  if (btCharts.btBox) { btCharts.btBox.destroy(); btCharts.btBox = null; }
+  const ht = _btRoll.horizon_table, hs = _btRoll.horizons;
+  const labels = [], boxData = [], meta = [];
+  hs.forEach(h => {
+    const r = ht[String(h)] || {};
+    if (!r.n) { labels.push(h + '년'); boxData.push(null); meta.push(null); return; }
+    const p = r.pcts || {};
+    const lo = btDeflate(p['0']) * 100, hi = btDeflate(p['100']) * 100;
+    const b25 = btDeflate(p['25']) * 100, b75 = btDeflate(p['75']) * 100;
+    const dim = (_btSynLevel(r.syn_frac) || r.n < 10);
+    labels.push(h + '년');
+    boxData.push([b25, b75]);                       // 박스(플로팅 바)
+    meta.push({ lo, hi, med: btDeflate(r.median) * 100, dim });
+  });
+  const ctx = document.getElementById('btBoxChart').getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{
+      data: boxData,
+      backgroundColor: meta.map(d => d && d.dim ? _btRgba(_btMuted, 0.35) : _btRgba(_btBrand, 0.35)),
+      borderColor: meta.map(d => d && d.dim ? _btMuted : _btBrand),
+      borderWidth: 1, borderSkipped: false, barPercentage: 0.5, categoryPercentage: 0.8,
+    }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => {
+          const d = meta[ctx.dataIndex]; if (!d) return '표본 부족';
+          return [`최고 ${d.hi.toFixed(1)}%`, `흔한 범위 ${ctx.raw[0].toFixed(1)}~${ctx.raw[1].toFixed(1)}%`,
+                  `중앙값 ${d.med.toFixed(1)}%`, `최악 ${d.lo.toFixed(1)}%`];
+        } } }
+      },
+      scales: {
+        x: { ticks: { font: { size: 11 }, color: _btMuted }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: _btMuted, callback: v => v + '%' },
+             grid: { color: MM_CHART_GRID }, title: { display: true, text: '연 수익률', color: _btMuted, font: { size: 10 } } }
+      }
+    },
+    plugins: [_btBoxPlugin]
+  });
+  chart._btBoxMeta = meta;
+  chart.update();
+  btCharts.btBox = chart;
+}
+
+const _btYearTick = function(val) { const l = this.getLabelForValue(val); return l ? String(l).slice(0, 4) : ''; };
+
+function renderRollCagrChart() {
+  if (btCharts.btRollCagr) { btCharts.btRollCagr.destroy(); btCharts.btRollCagr = null; }
+  const rc = _btRoll.rolling_cagr || {};
+  const palette = { '1': _btMuted, '3': _btUp, '5': _btBrand, '10': _btDown };
+  // 시간축 어댑터 없음 → 전 horizon 날짜 합집합을 category 라벨로
+  const allDates = new Set();
+  ['1', '3', '5', '10'].forEach(h => (rc[h] || []).forEach(p => allDates.add(p[0])));
+  const labels = [...allDates].sort();
+  const pos = {}; labels.forEach((d, i) => pos[d] = i);
+  const datasets = [];
+  ['1', '3', '5', '10'].forEach(h => {
+    const arr = rc[h] || [];
+    if (!arr.length) return;
+    const ys = new Array(labels.length).fill(null);
+    arr.forEach(p => { ys[pos[p[0]]] = +(btDeflate(p[1]) * 100).toFixed(2); });
+    datasets.push({
+      label: h + '년', data: ys, borderColor: palette[h], backgroundColor: palette[h],
+      borderWidth: 1.6, pointRadius: 0, tension: 0.1, spanGaps: true, hidden: (h === '1'),
+    });
+  });
+  const ctx = document.getElementById('btRollCagrChart').getContext('2d');
+  btCharts.btRollCagr = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: _btMuted, font: { size: 11 }, usePointStyle: true, boxWidth: 8 } },
+        tooltip: { callbacks: {
+          title: items => items.length ? String(items[0].label).slice(0, 7) : '',
+          label: c => c.parsed.y == null ? null : `${c.dataset.label}: ${c.parsed.y >= 0 ? '+' : ''}${c.parsed.y.toFixed(1)}%`
+        } }
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: _btMuted, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, callback: _btYearTick }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: _btMuted, callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
+      }
+    }
+  });
+}
+
+function renderUnderwater(dd) {
+  if (btCharts.btUnderwater) { btCharts.btUnderwater.destroy(); btCharts.btUnderwater = null; }
+  const stats = document.getElementById('btUnderwaterStats');
+  if (!dd || !dd.underwater || !dd.underwater.length) { stats.innerHTML = ''; return; }
+  const fmtDays = n => n == null ? '—' : (n >= 365 ? (n / 365).toFixed(1) + '년' : n + '일');
+  stats.innerHTML = [
+    ['최대 낙폭', (dd.max_dd * 100).toFixed(1) + '%', 'var(--down)'],
+    ['저점 → 회복', fmtDays(dd.recovery_days), 'var(--ds-ink)'],
+    ['최장 침수기간', fmtDays(dd.longest_underwater_days), 'var(--ds-ink)'],
+  ].map(([l, v, c]) => `<div><span style="color:var(--ds-muted);">${l}</span> <strong style="color:${c};">${v}</strong></div>`).join('');
+
+  const u = dd.underwater;
+  const step = Math.max(1, Math.floor(u.length / 600));
+  const ds = u.filter((_, i) => i % step === 0);
+  const labels = ds.map(p => p[0]);
+  const values = ds.map(p => +(p[1] * 100).toFixed(2));
+  const ctx = document.getElementById('btUnderwaterChart').getContext('2d');
+  btCharts.btUnderwater = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [{ data: values, borderColor: _btDown, backgroundColor: _btRgba(_btDown, 0.18),
+                                 borderWidth: 1, pointRadius: 0, fill: true }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { title: items => items.length ? String(items[0].label).slice(0, 7) : '',
+                                label: c => '낙폭 ' + c.parsed.y.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: _btMuted, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, callback: _btYearTick }, grid: { display: false } },
+        y: { max: 0, ticks: { font: { size: 10 }, color: _btMuted, callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
+      }
+    }
+  });
 }
 
 function renderAnnualDividendChart(annualDiv, totalDiv) {

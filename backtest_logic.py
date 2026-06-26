@@ -8,6 +8,27 @@ import numpy as np
 _portfolio_engine = None
 
 
+def compute_rolling_analysis(tickers, infl=0.02):
+    """분석탭 심화(P2) — 전체기간·거치식·배당재투자 TR 인덱스 기반 롤링/분포/낙폭.
+       결정#7: 사용자의 적립·세금·리밸·선택구간과 무관한 통계 관점("언제 시작했든").
+       실질(인플레) 전환은 CAGR 디플레이트로 프런트에서 처리(infl만 전달).
+       반환 None = 표본 부족(1년 미만). 그 외 dict."""
+    from modules.tr_index import build_portfolio_tr_index
+    from modules import rolling
+    pts = build_portfolio_tr_index(tickers)
+    if len(pts) < 13:   # 월말 13점(1년) 미만이면 의미 없음
+        return None
+    return {
+        'horizons': rolling.DEFAULT_HORIZONS,
+        'percentiles': rolling.DEFAULT_PCTS,
+        'horizon_table': {str(h): v for h, v in rolling.horizon_table(pts).items()},
+        'rolling_cagr': {str(h): rolling.rolling_cagr(pts, h) for h in (1, 3, 5, 10)},
+        'drawdown': rolling.drawdown(pts),
+        'infl': infl,
+        'syn_overall': round(sum(1 for _d, _v, s in pts if s) / len(pts), 4),
+    }
+
+
 def _get_portfolio_engine():
     global _portfolio_engine
     if _portfolio_engine is None:
@@ -180,6 +201,15 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
         }
         savings = build_savings_summary(savings_raw)
 
+    # 롤링용 통합 비중(P2) — 계좌 자본가중으로 종목 비중 합산(전체기간 거치식 관점)
+    _roll_w = {}
+    for a in accounts:
+        cap = float(a.get('initial_capital', 0.0)) or 1.0
+        tw = sum(float(t['weight']) for t in a['tickers']) or 1.0
+        for t in a['tickers']:
+            _roll_w[t['code']] = _roll_w.get(t['code'], 0.0) + cap * float(t['weight']) / tw
+    _roll_tickers = [{'code': c, 'weight': w} for c, w in _roll_w.items()]
+
     return {
         'multi_account':  True,
         'limit_warnings': limit_warnings or None,
@@ -198,6 +228,7 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
         'history':        history_out,
         'annual_returns': annual_returns,
         'annual_dividends': annual_dividends,
+        'rolling':         compute_rolling_analysis(_roll_tickers),
         'accounts':       accounts_out,
         'savings':        savings,
         'g2': {
@@ -399,4 +430,5 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         'history':        history_out,
         'annual_returns': annual_returns,
         'annual_dividends': annual_dividends,
+        'rolling':         compute_rolling_analysis(body['tickers']),
     }

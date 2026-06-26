@@ -4033,3 +4033,16 @@ _작성: Claude_
 - **미배포** — 오너 push 대기. 다음=P3 비교탭 동급화(아코디언5 + UX 2모드 분기, 결정#9).
 
 _작성: Claude_
+
+## 2026-06-26 — 심화분석 P2 오너 피드백 6건 반영
+
+P2 첫 배포 후 오너 라이브 피드백 6건(backtest.html + backtest_logic.py).
+- **① 색 진하게(흐림 해소·타탭과 결 맞춤)**: 표 풀컬러+볼드(`.bt-htable td` ink·700), 합성행 회색워싱 제거→**"추정" 앰버 배지**(`.bt-est`, gold-pale)로만 표기(n<10만 회색). 박스 채움 0.35→0.55~0.6, 축 라벨 muted→`--ds-body`, 합성 박스/수염=흐린회색→**진한 앰버**(`_btEstColor`=gold-deep).
+- **② 범례 클릭→체크박스**: 롤링 CAGR 기간 선택을 범례 토글 제거하고 컬러닷 체크박스(`.bt-rcb`, 기본 3/5/10 on·1 off, `btToggleRollCagr`)로.
+- **③ 부드러운 나타남/사라짐**: 유지(Chart.js 기본 애니, 손 안 댐 — 오너 만족).
+- **④ 오차막대 음수 누락**: y축 0~양수만 보이던 것 → **p0~p100 전 horizon 실측 범위로 min/max 산출 + 0 항상 포함**(QQQ 1년 worst ~-67%/-82%까지 표시), 0선 강조 그리드.
+- **⑤ 낙폭 카드 제거**: 기존 history 낙폭 차트와 **중복** → underwater 카드·`renderUnderwater`·백엔드 `rolling.drawdown` 키 삭제.
+- **⑥ 롤링 수익률 드래그 확대**: `chartjs-plugin-zoom` drag(mode x) + "확대 초기화" 버튼(`btRollCagrResetZoom`).
+- 검증: Playwright(QQQ) — underwater 제거·체크박스4(기본3/5/10)·박스 y[-82,+138]·드래그줌(x 0-652→209-414)+초기화·1년토글·실질·라이트/다크·**콘솔0**. 미배포→push 대기.
+
+_작성: Claude_

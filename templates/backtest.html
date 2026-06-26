@@ -114,10 +114,15 @@
 .bt-seg { display: inline-flex; border: 1.5px solid var(--ds-hairline); border-radius: var(--r-pill); overflow: hidden; }
 .bt-seg-btn { padding: 6px 14px; font-size: 0.8rem; font-weight: 700; color: var(--ds-muted); background: transparent; border: none; cursor: pointer; transition: background .15s, color .15s; }
 .bt-seg-btn.is-on { background: var(--brand); color: #fff; }
-.bt-htable th, .bt-htable td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--ds-hairline); white-space: nowrap; }
-.bt-htable th { color: var(--ds-muted); font-weight: 700; font-size: 0.76rem; }
+.bt-htable th, .bt-htable td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--ds-hairline); white-space: nowrap; color: var(--ds-ink); }
+.bt-htable th { color: var(--ds-body); font-weight: 700; font-size: 0.78rem; }
+.bt-htable td { font-weight: 600; }
 .bt-htable th:first-child, .bt-htable td:first-child { text-align: left; }
-.bt-htable tr.is-dim td { color: var(--ds-muted); opacity: 0.6; }
+.bt-htable tr.is-dim td { color: var(--ds-muted); }
+.bt-est { font-size: 0.68rem; font-weight: 700; color: var(--gold-deep, #9a7a1a); background: var(--gold-pale); border-radius: 4px; padding: 1px 5px; margin-left: 5px; }
+.bt-rcb { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; font-weight: 600; }
+.bt-rcb input { width: 15px; height: 15px; cursor: pointer; accent-color: var(--brand); margin: 0; }
+.bt-rcb .bt-rcb-dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 
 .bt-fee-panel {
   display: none; margin-top: 12px; padding: 12px;
@@ -657,21 +662,15 @@
 
         <!-- ③ 롤링 CAGR 시계열 -->
         <div class="bt-card" id="btRollCagrCard">
-          <div class="bt-card-title"><span class="bt-ico">{{ nicon('trend-up') }}</span> 롤링 수익률 (직전 N년 CAGR) <span id="btRollCagrRealBadge" style="display:none;font-weight:400;color:var(--ds-muted);font-size:0.74rem;">· 실질</span></div>
-          <div style="font-size:0.8rem;color:var(--ds-muted);line-height:1.6;margin-bottom:10px;">
-            각 시점에서 “직전 N년간 연평균 몇 %였나”. 선이 <strong>높고 평평할수록</strong> 시작 시점과 무관하게 꾸준했다는 뜻. 범례를 눌러 기간을 켜고 끌 수 있어요.
+          <div class="bt-card-title" style="justify-content:space-between;">
+            <span style="display:inline-flex;align-items:center;gap:8px;"><span class="bt-ico">{{ nicon('trend-up') }}</span> 롤링 수익률 (직전 N년 CAGR) <span id="btRollCagrRealBadge" style="display:none;font-weight:400;color:var(--ds-muted);font-size:0.74rem;">· 실질</span></span>
+            <button type="button" onclick="btRollCagrResetZoom()" class="ds-btn ds-btn-secondary ds-btn-sm"><span class="bt-ico">{{ nicon('refresh') }}</span> 확대 초기화</button>
           </div>
+          <div style="font-size:0.8rem;color:var(--ds-muted);line-height:1.6;margin-bottom:10px;">
+            각 시점에서 “직전 N년간 연평균 몇 %였나”. 선이 <strong>높고 평평할수록</strong> 시작 시점과 무관하게 꾸준했다는 뜻. 그래프를 <strong>가로로 드래그</strong>하면 그 구간만 확대됩니다.
+          </div>
+          <div id="btRollCagrToggles" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;font-size:0.82rem;"></div>
           <div class="bt-chart-wrap"><canvas id="btRollCagrChart"></canvas></div>
-        </div>
-
-        <!-- ④ 낙폭(전체기간) + 회복 -->
-        <div class="bt-card" id="btUnderwaterCard">
-          <div class="bt-card-title"><span class="bt-ico">{{ nicon('trend-down') }}</span> 낙폭 &amp; 회복 (전체기간)</div>
-          <div style="font-size:0.8rem;color:var(--ds-muted);line-height:1.6;margin-bottom:10px;">
-            고점 대비 얼마나, 얼마나 오래 떨어져 있었나. <strong>0에 붙어 있을수록</strong> 마음 편한 자산. (낮고 짧을수록 좋음 — 취향 아님)
-          </div>
-          <div id="btUnderwaterStats" style="display:flex;gap:18px;flex-wrap:wrap;font-size:0.82rem;margin-bottom:12px;"></div>
-          <div class="bt-chart-wrap drawdown"><canvas id="btUnderwaterChart"></canvas></div>
         </div>
 
       </div><!-- /btRollingSection -->
@@ -1658,9 +1657,12 @@ function btDeflate(cagr) {
   return _btRealOn ? (1 + cagr) / (1 + _btInfl) - 1 : cagr;
 }
 
+// 합성(추정) 구간 강조색 — 흐린 회색 대신 진한 앰버(가독성 + 다른 탭과 결 맞춤)
+function _btEstColor() { return _btCss('--gold-deep', '#b8860b'); }
+
 function renderRolling(roll) {
   const sec = document.getElementById('btRollingSection');
-  ['btBox', 'btRollCagr', 'btUnderwater'].forEach(k => {
+  ['btBox', 'btRollCagr'].forEach(k => {
     if (btCharts[k]) { btCharts[k].destroy(); btCharts[k] = null; }
   });
   _btRoll = roll;
@@ -1673,8 +1675,8 @@ function renderRolling(roll) {
   _btInfl = (parseFloat(document.getElementById('btInflInput').value) || 2) / 100;
   renderHorizonTable();
   renderBoxChart();
+  renderRollCagrToggles();
   renderRollCagrChart();
-  renderUnderwater(roll.drawdown);
 }
 
 function btSetReal(on) {
@@ -1687,7 +1689,7 @@ function btSetReal(on) {
   if (!_btRoll) return;
   renderHorizonTable();
   renderBoxChart();
-  renderRollCagrChart();
+  renderRollCagrChart();   // 체크박스 상태는 유지
 }
 
 function btOnInflChange() {
@@ -1707,18 +1709,19 @@ function renderHorizonTable() {
       html += `<tr class="is-dim"><td>${h}년</td><td colspan="5" style="text-align:left;">표본 부족 (가용 기간보다 깁니다)</td></tr>`;
       return;
     }
-    const dim = (_btSynLevel(r.syn_frac) || r.n < 10) ? ' class="is-dim"' : '';
+    // 표본 적을 때(<10)만 회색. 합성 의존은 가독성 유지 + "추정" 배지로 표기.
+    const dim = (r.n < 10) ? ' class="is-dim"' : '';
     const lp = r.loss_prob;
-    const lpColor = lp == null ? '' : (lp <= 0.001 ? 'color:var(--up);font-weight:700;' : (lp >= 0.3 ? 'color:var(--down);' : ''));
+    const lpColor = lp == null ? '' : (lp <= 0.001 ? 'color:var(--up);font-weight:800;' : (lp >= 0.3 ? 'color:var(--down);font-weight:700;' : 'font-weight:700;'));
     const pcts = r.pcts || {};
     const worst = btDeflate(pcts['0']), best = btDeflate(pcts['100']);
-    const synBadge = _btSynLevel(r.syn_frac) ? ` <span title="이 기간 윈도우의 ${(r.syn_frac*100).toFixed(0)}%가 추정 데이터에 의존" style="opacity:.5;">ⓘ</span>` : '';
+    const synBadge = _btSynLevel(r.syn_frac) ? ` <span class="bt-est" title="이 기간 윈도우의 ${(r.syn_frac*100).toFixed(0)}%가 추정(합성) 데이터에 의존">추정</span>` : '';
     html += `<tr${dim}>`
       + `<td>${h}년${synBadge}</td>`
       + `<td style="${lpColor}">${lp == null ? '—' : (lp * 100).toFixed(1) + '%'}</td>`
       + `<td>${pctFmt(btDeflate(r.median))}</td>`
-      + `<td style="color:var(--down);">${pctFmt(worst)}</td>`
-      + `<td style="color:var(--up);">${pctFmt(best)}</td>`
+      + `<td style="color:var(--down);font-weight:700;">${pctFmt(worst)}</td>`
+      + `<td style="color:var(--up);font-weight:700;">${pctFmt(best)}</td>`
       + `<td style="color:var(--ds-muted);">${r.n}</td>`
       + `</tr>`;
   });
@@ -1738,8 +1741,8 @@ const _btBoxPlugin = {
       if (d == null) return;
       const cx = x.getPixelForValue(i);
       const half = Math.min(x.width / chart.data.labels.length * 0.18, 14);
-      const col = d.dim ? _btMuted : _btBrand;
-      ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+      const col = d.est ? _btEstColor() : _btBrand;
+      ctx.strokeStyle = col; ctx.lineWidth = 1.8;
       // 수염 세로선 p0~p100
       ctx.beginPath(); ctx.moveTo(cx, y.getPixelForValue(d.lo)); ctx.lineTo(cx, y.getPixelForValue(d.hi)); ctx.stroke();
       // 위/아래 캡
@@ -1755,26 +1758,33 @@ const _btBoxPlugin = {
 function renderBoxChart() {
   if (btCharts.btBox) { btCharts.btBox.destroy(); btCharts.btBox = null; }
   const ht = _btRoll.horizon_table, hs = _btRoll.horizons;
+  const est = _btEstColor();
   const labels = [], boxData = [], meta = [];
+  let gMin = Infinity, gMax = -Infinity;
   hs.forEach(h => {
     const r = ht[String(h)] || {};
     if (!r.n) { labels.push(h + '년'); boxData.push(null); meta.push(null); return; }
     const p = r.pcts || {};
     const lo = btDeflate(p['0']) * 100, hi = btDeflate(p['100']) * 100;
     const b25 = btDeflate(p['25']) * 100, b75 = btDeflate(p['75']) * 100;
-    const dim = (_btSynLevel(r.syn_frac) || r.n < 10);
+    const isEst = _btSynLevel(r.syn_frac);
     labels.push(h + '년');
     boxData.push([b25, b75]);                       // 박스(플로팅 바)
-    meta.push({ lo, hi, med: btDeflate(r.median) * 100, dim });
+    meta.push({ lo, hi, med: btDeflate(r.median) * 100, est: isEst });
+    gMin = Math.min(gMin, lo); gMax = Math.max(gMax, hi);
   });
+  // y축을 실제 최저~최고(수염)에 맞춤 + 0 항상 포함(음수도 넉넉히)
+  if (!isFinite(gMin)) { gMin = -10; gMax = 10; }
+  const pad = Math.max((gMax - gMin) * 0.08, 2);
+  const yMin = Math.min(0, gMin) - pad, yMax = gMax + pad;
   const ctx = document.getElementById('btBoxChart').getContext('2d');
   const chart = new Chart(ctx, {
     type: 'bar',
     data: { labels, datasets: [{
       data: boxData,
-      backgroundColor: meta.map(d => d && d.dim ? _btRgba(_btMuted, 0.35) : _btRgba(_btBrand, 0.35)),
-      borderColor: meta.map(d => d && d.dim ? _btMuted : _btBrand),
-      borderWidth: 1, borderSkipped: false, barPercentage: 0.5, categoryPercentage: 0.8,
+      backgroundColor: meta.map(d => d && d.est ? _btRgba(est, 0.55) : _btRgba(_btBrand, 0.6)),
+      borderColor: meta.map(d => d && d.est ? est : _btBrand),
+      borderWidth: 1.5, borderSkipped: false, barPercentage: 0.5, categoryPercentage: 0.8,
     }] },
     options: {
       responsive: true, maintainAspectRatio: false,
@@ -1782,14 +1792,18 @@ function renderBoxChart() {
         legend: { display: false },
         tooltip: { callbacks: { label: ctx => {
           const d = meta[ctx.dataIndex]; if (!d) return '표본 부족';
+          const tag = d.est ? ' (추정 포함)' : '';
           return [`최고 ${d.hi.toFixed(1)}%`, `흔한 범위 ${ctx.raw[0].toFixed(1)}~${ctx.raw[1].toFixed(1)}%`,
-                  `중앙값 ${d.med.toFixed(1)}%`, `최악 ${d.lo.toFixed(1)}%`];
+                  `중앙값 ${d.med.toFixed(1)}%`, `최악 ${d.lo.toFixed(1)}%${tag}`];
         } } }
       },
       scales: {
-        x: { ticks: { font: { size: 11 }, color: _btMuted }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, color: _btMuted, callback: v => v + '%' },
-             grid: { color: MM_CHART_GRID }, title: { display: true, text: '연 수익률', color: _btMuted, font: { size: 10 } } }
+        x: { ticks: { font: { size: 11 }, color: _btBody() }, grid: { display: false } },
+        y: { min: yMin, max: yMax,
+             ticks: { font: { size: 10 }, color: _btBody(), callback: v => v + '%' },
+             grid: { color: ctxLine => ctxLine.tick.value === 0 ? _btRgba(_btMuted, 0.9) : MM_CHART_GRID,
+                     lineWidth: ctxLine => ctxLine.tick.value === 0 ? 1.5 : 1 },
+             title: { display: true, text: '연 수익률', color: _btBody(), font: { size: 10 } } }
       }
     },
     plugins: [_btBoxPlugin]
@@ -1799,12 +1813,34 @@ function renderBoxChart() {
   btCharts.btBox = chart;
 }
 
+function _btBody() { return _btCss('--ds-body', '#3a3f47'); }
+
 const _btYearTick = function(val) { const l = this.getLabelForValue(val); return l ? String(l).slice(0, 4) : ''; };
+
+const _btRollPalette = () => ({ '1': _btMuted, '3': _btUp, '5': _btBrand, '10': _btDown });
+
+function renderRollCagrToggles() {
+  const wrap = document.getElementById('btRollCagrToggles');
+  const rc = _btRoll.rolling_cagr || {};
+  const pal = _btRollPalette();
+  const defOn = { '1': false, '3': true, '5': true, '10': true };
+  wrap.innerHTML = ['1', '3', '5', '10'].filter(h => (rc[h] || []).length).map(h =>
+    `<label class="bt-rcb"><input type="checkbox" data-h="${h}" ${defOn[h] ? 'checked' : ''} onchange="btToggleRollCagr()">`
+    + `<span class="bt-rcb-dot" style="background:${pal[h]};"></span>직전 ${h}년</label>`
+  ).join('');
+}
+
+function _btRollVisible() {
+  const cbs = document.querySelectorAll('#btRollCagrToggles input[type=checkbox]');
+  if (!cbs.length) return { '3': true, '5': true, '10': true };
+  const v = {}; cbs.forEach(c => v[c.dataset.h] = c.checked); return v;
+}
 
 function renderRollCagrChart() {
   if (btCharts.btRollCagr) { btCharts.btRollCagr.destroy(); btCharts.btRollCagr = null; }
   const rc = _btRoll.rolling_cagr || {};
-  const palette = { '1': _btMuted, '3': _btUp, '5': _btBrand, '10': _btDown };
+  const pal = _btRollPalette();
+  const vis = _btRollVisible();
   // 시간축 어댑터 없음 → 전 horizon 날짜 합집합을 category 라벨로
   const allDates = new Set();
   ['1', '3', '5', '10'].forEach(h => (rc[h] || []).forEach(p => allDates.add(p[0])));
@@ -1817,8 +1853,8 @@ function renderRollCagrChart() {
     const ys = new Array(labels.length).fill(null);
     arr.forEach(p => { ys[pos[p[0]]] = +(btDeflate(p[1]) * 100).toFixed(2); });
     datasets.push({
-      label: h + '년', data: ys, borderColor: palette[h], backgroundColor: palette[h],
-      borderWidth: 1.6, pointRadius: 0, tension: 0.1, spanGaps: true, hidden: (h === '1'),
+      label: '직전 ' + h + '년', _h: h, data: ys, borderColor: pal[h], backgroundColor: pal[h],
+      borderWidth: 2, pointRadius: 0, tension: 0.1, spanGaps: true, hidden: !vis[h],
     });
   });
   const ctx = document.getElementById('btRollCagrChart').getContext('2d');
@@ -1829,52 +1865,31 @@ function renderRollCagrChart() {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: true, labels: { color: _btMuted, font: { size: 11 }, usePointStyle: true, boxWidth: 8 } },
+        legend: { display: false },
         tooltip: { callbacks: {
           title: items => items.length ? String(items[0].label).slice(0, 7) : '',
           label: c => c.parsed.y == null ? null : `${c.dataset.label}: ${c.parsed.y >= 0 ? '+' : ''}${c.parsed.y.toFixed(1)}%`
-        } }
+        } },
+        zoom: { zoom: { drag: { enabled: true, backgroundColor: _btRgba(_btBrand, 0.15) }, mode: 'x' } }
       },
       scales: {
-        x: { ticks: { font: { size: 10 }, color: _btMuted, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, callback: _btYearTick }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, color: _btMuted, callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
+        x: { ticks: { font: { size: 10 }, color: _btBody(), maxRotation: 0, autoSkip: true, maxTicksLimit: 8, callback: _btYearTick }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, color: _btBody(), callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
       }
     }
   });
 }
 
-function renderUnderwater(dd) {
-  if (btCharts.btUnderwater) { btCharts.btUnderwater.destroy(); btCharts.btUnderwater = null; }
-  const stats = document.getElementById('btUnderwaterStats');
-  if (!dd || !dd.underwater || !dd.underwater.length) { stats.innerHTML = ''; return; }
-  const fmtDays = n => n == null ? '—' : (n >= 365 ? (n / 365).toFixed(1) + '년' : n + '일');
-  stats.innerHTML = [
-    ['최대 낙폭', (dd.max_dd * 100).toFixed(1) + '%', 'var(--down)'],
-    ['저점 → 회복', fmtDays(dd.recovery_days), 'var(--ds-ink)'],
-    ['최장 침수기간', fmtDays(dd.longest_underwater_days), 'var(--ds-ink)'],
-  ].map(([l, v, c]) => `<div><span style="color:var(--ds-muted);">${l}</span> <strong style="color:${c};">${v}</strong></div>`).join('');
+function btToggleRollCagr() {
+  const chart = btCharts.btRollCagr;
+  if (!chart) return;
+  const vis = _btRollVisible();
+  chart.data.datasets.forEach(ds => { ds.hidden = !vis[ds._h]; });
+  chart.update();
+}
 
-  const u = dd.underwater;
-  const step = Math.max(1, Math.floor(u.length / 600));
-  const ds = u.filter((_, i) => i % step === 0);
-  const labels = ds.map(p => p[0]);
-  const values = ds.map(p => +(p[1] * 100).toFixed(2));
-  const ctx = document.getElementById('btUnderwaterChart').getContext('2d');
-  btCharts.btUnderwater = new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets: [{ data: values, borderColor: _btDown, backgroundColor: _btRgba(_btDown, 0.18),
-                                 borderWidth: 1, pointRadius: 0, fill: true }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false },
-        tooltip: { callbacks: { title: items => items.length ? String(items[0].label).slice(0, 7) : '',
-                                label: c => '낙폭 ' + c.parsed.y.toFixed(1) + '%' } } },
-      scales: {
-        x: { ticks: { font: { size: 10 }, color: _btMuted, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, callback: _btYearTick }, grid: { display: false } },
-        y: { max: 0, ticks: { font: { size: 10 }, color: _btMuted, callback: v => v + '%' }, grid: { color: MM_CHART_GRID } }
-      }
-    }
-  });
+function btRollCagrResetZoom() {
+  if (btCharts.btRollCagr && btCharts.btRollCagr.resetZoom) btCharts.btRollCagr.resetZoom();
 }
 
 function renderAnnualDividendChart(annualDiv, totalDiv) {

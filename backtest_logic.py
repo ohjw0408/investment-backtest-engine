@@ -23,7 +23,6 @@ def compute_rolling_analysis(tickers, infl=0.02):
         'percentiles': rolling.DEFAULT_PCTS,
         'horizon_table': {str(h): v for h, v in rolling.horizon_table(pts).items()},
         'rolling_cagr': {str(h): rolling.rolling_cagr(pts, h) for h in (1, 3, 5, 10)},
-        'drawdown': rolling.drawdown(pts),
         'infl': infl,
         'syn_overall': round(sum(1 for _d, _v, s in pts if s) / len(pts), 4),
     }

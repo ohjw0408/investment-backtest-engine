@@ -56,10 +56,25 @@
   <meta property="og:description" content="{{ self.meta_desc() }}">
   {% if canonical_url %}<meta property="og:url" content="{{ canonical_url }}">{% endif %}
   <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="{{ url_for('static', filename='images/favicon-192.png', _external=True) }}">
+  <meta name="twitter:image" content="{{ url_for('static', filename='images/favicon-192.png', _external=True) }}">
   <!-- 검색엔진 소유확인 -->
   <meta name="google-site-verification" content="6B8AZnob2hRy4f5Cxzw9qB9tgb742_daLd3Cc6gpzF8">
   <meta name="naver-site-verification" content="95b94c445cefac66655398c16b5d5fc5db107e40">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+  <!-- 파비콘 (구글 검색결과용 실제 파일 — data URI는 구글이 안 씀) -->
+  <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/favicon-32.png') }}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='images/favicon-192.png') }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Money Milestone",
+    "url": "https://moneymilestone.co.kr",
+    "logo": "{{ url_for('static', filename='images/favicon-192.png', _external=True) }}"
+  }
+  </script>
   <script>
     // 다크모드 FOUC 방지: CSS 로드 전에 테마 결정
     (function () {

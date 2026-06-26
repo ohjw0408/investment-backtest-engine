@@ -4064,3 +4064,13 @@ _작성: Claude_
 - 검증: Playwright — 캐러셀 2슬라이드·next·점토글·일시정지(정지유지)·재생(자동전진)·라이트/다크 스샷, examples KR/US 설명 렌더+탭전환, **콘솔0**. 미배포→push 대기.
 
 _작성: Claude_
+
+## 2026-06-26 — 파비콘 실제 파일화 (구글 검색결과 로고)
+
+오너: 구글 검색결과에 사이트는 떠도 로고(파비콘) 안 나옴.
+- **원인**: `base.html` favicon이 **data URI 인라인 SVG(💰 이모지)** — 구글은 data: URI를 검색결과 파비콘으로 안 씀(별도 fetch 가능한 실제 URL 필요). + co.kr 신규 도메인 재크롤 지연.
+- **수정**: `static/images/logo.png`(390² RGBA, 주황 로고)에서 PIL로 favicon 세트 생성 — `favicon.ico`(16/32/48 멀티), `favicon-192.png`, `favicon-32.png`, `apple-touch-icon.png`(180). base.html link를 data URI → 실제 파일 4종 + apple-touch로 교체. `/favicon.ico` 루트 라우트 추가(`send_from_directory`, 구글·브라우저 루트 우선 조회). 보너스: `og:image`/`twitter:image` + `Organization` JSON-LD `logo`(지식패널용).
+- 검증: 로컬 `/favicon.ico` 200(image/x-icon 5002B), 홈 head icon링크4·JSON-LD·data URI 제거 확인, 파비콘 육안(주황 로고 정사각).
+- ⚠️ 반영=배포 후 구글 재크롤 대기(수일~수주). Search Console "URL 검사→색인 요청"으로 단축. 미배포→push 대기.
+
+_작성: Claude_

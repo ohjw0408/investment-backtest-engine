@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for, Response
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, Response, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
 import random
 import datetime
@@ -203,6 +203,14 @@ def inject_user():
 def current_user():
     uid = session.get('user_id')
     return get_user_by_id(uid) if uid else None
+
+
+@app.route('/favicon.ico')
+def favicon_ico():
+    # 구글·브라우저는 도메인 루트에서 /favicon.ico를 먼저 찾는다(검색결과 파비콘).
+    return send_from_directory(
+        os.path.join(app.root_path, 'static', 'images'),
+        'favicon.ico', mimetype='image/x-icon')
 
 
 @app.route('/robots.txt')

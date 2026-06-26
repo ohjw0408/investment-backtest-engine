@@ -2972,6 +2972,11 @@ def _portfolio_index_series(tickers, years=6, conn=None):
     #    상태 충돌/락으로 일부 조회가 비어 common 교집합이 소실 → [] 버그. 1요청 1연결 공유로 격리.
     #    (get_price/get_symbol_data 경로는 추가로 매 호출 yfinance 최신분 보충 → 배치 rate-limit 취약.)
     #    DB는 직전영업일까지 백필돼 추세 비교엔 충분하고, sqlite라 빠르고 안정적.
+    # raw DB 직접 조회는 get_price(라인 ~596)의 고립 스파이크 필터를 안 거침 →
+    # 저장된 오틱(예: SPY 2026-06-17=346500, yfinance bad tick)이 그대로 노출돼 추세 차트에 델타 스파이크.
+    # get_price와 동일한 _drop_isolated_price_spikes를 여기서도 적용해 일관 처리.
+    import pandas as _pd
+    from modules.price_loader import _drop_isolated_price_spikes
     own = conn is None
     if own:
         conn = _price_daily_conn()
@@ -2983,7 +2988,10 @@ def _portfolio_index_series(tickers, years=6, conn=None):
                 rows = conn.execute(
                     "SELECT date, close FROM price_daily WHERE code=? AND date>=? ORDER BY date",
                     (c, start)).fetchall()
-                m = {r[0]: float(r[1]) for r in rows if r[1] and float(r[1]) > 0}
+                if not rows:
+                    continue
+                dfx = _drop_isolated_price_spikes(_pd.DataFrame(rows, columns=['date', 'close']))
+                m = {r.date: float(r.close) for r in dfx.itertuples() if r.close and float(r.close) > 0}
                 if m:
                     series[code] = (w, m)
             except Exception:

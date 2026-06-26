@@ -56,9 +56,11 @@
 .ex-btn-ic { flex: 0 0 auto; width: 36px; }
 
 /* 안내 배너 */
-.ex-note { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; padding: 11px 14px;
-  border-radius: var(--r-lg, 12px); background: var(--ds-soft); border: 1px solid var(--ds-hairline);
-  font-size: 12px; color: var(--ds-body); line-height: 1.5; }
+.ex-note { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 15px 18px;
+  border-radius: var(--r-lg, 12px); background: var(--ds-canvas); border: 1px solid var(--ds-hairline);
+  box-shadow: var(--ds-shadow); font-size: 12.5px; color: var(--ds-body); line-height: 1.6; }
+[data-theme="dark"] .ex-note { background: var(--ds-dark-el); }
+.ex-note > span:first-child { font-size: 16px; line-height: 1.4; flex-shrink: 0; }
 .ex-note b { color: var(--ds-ink); font-weight: 700; }
 
 /* 투자대가 카드 (모노그램·stance) */

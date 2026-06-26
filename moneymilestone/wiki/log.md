@@ -1,5 +1,13 @@
 # Log
 
+## [2026-06-26] FEAT | 심화분석 P0 — 롤링 엔진 + 총수익 인덱스 (오너)
+
+`포트폴리오_심화분석_plan.md` P0 완료(P2~P4 토대).
+- **`modules/rolling.py` 신규**(순수함수·월말 리샘플): `rolling_cagr`·`horizon_table`(loss_prob·percentile 오차막대용·syn_frac)·`drawdown`(낙폭·회복기간·최장침수)·`real_adjust`(인플레 실질). 골든 테스트 `tests/test_rolling.py` 8 PASS.
+- **총수익(배당 재투자) 인덱스**(결정#6): `_ticker_series`(app.py)가 close→배당 재투자 TR(`tr*=(close+dv)/prev`). ⚠️ **분할 버그 발견·제거**: price_daily는 이미 분할조정인데 corporate_actions split을 곱해 SCHD 2024-10-11 3:1서 가짜 3x 점프(TR 18.45x) → split 제거. 검증 SCHD 3.85→6.15x·QQQ 12.6→14.27x(저배당 근접). 오버레이(추세 겹쳐보기)도 자동 총수익 기준으로 전환.
+- 검증: rolling+spike 타겟 11 PASS. ⚠️ 오버레이 값이 가격→총수익으로 바뀜(배당주 상향, 의도된 결정#6). 구조·렌더 경로 불변.
+- 변경=`modules/rolling.py`(신규)·`tests/test_rolling.py`(신규)·`app.py`.
+
 ## [2026-06-26] FIX | 개별주 짧은 이력(버핏 2021) — 전체기간 백필 + 플래그 + 부분커버리지 (오너 Q1)
 
 버핏 포폴이 겹쳐보기서 2021부터 시작(GOOGL 2004 상장인데). 원인=**버그**(캡 아님): 개별주는 합성 백필 대상 아님 + 온디맨드 5년 페치만 + `_portfolio_index_series`가 price_daily raw 직독(get_price 과거보충 우회) → 공통일 교집합이 5년에 갇힘. (get_price 직접 호출 시 GOOGL 2004-08~ 5495행 정상 페치 확인.)

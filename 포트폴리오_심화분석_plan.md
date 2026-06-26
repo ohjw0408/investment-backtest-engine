@@ -75,15 +75,15 @@
 
 > 1순위 = **P1(비교탭 드래그 확대)** — P0와 독립이라 단독 선출시 가능(빠른 가치). 이후 P0→P2→P3→P4.
 
-### P0. 공용 롤링 엔진 토대 (선행, 경량)
-- **총수익(배당 재투자) 인덱스 빌더** — 결정#6. `_portfolio_index_series`를 배당 재투자 반영하도록 확장(또는 신규). 오버레이도 이걸로 교체.
-- **`modules/rolling.py` 신규** — 총수익 인덱스(date, index, syn) → 롤링 통계 순수함수:
-  - `rolling_cagr(series, years, step_months=1)` → 시점별 직전 N년 CAGR 시계열.
-  - `horizon_distribution(series, horizons)` → horizon별 {n, median, min, max, p5/p25/p75/p95, **손실확률(음수 비율)**, 합성의존%} ← 오차막대·요약표 소스.
-  - `drawdown_series(series)` → underwater + 최대낙폭 구간 + **회복기간**.
-  - `real_adjust(series, infl=0.02)` → 인플레 반영 실질 인덱스(토글용).
-- **공용 인덱스 어댑터** — 분석(`history`)·비교(`_portfolio_index_series`)가 같은 포맷 산출(중복 제거).
-- **골든 테스트** `tests/test_rolling.py`. 검증: pytest 타겟.
+### P0. 공용 롤링 엔진 토대 ✅ 완료(2026-06-26)
+- ✅ **총수익(배당 재투자) 인덱스** — 결정#6. `_ticker_series`(app.py)가 close→**배당 재투자 TR**로(`tr*=(close+dv)/prev`). ⚠️ price_daily는 이미 분할조정이라 split 곱 금지(SCHD 2024 3:1 가짜점프 버그 발견·제거). 검증: SCHD price 3.85→TR 6.15x·QQQ 12.6→14.27x(저배당 근접). 오버레이도 자동 TR.
+- ✅ **`modules/rolling.py` 신규**(순수함수, 월말 리샘플 기준):
+  - `rolling_cagr(points, years)` → 직전 N년 CAGR 월별 시계열.
+  - `horizon_table(points, horizons, percentiles)` → horizon별 {n, **loss_prob**, median, syn_frac, pcts{0/25/75/100…}} ← 오차막대·요약표 소스.
+  - `drawdown(points)` → underwater + 최대낙폭·저점·**회복기간**·최장침수.
+  - `real_adjust(points, infl=0.02)` → 인플레 실질 인덱스(syn 보존).
+- ✅ **골든 테스트** `tests/test_rolling.py` 8개 PASS(상승=손실0·하락=손실1·표본부족·낙폭회복·실질할인·syn).
+- 잔여(P2서): 분석탭 `history` 어댑터(분석은 단일경로라 rolling 입력은 인덱스 재사용 가능).
 
 ### P1. 비교탭 추세 겹쳐보기 — **드래그 확대** ✅ 완료(2026-06-26, 미푸시는 오너 승인 시)
 - rrOvChart에 `chartjs-plugin-zoom` drag 줌(mode x) + **↺ 초기화 버튼**(resetZoom + 기본 5년 복귀).

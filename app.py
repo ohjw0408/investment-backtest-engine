@@ -2983,10 +2983,27 @@ def _ticker_series(conn, code, start):
             (c, start)).fetchall()
         if rows:
             dfx = _drop_isolated_price_spikes(_pd.DataFrame(rows, columns=['date', 'close', 'volume']))
+            # 총수익 인덱스(배당 재투자) — 결정#6. 배당주(SCHD 등) 저평가 방지.
+            # ⚠️ price_daily close·dividend는 이미 분할조정(연속)이라 split 곱하면 가짜 점프
+            #    (예: SCHD 2024-10-11 3:1) → split 적용 안 함. 배당만 재투자.
+            act = conn.execute(
+                "SELECT date, dividend FROM corporate_actions WHERE code=? AND date>=?",
+                (c, start)).fetchall()
+            divm = {a[0]: (float(a[1]) if a[1] else 0.0) for a in act}
+            prev_close = None
+            tr = None
             for r in dfx.itertuples():
-                if r.close and float(r.close) > 0:
-                    m[r.date] = float(r.close)
-                    syn[r.date] = 1 if (r.volume is None or float(r.volume) == 0) else 0
+                if not (r.close and float(r.close) > 0):
+                    continue
+                close = float(r.close)
+                dv = divm.get(r.date, 0.0) or 0.0
+                if prev_close is None:
+                    tr = close
+                else:
+                    tr = tr * (close + dv) / prev_close   # 배당 재투자
+                m[r.date] = tr
+                syn[r.date] = 1 if (r.volume is None or float(r.volume) == 0) else 0
+                prev_close = close
     except Exception:
         pass
     _TS_TKCACHE[key] = (m, syn)

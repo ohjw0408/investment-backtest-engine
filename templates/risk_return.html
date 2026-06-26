@@ -108,6 +108,26 @@
   .rr-pf-list { gap: 6px; }
   .rr-pf-chk { padding: 6px 10px; font-size: 0.8rem; }
 }
+/* 심화 비교 아코디언 (P3) */
+.rr-acc { border: 1px solid var(--border); border-radius: 12px; margin-top: 10px; overflow: hidden; background: var(--card); }
+.rr-acc-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer; user-select: none; font-weight: 700; color: var(--text); }
+.rr-acc-head:hover { background: var(--bg); }
+.rr-acc-head .rr-acc-cy { margin-left: auto; transition: transform .25s; color: var(--text-muted); font-size: 0.9rem; }
+.rr-acc.open .rr-acc-cy { transform: rotate(180deg); }
+.rr-acc-sub { font-weight: 400; color: var(--text-muted); font-size: 0.76rem; }
+.rr-acc-wrap { max-height: 0; overflow: hidden; transition: max-height .35s cubic-bezier(.4,0,.2,1); }
+.rr-acc.open .rr-acc-wrap { max-height: 1400px; }
+.rr-acc-body { padding: 4px 16px 18px; }
+.rr-acc-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px; }
+.rr-acc-desc b { color: var(--text); }
+.rr-acc-2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 760px) { .rr-acc-2 { grid-template-columns: 1fr; } }
+.rr-acc-chart { position: relative; height: 240px; }
+.rr-lp-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.rr-lp-table th, .rr-lp-table td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.rr-lp-table th:first-child, .rr-lp-table td:first-child { text-align: left; }
+.rr-lp-table th { color: var(--text-muted); font-weight: 600; font-size: 0.72rem; }
+.rr-cta-sticky { position: sticky; bottom: 12px; z-index: 20; }
 </style>
 {% endblock %}
 
@@ -195,7 +215,7 @@
       </div>
     </div>
 
-    <div style="margin-top:18px;">
+    <div style="margin-top:18px;" class="rr-cta-sticky">
       <button class="btn-primary" id="rrCompareBtn" onclick="rrCompare()"
         style="font-size:1.05rem;font-weight:800;padding:14px 30px;width:100%;border-radius:11px;">📊 정밀 비교하기</button>
     </div>
@@ -225,6 +245,12 @@
         <div class="rr-chart-wrap"><canvas id="rrSpider"></canvas></div>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">* 각 축은 비교 대상끼리 상대 정규화(클수록 좋음). 안정성=낮은 변동성, 방어력=낮은 낙폭 기준.</div>
       </div>
+    </div>
+
+    <!-- 심화 비교 아코디언 (P3) — 지표별 연도 추이 + 수익률 롤링 -->
+    <div class="rr-card" id="rrAccordions" style="display:none;">
+      <div class="rr-card-title">🔎 지표별 심화 비교 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 항목을 펼쳐 연도별 추이를 겹쳐 보세요</span></div>
+      <div id="rrAccHost"></div>
     </div>
 
     {% if user %}
@@ -372,8 +398,133 @@ async function rrCompare(){
     rrRenderScatter();
     rrRenderSpiderCtrl();
     rrRenderSpider();
+    rrRenderAccordions(data);
+    if (rrAutoScroll) { rrAutoScroll = false; document.getElementById('rrResults').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   } catch(e){ status.textContent = '산출에 실패했어요. 네트워크를 확인해주세요.'; }
   finally { btn.disabled = false; }
+}
+
+// ── 심화 비교 아코디언 (P3) ──
+let rrAutoScroll = false;
+let rrAccCharts = {};
+const RR_ACC = [
+  { key:'ret',  title:'수익률',        sub:'연도별 수익률 + 기간별 손실확률',
+    desc:'각 해의 수익률을 겹쳐 봅니다. 오른쪽 표는 “그 기간 묻어뒀다면 손해 볼 확률” — <b>기간이 길수록 0에 가까워지는 포트가 안정적</b>입니다.',
+    get:a=>a.ret, roll:true },
+  { key:'vol',  title:'변동성',
+    desc:'수익률이 출렁인 정도(연 단위). <b>낮고 평평할수록 마음 편한</b> 포트입니다.', get:a=>a.vol },
+  { key:'mdd',  title:'최대낙폭(MDD)',
+    desc:'그 해 고점 대비 가장 크게 빠진 폭. <b>0에 붙어 있을수록</b> 방어적입니다.', get:a=>a.mdd },
+  { key:'div',  title:'배당',
+    desc:'연도별 배당수익률(그 해 배당 ÷ 연말가). <b>높고 꾸준할수록</b> 현금흐름이 좋습니다.', div:'dyield' },
+  { key:'divg', title:'배당 성장률',
+    desc:'배당이 해마다 얼마나 늘었나(전년 대비). <b>꾸준히 +면</b> 배당이 성장하는 포트입니다.', divg:true },
+];
+
+function rrRenderAccordions(data){
+  Object.values(rrAccCharts).forEach(c=>{ try{ c.destroy(); }catch(e){} });
+  rrAccCharts = {};
+  const items = (data.items||[]).filter(it=> (it.annual&&it.annual.length) || (it.annual_div&&it.annual_div.length));
+  const host = document.getElementById('rrAccHost');
+  const card = document.getElementById('rrAccordions');
+  if (!items.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  host.innerHTML = RR_ACC.map((m,idx)=>`
+    <div class="rr-acc" data-acc="${m.key}">
+      <div class="rr-acc-head" onclick="rrAccToggle('${m.key}')">
+        <span>${esc(m.title)}</span>${m.sub?`<span class="rr-acc-sub">· ${esc(m.sub)}</span>`:''}
+        <span class="rr-acc-cy">▾</span>
+      </div>
+      <div class="rr-acc-wrap"><div class="rr-acc-body">
+        <div class="rr-acc-desc">${m.desc}</div>
+        ${m.roll
+          ? `<div class="rr-acc-2"><div class="rr-acc-chart"><canvas id="rrAcc_${m.key}"></canvas></div>`
+            + `<div id="rrLP_${m.key}"></div></div>`
+          : `<div class="rr-acc-chart"><canvas id="rrAcc_${m.key}"></canvas></div>`}
+      </div></div>
+    </div>`).join('');
+  window._rrAccItems = items;
+}
+
+function rrAccToggle(key){
+  const el = document.querySelector(`.rr-acc[data-acc="${key}"]`);
+  if (!el) return;
+  const opening = !el.classList.contains('open');
+  el.classList.toggle('open', opening);
+  if (opening && !rrAccCharts[key]) rrAccDraw(key);
+}
+
+function rrAccDraw(key){
+  const m = RR_ACC.find(x=>x.key===key);
+  const items = window._rrAccItems || [];
+  const cv = document.getElementById('rrAcc_'+key);
+  if (!cv) return;
+  if (m.divg) { rrAccCharts[key] = rrDivGrowthChart(cv, items); }
+  else if (m.div) { rrAccCharts[key] = rrYearLineChart(cv, items, it=>(it.annual_div||[]).map(a=>[a.year, a.dyield])); }
+  else { rrAccCharts[key] = rrYearLineChart(cv, items, it=>(it.annual||[]).map(a=>[a.year, m.get(a)])); }
+  if (m.roll) rrRenderLossProb(key, items);
+}
+
+function _rrYearAxis(opts){
+  return { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    plugins:{ legend:{display:true, labels:{font:{size:11}, usePointStyle:true, boxWidth:8, color:'var(--text-muted)'}},
+      tooltip:{callbacks:{label:c=> c.parsed.y==null?null:`${c.dataset.label}: ${c.parsed.y>=0?'+':''}${c.parsed.y.toFixed(1)}%`}} },
+    scales:{ x:{ticks:{font:{size:10}},grid:{display:false}},
+      y:{ticks:{font:{size:10},callback:v=>v+'%'}} } };
+}
+
+function rrYearLineChart(cv, items, pairsOf){
+  const yset=new Set();
+  items.forEach(it=> pairsOf(it).forEach(([y])=>yset.add(y)));
+  const years=[...yset].sort((a,b)=>a-b);
+  const pos={}; years.forEach((y,i)=>pos[y]=i);
+  const datasets = items.map((it,i)=>{
+    const ys=new Array(years.length).fill(null);
+    pairsOf(it).forEach(([y,v])=>{ if(v!=null) ys[pos[y]]=+(v*100).toFixed(2); });
+    const col=colorOf(i);
+    return { label:it.name, data:ys, borderColor:col, backgroundColor:col,
+      borderWidth:2, pointRadius:0, tension:.1, spanGaps:true };
+  });
+  return new Chart(cv.getContext('2d'), { type:'line',
+    data:{labels:years.map(String), datasets}, options:_rrYearAxis() });
+}
+
+function rrDivGrowthChart(cv, items){
+  const yset=new Set();
+  items.forEach(it=> ((it.divgrowth&&it.divgrowth.yoy)||[]).forEach(p=>yset.add(p.year)));
+  const years=[...yset].sort((a,b)=>a-b);
+  const pos={}; years.forEach((y,i)=>pos[y]=i);
+  const datasets = items.map((it,i)=>{
+    const ys=new Array(years.length).fill(null);
+    ((it.divgrowth&&it.divgrowth.yoy)||[]).forEach(p=>{ ys[pos[p.year]]=+(p.growth*100).toFixed(1); });
+    const col=colorOf(i);
+    return { label:it.name + (it.divgrowth&&it.divgrowth.cagr!=null?` (연 ${(it.divgrowth.cagr*100).toFixed(1)}%)`:''),
+      data:ys, borderColor:col, backgroundColor:col, borderWidth:2, pointRadius:0, tension:.1, spanGaps:true };
+  });
+  return new Chart(cv.getContext('2d'), { type:'line',
+    data:{labels:years.map(String), datasets}, options:_rrYearAxis() });
+}
+
+function rrRenderLossProb(key, items){
+  const host = document.getElementById('rrLP_'+key);
+  if (!host) return;
+  const withRoll = items.filter(it=>it.rolling_return && it.rolling_return.horizon_table);
+  if (!withRoll.length){ host.innerHTML='<div style="font-size:0.78rem;color:var(--text-muted);">롤링 데이터 없음</div>'; return; }
+  const horizons = withRoll[0].rolling_return.horizons || [1,3,5,10,15,20];
+  let html = '<div style="font-size:0.78rem;font-weight:700;margin-bottom:6px;">기간별 손실확률</div>';
+  html += '<div style="overflow-x:auto;"><table class="rr-lp-table"><thead><tr><th>기간</th>'
+    + withRoll.map((it,i)=>`<th style="color:${colorOf(items.indexOf(it))}">${esc(it.name.length>6?it.name.slice(0,6)+'…':it.name)}</th>`).join('') + '</tr></thead><tbody>';
+  horizons.forEach(h=>{
+    html += `<tr><td>${h}년</td>` + withRoll.map(it=>{
+      const r = it.rolling_return.horizon_table[String(h)] || {};
+      if (r.loss_prob==null) return '<td style="color:var(--text-muted)">—</td>';
+      const lp = r.loss_prob;
+      const c = lp<=0.001 ? 'var(--green,#2E7D32)' : (lp>=0.3 ? 'var(--red,#C62828)' : 'inherit');
+      return `<td style="color:${c};font-weight:600;">${(lp*100).toFixed(1)}%</td>`;
+    }).join('') + '</tr>';
+  });
+  html += '</tbody></table></div><div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">전체기간·거치식·배당재투자 기준(추정 데이터 포함).</div>';
+  host.innerHTML = html;
 }
 
 // ── 수치표 ──
@@ -927,5 +1078,7 @@ rrRenderChips();
 const _rrPre = rrApplyPreload();
 if (RR_AUTH) { rrLoadPortfolios().then(rrOvInit); }
 else { if(!_rrPre) rrRenderBuilder(); rrOvInit(); }
+// 2모드(결정#9): 예시 유입(preload) = 자동 풀로드 + 결과로 스크롤. 직접 입력 = 수동(버튼).
+if (_rrPre) { rrAutoScroll = true; setTimeout(rrCompare, 80); }
 </script>
 {% endblock %}

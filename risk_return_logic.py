@@ -116,6 +116,88 @@ def _metrics_full(returns: pd.Series, spy_returns=None, div_yield=None):
     }
 
 
+def _annual_risk_return(daily_r):
+    """일별 수익률 → 연도별 {year, ret, vol, mdd}. 좌측 겹침 라인용(공통기간 기준)."""
+    r = daily_r.dropna()
+    r = r[np.isfinite(r)]
+    if not len(r):
+        return []
+    out = []
+    for yr, g in r.groupby(r.index.year):
+        if len(g) < 5:
+            continue
+        ret = float((1.0 + g).prod() - 1.0)
+        vol = float(g.std() * np.sqrt(252.0)) if len(g) > 1 else 0.0
+        cum = (1.0 + g).cumprod()
+        mdd = float((cum / cum.cummax() - 1.0).min())
+        out.append({"year": int(yr), "ret": round(ret, 6), "vol": round(vol, 6), "mdd": round(mdd, 6)})
+    return out
+
+
+def _annual_dividends(weights, series, start, end):
+    """포폴 연도별 배당: dyield(연 배당수익률) + dindex(첫해=100 정규화 배당액 흐름).
+       weights={code:w}. 배당성장률·배당 아코디언 라인용."""
+    years = list(range(start.year, end.year + 1))
+    dyield, damt = {}, {}
+    for code, w in weights.items():
+        s = series.get(code)
+        if not s:
+            continue
+        close, div = s
+        for y in years:
+            ys, ye = pd.Timestamp(y, 1, 1), pd.Timestamp(y, 12, 31)
+            dsum = float(div[(div.index >= ys) & (div.index <= ye)].sum())
+            yc = close[(close.index >= ys) & (close.index <= ye)]
+            if not len(yc):
+                continue
+            px_end = float(yc.iloc[-1])
+            if px_end > 0:
+                dyield[y] = dyield.get(y, 0.0) + w * (dsum / px_end)   # 연 배당수익률
+            # 정규화 배당액 = 주당배당 / 첫 종가(있는 종목) → 비교가능 흐름
+            px0 = float(close.iloc[0]) if len(close) else 0.0
+            if px0 > 0:
+                damt[y] = damt.get(y, 0.0) + w * (dsum / px0)
+    out = []
+    for y in years:
+        if y in dyield or y in damt:
+            out.append({"year": int(y), "dyield": round(dyield.get(y, 0.0), 6), "dindex": round(damt.get(y, 0.0), 6)})
+    return out
+
+
+def _dividend_growth(annual_div):
+    """연배당액(dindex) → {cagr, yoy:[{year, growth}]}. 마지막 해는 미수령 가능성 있어 그대로."""
+    pts = [(d["year"], d["dindex"]) for d in (annual_div or []) if d.get("dindex", 0) > 0]
+    yoy = []
+    for i in range(1, len(pts)):
+        prev = pts[i - 1][1]
+        if prev > 0:
+            yoy.append({"year": pts[i][0], "growth": round(pts[i][1] / prev - 1.0, 4)})
+    cagr = None
+    if len(pts) >= 2:
+        y0, v0 = pts[0]; y1, v1 = pts[-1]
+        span = y1 - y0
+        if span >= 1 and v0 > 0:
+            cagr = round((v1 / v0) ** (1.0 / span) - 1.0, 4)
+    return {"cagr": cagr, "yoy": yoy}
+
+
+def _rolling_return_table(tickers):
+    """전체기간·거치식·배당재투자 TR 인덱스 기반 수익률 롤링 분포(P2 엔진 재사용, 결정#7)."""
+    try:
+        from modules.tr_index import build_portfolio_tr_index
+        from modules import rolling
+        pts = build_portfolio_tr_index(tickers)
+        if len(pts) < 13:
+            return None
+        return {
+            "horizons": rolling.DEFAULT_HORIZONS,
+            "horizon_table": {str(h): v for h, v in rolling.horizon_table(pts).items()},
+            "syn_overall": round(sum(1 for _d, _v, s in pts if s) / len(pts), 4),
+        }
+    except Exception:
+        return None
+
+
 def compute_comparison(portfolios, benchmarks, loader, data_end=None):
     """포트폴리오 비교 탭 — 선택 포폴 + 벤치마크의 11지표.
 
@@ -188,11 +270,22 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
         dy = sum(yld.get(c, 0.0) * w for c, w in weights.items())
         m = _metrics_full(pr, spy_r, dy)
         if m:
-            items.append({"kind": "portfolio", "name": name, **m})
+            annual = _annual_risk_return(pr)
+            div_y = _annual_dividends(weights, series, common_start, common_end)
+            tk = [{"code": c, "weight": w * 100.0} for c, w in weights.items()]
+            items.append({"kind": "portfolio", "name": name, **m,
+                          "annual": annual, "annual_div": div_y,
+                          "divgrowth": _dividend_growth(div_y),
+                          "rolling_return": _rolling_return_table(tk)})
     for b in bench_list:
         m = _metrics_full(rets_c[b["code"]], spy_r, yld.get(b["code"], 0.0))
         if m:
-            items.append({"kind": "benchmark", "name": b["name"], "code": b["code"], **m})
+            annual = _annual_risk_return(rets_c[b["code"]])
+            div_y = _annual_dividends({b["code"]: 1.0}, series, common_start, common_end)
+            items.append({"kind": "benchmark", "name": b["name"], "code": b["code"], **m,
+                          "annual": annual, "annual_div": div_y,
+                          "divgrowth": _dividend_growth(div_y),
+                          "rolling_return": _rolling_return_table([{"code": b["code"], "weight": 100.0}])})
 
     years = round((common_end - common_start).days / 365.25, 2)
     period = {

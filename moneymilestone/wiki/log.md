@@ -4074,3 +4074,14 @@ _작성: Claude_
 - ⚠️ 반영=배포 후 구글 재크롤 대기(수일~수주). Search Console "URL 검사→색인 요청"으로 단축. 미배포→push 대기.
 
 _작성: Claude_
+
+## 2026-06-26 — 심화분석 P3a (비교탭 동급화: 아코디언5 + 2모드)
+
+비교탭(`/risk-return`)에 분석탭급 심화 추가. 플랜=`포트폴리오_심화분석_plan.md`(P3a ✅).
+- **백엔드**(`risk_return_logic.compute_comparison`): 항목별 `annual`(연도 ret/vol/mdd) + `annual_div`(연 dyield·정규화 dindex) + `divgrowth`(cagr·yoy) + `rolling_return`(전체기간 TR 인덱스 → horizon_table, P2 `tr_index`+`rolling` 재사용). 기존 11지표·scatter(`compute_risk_return`) 불변.
+- **프론트**(`risk_return.html`): 핵심표 아래 **아코디언 5개**(수익률·변동성·MDD·배당·배당성장률). 각 좌=연도 겹침 라인(전 항목 컬러). 수익률 아코디언 우측=**기간별 손실확률 비교표**(horizon×항목, 0%=초록·고위험=빨강). 펼침 시 lazy 차트 렌더, max-height 부드러운 애니. 각 항목 쉬운 설명.
+- **2모드 UX**(결정#9): 예시 유입(`mm_rr_preload`)=자동 `rrCompare`+결과로 스크롤. 직접 입력=수동(버튼), compare 버튼 `position:sticky`로 종목 많아도 가시.
+- 검증: 백엔드 스모크(3항목 annual27y·divgrowth·rolling) + Playwright(직접모드 아코디언5·7항목, 수익률 펼침=차트+손실확률표6행, 5차트 전부, 예시유입 자동발화, 라이트/다크, **콘솔0**). tr_index/rolling 회귀 12 PASS.
+- **P3b 잔여**: 변동성·MDD 롤링 분포 오차막대(신규 엔진), 배당성장률 저베이스 YoY 스파이크 클램프. 미배포→push 대기.
+
+_작성: Claude_

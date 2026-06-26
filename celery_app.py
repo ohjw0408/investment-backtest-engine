@@ -64,4 +64,10 @@ celery.conf.beat_schedule = {
         'task': 'tasks.evaluate_calendar_alerts',
         'schedule': crontab(hour=23, minute=0),
     },
+    # 가격 오틱(고립 스파이크) 클린업 — 매일 10:00 UTC(US/KR 장 마감 후). 증분 페치가 못 거른
+    # 오틱을 DB 전체 이웃 기준으로 제거 → 겹쳐보기 등 raw 읽기경로 self-heal.
+    'purge-price-spikes': {
+        'task': 'tasks.purge_price_spikes',
+        'schedule': crontab(hour=10, minute=0),
+    },
 }

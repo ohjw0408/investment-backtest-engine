@@ -431,6 +431,10 @@ class PriceLoader:
         df["dividend"] = df["dividend"].fillna(0)
         df["split"]    = df["split"].replace(0, 1).fillna(1)
         df["code"]     = code
+        # 쓰기 전 고립 스파이크(yfinance 오틱) 제거 — DB에 잘못된 값이 박히는 것을 1차 차단.
+        # (INSERT OR IGNORE라 한번 박히면 재페치로 안 고쳐지므로 입력 단계서 거른다. 단일일 증분
+        #  페치는 이웃이 없어 못 거르니, purge_isolated_spikes 주기 태스크가 2차 안전망.)
+        df = _drop_isolated_price_spikes(df)
         price_df  = df[["code", "date", "open", "high", "low", "close", "volume"]]
         action_df = df[["code", "date", "dividend", "split"]]
         return price_df, action_df
@@ -445,6 +449,38 @@ class PriceLoader:
             df.values.tolist()
         )
         self.conn.commit()
+
+    def purge_isolated_spikes(self, days: int = 120, ratio_threshold: float = 4.0) -> int:
+        """price_daily에서 고립 스파이크(오틱) 행을 영구 DELETE — 근본 클린업.
+
+        get_price는 읽기 시 _drop_isolated_price_spikes로 마스킹만 하고, 쓰기경로(특히 단일일
+        증분 페치)는 이웃이 없어 오틱을 못 거른다 → DB에 틀린 값이 잔존. 이 메서드는 DB 전체
+        이웃을 보고 오틱 행을 실제로 지워 self-heal. 다음 페치가 정상값으로 다시 채운다.
+
+        days: 최근 N일 윈도만 검사(오틱은 최근 페치서 유입). 이웃 판정 위해 +7일 더 읽음.
+        반환: 삭제 행수."""
+        from datetime import datetime, timedelta
+        from itertools import groupby
+        win_start  = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        read_start = (datetime.now() - timedelta(days=days + 7)).strftime('%Y-%m-%d')
+        rows = self.conn.execute(
+            "SELECT code, date, close FROM price_daily WHERE date>=? ORDER BY code, date",
+            (read_start,)
+        ).fetchall()
+        to_del = []
+        for code, grp in groupby(rows, key=lambda r: r[0]):
+            g = list(grp)
+            if len(g) < 3:
+                continue
+            df = pd.DataFrame([(d, c) for _, d, c in g], columns=['date', 'close'])
+            kept = set(_drop_isolated_price_spikes(df, ratio_threshold)['date'])
+            for _, d, c in g:
+                if d not in kept and d >= win_start:
+                    to_del.append((code, d))
+        if to_del:
+            self.conn.executemany("DELETE FROM price_daily WHERE code=? AND date=?", to_del)
+            self.conn.commit()
+        return len(to_del)
 
     # -------------------------------------------------
     # 핵심 함수

@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-26] FIX | 가격 오틱(스파이크) 근본 해결 — 쓰기정제 + purge beat + DB 클린업 (오너 지시)
+
+오너: 읽기시 마스킹 말고 근본 해결 + 데이터 클린업. (BUG-BACKTEST-SPY-SPIKE가 읽기필터로만 가려져 raw 경로[겹쳐보기]서 재발 → BUG-OVERLAY-SPIKE.)
+- **① 쓰기경로 정제**: `fetch_from_api`가 DB 저장 전 `_drop_isolated_price_spikes` 적용 → 풀레인지 페치 오틱 1차 차단(`INSERT OR IGNORE`라 한번 박히면 못 고치므로 입력단 차단).
+- **② 근본 클린업 메서드**: 신규 `PriceLoader.purge_isolated_spikes(days=120)` — DB **전체 이웃**(±)을 보고 고립 오틱 행을 실제 **DELETE**. 단일일 증분 페치(이웃 없어 쓰기필터가 못 잡음)까지 self-heal. 다음 페치가 정상값으로 재충전.
+- **③ 주기 태스크**: `tasks.purge_price_spikes` + Beat `purge-price-spikes` 매일 10:00 UTC(장 마감 후). prod=배포 시 겹쳐보기 읽기필터로 **즉시 마스킹** + 익일 beat가 **물리 삭제**(DB git 미추적이라 코드 배포로 self-heal).
+- **④ 로컬 DB 클린업**: `purge_isolated_spikes()` 1회 실행 → SPY 2026-06-17=346500 행 삭제 확인(이웃 15/16/18 정상 보존, 삭제 1행).
+- 검증: targeted `test_price_loader_spikes.py` **3 PASS**(기존2+신규 purge DB DELETE 테스트), 겹쳐보기 giant-spike 0, app/tasks/celery_app/price_loader parse·import OK, beat 등록 확인.
+- 변경=`modules/price_loader.py`·`tasks.py`·`celery_app.py`·`tests/test_price_loader_spikes.py`.
+
 ## [2026-06-26] FIX | 추세 겹쳐보기 델타 스파이크 + 로딩 스피너 (오너 보고+지시)
 
 오너: 비교 겹쳐보기에서 올웨더·영구·골드버터플라이·60/40·멀티에셋 전부 6월 중순 델타 스파이크. + 로딩 스피너 요청.

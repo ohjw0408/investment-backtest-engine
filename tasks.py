@@ -377,6 +377,23 @@ def refresh_index_ohlc():
 
 
 @celery.task
+def purge_price_spikes():
+    """매일 실행(Celery Beat) — price_daily의 고립 스파이크(yfinance 오틱) 행을 영구 제거.
+
+    쓰기경로가 못 거른 증분 오틱(예: SPY 2026-06-17=346500)을 DB 전체 이웃 기준으로 지워
+    겹쳐보기 등 raw 읽기 경로까지 self-heal. 다음 페치가 정상값으로 다시 채운다.
+    """
+    try:
+        from modules.price_loader import PriceLoader
+        n = PriceLoader().purge_isolated_spikes()
+        print(f"[purge_price_spikes] {n} rows deleted")
+        return {"status": "ok", "deleted": n}
+    except Exception as e:
+        print(f"[purge_price_spikes] 오류: {e}")
+        raise
+
+
+@celery.task
 def refresh_macro():
     """거시경제 지표 증분 갱신 (Celery Beat 자동 실행). FRED·ECOS·yfinance 시장지수."""
     try:

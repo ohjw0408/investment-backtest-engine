@@ -295,6 +295,31 @@
   font-size: 13px; font-weight: 700; padding: 10px 18px; border-radius: var(--r-pill); box-shadow: var(--ds-shadow); transition: background .15s; }
 .guru-promo-card:hover .guru-promo-cta { background: var(--brand-hover); }
 @media (max-width: 560px) { .guru-promo-t { font-size: 18px; } .guru-promo-d { font-size: 12.5px; } }
+/* 홈 프로모 캐러셀 (대가 ↔ 포트폴리오 예시 자동 전환) */
+.hc-viewport { overflow: hidden; border-radius: var(--r-xl); }
+.hc-track { display: flex; transition: transform .5s cubic-bezier(.4, 0, .2, 1); will-change: transform; }
+.hc-slide { flex: 0 0 100%; min-width: 100%; text-decoration: none; display: flex; }
+.hc-slide > .guru-promo-card { flex: 1; width: 100%; }
+.hc-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 0 4px; }
+.hc-dots { display: flex; gap: 6px; margin-right: auto; }
+.hc-dot { width: 7px; height: 7px; padding: 0; border: none; border-radius: 50%; background: var(--ds-hairline); cursor: pointer; transition: width .25s, background .25s; }
+.hc-dot.on { width: 18px; border-radius: 4px; background: var(--brand); }
+.hc-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body);
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; transition: background .15s; }
+.hc-btn:hover { background: var(--ds-soft); }
+[data-theme="dark"] .hc-btn { background: var(--ds-dark-el); }
+.examples-promo-card { background:
+    radial-gradient(135% 165% at 100% -25%, color-mix(in srgb, var(--up) 24%, transparent), transparent 56%),
+    linear-gradient(135deg, color-mix(in srgb, var(--up) 11%, var(--ds-canvas)), var(--ds-canvas) 70%);
+  border: 1px solid color-mix(in srgb, var(--up) 26%, var(--ds-hairline)); }
+.examples-promo-card::after { background: radial-gradient(circle, color-mix(in srgb, var(--up) 24%, transparent), transparent 70%); }
+[data-theme="dark"] .examples-promo-card { background:
+    radial-gradient(135% 165% at 100% -25%, color-mix(in srgb, var(--up) 30%, transparent), transparent 56%),
+    linear-gradient(135deg, color-mix(in srgb, var(--up) 18%, var(--ds-dark-el)), var(--ds-dark-el) 70%);
+  border-color: color-mix(in srgb, var(--up) 34%, transparent); }
+.examples-promo-card .guru-promo-cta { background: var(--up); }
+.examples-promo-card:hover .guru-promo-cta { filter: brightness(1.06); }
+.examples-promo-card .guru-promo-badge { color: var(--up); background: color-mix(in srgb, var(--up) 14%, var(--ds-canvas)); border-color: color-mix(in srgb, var(--up) 32%, transparent); }
 .mobile-legal { padding: 18px 4px 6px; text-align: center; }
 .mobile-legal a { font-size: 12px; color: var(--ds-muted); text-decoration: none; }
 .mobile-legal .sep { color: var(--ds-hairline); margin: 0 8px; }
@@ -495,28 +520,96 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
 
   {% endif %}
 
-  <!-- ===== 투자대가 진입 프로모 (로그인 시 '다음 할 일' 아래로) ===== -->
-  <a class="guru-promo" href="/gurus">
-    <div class="guru-promo-card">
-      <div class="guru-promo-top">
-        <div class="guru-promo-avatars">
-          <span class="guru-promo-av" data-gavatar="warren-buffett" style="background:#8bc34a">WB</span>
-          <span class="guru-promo-av" data-gavatar="ray-dalio" style="background:#ff9800">RD</span>
-          <span class="guru-promo-av" data-gavatar="michael-burry" style="background:#cf202f">MB</span>
-          <span class="guru-promo-av" data-gavatar="bill-ackman" style="background:#0052ff">BA</span>
-        </div>
-        <span class="guru-promo-badge">★ SEC 13F 공시</span>
-      </div>
-      <div class="guru-promo-main">
-        <div class="guru-promo-t">월가 전설들은 지금 무엇을 들고 있을까?</div>
-        <div class="guru-promo-d">워런 버핏 · 마이클 버리 · 빌 애크만 · 레이 달리오 등 세계적 투자 대가들이 SEC에 공시한 <b>실제 보유 종목과 비중</b>을 그대로 확인하세요. 마음에 드는 포트폴리오는 <b>클릭 한 번으로 백테스트</b>까지 — 분기마다 자동 업데이트됩니다.</div>
-      </div>
-      <div class="guru-promo-foot">
-        <span class="guru-promo-stats">투자 대가 <b>10인</b> · 13F 공시 기준</span>
-        <span class="guru-promo-cta">포트폴리오 보러가기 ›</span>
+  <!-- ===== 홈 프로모 캐러셀: 투자대가 ↔ 포트폴리오 예시 (3초 자동 전환) ===== -->
+  <div class="guru-promo" id="homeCarousel">
+    <div class="hc-viewport">
+      <div class="hc-track" id="hcTrack">
+
+        <!-- 슬라이드 1: 투자대가 13F -->
+        <a class="hc-slide" href="/gurus">
+          <div class="guru-promo-card">
+            <div class="guru-promo-top">
+              <div class="guru-promo-avatars">
+                <span class="guru-promo-av" data-gavatar="warren-buffett" style="background:#8bc34a">WB</span>
+                <span class="guru-promo-av" data-gavatar="ray-dalio" style="background:#ff9800">RD</span>
+                <span class="guru-promo-av" data-gavatar="michael-burry" style="background:#cf202f">MB</span>
+                <span class="guru-promo-av" data-gavatar="bill-ackman" style="background:#0052ff">BA</span>
+              </div>
+              <span class="guru-promo-badge">★ SEC 13F 공시</span>
+            </div>
+            <div class="guru-promo-main">
+              <div class="guru-promo-t">월가 전설들은 지금 무엇을 들고 있을까?</div>
+              <div class="guru-promo-d">워런 버핏 · 마이클 버리 · 빌 애크만 · 레이 달리오 등 세계적 투자 대가들이 SEC에 공시한 <b>실제 보유 종목과 비중</b>을 그대로 확인하세요. 마음에 드는 포트폴리오는 <b>클릭 한 번으로 백테스트</b>까지 — 분기마다 자동 업데이트됩니다.</div>
+            </div>
+            <div class="guru-promo-foot">
+              <span class="guru-promo-stats">투자 대가 <b>10인</b> · 13F 공시 기준</span>
+              <span class="guru-promo-cta">포트폴리오 보러가기 ›</span>
+            </div>
+          </div>
+        </a>
+
+        <!-- 슬라이드 2: 포트폴리오 예시(추천 자산배분) -->
+        <a class="hc-slide" href="/examples">
+          <div class="guru-promo-card examples-promo-card">
+            <div class="guru-promo-top">
+              <div class="guru-promo-avatars">
+                <span class="guru-promo-av" style="background:#3949ab">🛡️</span>
+                <span class="guru-promo-av" style="background:#00897b">🌦️</span>
+                <span class="guru-promo-av" style="background:#fb8c00">⚖️</span>
+                <span class="guru-promo-av" style="background:#8e24aa">💰</span>
+              </div>
+              <span class="guru-promo-badge">🎨 검증된 전략 29종</span>
+            </div>
+            <div class="guru-promo-main">
+              <div class="guru-promo-t">자산 배분 투자, 어떻게 하는 걸까?</div>
+              <div class="guru-promo-d">영구 포트폴리오 · 올웨더 · 60/40 · SCHD … <b>역사와 전통이 있는 유명 자산배분 전략</b>을 미국·한국 ETF로 정리했어요. 있어야 할 건 다 있고 없을 건 없죠. <b>마음에 드는 예시를 골라 분석·비교</b>하고, 내 식대로 바꿔 보세요.</div>
+            </div>
+            <div class="guru-promo-foot">
+              <span class="guru-promo-stats">미국 · 한국 ETF <b>29종</b> 자산배분</span>
+              <span class="guru-promo-cta">예시 포트폴리오 보기 ›</span>
+            </div>
+          </div>
+        </a>
+
       </div>
     </div>
-  </a>
+    <div class="hc-bar">
+      <div class="hc-dots">
+        <button class="hc-dot on" type="button" data-i="0" aria-label="1페이지"></button>
+        <button class="hc-dot" type="button" data-i="1" aria-label="2페이지"></button>
+      </div>
+      <button class="hc-btn" type="button" id="hcPause" aria-label="자동 전환 일시정지">⏸</button>
+      <button class="hc-btn" type="button" id="hcNext" aria-label="다음">›</button>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var root = document.getElementById('homeCarousel');
+    if (!root) return;
+    var track = document.getElementById('hcTrack');
+    var dots = [].slice.call(root.querySelectorAll('.hc-dot'));
+    var n = track.children.length, i = 0, timer = null, paused = false;
+    function go(k) {
+      i = (k + n) % n;
+      track.style.transform = 'translateX(-' + (i * 100) + '%)';
+      dots.forEach(function (d, j) { d.classList.toggle('on', j === i); });
+    }
+    function start() { stop(); if (!paused) timer = setInterval(function () { go(i + 1); }, 3000); }
+    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+    document.getElementById('hcNext').addEventListener('click', function () { go(i + 1); start(); });
+    dots.forEach(function (d) { d.addEventListener('click', function () { go(+d.dataset.i); start(); }); });
+    var pb = document.getElementById('hcPause');
+    pb.addEventListener('click', function () {
+      paused = !paused;
+      pb.textContent = paused ? '▶' : '⏸';
+      pb.setAttribute('aria-label', paused ? '자동 전환 재생' : '자동 전환 일시정지');
+      if (paused) stop(); else start();
+    });
+    root.addEventListener('mouseenter', stop);
+    root.addEventListener('mouseleave', function () { if (!paused) start(); });
+    start();
+  })();
+  </script>
 
   <!-- ===== 투자 도구 (기능 유도 — 로그인/비로그인 공용) ===== -->
   <div class="feat-sec">

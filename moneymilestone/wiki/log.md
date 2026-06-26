@@ -4055,3 +4055,12 @@ _작성: Claude_
 - 검증: Playwright(QQQ) — short labels[1·3년]·long[5·10·15·20년]·독립축·라이트/다크·콘솔0. 미배포→push 대기.
 
 _작성: Claude_
+
+## 2026-06-26 — 홈 프로모 캐러셀 + 포트폴리오 예시 탭 설명
+
+오너 디자인 2건.
+- **examples 탭별 설명**(`templates/examples.html`): 한국/미국 패널 상단에 `ex-note` 추가. KR="한국 상장 ETF·연금저축/IRP/ISA 절세계좌·원화·소액", US="미국 상장 해외 ETF·종류多·규모大·거래활발·저비용(환전/환율/양도세 유의)". rid 조건 분기.
+- **홈 프로모 캐러셀**(`templates/index.html`): 기존 단일 투자대가 광고카드(`guru-promo`)를 **2슬라이드 캐러셀**로. 슬라이드1=기존 대가 13F(그대로), 슬라이드2=**포트폴리오 예시 홍보**(초록 `examples-promo-card`, "자산 배분 투자, 어떻게 하는 걸까?" + 영구/올웨더/60·40/SCHD 29종 → /examples). 우하단 화살표·점2개 인디케이터·일시정지(⏸/▶)·**3초 자동전환**(transform translateX 슬라이드 .5s), hover 시 정지. 순수 JS(인라인), `order:4`(is-auth) 유지.
+- 검증: Playwright — 캐러셀 2슬라이드·next·점토글·일시정지(정지유지)·재생(자동전진)·라이트/다크 스샷, examples KR/US 설명 렌더+탭전환, **콘솔0**. 미배포→push 대기.
+
+_작성: Claude_

@@ -161,6 +161,17 @@
 
   {% for rid, rlabel, groups in regions %}
   <div class="ex-panel {% if loop.first %}on{% endif %}" data-panel="{{ rid }}">
+    {% if rid == 'kr' %}
+    <div class="ex-note" style="margin-top:14px;">
+      <span>🇰🇷</span>
+      <span><b>한국 시장에 상장된 ETF</b>로 구성한 포트폴리오예요. <b>연금저축·IRP·ISA 같은 절세 계좌</b>에서 투자할 수 있고, 환전 없이 원화로 거래해 세금·환율 신경 쓸 일이 적습니다. 소액으로 시작하기 좋아요.</span>
+    </div>
+    {% elif rid == 'us' %}
+    <div class="ex-note" style="margin-top:14px;">
+      <span>🇺🇸</span>
+      <span><b>미국 시장에 상장된 해외 ETF</b>로 구성한 포트폴리오예요. <b>종류가 다양하고 규모가 크며 거래가 활발</b>해 선택의 폭이 넓고 비용이 낮습니다. (환전·환율 변동·해외주식 양도소득세는 함께 고려하세요.)</span>
+    </div>
+    {% endif %}
     {% for cat, clabel, items in groups %}
     <div class="ex-sec-title">{{ clabel }}</div>
     <div class="ex-grid">

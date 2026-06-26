@@ -70,4 +70,9 @@ celery.conf.beat_schedule = {
         'task': 'tasks.purge_price_spikes',
         'schedule': crontab(hour=10, minute=0),
     },
+    # 대가·예시 포폴 종목 전체기간 워밍업 — 매일 11:00 UTC(스파이크 클린업 후). 플래그면 no-op.
+    'warmup-history': {
+        'task': 'tasks.warmup_history',
+        'schedule': crontab(hour=11, minute=0),
+    },
 }

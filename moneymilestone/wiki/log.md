@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-26] FIX | 개별주 짧은 이력(버핏 2021) — 전체기간 백필 + 플래그 + 부분커버리지 (오너 Q1)
+
+버핏 포폴이 겹쳐보기서 2021부터 시작(GOOGL 2004 상장인데). 원인=**버그**(캡 아님): 개별주는 합성 백필 대상 아님 + 온디맨드 5년 페치만 + `_portfolio_index_series`가 price_daily raw 직독(get_price 과거보충 우회) → 공통일 교집합이 5년에 갇힘. (get_price 직접 호출 시 GOOGL 2004-08~ 5495행 정상 페치 확인.)
+- **전체기간 플래그**: `price_loader` 신규 `ticker_meta`(code PK, hist_complete·hist_earliest·checked_at·sanity_ok예약) + `is_history_complete`/`ensure_full_history`(플래그 없으면 1970부터 1회 깊은 get_price 적재 후 플래그, 있으면 즉시 no-op). 공유 DB라 첫 사용자가 채우면 전체 공유.
+- **지연 백필**: `_portfolio_index_series`가 종목별 ensure_full_history 호출(플래그면 스킵). 새로 받으면 종목캐시 무효화.
+- **부분 커버리지 빌드**: 교집합→**가용 종목 일간수익률 체인**(pandas). 종목별 시작 달라도 최이른일까지 연장, 일부만 있는 날(또는 합성)=syn=1(점선), 빠진 비중은 남은 종목에 비례 재분배. (프런트 중앙값 규격화와 결합 → 늦은 포트는 피어 median 합류.)
+- **워밍업**: `tasks.warmup_history`(대가+예시 종목 사전 ensure) + beat 매일 11:00 UTC → 큐레이션 포폴 첫 사용자도 즉시.
+- 검증: 플래그 set/재호출 no-op·버핏류 포폴 **1970→2026 확장(was 2021)·점선950/실선831**·결과캐시 warm 0ms·colt 148ms. ⚠️ 첫 미플래그 종목 로드는 페치로 수초(워밍업/플래그로 이후 즉시). ⚠️ 로컬 HTTP 4s=Redis다운+limiter 타임아웃 아티팩트(prod 무관).
+- 변경=`modules/price_loader.py`·`app.py`·`tasks.py`·`celery_app.py`.
+
 ## [2026-06-26] PERF | 추세 겹쳐보기 속도+로딩바 (오너 Q2)
 
 5포폴 전체기간 시 렉+로딩 김. 측정: 백엔드 ~640ms·총 55,612 포인트(과다)가 주범(전송·파싱·Chart 렌더·줌 redraw).

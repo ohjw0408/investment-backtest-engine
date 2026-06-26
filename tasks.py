@@ -377,6 +377,54 @@ def refresh_index_ohlc():
 
 
 @celery.task
+def warmup_history():
+    """대가·예시 포폴 구성종목의 전체기간을 미리 백필(플래그) — 첫 사용자 콜드 부담 제거.
+
+    추세 겹쳐보기는 큐레이션된 대가/예시 포폴을 주로 띄우므로, 그 종목들은 미리 풀히스토리
+    적재해두면 누가 처음 봐도 즉시. 이미 hist_complete 플래그면 no-op라 반복 실행 안전.
+    """
+    import json as _json
+    import os as _os
+    import time as _t
+    try:
+        from modules.price_loader import PriceLoader
+        from modules.gurus import store as guru_store
+        pl = PriceLoader()
+        codes = set()
+        # 예시 포폴
+        try:
+            p = _os.path.join(_os.path.dirname(__file__), "data", "meta", "portfolio_examples.json")
+            for s in _json.load(open(p, encoding="utf-8")).get("strategies", []):
+                for t in s.get("tickers", []):
+                    if t.get("code"):
+                        codes.add(str(t["code"]).upper())
+        except Exception as e:
+            print(f"[warmup_history] examples 로드 실패: {e}")
+        # 대가 보유
+        try:
+            for g in guru_store.list_gurus():
+                d = guru_store.get_guru(g["slug"], limit=30)
+                for h in (d or {}).get("holdings", []):
+                    if h.get("ticker"):
+                        codes.add(str(h["ticker"]).upper())
+        except Exception as e:
+            print(f"[warmup_history] gurus 로드 실패: {e}")
+        done = 0
+        for c in sorted(codes):
+            try:
+                if pl.ensure_full_history(c):
+                    done += 1
+                    _t.sleep(0.4)   # yfinance rate-limit 회피(이미 플래그면 sleep 안 함)
+            except Exception:
+                pass
+        print(f"[warmup_history] {len(codes)}종목 중 {done}개 신규 백필")
+        return {"status": "ok", "total": len(codes), "fetched": done}
+    except Exception as e:
+        print(f"[warmup_history] 오류: {e}")
+        raise
+
+
+@celery.task
 def purge_price_spikes():
     """매일 실행(Celery Beat) — price_daily의 고립 스파이크(yfinance 오틱) 행을 영구 제거.
 

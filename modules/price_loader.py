@@ -292,7 +292,63 @@ class PriceLoader:
                 PRIMARY KEY (code, datetime)
             )
         """)
+        # 종목 메타 — 전체기간 백필 완료 플래그(매 로드마다 먼과거 재페치 방지).
+        # hist_complete=1 = 과거를 가능한 한 다 받음(영구). sanity_ok = 예약(스파이크 검증, 추후).
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS ticker_meta (
+                code TEXT PRIMARY KEY,
+                hist_complete INTEGER DEFAULT 0,
+                hist_earliest TEXT,
+                checked_at TEXT,
+                sanity_ok INTEGER,
+                sanity_at TEXT
+            )
+        """)
         self.conn.commit()
+
+    # -------------------------------------------------
+    # 전체기간 백필 플래그 + 보장
+    # -------------------------------------------------
+
+    HISTORY_FAR_START = "1970-01-01"   # 깊은 백필 시작(대부분 종목 상장 이전)
+
+    def is_history_complete(self, code: str) -> bool:
+        code = str(code).split(".")[0].upper()
+        row = self.conn.execute(
+            "SELECT hist_complete FROM ticker_meta WHERE code=?", (code,)
+        ).fetchone()
+        return bool(row and row[0])
+
+    def _mark_history_complete(self, code: str):
+        code = str(code).split(".")[0].upper()
+        earliest = self.conn.execute(
+            "SELECT MIN(date) FROM price_daily WHERE code=?", (code,)
+        ).fetchone()[0]
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.conn.execute(
+            "INSERT INTO ticker_meta (code, hist_complete, hist_earliest, checked_at) VALUES (?,1,?,?) "
+            "ON CONFLICT(code) DO UPDATE SET hist_complete=1, hist_earliest=excluded.hist_earliest, checked_at=excluded.checked_at",
+            (code, earliest, now)
+        )
+        self.conn.commit()
+
+    def ensure_full_history(self, code: str) -> bool:
+        """종목 전체기간을 price_daily에 보장. 이미 플래그면 즉시 스킵(no-op).
+           아니면 먼과거부터 1회 깊은 페치 → 공유 DB 적재 → 플래그. 반환=이번에 페치했는지."""
+        code = str(code).split(".")[0].upper()
+        if not code or code == "KRX_GOLD":
+            return False
+        if self.is_history_complete(code):
+            return False
+        end = datetime.now().strftime("%Y-%m-%d")
+        try:
+            # get_price가 start<db_min 갭을 yfinance서 보충 적재(raw close 저장, FX 미적용=조회만)
+            self.get_price(code, self.HISTORY_FAR_START, end, apply_fx=False)
+        except Exception:
+            pass
+        # 더 과거가 없어도(신생주) 시도는 끝 → 완료로 마킹(매 로드 재시도 방지)
+        self._mark_history_complete(code)
+        return True
 
     # -------------------------------------------------
     # 자산 판별

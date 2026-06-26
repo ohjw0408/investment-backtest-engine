@@ -3034,6 +3034,15 @@ def _portfolio_index_series(tickers, years=None, conn=None, downsample=1800):
     if cached is not None:
         return cached
 
+    # 전체기간 지연 백필 — 플래그 안 꽂힌 종목만 먼과거 1회 페치(공유 DB 적재). 플래그면 즉시 스킵.
+    for code, _w in valid:
+        try:
+            if portfolio_engine.loader.ensure_full_history(code):
+                for k in [k for k in _TS_TKCACHE if k[0] == code]:
+                    _TS_TKCACHE.pop(k, None)
+        except Exception:
+            pass
+
     own = conn is None
     if own:
         conn = _price_daily_conn()
@@ -3048,25 +3057,25 @@ def _portfolio_index_series(tickers, years=None, conn=None, downsample=1800):
             conn.close()
     if not series:
         return []
-    common = None
-    for _, m, _syn in series.values():
-        ks = set(m.keys())
-        common = ks if common is None else (common & ks)
-    dates = sorted(common or [])
-    if len(dates) < 2:
+
+    # 부분 커버리지 백필 — 종목별 시작이 달라도 가용 종목만으로 일간수익률 체인.
+    # 일부만 있는 날(또는 합성 섞인 날)은 syn=1(프런트 점선). 빠진 종목 비중은 남은 종목에 비례 재분배.
+    import pandas as _pd
+    closes = _pd.DataFrame({c: _pd.Series(m) for c, (w, m, syn) in series.items()}).sort_index()
+    if len(closes.index) < 2:
         return []
-    t0 = dates[0]
-    out = []
-    for dt in dates:
-        val = 0.0
-        syn_any = 0
-        for _, (w, m, syn) in series.items():
-            base = m.get(t0)
-            if base:
-                val += w * (m[dt] / base) * 100.0
-            if syn.get(dt):
-                syn_any = 1
-        out.append([dt, round(val, 4), syn_any])
+    weights = _pd.Series({c: w for c, (w, m, syn) in series.items()}, dtype=float)
+    rets = closes.pct_change()
+    wrow = rets.notna().mul(weights, axis=1)
+    port_ret = rets.mul(weights, axis=1).sum(axis=1).div(wrow.sum(axis=1).replace(0.0, _pd.NA)).fillna(0.0)
+    idx = (1.0 + port_ret).cumprod() * 100.0
+    syn_df = _pd.DataFrame({c: _pd.Series(syn) for c, (w, m, syn) in series.items()}).reindex(closes.index)
+    present = closes.notna()
+    any_syn = (syn_df.fillna(0).astype(bool) & present).any(axis=1)
+    partial = present.sum(axis=1) < len(series)
+    synflag = (any_syn | partial)
+    out = [[d, round(float(v), 4), int(bool(s))]
+           for d, v, s in zip(closes.index, idx.values, synflag.values)]
     out = _downsample_points(out, downsample)
     _TS_RESCACHE[sig] = out
     return out

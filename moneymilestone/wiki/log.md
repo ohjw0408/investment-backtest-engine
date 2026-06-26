@@ -4046,3 +4046,12 @@ P2 첫 배포 후 오너 라이브 피드백 6건(backtest.html + backtest_logic
 - 검증: Playwright(QQQ) — underwater 제거·체크박스4(기본3/5/10)·박스 y[-82,+138]·드래그줌(x 0-652→209-414)+초기화·1년토글·실질·라이트/다크·**콘솔0**. 미배포→push 대기.
 
 _작성: Claude_
+
+## 2026-06-26 — 심화분석 P2 오차막대 스케일 충돌 → 단기/장기 2패널
+
+오너: 1년(-64~+139%) vs 장기(0~26%) 단일 y축 공존 불가 — 1년 맞추면 장기 뭉개지고, 장기 맞추면 1년 튐. 오너 선택=**2패널 분리**.
+- `renderBoxChart` → `_btDrawBox(canvasId, key, horizons)` 헬퍼 2회 호출: 단기(≤3년: 1·3)·장기(≥5년: 5·10·15·20). 각 패널 y축 독립 자동(단기 -100~150, 장기 -40~80). `.bt-grid-2` 2열(모바일 1열).
+- y축 라벨 정수화(`suggestedMin/Max` + `Math.round`·maxTicksLimit) — 강제 min/max의 소수 tick(137.79%) 제거.
+- 검증: Playwright(QQQ) — short labels[1·3년]·long[5·10·15·20년]·독립축·라이트/다크·콘솔0. 미배포→push 대기.
+
+_작성: Claude_

@@ -655,9 +655,18 @@
           <div class="bt-card-title" style="margin-top:22px;font-size:0.84rem;"><span class="bt-ico">{{ nicon('chart') }}</span> 연 수익률 분포 (오차막대)</div>
           <div style="font-size:0.78rem;color:var(--ds-muted);line-height:1.6;margin-bottom:10px;">
             막대=흔한 범위(가운데 50%), 가는 선=최악~최고, 가로선=중앙값. <strong>기간이 길수록 막대가 좁아지고 0(원금) 위로 올라갑니다.</strong>
-            퍼짐이 큰 건 “정답 없음, 성향” — 위로 뚫린 매력 vs 예측 가능한 안정, 취향입니다.
+            단기는 변동이 커 <strong>단기/장기를 따로</strong> 그렸어요(축이 다름). 퍼짐이 큰 건 “정답 없음, 성향”.
           </div>
-          <div class="bt-chart-wrap"><canvas id="btBoxChart"></canvas></div>
+          <div class="bt-grid-2">
+            <div>
+              <div style="font-size:0.76rem;font-weight:700;color:var(--ds-body);margin-bottom:6px;text-align:center;">단기 (변동 큼)</div>
+              <div class="bt-chart-wrap annual"><canvas id="btBoxChartShort"></canvas></div>
+            </div>
+            <div>
+              <div style="font-size:0.76rem;font-weight:700;color:var(--ds-body);margin-bottom:6px;text-align:center;">장기 (안정)</div>
+              <div class="bt-chart-wrap annual"><canvas id="btBoxChartLong"></canvas></div>
+            </div>
+          </div>
         </div>
 
         <!-- ③ 롤링 CAGR 시계열 -->
@@ -1662,7 +1671,7 @@ function _btEstColor() { return _btCss('--gold-deep', '#b8860b'); }
 
 function renderRolling(roll) {
   const sec = document.getElementById('btRollingSection');
-  ['btBox', 'btRollCagr'].forEach(k => {
+  ['btBoxShort', 'btBoxLong', 'btRollCagr'].forEach(k => {
     if (btCharts[k]) { btCharts[k].destroy(); btCharts[k] = null; }
   });
   _btRoll = roll;
@@ -1756,29 +1765,32 @@ const _btBoxPlugin = {
 };
 
 function renderBoxChart() {
-  if (btCharts.btBox) { btCharts.btBox.destroy(); btCharts.btBox = null; }
-  const ht = _btRoll.horizon_table, hs = _btRoll.horizons;
-  const est = _btEstColor();
+  // 스케일 충돌 회피 — 단기(≤3년)/장기(≥5년) 2패널 분리, 각자 y축 자동.
+  const hs = _btRoll.horizons;
+  _btDrawBox('btBoxChartShort', 'btBoxShort', hs.filter(h => h <= 3));
+  _btDrawBox('btBoxChartLong', 'btBoxLong', hs.filter(h => h >= 5));
+}
+
+function _btDrawBox(canvasId, chartKey, horizons) {
+  if (btCharts[chartKey]) { btCharts[chartKey].destroy(); btCharts[chartKey] = null; }
+  const ht = _btRoll.horizon_table, est = _btEstColor();
   const labels = [], boxData = [], meta = [];
   let gMin = Infinity, gMax = -Infinity;
-  hs.forEach(h => {
+  horizons.forEach(h => {
     const r = ht[String(h)] || {};
     if (!r.n) { labels.push(h + '년'); boxData.push(null); meta.push(null); return; }
     const p = r.pcts || {};
     const lo = btDeflate(p['0']) * 100, hi = btDeflate(p['100']) * 100;
     const b25 = btDeflate(p['25']) * 100, b75 = btDeflate(p['75']) * 100;
-    const isEst = _btSynLevel(r.syn_frac);
     labels.push(h + '년');
-    boxData.push([b25, b75]);                       // 박스(플로팅 바)
-    meta.push({ lo, hi, med: btDeflate(r.median) * 100, est: isEst });
+    boxData.push([b25, b75]);
+    meta.push({ lo, hi, med: btDeflate(r.median) * 100, est: _btSynLevel(r.syn_frac) });
     gMin = Math.min(gMin, lo); gMax = Math.max(gMax, hi);
   });
-  // y축을 실제 최저~최고(수염)에 맞춤 + 0 항상 포함(음수도 넉넉히)
   if (!isFinite(gMin)) { gMin = -10; gMax = 10; }
   const pad = Math.max((gMax - gMin) * 0.08, 2);
   const yMin = Math.min(0, gMin) - pad, yMax = gMax + pad;
-  const ctx = document.getElementById('btBoxChart').getContext('2d');
-  const chart = new Chart(ctx, {
+  const chart = new Chart(document.getElementById(canvasId).getContext('2d'), {
     type: 'bar',
     data: { labels, datasets: [{
       data: boxData,
@@ -1799,8 +1811,8 @@ function renderBoxChart() {
       },
       scales: {
         x: { ticks: { font: { size: 11 }, color: _btBody() }, grid: { display: false } },
-        y: { min: yMin, max: yMax,
-             ticks: { font: { size: 10 }, color: _btBody(), callback: v => v + '%' },
+        y: { suggestedMin: yMin, suggestedMax: yMax,
+             ticks: { font: { size: 10 }, color: _btBody(), maxTicksLimit: 8, callback: v => Math.round(v) + '%' },
              grid: { color: ctxLine => ctxLine.tick.value === 0 ? _btRgba(_btMuted, 0.9) : MM_CHART_GRID,
                      lineWidth: ctxLine => ctxLine.tick.value === 0 ? 1.5 : 1 },
              title: { display: true, text: '연 수익률', color: _btBody(), font: { size: 10 } } }
@@ -1810,7 +1822,7 @@ function renderBoxChart() {
   });
   chart._btBoxMeta = meta;
   chart.update();
-  btCharts.btBox = chart;
+  btCharts[chartKey] = chart;
 }
 
 function _btBody() { return _btCss('--ds-body', '#3a3f47'); }

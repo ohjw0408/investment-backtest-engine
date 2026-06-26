@@ -3082,7 +3082,10 @@ def _portfolio_index_series(tickers, years=None, conn=None, downsample=1800):
     if len(closes.index) < 2:
         return []
     weights = _pd.Series({c: w for c, (w, m, syn) in series.items()}, dtype=float)
-    rets = closes.pct_change()
+    # fill_method=None 필수: 기본값 'pad'는 종목 데이터 구멍(예: AXP 2013~2020 결손)을
+    # forward-fill 후 pct_change → 구멍 닫히는 날 +150~250% 가짜수익 → 포폴 지수 점프(2021-06-25 버그).
+    # None이면 구멍 종료일은 NaN(그날 제외) → 신규 진입 종목과 동일 처리, 점프 없음.
+    rets = closes.pct_change(fill_method=None)
     wrow = rets.notna().mul(weights, axis=1)
     port_ret = rets.mul(weights, axis=1).sum(axis=1).div(wrow.sum(axis=1).replace(0.0, _pd.NA)).fillna(0.0)
     idx = (1.0 + port_ret).cumprod() * 100.0

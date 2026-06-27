@@ -32,6 +32,7 @@ def ticker_tr_series(conn, code, start='1900-01-01'):
             (c, start)).fetchall()
         if rows:
             dfx = _drop_isolated_price_spikes(pd.DataFrame(rows, columns=['date', 'close', 'volume']))
+            dfx = _drop_corrupt_generated_tail(dfx)
             act = conn.execute(
                 "SELECT date, dividend FROM corporate_actions WHERE code=? AND date>=?",
                 (c, start)).fetchall()
@@ -53,6 +54,35 @@ def ticker_tr_series(conn, code, start='1900-01-01'):
     except Exception:
         pass
     return m, syn
+
+
+def _drop_corrupt_generated_tail(df):
+    """Drop legacy generated rows with impossible near-zero tails.
+
+    Some old volume=0 ETF backfills contain repeated near-zero prices inside an otherwise
+    normal bond ETF path. They are not isolated one-day spikes, so the regular spike filter
+    cannot catch them. Only apply this when the generated distribution has an extreme lower
+    tail; normal long equity histories such as SPY/QQQ keep their early low prices.
+    """
+    import pandas as pd
+    if df is None or df.empty or "volume" not in df.columns or "close" not in df.columns:
+        return df
+    out = df.copy()
+    close = pd.to_numeric(out["close"], errors="coerce")
+    gen = out["volume"].isna() | (pd.to_numeric(out["volume"], errors="coerce") == 0)
+    gen_close = close[gen & (close > 0)]
+    if len(gen_close) < 100:
+        return df
+    med = float(gen_close.median())
+    if med <= 0:
+        return df
+    p01 = float(gen_close.quantile(0.01)) / med
+    p10 = float(gen_close.quantile(0.10)) / med
+    if p01 < 0.02 and p10 < 0.05:
+        bad = gen & (close > 0) & (close < med * 0.10)
+        if bool(bad.any()):
+            return out.loc[~bad].copy()
+    return df
 
 
 def build_portfolio_tr_index(tickers, conn=None, start='1900-01-01'):

@@ -22,6 +22,14 @@ DEFAULT_BENCHMARKS = [
 
 MIN_YEARS_WARN = 3.0
 _LOAD_START = "2000-01-01"
+_DEEP_SYNTH_DAILY_JUMP_LIMIT = 0.45
+# 종목별 합성손상 게이트: 합성 구간 일변동성이 실데이터 대비 이 배수를 넘거나(SHY 20×·IEF 2.9×)
+# 합성 단일일 변동 최대치가 한도를 넘으면 그 종목 합성 전체를 버리고 실데이터만 쓴다(원래 안전동작).
+# 정상 합성(SPY/QQQ/SCHD/GLD/TLT)은 비율 ~1.0~1.3·max ≤0.21 이라 보존된다.
+_DEEP_SYNTH_VOL_RATIO = 2.5
+_DEEP_SYNTH_MAXABS = 0.30
+_DIV_GROWTH_LOW_BASE_FRACTION = 0.30
+_DIV_GROWTH_SPIKE_LIMIT = 1.0
 
 
 def _load_series(loader, code, data_end):
@@ -31,6 +39,7 @@ def _load_series(loader, code, data_end):
         if df is None or len(df) == 0:
             return None
         df = df.copy()
+        df = _drop_corrupt_generated_tail(df)
         df["date"] = pd.to_datetime(df["date"])
         df = df.set_index("date").sort_index()
         close = df["close"].astype(float)
@@ -42,6 +51,29 @@ def _load_series(loader, code, data_end):
         return close, div
     except Exception:
         return None
+
+
+def _drop_corrupt_generated_tail(df):
+    """Drop legacy generated near-zero tails from risk-return inputs."""
+    if df is None or df.empty or "volume" not in df.columns or "close" not in df.columns:
+        return df
+    out = df.copy()
+    close = pd.to_numeric(out["close"], errors="coerce")
+    vol = pd.to_numeric(out["volume"], errors="coerce")
+    gen = out["volume"].isna() | (vol == 0)
+    gen_close = close[gen & (close > 0)]
+    if len(gen_close) < 100:
+        return df
+    med = float(gen_close.median())
+    if med <= 0:
+        return df
+    p01 = float(gen_close.quantile(0.01)) / med
+    p10 = float(gen_close.quantile(0.10)) / med
+    if p01 < 0.02 and p10 < 0.05:
+        bad = gen & (close > 0) & (close < med * 0.10)
+        if bool(bad.any()):
+            return out.loc[~bad].copy()
+    return df
 
 
 def _total_return_matrix(series_by_code):
@@ -116,6 +148,55 @@ def _metrics_full(returns: pd.Series, spy_returns=None, div_yield=None):
     }
 
 
+def _clean_deep_points(pts):
+    """비교 심화용 TR 포인트 정리.
+
+    합성/백필 구간(volume=0) 일부는 단일일 점프가 아니라 구간 전체가 손상돼 있다
+    (예: SHY 합성이 실데이터 대비 변동성 20×·하루 +122%). 이런 종목은 단일일 점프 제거로는
+    못 살리므로, 합성 구간 변동성이 실데이터 대비 비정상이면 그 종목 합성 전체를 버리고
+    실데이터만 쓴다(원래 비교 심화의 안전동작). 정상 합성(SPY/QQQ 등)은 그대로 보존하고,
+    남는 병적 단일일 점프만 추가로 반복 제거한다.
+    """
+    if not pts or len(pts) < 3:
+        return pts or []
+    df = pd.DataFrame(
+        [(p[0], p[1], int(p[2]) if len(p) > 2 else 0) for p in pts],
+        columns=["date", "val", "syn"],
+    )
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["val"] = pd.to_numeric(df["val"], errors="coerce")
+    df = df.dropna(subset=["date", "val"]).sort_values("date")
+    df = df[np.isfinite(df["val"]) & (df["val"] > 0)]
+    if len(df) < 3:
+        return []
+
+    # 합성손상 게이트: 합성 일변동성이 실데이터 대비 비정상이면 합성 전체 제거 → 실데이터 폴백
+    r_all = df["val"].pct_change(fill_method=None)
+    syn_b = df["syn"].astype(bool)
+    real_r = r_all[~syn_b].dropna()
+    syn_r = r_all[syn_b].dropna()
+    if len(real_r) > 30 and len(syn_r) > 30:
+        rs, ss = float(real_r.std()), float(syn_r.std())
+        if rs > 0 and (ss > _DEEP_SYNTH_VOL_RATIO * rs
+                       or float(syn_r.abs().max()) > _DEEP_SYNTH_MAXABS):
+            df = df.loc[~syn_b].copy()
+            if len(df) < 3:
+                return []
+
+    for _ in range(6):
+        r = df["val"].pct_change(fill_method=None)
+        syn = df["syn"].astype(bool)
+        bad = (r.abs() > _DEEP_SYNTH_DAILY_JUMP_LIMIT) & (syn | syn.shift(1).fillna(False))
+        if not bool(bad.any()):
+            break
+        df = df.loc[~bad].copy()
+        if len(df) < 3:
+            break
+
+    return [[d.strftime("%Y-%m-%d"), round(float(v), 4), int(bool(s))]
+            for d, v, s in zip(df["date"], df["val"], df["syn"])]
+
+
 def _annual_from_points(pts):
     """TR 인덱스([[date,val,(syn)]]) → 연도별 {year, ret, vol, mdd}.
        각 항목 자기 가용기간 기준(공통 겹침기간 비종속). 비현실 값(|연수익|>300%)은
@@ -123,6 +204,7 @@ def _annual_from_points(pts):
     if not pts or len(pts) < 2:
         return []
     s = pd.Series({pd.Timestamp(d): v for d, v, *_ in pts}).sort_index()
+    syn = pd.Series({pd.Timestamp(p[0]): (int(p[2]) if len(p) > 2 else 0) for p in pts}).reindex(s.index).fillna(0)
     r = s.pct_change().dropna()
     r = r[np.isfinite(r)]
     if not len(r):
@@ -138,7 +220,14 @@ def _annual_from_points(pts):
         vol = float(g.std() * np.sqrt(252.0)) if len(g) > 1 else 0.0
         cum = (1.0 + g).cumprod()
         mdd = float((cum / cum.cummax() - 1.0).min())
-        row = {"year": int(yr), "ret": round(ret, 6), "vol": round(vol, 6), "mdd": round(mdd, 6)}
+        syn_frac = float(syn.reindex(g.index).fillna(0).mean()) if len(g) else 0.0
+        row = {
+            "year": int(yr),
+            "ret": round(ret, 6),
+            "vol": round(vol, 6),
+            "mdd": round(mdd, 6),
+            "syn_frac": round(syn_frac, 4),
+        }
         if yr == last_year and len(g) < 230:   # 진행 중인 올해(거래일 부족) = 부분연도
             row["partial"] = True
         out.append(row)
@@ -147,25 +236,22 @@ def _annual_from_points(pts):
 
 def _item_deep(tickers):
     """항목(포폴/벤치) TR 인덱스 빌드 → (annual, rolling_return).
-       ⚠️ 합성 백필(vol=0)이 손상된 종목(SHY/IEF 등 2008 0.00~190 진동)이 있어
-       비교 심화는 **실데이터(syn=0)만** 사용(공통기간 비종속·합성 글리치 차단).
-       (분석탭 롤링은 결정#1로 합성 포함+회색 — 비교는 N개 겹침이라 글리치에 더 취약해 실데이터.)"""
+       추세 겹쳐보기와 같은 전체 TR 인덱스를 쓰되, 합성 구간 병적 점프만 방어한다."""
     try:
         from modules.tr_index import build_portfolio_tr_index
         from modules import rolling
         pts = build_portfolio_tr_index(tickers)
     except Exception:
         return [], None
-    real = [p for p in pts if not (len(p) > 2 and p[2])]   # syn=0만
-    if len(real) < 2:
-        real = pts                                          # 실데이터 거의 없으면 전체 fallback
-    annual = _annual_from_points(real)
+    pts = _clean_deep_points(pts)
+    annual = _annual_from_points(pts)
     rr = None
-    if len(real) >= 13:
+    if len(pts) >= 13:
+        syn_overall = sum(1 for p in pts if len(p) > 2 and p[2]) / len(pts)
         rr = {
             "horizons": rolling.DEFAULT_HORIZONS,
-            "horizon_table": {str(h): v for h, v in rolling.horizon_table(real).items()},
-            "syn_overall": 0.0,
+            "horizon_table": {str(h): v for h, v in rolling.horizon_table(pts).items()},
+            "syn_overall": round(float(syn_overall), 4),
         }
     return annual, rr
 
@@ -200,21 +286,45 @@ def _annual_dividends(weights, series):
             px0 = float(close.iloc[0]) if len(close) else 0.0
             if px0 > 0:
                 damt[y] = damt.get(y, 0.0) + w * (dsum / px0)
+    latest = None
+    for code in weights:
+        s = series.get(code)
+        if s and len(s[0]):
+            dt = s[0].index[-1]
+            latest = dt if latest is None or dt > latest else latest
+
     out = []
     for y in years:
         if y in dyield or y in damt:
-            out.append({"year": int(y), "dyield": round(dyield.get(y, 0.0), 6), "dindex": round(damt.get(y, 0.0), 6)})
+            row = {"year": int(y), "dyield": round(dyield.get(y, 0.0), 6), "dindex": round(damt.get(y, 0.0), 6)}
+            if latest is not None and y == latest.year and latest.month < 12:
+                row["partial"] = True
+            out.append(row)
     return out
 
 
 def _dividend_growth(annual_div):
-    """연배당액(dindex) → {cagr, yoy:[{year, growth}]}. 마지막 해는 미수령 가능성 있어 그대로."""
-    pts = [(d["year"], d["dindex"]) for d in (annual_div or []) if d.get("dindex", 0) > 0]
+    """연배당액(dindex) → {cagr, yoy:[{year, growth}]}.
+
+    아주 작은 첫 배당/부분연도 때문에 +2000% 같은 저베이스 스파이크가 나오면 차트 축 전체를
+    망가뜨리므로 성장률 표본에서 제외한다. 배당 자체 표시는 유지하고, 성장률만 안정 구간 기준.
+    """
+    raw = [(d["year"], d["dindex"]) for d in (annual_div or [])
+           if d.get("dindex", 0) > 0 and not d.get("partial")]
+    if not raw:
+        return {"cagr": None, "yoy": []}
+    vals = np.array([v for _, v in raw], dtype=float)
+    med = float(np.median(vals[vals > 0])) if np.any(vals > 0) else 0.0
+    min_base = med * _DIV_GROWTH_LOW_BASE_FRACTION if med > 0 else 0.0
+    pts = [(y, v) for y, v in raw if v >= min_base]
     yoy = []
     for i in range(1, len(pts)):
-        prev = pts[i - 1][1]
-        if prev > 0:
-            yoy.append({"year": pts[i][0], "growth": round(pts[i][1] / prev - 1.0, 4)})
+        y0, prev = pts[i - 1]
+        y1, cur = pts[i]
+        if prev > 0 and y1 - y0 == 1:
+            growth = cur / prev - 1.0
+            if abs(growth) <= _DIV_GROWTH_SPIKE_LIMIT:
+                yoy.append({"year": y1, "growth": round(growth, 4)})
     cagr = None
     if len(pts) >= 2:
         y0, v0 = pts[0]; y1, v1 = pts[-1]

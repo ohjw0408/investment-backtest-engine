@@ -2991,6 +2991,11 @@ def _ticker_series(conn, code, start):
             (c, start)).fetchall()
         if rows:
             dfx = _drop_isolated_price_spikes(_pd.DataFrame(rows, columns=['date', 'close', 'volume']))
+            try:
+                from modules.tr_index import _drop_corrupt_generated_tail
+                dfx = _drop_corrupt_generated_tail(dfx)
+            except Exception:
+                pass
             # 총수익 인덱스(배당 재투자) — 결정#6. 배당주(SCHD 등) 저평가 방지.
             # ⚠️ price_daily close·dividend는 이미 분할조정(연속)이라 split 곱하면 가짜 점프
             #    (예: SCHD 2024-10-11 3:1) → split 적용 안 함. 배당만 재투자.

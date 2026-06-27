@@ -116,13 +116,14 @@
 .rr-acc.open .rr-acc-cy { transform: rotate(180deg); }
 .rr-acc-sub { font-weight: 400; color: var(--text-muted); font-size: 0.76rem; }
 .rr-acc-wrap { max-height: 0; overflow: hidden; transition: max-height .35s cubic-bezier(.4,0,.2,1); }
-.rr-acc.open .rr-acc-wrap { max-height: 1400px; }
+.rr-acc.open .rr-acc-wrap { max-height: 1800px; }
 .rr-acc-body { padding: 4px 16px 18px; }
 .rr-acc-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px; }
 .rr-acc-desc b { color: var(--text); }
 .rr-acc-2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
 @media (max-width: 760px) { .rr-acc-2 { grid-template-columns: 1fr; } }
-.rr-acc-chart { position: relative; height: 240px; }
+.rr-acc-chart { position: relative; height: 380px; }
+.rr-lp-panel { margin-top: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--bg); }
 .rr-lp-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
 .rr-lp-table th, .rr-lp-table td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .rr-lp-table th:first-child, .rr-lp-table td:first-child { text-align: left; }
@@ -131,8 +132,11 @@
 .rr-acc-tb { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
 .rr-tb-btn { font-size: 0.74rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; cursor: pointer;
   border: 1px solid var(--border); background: var(--card); color: var(--text-muted); }
+.rr-tb-btn.on { border-color: var(--blue); color: var(--blue); background: rgba(25,118,210,0.08); }
 .rr-tb-btn:hover { background: var(--bg); color: var(--text); }
 .rr-tb-hint { font-size: 0.7rem; color: var(--text-muted); }
+.rr-acc-tb input[type=date] { font-family: inherit; font-size: 0.74rem; padding: 4px 7px; border: 1px solid var(--border); border-radius: 7px; background: var(--input-bg); color: var(--text); }
+@media (max-width: 768px) { .rr-acc-chart { height: 320px; } .rr-lp-panel { padding: 10px; } }
 </style>
 {% endblock %}
 
@@ -412,6 +416,7 @@ async function rrCompare(){
 // ── 심화 비교 아코디언 (P3) ──
 let rrAutoScroll = false;
 let rrAccCharts = {};
+let rrAccRanges = {};
 const RR_ACC = [
   { key:'ret',  title:'수익률',        sub:'연도별 수익률 + 기간별 손실확률',
     desc:'각 해의 수익률을 겹쳐 봅니다. 오른쪽 표는 “그 기간 묻어뒀다면 손해 볼 확률” — <b>기간이 길수록 0에 가까워지는 포트가 안정적</b>입니다.',
@@ -444,8 +449,8 @@ function rrRenderAccordions(data){
         <div class="rr-acc-desc">${m.desc}</div>
         <div class="rr-acc-tb" id="rrTB_${m.key}"></div>
         ${m.roll
-          ? `<div class="rr-acc-2"><div class="rr-acc-chart"><canvas id="rrAcc_${m.key}"></canvas></div>`
-            + `<div id="rrLP_${m.key}"></div></div>`
+          ? `<div class="rr-acc-chart"><canvas id="rrAcc_${m.key}"></canvas></div>`
+            + `<div id="rrLP_${m.key}" class="rr-lp-panel"></div>`
           : `<div class="rr-acc-chart"><canvas id="rrAcc_${m.key}"></canvas></div>`}
       </div></div>
     </div>`).join('');
@@ -467,38 +472,91 @@ function rrAccDraw(key){
   if (!cv) return;
   if (m.divg) { rrAccCharts[key] = rrDivGrowthChart(cv, items); }
   else if (m.div) { rrAccCharts[key] = rrYearLineChart(cv, items, it=>(it.annual_div||[]).map(a=>[a.year, a.dyield])); }
-  else { rrAccCharts[key] = rrYearLineChart(cv, items, it=>(it.annual||[]).map(a=>[a.year, m.get(a)])); }
+  else { rrAccCharts[key] = rrYearLineChart(cv, items, it=>(it.annual||[]).map(a=>[a.year, m.get(a), (a.syn_frac||0) > 0.15])); }
   if (m.roll) rrRenderLossProb(key, items);
   rrAccToolbar(key);
+  rrAccApplyRange(key);
 }
 
-// 기간 선택 버튼 + 드래그 줌 안내 툴바
-const RR_PRESETS = [['전체',null,null],['닷컴',2000,2002],['금융위기',2007,2009],['코로나',2020,2021],["'22 긴축",2022,2023]];
+// 추세 겹쳐보기와 같은 기간 컨트롤: 기본 5년 + 날짜 범위 + 사건 프리셋
+const RR_EVENTS = [['닷컴','2000-01-01','2002-12-31'],['금융위기','2007-06-01','2009-06-30'],['코로나','2020-01-01','2020-12-31'],["'22 긴축",'2022-01-01','2022-12-31']];
+function rrAccBounds(key){
+  const yrs = rrAccCharts[key]?._years || [];
+  if (!yrs.length) return {first:null,last:null};
+  return {first:yrs[0], last:yrs[yrs.length-1]};
+}
+function rrAccDefaultRange(key){
+  const {first,last}=rrAccBounds(key);
+  if (last == null) return {activeY:5,start:'',end:''};
+  const sy=Math.max(first, last-4);
+  return {activeY:5,start:`${sy}-01-01`,end:`${last}-12-31`};
+}
+function rrAccEnsureRange(key){
+  if (!rrAccRanges[key]) rrAccRanges[key] = rrAccDefaultRange(key);
+  return rrAccRanges[key];
+}
 function rrAccToolbar(key){
   const tb = document.getElementById('rrTB_'+key);
   const ch = rrAccCharts[key];
   if (!tb || !ch) return;
-  tb.innerHTML = RR_PRESETS.map(([lbl,s,e])=>
-    `<button class="rr-tb-btn" onclick="rrAccZoom('${key}',${s},${e})">${esc(lbl)}</button>`).join('')
-    + `<span class="rr-tb-hint">· 그래프를 가로로 드래그해도 확대돼요</span>`;
+  const st = rrAccEnsureRange(key);
+  tb.innerHTML = `
+    <span class="grp">📅 <input type="date" id="rrAccStart_${key}" value="${st.start||''}"> ~ <input type="date" id="rrAccEnd_${key}" value="${st.end||''}"></span>
+    <span class="grp">
+      ${[1,3,5,10].map(y=>`<button class="rr-tb-btn${st.activeY===y?' on':''}" data-y="${y}">${y}년</button>`).join('')}
+      <button class="rr-tb-btn${st.activeY===0?' on':''}" data-y="0">전체</button>
+    </span>
+    <span class="grp">사건확대:
+      ${RR_EVENTS.map(([lbl,s,e])=>`<button class="rr-tb-btn ev" data-start="${s}" data-end="${e}">${esc(lbl)}</button>`).join('')}
+      <button class="rr-tb-btn" id="rrAccReset_${key}" title="확대 초기화(기본 5년)">↺ 초기화</button>
+    </span>
+    <span class="rr-tb-hint">· 그래프를 가로로 드래그하면 확대돼요 · 점선은 합성/추정 구간이에요</span>`;
+  document.getElementById(`rrAccStart_${key}`).addEventListener('change',e=>{
+    rrAccRanges[key].start=e.target.value; rrAccRanges[key].activeY=-1; rrAccApplyRange(key); rrAccToolbar(key);
+  });
+  document.getElementById(`rrAccEnd_${key}`).addEventListener('change',e=>{
+    rrAccRanges[key].end=e.target.value; rrAccRanges[key].activeY=-1; rrAccApplyRange(key); rrAccToolbar(key);
+  });
+  tb.querySelectorAll('button[data-y]').forEach(b=>b.addEventListener('click',()=>{
+    const yrs=+b.dataset.y, {first,last}=rrAccBounds(key);
+    if (last == null) return;
+    rrAccRanges[key].activeY=yrs;
+    if (yrs===0) { rrAccRanges[key].start=`${first}-01-01`; rrAccRanges[key].end=`${last}-12-31`; }
+    else { const sy=Math.max(first, last-yrs+1); rrAccRanges[key].start=`${sy}-01-01`; rrAccRanges[key].end=`${last}-12-31`; }
+    rrAccApplyRange(key); rrAccToolbar(key);
+  }));
+  tb.querySelectorAll('.ev').forEach(b=>b.addEventListener('click',()=>{
+    rrAccRanges[key].start=b.dataset.start; rrAccRanges[key].end=b.dataset.end; rrAccRanges[key].activeY=-1;
+    if (!rrAccApplyRange(key) && typeof mmToast==='function') mmToast('그 기간 데이터가 없어요.','warn');
+    rrAccToolbar(key);
+  }));
+  const reset=document.getElementById(`rrAccReset_${key}`);
+  if (reset) reset.addEventListener('click',()=>{ if(ch.resetZoom) try{ch.resetZoom();}catch(_){}
+    rrAccRanges[key]=rrAccDefaultRange(key); rrAccApplyRange(key); rrAccToolbar(key); });
 }
-function rrAccZoom(key, s, e){
-  const ch = rrAccCharts[key]; if(!ch) return;
+function rrAccApplyRange(key){
+  const ch = rrAccCharts[key]; if(!ch) return false;
   const yrs = ch._years || [];
-  if (s==null){ if(ch.resetZoom) ch.resetZoom(); ch.options.scales.x.min=undefined; ch.options.scales.x.max=undefined; ch.update(); return; }
-  let i0 = yrs.findIndex(y=>y>=s), i1 = -1;
-  for (let i=yrs.length-1;i>=0;i--){ if(yrs[i]<=e){ i1=i; break; } }
-  if (i0<0 || i1<0 || i1<i0){ if(typeof mmToast==='function') mmToast('그 기간 데이터가 없어요.','warn'); return; }
+  if (!yrs.length) return false;
+  const st=rrAccEnsureRange(key);
+  const sy=st.start ? new Date(st.start).getFullYear() : yrs[0];
+  const ey=st.end ? new Date(st.end).getFullYear() : yrs[yrs.length-1];
+  let i0 = yrs.findIndex(y=>y>=sy), i1 = -1;
+  for (let i=yrs.length-1;i>=0;i--){ if(yrs[i]<=ey){ i1=i; break; } }
+  if (i0<0 || i1<0 || i1<i0) return false;
   ch.options.scales.x.min = i0; ch.options.scales.x.max = i1; ch.update();
+  return true;
 }
 
 function _rrYearAxis(){
+  const txt = cssVar('--text-muted') || '#888';
+  const grid = cssVar('--border') || '#e0e0e0';
   return { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-    plugins:{ legend:{display:true, labels:{font:{size:11}, usePointStyle:true, boxWidth:8, color:'var(--text-muted)'}},
-      tooltip:{callbacks:{label:c=> c.parsed.y==null?null:`${c.dataset.label}: ${c.parsed.y>=0?'+':''}${c.parsed.y.toFixed(1)}%`}},
+    plugins:{ legend:{display:true, labels:{font:{size:11}, usePointStyle:true, boxWidth:8, color:txt}},
+      tooltip:{callbacks:{label:c=> c.parsed.y==null?null:`${c.dataset.label}: ${c.parsed.y>=0?'+':''}${c.parsed.y.toFixed(1)}%${c.dataset._syn?.[c.dataIndex]?' · 추정':''}`}},
       zoom:{ zoom:{ drag:{enabled:true, backgroundColor:'rgba(25,118,210,0.15)'}, mode:'x' } } },
-    scales:{ x:{ticks:{font:{size:10}},grid:{display:false}},
-      y:{ticks:{font:{size:10},callback:v=>v+'%'}} } };
+    scales:{ x:{ticks:{font:{size:10}, color:txt},grid:{display:false}},
+      y:{ticks:{font:{size:10}, color:txt, callback:v=>v+'%'}, grid:{color:grid}} } };
 }
 
 function rrYearLineChart(cv, items, pairsOf){
@@ -508,10 +566,12 @@ function rrYearLineChart(cv, items, pairsOf){
   const pos={}; years.forEach((y,i)=>pos[y]=i);
   const datasets = items.map((it,i)=>{
     const ys=new Array(years.length).fill(null);
-    pairsOf(it).forEach(([y,v])=>{ if(v!=null) ys[pos[y]]=+(v*100).toFixed(2); });
+    const synArr=new Array(years.length).fill(0);
+    pairsOf(it).forEach(([y,v,syn])=>{ if(v!=null) { ys[pos[y]]=+(v*100).toFixed(2); synArr[pos[y]]=syn?1:0; } });
     const col=colorOf(i);
     return { label:it.name, data:ys, borderColor:col, backgroundColor:col,
-      borderWidth:2, pointRadius:0, tension:.1, spanGaps:true };
+      borderWidth:2, pointRadius:0, tension:.1, spanGaps:true, _syn:synArr,
+      segment:{ borderDash:ctx => (synArr[ctx.p0DataIndex] || synArr[ctx.p1DataIndex]) ? [5,4] : undefined } };
   });
   const ch = new Chart(cv.getContext('2d'), { type:'line',
     data:{labels:years.map(String), datasets}, options:_rrYearAxis() });
@@ -528,7 +588,7 @@ function rrDivGrowthChart(cv, items){
     ((it.divgrowth&&it.divgrowth.yoy)||[]).forEach(p=>{ ys[pos[p.year]]=+(p.growth*100).toFixed(1); });
     const col=colorOf(i);
     return { label:it.name + (it.divgrowth&&it.divgrowth.cagr!=null?` (연 ${(it.divgrowth.cagr*100).toFixed(1)}%)`:''),
-      data:ys, borderColor:col, backgroundColor:col, borderWidth:2, pointRadius:0, tension:.1, spanGaps:true };
+      data:ys, borderColor:col, backgroundColor:col, borderWidth:2, pointRadius:0, tension:.1, spanGaps:true, _syn:[] };
   });
   const ch = new Chart(cv.getContext('2d'), { type:'line',
     data:{labels:years.map(String), datasets}, options:_rrYearAxis() });
@@ -553,7 +613,8 @@ function rrRenderLossProb(key, items){
       return `<td style="color:${c};font-weight:600;">${(lp*100).toFixed(1)}%</td>`;
     }).join('') + '</tr>';
   });
-  html += '</tbody></table></div><div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">상장 후 실데이터·거치식·배당재투자 기준. “—”=표본 부족(이력이 그 기간보다 짧음).</div>';
+  const usesSyn = withRoll.some(it => (it.rolling_return?.syn_overall || 0) > 0.05);
+  html += `</tbody></table></div><div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">전체 가용기간·거치식·배당재투자 기준${usesSyn ? ' · 합성/추정 구간 포함' : ''}. “—”=표본 부족(이력이 그 기간보다 짧음).</div>`;
   host.innerHTML = html;
 }
 

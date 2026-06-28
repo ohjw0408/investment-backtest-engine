@@ -1,5 +1,37 @@
 # Log
 
+## [2026-06-28] FIX | 비교 심화 P3 — 가격 기반 아코디언 지표 actual-only 산출
+
+오너 확인 후 비교 심화 아코디언의 합성/추정 데이터 처리 기준을 배당 지표에서 가격 기반 지표까지 확장.
+- 수익률·변동성·MDD 연간 오차막대는 `syn_frac>0` 연도와 진행 중인 부분연도를 제외하고 실제 완전연도만 사용하도록 `risk_return_logic._annual_from_points(actual_only=True)` 경로로 변경.
+- 수익률 아코디언의 기간별 손실확률도 `rolling.horizon_table(actual_only=True)`로 계산해, 합성/백필 플래그가 포함된 롤링 윈도우를 제외.
+- 프론트 방어 필터를 추가해 `annual` 응답에 합성/부분연도가 남아도 오차막대 표본에 섞이지 않게 했고, 안내 문구를 “합성/추정 구간 제외”로 정정.
+- 검증: `py_compile risk_return_logic.py modules/rolling.py`, `pytest tests/test_rolling.py`, `node --check tests/check_rr_deep.js`, Playwright `tests/check_rr_deep.js` PASS(10/10: 가격 기반 연도지표 합성/부분연도 제외, 롤링 손실확률 합성 윈도우 제외, 아코디언5, 오차막대, 콘솔0). 라이트/다크 스크린샷 육안 확인.
+- 변경: `risk_return_logic.py`, `modules/rolling.py`, `templates/risk_return.html`, `tests/test_rolling.py`, `tests/check_rr_deep.js`.
+
+_작성: Codex_
+
+## [2026-06-28] FIX | 비교 심화 P3 — MDD 축 여유 + 배당성장률 실제구간 기준
+
+오너 피드백 2건 반영.
+- **MDD 오차막대 하단 수염 잘림/붙음**: 음수 표시 자체가 문제가 아니라 y축 범위가 빡빡해 끝이 안 보이는 문제. `rrBoxChart` y축을 `suggestedMin/Max` → 여유 pad 포함 `min/max`로 강제, 특히 MDD는 더 넉넉한 하단 여백 적용.
+- **SCHD vs 60/40 배당성장률/배당률 이상**: 원인 확인 결과 SCHD 2000~2011년 `volume=0` 백필/프록시 배당이 SCHD 배당성장률 표본에 섞였고, 2026 미완료 배당도 배당률 분포에 들어가 시각 왜곡. `risk_return_logic.py`가 실제 가격 구간(`volume>0`)과 전 구성종목 실제 커버리지 기준으로 연배당을 산출하도록 수정. 프론트 분포도 미완료 연도 제외.
+- 수정 후 숫자: 60/40 배당률 완성연도 p50 약 **1.96%**, SCHD p50 약 **3.00%**. SCHD 배당성장률은 2013~2025 실제구간만 사용, p50 약 **11.4%**, CAGR 약 **13.1%**.
+- 검증: `py_compile risk_return_logic.py`, `node --check tests/check_rr_deep.js`, `git diff --check`, Playwright `tests/check_rr_deep.js` PASS(8/8: SCHD 실제구간·SCHD 배당률>60/40·아코디언5·수염 meta·축파괴 없음·콘솔0). 라이트/다크 스샷 육안 확인.
+- 변경=`risk_return_logic.py`, `templates/risk_return.html`, `tests/check_rr_deep.js`.
+
+_작성: Codex_
+
+## [2026-06-28] FIX | 비교 심화 P3 — 연도별 라인차트 → 분포 오차막대 마무리
+
+오너가 이어받기 요청한 미커밋 `templates/risk_return.html` 작업을 확인하고, 비교 심화 아코디언 5개(수익률·변동성·MDD·배당·배당성장률)를 연도별 라인차트 대신 분포 오차막대로 마무리.
+- 상태 확인: 미커밋 변경은 `templates/risk_return.html` 1개였고, 최근 커밋 `5e50ed4`의 합성백필 글리치 방어는 이미 반영된 상태. 남은 일은 프론트 차트 표현/문구/검증.
+- 수정: 라인차트 잔여 문구("연도별 추이 겹쳐보기")를 오차막대 설명으로 교체, 제거된 기간툴바 CSS 정리, `rrBoxWhisker` 플러그인이 최초 렌더부터 수염/중앙선을 그리도록 plugin option으로 meta 전달.
+- 검증: `node --check tests/check_rr_deep.js`, `git diff --check`, Playwright `node tests/check_rr_deep.js http://127.0.0.1:5000 rr_deep_box` PASS(아코디언5 bar chart·수염 meta·축파괴 없음·콘솔에러0). 라이트/다크 아코디언 스크린샷 육안 확인.
+- 변경=`templates/risk_return.html`, `tests/check_rr_deep.js`.
+
+_작성: Codex_
+
 ## [2026-06-27] FIX | 비교 심화 P3 — 합성백필 글리치 차트 축파괴 (코덱스 착수 → 마무리)
 
 코덱스가 비교 심화 아코디언(P3)을 "real-only(syn=0)→전체이력+약한필터"로 갈아엎고 기간컨트롤 UI(날짜·1·3·5·10년·사건확대)·합성 점선·배당 부분연도/저베이스 필터·차트 테마색 추가(미커밋). 잔존 버그 발견·수정.

@@ -62,7 +62,7 @@ def _pct(arr: np.ndarray, p: float) -> float:
     return float(np.percentile(arr, p)) if arr.size else 0.0
 
 
-def horizon_table(points, horizons=None, percentiles=None):
+def horizon_table(points, horizons=None, percentiles=None, actual_only=False):
     """horizon별 롤링 총수익(=CAGR) 분포 통계.
        반환: {h: {n, loss_prob, median, syn_frac, pcts:{p값:cagr}}}.
        n<3이면 표본부족(요약은 주되 UI서 회색 처리 판단)."""
@@ -82,21 +82,37 @@ def horizon_table(points, horizons=None, percentiles=None):
             out[h] = {"n": 0, "loss_prob": None, "median": None, "syn_frac": None, "pcts": {}}
             continue
         shifted = m.shift(need)
-        cagr = ((m / shifted) ** (1.0 / h) - 1.0).dropna()
+        cagr_all = ((m / shifted) ** (1.0 / h) - 1.0).dropna()
+        cagr = cagr_all
+        window_syn = None
+        if syn_m is not None:
+            syn_i = syn_m.astype(int)
+            window_syn = (
+                syn_i.rolling(need + 1, min_periods=need + 1).max()
+                .reindex(cagr_all.index).fillna(0).astype(bool)
+            )
+            if actual_only:
+                cagr = cagr_all.loc[~window_syn]
         arr = cagr.values.astype(float)
         n = arr.size
         # 윈도우별 합성 의존도 — 끝점이 syn인 비율(근사)
         syn_frac = None
         if syn_m is not None:
-            ends = syn_m.reindex(cagr.index).fillna(False)
-            syn_frac = round(float(ends.mean()), 4) if n else None
-        out[h] = {
+            if actual_only:
+                syn_frac = 0.0 if n else None
+            else:
+                ends = syn_m.reindex(cagr.index).fillna(False)
+                syn_frac = round(float(ends.mean()), 4) if n else None
+        row = {
             "n": int(n),
             "loss_prob": round(float((arr < 0).mean()), 4) if n else None,
             "median": round(float(np.median(arr)), 6) if n else None,
             "syn_frac": syn_frac,
             "pcts": {str(p): round(_pct(arr, p), 6) for p in percentiles} if n else {},
         }
+        if actual_only and window_syn is not None:
+            row["excluded_syn_frac"] = round(float(window_syn.mean()), 4) if len(window_syn) else None
+        out[h] = row
     return out
 
 

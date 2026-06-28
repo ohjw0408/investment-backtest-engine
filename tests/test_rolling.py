@@ -86,3 +86,13 @@ def test_syn_flag_passthrough_and_frac():
     assert len(real[0]) == 3            # syn 보존
     tbl = rolling.horizon_table(pts, horizons=[1])
     assert tbl[1]["syn_frac"] is not None
+
+
+def test_horizon_table_actual_only_excludes_syn_windows():
+    pts = [[d, v, s] for (d, v), s in zip(_geo_series(2000, 365 * 4, 0.06),
+                                          ([1] * (365 * 2) + [0] * (365 * 2)))]
+    mixed = rolling.horizon_table(pts, horizons=[1])
+    actual = rolling.horizon_table(pts, horizons=[1], actual_only=True)
+    assert mixed[1]["n"] > actual[1]["n"] > 0
+    assert actual[1]["syn_frac"] == 0.0
+    assert actual[1]["excluded_syn_frac"] > 0

@@ -30,6 +30,8 @@ _DEEP_SYNTH_VOL_RATIO = 2.5
 _DEEP_SYNTH_MAXABS = 0.30
 _DIV_GROWTH_LOW_BASE_FRACTION = 0.30
 _DIV_GROWTH_SPIKE_LIMIT = 1.0
+_DIV_MIN_ACTUAL_DAYS = 40
+_DIV_FULL_YEAR_DAYS = 200
 
 
 def _load_series(loader, code, data_end):
@@ -48,7 +50,12 @@ def _load_series(loader, code, data_end):
             return None
         div = df["dividend"].astype(float) if "dividend" in df.columns else pd.Series(0.0, index=df.index)
         div = div.reindex(close.index).fillna(0.0)
-        return close, div
+        if "volume" in df.columns:
+            vol = pd.to_numeric(df["volume"], errors="coerce").reindex(close.index)
+            actual = (vol > 0)
+        else:
+            actual = pd.Series(True, index=close.index)
+        return close, div, actual.astype(bool)
     except Exception:
         return None
 
@@ -197,7 +204,7 @@ def _clean_deep_points(pts):
             for d, v, s in zip(df["date"], df["val"], df["syn"])]
 
 
-def _annual_from_points(pts):
+def _annual_from_points(pts, actual_only=False):
     """TR 인덱스([[date,val,(syn)]]) → 연도별 {year, ret, vol, mdd}.
        각 항목 자기 가용기간 기준(공통 겹침기간 비종속). 비현실 값(|연수익|>300%)은
        데이터 글리치로 보고 그 해 제외(차트 폭주 방지)."""
@@ -221,6 +228,9 @@ def _annual_from_points(pts):
         cum = (1.0 + g).cumprod()
         mdd = float((cum / cum.cummax() - 1.0).min())
         syn_frac = float(syn.reindex(g.index).fillna(0).mean()) if len(g) else 0.0
+        partial = yr == last_year and len(g) < 230
+        if actual_only and (syn_frac > 0 or partial):
+            continue
         row = {
             "year": int(yr),
             "ret": round(ret, 6),
@@ -228,7 +238,7 @@ def _annual_from_points(pts):
             "mdd": round(mdd, 6),
             "syn_frac": round(syn_frac, 4),
         }
-        if yr == last_year and len(g) < 230:   # 진행 중인 올해(거래일 부족) = 부분연도
+        if partial:
             row["partial"] = True
         out.append(row)
     return out
@@ -244,13 +254,13 @@ def _item_deep(tickers):
     except Exception:
         return [], None
     pts = _clean_deep_points(pts)
-    annual = _annual_from_points(pts)
+    annual = _annual_from_points(pts, actual_only=True)
     rr = None
     if len(pts) >= 13:
         syn_overall = sum(1 for p in pts if len(p) > 2 and p[2]) / len(pts)
         rr = {
             "horizons": rolling.DEFAULT_HORIZONS,
-            "horizon_table": {str(h): v for h, v in rolling.horizon_table(pts).items()},
+            "horizon_table": {str(h): v for h, v in rolling.horizon_table(pts, actual_only=True).items()},
             "syn_overall": round(float(syn_overall), 4),
         }
     return annual, rr
@@ -258,48 +268,54 @@ def _item_deep(tickers):
 
 def _annual_dividends(weights, series):
     """포폴 연도별 배당: dyield(연 배당수익률) + dindex(첫해=100 정규화 배당액 흐름).
-       weights={code:w}. 각 종목 자기 가용기간 전체(공통기간 비종속)."""
-    yrs = []
-    for code in weights:
-        s = series.get(code)
-        if s and len(s[0]):
-            yrs += [int(s[0].index[0].year), int(s[0].index[-1].year)]
-    if not yrs:
-        return []
-    years = list(range(min(yrs), max(yrs) + 1))
-    dyield, damt = {}, {}
+       weights={code:w}. 배당/성장률은 상장 전 백필·프록시 구간을 제외하고 실제 구간만 사용."""
+    usable = {}
+    first_years, last_years = [], []
     for code, w in weights.items():
         s = series.get(code)
-        if not s:
+        if not s or not len(s[0]):
             continue
-        close, div = s
-        for y in years:
-            ys, ye = pd.Timestamp(y, 1, 1), pd.Timestamp(y, 12, 31)
-            dsum = float(div[(div.index >= ys) & (div.index <= ye)].sum())
-            yc = close[(close.index >= ys) & (close.index <= ye)]
-            if not len(yc):
-                continue
-            px_end = float(yc.iloc[-1])
-            if px_end > 0:
-                dyield[y] = dyield.get(y, 0.0) + w * (dsum / px_end)   # 연 배당수익률
-            # 정규화 배당액 = 주당배당 / 첫 종가(있는 종목) → 비교가능 흐름
-            px0 = float(close.iloc[0]) if len(close) else 0.0
-            if px0 > 0:
-                damt[y] = damt.get(y, 0.0) + w * (dsum / px0)
-    latest = None
-    for code in weights:
-        s = series.get(code)
-        if s and len(s[0]):
-            dt = s[0].index[-1]
-            latest = dt if latest is None or dt > latest else latest
+        close, div = s[0], s[1]
+        actual = s[2].reindex(close.index).fillna(False) if len(s) > 2 else pd.Series(True, index=close.index)
+        actual_close = close[actual]
+        if len(actual_close) < _DIV_MIN_ACTUAL_DAYS:
+            continue
+        usable[code] = (w, close, div, actual.astype(bool), float(actual_close.iloc[0]))
+        first_years.append(int(actual_close.index[0].year))
+        last_years.append(int(actual_close.index[-1].year))
+    if len(usable) != len(weights):
+        return []
+    years = list(range(max(first_years), min(last_years) + 1))
+    latest = min((v[1][v[3]].index[-1] for v in usable.values()), default=None)
 
     out = []
     for y in years:
-        if y in dyield or y in damt:
-            row = {"year": int(y), "dyield": round(dyield.get(y, 0.0), 6), "dindex": round(damt.get(y, 0.0), 6)}
-            if latest is not None and y == latest.year and latest.month < 12:
-                row["partial"] = True
-            out.append(row)
+        dyield = 0.0
+        damt = 0.0
+        partial = False
+        ok = True
+        for code, (w, close, div, actual, px0) in usable.items():
+            ys, ye = pd.Timestamp(y, 1, 1), pd.Timestamp(y, 12, 31)
+            mask = (close.index >= ys) & (close.index <= ye) & actual
+            if int(mask.sum()) < _DIV_MIN_ACTUAL_DAYS:
+                ok = False
+                break
+            if int(mask.sum()) < _DIV_FULL_YEAR_DAYS:
+                partial = True
+            dsum = float(div[mask].sum())
+            yc = close[mask]
+            px_end = float(yc.iloc[-1])
+            if px_end > 0:
+                dyield += w * (dsum / px_end)   # 연 배당수익률
+            # 정규화 배당액 = 실제 첫 종가 기준 주당배당 흐름
+            if px0 > 0:
+                damt += w * (dsum / px0)
+        if not ok:
+            continue
+        row = {"year": int(y), "dyield": round(dyield, 6), "dindex": round(damt, 6)}
+        if partial or (latest is not None and y == latest.year and latest.month < 12):
+            row["partial"] = True
+        out.append(row)
     return out
 
 
@@ -391,7 +407,8 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
 
     # 종목별 최근 1년 배당수익률 = 직전 1년 배당합 / 마지막 종가
     yld = {}
-    for code, (close, div) in series.items():
+    for code, s in series.items():
+        close, div = s[0], s[1]
         lc = close.dropna()
         if not len(lc):
             yld[code] = 0.0

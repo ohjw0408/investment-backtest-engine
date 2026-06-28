@@ -1,5 +1,5 @@
 ---
-updated: 2026-06-23
+updated: 2026-06-28
 tags: [dev]
 ---
 
@@ -20,6 +20,12 @@ tags: [dev]
 ---
 
 ## 한 줄 요약
+
+> ✅ **2026-06-28 업데이트 118 (비교 심화 P3 — 가격 기반 actual-only 산출):** 오너가 지적한 “합성 데이터가 수익률/MDD/배당률 같은 아코디언 지표를 달라지게 할 가능성”을 가격 기반 지표까지 정리. `risk_return_logic._annual_from_points(actual_only=True)`로 수익률·변동성·MDD 연간 오차막대에서 `syn_frac>0` 연도와 진행 중인 부분연도를 제외하고, `modules.rolling.horizon_table(actual_only=True)`로 기간별 손실확률에서도 합성/백필 플래그가 포함된 롤링 윈도우를 제외. 프론트 `_rrBoxValues`에도 방어 필터를 남기고 안내 문구를 “합성/추정 구간 제외”로 정정. 검증 `py_compile`, `pytest tests/test_rolling.py` 9 PASS, `node --check`, Playwright `tests/check_rr_deep.js` 10/10 PASS(가격 기반 연도지표 합성/부분연도 제외·롤링 손실확률 합성 윈도우 제외·콘솔0), 라이트/다크 스크린샷 육안 확인. (Codex)
+
+> ✅ **2026-06-28 업데이트 117 (비교 심화 P3 — MDD 축 여유 + 배당 실제구간 필터):** 오너 피드백 반영. **① MDD 오차막대 하단 수염이 차트 범위 끝에 붙거나 안 보이는 문제** → `rrBoxChart` y축을 여유 pad 포함 `min/max`로 강제, MDD는 더 큰 하단 여백. **② 60/40이 SCHD보다 배당성장률이 안정적이고 배당률도 비슷해 보이던 문제** → 원인=SCHD 2000~2011 `volume=0` 백필/프록시 배당 + 2026 미완료 배당이 분포에 섞임. `risk_return_logic.py` 연배당 산출을 실제 가격구간(`volume>0`)·전 구성종목 실제 커버리지 기준으로 변경, 프론트 배당률 분포는 partial 제외. 수정 후 60/40 배당률 p50≈1.96%, SCHD p50≈3.00%, SCHD 배당성장률은 2013~2025 실제구간 p50≈11.4%·CAGR≈13.1%. 검증=py_compile·node check·Playwright 8/8·라이트/다크 육안. (Codex)
+
+> ✅ **2026-06-28 업데이트 116 (비교 심화 P3 — 오차막대 UI 마무리, 로컬 검증):** Codex가 미커밋 `templates/risk_return.html` 상태를 이어받아 비교 심화 아코디언 5개를 연도별 라인차트에서 **분포 오차막대(box-whisker: p25~p75·최저~최고·중앙값)** 중심으로 마감. 남아 있던 라인차트 문구/기간툴바 CSS 제거, `rrBoxWhisker` 최초 렌더 수염 누락 위험을 plugin option meta 전달로 수정. 검증=`node --check tests/check_rr_deep.js`, `git diff --check`, Playwright `tests/check_rr_deep.js` PASS(아코디언5 bar chart·수염 meta·축파괴 없음·콘솔0), 라이트/다크 아코디언 스샷 육안 확인. 변경=`templates/risk_return.html`, `tests/check_rr_deep.js`. (Codex)
 
 > ✅ **2026-06-27 업데이트 115 (비교 심화 P3 — 합성백필 글리치 차트 축파괴 픽스, 배포):** 코덱스가 비교 심화 아코디언(P3)을 real-only→전체이력+기간컨트롤 UI(날짜·1·3·5·10년·사건확대)·합성 점선·테마색으로 갈아엎음(미커밋). **잔존 버그**(probe 입증): SHY 연수익 **−85.7%~+172.6%**, SCHD 배당성장 **+270.4%**로 차트 Y축 박살. 원인=손상 합성백필이 단일점프 아닌 **구간 전체** 쓰레기(SHY 합성 일변동성 실데이터 20×·하루+122%, IEF 2.9×) — 코덱스 45% 단일일필터로 못 잡음. **수정**(`risk_return_logic.py`): ①**종목별 합성손상 게이트**(`_clean_deep_points`) 합성 변동성 실데이터 >2.5× OR 단일일 >30%면 그 종목 합성 드롭→real-only 폴백, 정상 합성(SPY/QQQ/SCHD/GLD/TLT)은 긴이력 보존 ②배당성장 저베이스 0.15→0.30·spike캡 3.0→1.0. 검증=SHY [−85.7,+172.6]→[−3.9,+4.9]%·SCHD 배당+270%→max+44.8%·Playwright adhoc 아코디언5 max ret49/divg53%·콘솔0·라이트 육안. 신규 `tests/check_rr_deep.js`. ⚠️다크 육안·실로그인 경로 미검증. 상세→[[log]]·[[bugs]] BUG-COMPARE-DEEP-SYNTH. (Claude)
 

@@ -202,6 +202,20 @@
     <div id="rrCorrHost"></div>
   </div>
 
+  <div id="rrCompareCharts" style="display:none;">
+    <div class="rr-card">
+      <div class="rr-card-title">🎯 리스크-리턴 도표 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 왼쪽 위일수록 좋음(저위험·고수익)</span></div>
+      <div class="rr-chart-wrap"><canvas id="rrScatter"></canvas></div>
+    </div>
+
+    <div class="rr-card">
+      <div class="rr-card-title">🕸 종합 비교 (레이더) <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 6축 모두 바깥쪽일수록 좋음</span></div>
+      <div class="rr-spider-ctrl" id="rrSpiderCtrl"></div>
+      <div class="rr-chart-wrap"><canvas id="rrSpider"></canvas></div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">* 각 축은 비교 대상끼리 상대 정규화(클수록 좋음). 안정성=낮은 변동성, 방어력=낮은 낙폭 기준.</div>
+    </div>
+  </div>
+
   <!-- 포트폴리오 정밀 비교 (선택 + 결과) -->
   <div class="rr-card" id="rrCompareCard" style="border-color:rgba(25,118,210,0.45);">
     <div style="font-size:1.05rem;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -246,20 +260,6 @@
         <div id="rrTableHost"></div>
         <div class="rr-period" id="rrPeriod"></div>
         <div id="rrWarn"></div>
-      </div>
-
-      <!-- 리스크-리턴 산점도 -->
-      <div class="rr-card">
-        <div class="rr-card-title">🎯 리스크-리턴 도표 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 왼쪽 위일수록 좋음(저위험·고수익)</span></div>
-        <div class="rr-chart-wrap"><canvas id="rrScatter"></canvas></div>
-      </div>
-
-      <!-- 스파이더 -->
-      <div class="rr-card">
-        <div class="rr-card-title">🕸 종합 비교 (레이더) <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 6축 모두 바깥쪽일수록 좋음</span></div>
-        <div class="rr-spider-ctrl" id="rrSpiderCtrl"></div>
-        <div class="rr-chart-wrap"><canvas id="rrSpider"></canvas></div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">* 각 축은 비교 대상끼리 상대 정규화(클수록 좋음). 안정성=낮은 변동성, 방어력=낮은 낙폭 기준.</div>
       </div>
     </div>
 
@@ -388,6 +388,7 @@ async function rrCompare(){
   const btn = document.getElementById('rrCompareBtn');
   const status = document.getElementById('rrStatus');
   document.getElementById('rrResults').style.display = 'none';
+  document.getElementById('rrCompareCharts').style.display = 'none';
   status.style.display = 'block'; status.textContent = '⏳ 산출 중...';
   btn.disabled = true;
   try {
@@ -409,13 +410,16 @@ async function rrCompare(){
     rrItems = data.items;
     rrVisible = rrItems.map(() => true);
     status.style.display = 'none';
+    document.getElementById('rrCompareCharts').style.display = 'block';
     document.getElementById('rrResults').style.display = 'block';
     rrRenderTable(data);
     rrRenderScatter();
     rrRenderSpiderCtrl();
     rrRenderSpider();
     rrRenderAccordions(data);
-    if (rrAutoScroll) { rrAutoScroll = false; document.getElementById('rrResults').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    const chartBlock = document.getElementById('rrCompareCharts');
+    if (chartBlock) chartBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (rrAutoScroll) rrAutoScroll = false;
   } catch(e){ status.textContent = '산출에 실패했어요. 네트워크를 확인해주세요.'; }
   finally { btn.disabled = false; }
 }
@@ -817,9 +821,14 @@ window.addEventListener('resize', () => {
 });
 
 // ── 추세 겹쳐보기 오버레이 ──
-const rrOv = { items: [], raw: {}, start: null, end: null, mode: 'norm', activeY: 5, macros: [], chart: null };
-const rrCorr = { start: null, end: null, activeY: 5 };
+const rrOv = { items: [], raw: {}, start: null, end: null, mode: 'norm', activeY: 5, activeEvent: null, macros: [], chart: null };
 const RR_OV_QUICK = [['SYM:SPY','S&P500'],['SYM:069500','코스피200'],['SYM:GLD','금'],['SYM:TLT','미국 장기채']];
+const RR_RANGE_EVENTS = [
+  { key:'dotcom', label:'닷컴', start:'2000-01-01', end:'2002-12-31' },
+  { key:'gfc', label:'금융위기', start:'2007-06-01', end:'2009-06-30' },
+  { key:'covid', label:'코로나', start:'2020-01-01', end:'2020-12-31' },
+  { key:'tightening22', label:"'22 긴축", start:'2022-01-01', end:'2022-12-31' },
+];
 function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function rrOvRecolor(){ rrOv.items.forEach((it,i)=>it.color = colorOf(i)); }
 
@@ -928,15 +937,45 @@ function rrOvSeriesBounds(){
 function rrOvSetDefaultRange(){
   const {mn,mx} = rrOvSeriesBounds();
   rrOv.end = mx;
+  rrOv.activeEvent = null;
   if (mx){ const d=new Date(mx); d.setFullYear(d.getFullYear()-rrOv.activeY); const cap=d.toISOString().slice(0,10);
     rrOv.start = (mn && mn>cap) ? mn : cap; } else rrOv.start = mn;
 }
 function rrOvRangeYears(){ if(!rrOv.start||!rrOv.end) return 0; return (new Date(rrOv.end)-new Date(rrOv.start))/(365*864e5); }
 
+function rrOvApplyRange(start, end, activeY=-1, activeEvent=null){
+  rrOv.start = start;
+  rrOv.end = end;
+  rrOv.activeY = activeY;
+  rrOv.activeEvent = activeEvent;
+  rrOvRenderCtrl();
+  rrOvDraw();
+}
+function rrOvSetYears(yrs){
+  const {mn,mx} = rrOvSeriesBounds();
+  let st = mn, en = mx;
+  if (yrs !== 0 && mx){
+    const d = new Date(mx);
+    d.setFullYear(d.getFullYear()-yrs);
+    st = d.toISOString().slice(0,10);
+  }
+  rrOvApplyRange(st, en, yrs, null);
+}
+function rrOvApplyEvent(key){
+  const ev = RR_RANGE_EVENTS.find(x=>x.key===key);
+  if (!ev) return;
+  const {mn,mx}=rrOvSeriesBounds();
+  const st=(mn&&ev.start<mn)?mn:ev.start, en=(mx&&ev.end>mx)?mx:ev.end;
+  if (mx&&st>mx || mn&&en<mn || st>=en){ if(typeof mmToast==='function') mmToast('그 시기엔 표시할 데이터가 없어요.','err'); return; }
+  rrOvApplyRange(st, en, -1, key);
+}
+
 function rrOvRenderCtrl(){
   const el = document.getElementById('rrOvCtrl');
   if (!rrOv.items.length){ el.innerHTML=''; return; }
   const over5 = rrOv.mode==='norm' && rrOvRangeYears() > 5.05;
+  const evButtons = RR_RANGE_EVENTS.map(ev =>
+    `<button class="qr ev${rrOv.activeEvent===ev.key?' on':''}" data-ev="${ev.key}">${ev.label}</button>`).join('');
   el.innerHTML = `
     <span class="grp">📅 <input type="date" id="rrOvStart" value="${rrOv.start||''}"> ~ <input type="date" id="rrOvEnd" value="${rrOv.end||''}"></span>
     <span class="grp">
@@ -946,37 +985,21 @@ function rrOvRenderCtrl(){
       <button class="qr${rrOv.activeY===10?' on':''}" data-y="10">10년</button>
       <button class="qr${rrOv.activeY===0?' on':''}" data-y="0">전체</button></span>
     <span class="grp">🔍 사건확대:
-      <button class="qr ev" data-range="2000-01-01:2002-12-31">닷컴</button>
-      <button class="qr ev" data-range="2007-06-01:2009-06-30">금융위기</button>
-      <button class="qr ev" data-range="2020-01-01:2020-12-31">코로나</button>
-      <button class="qr ev" data-range="2022-01-01:2022-12-31">'22 긴축</button>
+      ${evButtons}
       <button class="qr" id="rrOvZoomReset" title="확대 초기화(기본 5년)">↺ 초기화</button></span>
     <span class="grp">표시:
       <label><input type="radio" name="rrovm" value="norm" ${rrOv.mode==='norm'?'checked':''}>정규화(시작=100)</label>
       <label><input type="radio" name="rrovm" value="raw" ${rrOv.mode==='raw'?'checked':''}>원값(개별축)</label></span>
     <span class="rr-ov-zoomhint" style="font-size:0.72rem;color:var(--text-muted);">💡 그래프를 <b>드래그</b>하면 그 구간만 확대돼요.</span>
     ${over5?'<span class="rr-ov-warn">⚠ 5년 초과 + 정규화는 작은 차이가 과장돼 보여요</span>':''}`;
-  document.getElementById('rrOvStart').addEventListener('change',e=>{ rrOv.start=e.target.value; rrOv.activeY=-1; rrOvRenderCtrl(); rrOvDraw(); });
-  document.getElementById('rrOvEnd').addEventListener('change',e=>{ rrOv.end=e.target.value; rrOv.activeY=-1; rrOvRenderCtrl(); rrOvDraw(); });
+  document.getElementById('rrOvStart').addEventListener('change',e=>rrOvApplyRange(e.target.value, rrOv.end, -1, null));
+  document.getElementById('rrOvEnd').addEventListener('change',e=>rrOvApplyRange(rrOv.start, e.target.value, -1, null));
   el.querySelectorAll('input[name=rrovm]').forEach(r=>r.addEventListener('change',e=>{ rrOv.mode=e.target.value; rrOvRenderCtrl(); rrOvDraw(); }));
-  el.querySelectorAll('.qr[data-y]').forEach(b=>b.addEventListener('click',()=>{
-    const yrs=+b.dataset.y; rrOv.activeY=yrs; const {mn,mx}=rrOvSeriesBounds(); rrOv.end=mx;
-    if (yrs===0) rrOv.start=mn;
-    else if (mx){ const d=new Date(mx); d.setFullYear(d.getFullYear()-yrs); rrOv.start=d.toISOString().slice(0,10); }
-    rrOvRenderCtrl(); rrOvDraw();
-  }));
-  // 사건 프리셋 확대 — 가용 데이터 범위로 클램프, 데이터 없으면 무시
-  el.querySelectorAll('.ev').forEach(b=>b.addEventListener('click',()=>{
-    const [s,e]=b.dataset.range.split(':'); const {mn,mx}=rrOvSeriesBounds();
-    const st=(mn&&s<mn)?mn:s, en=(mx&&e>mx)?mx:e;
-    if (mx&&st>mx || mn&&en<mn || st>=en){ if(typeof mmToast==='function') mmToast('그 시기엔 표시할 데이터가 없어요.','err'); return; }
-    rrOv.start=st; rrOv.end=en; rrOv.activeY=-1; rrOvRenderCtrl(); rrOvDraw();
-  }));
+  el.querySelectorAll('.qr[data-y]').forEach(b=>b.addEventListener('click',()=>rrOvSetYears(+b.dataset.y)));
+  el.querySelectorAll('.ev').forEach(b=>b.addEventListener('click',()=>rrOvApplyEvent(b.dataset.ev)));
   const zr=document.getElementById('rrOvZoomReset');
   if (zr) zr.addEventListener('click',()=>{ if(rrOv.chart&&rrOv.chart.resetZoom) try{rrOv.chart.resetZoom();}catch(_){}
-    rrOv.activeY=5; const {mn,mx}=rrOvSeriesBounds(); rrOv.end=mx;
-    if(mx){ const d=new Date(mx); d.setFullYear(d.getFullYear()-5); const cap=d.toISOString().slice(0,10); rrOv.start=(mn&&mn>cap)?mn:cap; }
-    rrOvRenderCtrl(); rrOvDraw(); });
+    rrOvSetYears(5); });
 }
 
 function rrOvMedian(a){ const b=[...a].sort((x,y)=>x-y); const n=b.length; if(!n) return 0;
@@ -1077,36 +1100,22 @@ function rrCorrBounds(){
   return (mn && mx && mn < mx) ? { mn, mx } : null;
 }
 function rrCorrSetYears(yrs){
-  const b = rrCorrBounds();
-  if (!b) return;
-  rrCorr.activeY = yrs;
-  rrCorr.end = b.mx;
-  if (yrs === 0) rrCorr.start = b.mn;
-  else {
-    const d = new Date(b.mx + 'T00:00:00');
-    d.setFullYear(d.getFullYear() - yrs);
-    const cap = d.toISOString().slice(0,10);
-    rrCorr.start = cap > b.mn ? cap : b.mn;
-  }
+  rrOvSetYears(yrs);
 }
 function rrCorrClamp(){
   const b = rrCorrBounds();
   if (!b) return null;
-  if (!rrCorr.start || !rrCorr.end) rrCorrSetYears(rrCorr.activeY >= 0 ? rrCorr.activeY : 5);
-  if (rrCorr.start < b.mn) rrCorr.start = b.mn;
-  if (rrCorr.end > b.mx) rrCorr.end = b.mx;
-  if (rrCorr.start >= rrCorr.end) rrCorrSetYears(0);
   return b;
 }
 function rrCorrMonthly(it){
-  const pts = rrCorrPointList(it).filter(p => !rrCorr.end || p.d <= rrCorr.end);
+  const pts = rrCorrPointList(it).filter(p => !rrOv.end || p.d <= rrOv.end);
   const byMonth = {};
   pts.forEach(p => { byMonth[p.d.slice(0,7)] = p; });
   const months = Object.keys(byMonth).sort();
   const out = [];
   for (let i=1; i<months.length; i++){
     const prev = byMonth[months[i-1]], cur = byMonth[months[i]];
-    if ((rrCorr.start && cur.d < rrCorr.start) || (rrCorr.end && cur.d > rrCorr.end)) continue;
+    if ((rrOv.start && cur.d < rrOv.start) || (rrOv.end && cur.d > rrOv.end)) continue;
     const ret = cur.v / prev.v - 1;
     if (Number.isFinite(ret) && ret > -0.9999 && Math.abs(ret) < 10) out.push({ m: months[i], date: cur.d, ret });
   }
@@ -1162,28 +1171,22 @@ function rrCorrRender(){
     host.innerHTML = '<div class="rr-empty" style="padding:24px 12px;">공통으로 겹치는 기간이 부족합니다.</div>';
     return;
   }
+  const evButtons = RR_RANGE_EVENTS.map(ev =>
+    `<button class="qr ev${rrOv.activeEvent===ev.key?' on':''}" data-ev="${ev.key}">${ev.label}</button>`).join('');
   ctrl.innerHTML = `
-    <span class="grp">기간 <input type="date" id="rrCorrStart" value="${rrCorr.start || ''}"> ~ <input type="date" id="rrCorrEnd" value="${rrCorr.end || ''}"></span>
+    <span class="grp">기간 <input type="date" id="rrCorrStart" value="${rrOv.start || ''}"> ~ <input type="date" id="rrCorrEnd" value="${rrOv.end || ''}"></span>
     <span class="grp">
-      <button class="qr${rrCorr.activeY===1?' on':''}" data-y="1">1년</button>
-      <button class="qr${rrCorr.activeY===3?' on':''}" data-y="3">3년</button>
-      <button class="qr${rrCorr.activeY===5?' on':''}" data-y="5">5년</button>
-      <button class="qr${rrCorr.activeY===10?' on':''}" data-y="10">10년</button>
-      <button class="qr${rrCorr.activeY===0?' on':''}" data-y="0">전체</button></span>
+      <button class="qr${rrOv.activeY===1?' on':''}" data-y="1">1년</button>
+      <button class="qr${rrOv.activeY===3?' on':''}" data-y="3">3년</button>
+      <button class="qr${rrOv.activeY===5?' on':''}" data-y="5">5년</button>
+      <button class="qr${rrOv.activeY===10?' on':''}" data-y="10">10년</button>
+      <button class="qr${rrOv.activeY===0?' on':''}" data-y="0">전체</button></span>
     <span class="grp">사건구간:
-      <button class="qr ev" data-range="2000-01-01:2002-12-31">닷컴</button>
-      <button class="qr ev" data-range="2007-06-01:2009-06-30">금융위기</button>
-      <button class="qr ev" data-range="2020-01-01:2020-12-31">코로나</button>
-      <button class="qr ev" data-range="2022-01-01:2022-12-31">'22 긴축</button></span>`;
-  document.getElementById('rrCorrStart').addEventListener('change', e => { rrCorr.start = e.target.value; rrCorr.activeY = -1; rrCorrRender(); });
-  document.getElementById('rrCorrEnd').addEventListener('change', e => { rrCorr.end = e.target.value; rrCorr.activeY = -1; rrCorrRender(); });
+      ${evButtons}</span>`;
+  document.getElementById('rrCorrStart').addEventListener('change', e => rrOvApplyRange(e.target.value, rrOv.end, -1, null));
+  document.getElementById('rrCorrEnd').addEventListener('change', e => rrOvApplyRange(rrOv.start, e.target.value, -1, null));
   ctrl.querySelectorAll('.qr[data-y]').forEach(btn => btn.addEventListener('click', () => { rrCorrSetYears(+btn.dataset.y); rrCorrRender(); }));
-  ctrl.querySelectorAll('.ev').forEach(btn => btn.addEventListener('click', () => {
-    const [s,e] = btn.dataset.range.split(':');
-    const st = s < b.mn ? b.mn : s, en = e > b.mx ? b.mx : e;
-    if (st >= en){ if (typeof mmToast === 'function') mmToast('그 기간에 겹치는 데이터가 없어요.', 'err'); return; }
-    rrCorr.start = st; rrCorr.end = en; rrCorr.activeY = -1; rrCorrRender();
-  }));
+  ctrl.querySelectorAll('.ev').forEach(btn => btn.addEventListener('click', () => rrOvApplyEvent(btn.dataset.ev)));
 
   const series = items.map(it => ({ it, idx: Math.max(0, rrOv.items.indexOf(it)), rows: rrCorrMonthly(it) })).filter(x => x.rows.length >= 3);
   if (series.length < 2){

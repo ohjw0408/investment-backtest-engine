@@ -219,6 +219,8 @@ def mark_all_read(user_id):
 
 def register_device_token(user_id, token, platform):
     """기기 토큰 등록(업서트). 토큰은 기기당 1개라 unique — 재로그인/계정전환 시 user_id 재배정."""
+    if not auth_manager.has_push_consent(user_id):
+        return False
     now = datetime.now().isoformat()
     c = _conn()
     c.execute(
@@ -229,9 +231,12 @@ def register_device_token(user_id, token, platform):
         (user_id, token, platform, now, now)
     )
     c.commit()
+    return True
 
 
 def get_device_tokens(user_id):
+    if not auth_manager.has_push_consent(user_id):
+        return []
     return [dict(r) for r in _conn().execute(
         "SELECT token, platform FROM device_tokens WHERE user_id=?", (user_id,)
     ).fetchall()]
@@ -246,6 +251,8 @@ def delete_device_token(token):
 
 def has_device_tokens(user_id):
     """푸시 알림 켜짐 여부 = 등록된 기기 토큰 존재."""
+    if not auth_manager.has_push_consent(user_id):
+        return False
     return _conn().execute(
         "SELECT 1 FROM device_tokens WHERE user_id=? LIMIT 1", (user_id,)
     ).fetchone() is not None

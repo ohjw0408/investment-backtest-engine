@@ -411,7 +411,7 @@ let rrAutoScroll = false;
 let rrAccCharts = {};
 const RR_ACC = [
   { key:'ret',  title:'수익률',        sub:'분포 오차막대 + 기간별 손실확률',
-    desc:'연도별 수익률 분포를 오차막대로 요약합니다. <b>박스는 흔한 범위(p25~p75), 수염은 최저~최고, 굵은 선은 중앙값</b>입니다. 오른쪽 표는 “그 기간 묻어뒀다면 손해 볼 확률”입니다.',
+    desc:'연도별 수익률 분포를 오차막대로 요약합니다. <b>박스는 흔한 범위(p25~p75), 수염은 최저~최고, 굵은 선은 중앙값</b>입니다. 오른쪽 표는 과거 데이터상 같은 기간을 보유했을 때 손실로 끝난 사례 비율입니다.',
     get:a=>a.ret, roll:true },
   { key:'vol',  title:'변동성',
     desc:'연도별 변동성 분포입니다. <b>낮고 수염이 짧을수록</b> 출렁임이 작고 예측 가능한 포트입니다.', get:a=>a.vol },
@@ -446,6 +446,7 @@ function rrRenderAccordions(data){
       </div></div>
     </div>`).join('');
   window._rrAccItems = items;
+  RR_ACC.forEach(m=>rrAccToggle(m.key));
 }
 
 function rrAccToggle(key){
@@ -563,7 +564,7 @@ function rrRenderLossProb(key, items){
   const withRoll = items.filter(it=>it.rolling_return && it.rolling_return.horizon_table);
   if (!withRoll.length){ host.innerHTML='<div style="font-size:0.78rem;color:var(--text-muted);">롤링 데이터 없음</div>'; return; }
   const horizons = withRoll[0].rolling_return.horizons || [1,3,5,10,15,20];
-  let html = '<div style="font-size:0.78rem;font-weight:700;margin-bottom:6px;">기간별 손실확률</div>';
+  let html = '<div style="font-size:0.78rem;font-weight:700;margin-bottom:6px;">기간별 손실확률 <span style="font-weight:500;color:var(--text-muted);">(과거 표본)</span></div>';
   html += '<div style="overflow-x:auto;"><table class="rr-lp-table"><thead><tr><th>기간</th>'
     + withRoll.map((it,i)=>`<th style="color:${colorOf(items.indexOf(it))}">${esc(it.name.length>6?it.name.slice(0,6)+'…':it.name)}</th>`).join('') + '</tr></thead><tbody>';
   horizons.forEach(h=>{
@@ -576,7 +577,7 @@ function rrRenderLossProb(key, items){
     }).join('') + '</tr>';
   });
   const usesSyn = withRoll.some(it => (it.rolling_return?.syn_overall || 0) > 0.05);
-  html += `</tbody></table></div><div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">전체 가용기간·거치식·배당재투자 기준${usesSyn ? ' · 합성/추정 구간 제외' : ''}. “—”=표본 부족(이력이 그 기간보다 짧음).</div>`;
+  html += `</tbody></table></div><div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;line-height:1.45;">전체 가용기간·거치식·배당재투자 기준${usesSyn ? ' · 합성/추정 구간 제외' : ''}. 기간별 손실확률은 미래 손실 가능성을 보장하거나 예측하지 않으며, 과거 표본에서 해당 기간 보유 결과가 손실로 끝난 비율입니다. 0.0%는 과거 표본에 손실 사례가 없었다는 뜻일 뿐 앞으로 손실이 나지 않는다는 의미가 아닙니다. “—”=표본 부족(이력이 그 기간보다 짧음).</div>`;
   host.innerHTML = html;
 }
 

@@ -380,7 +380,7 @@ async function confirmDelete() {
   const hint = document.getElementById('pushHint');
   const isApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   if (hint) hint.textContent = isApp
-    ? '동의하지 않으면 알림을 받을 수 없어요. 언제든 다시 켤 수 있어요.'
+    ? '기본값은 꺼짐입니다. 동의해야만 알림을 받을 수 있고, 언제든 다시 끌 수 있어요.'
     : '푸시 알림은 앱에서 켤 수 있어요. (웹은 화면이 열려 있을 때만 알림이 표시돼요)';
   fetch('/api/push/status').then(r => r.json()).then(j => { t.checked = !!j.enabled; }).catch(() => {});
   t.addEventListener('change', async () => {
@@ -391,7 +391,6 @@ async function confirmDelete() {
       else { t.checked = false; mmToast('알림 권한이 필요해요. 휴대폰 설정 › 앱 › 알림에서 허용해 주세요.', 'err'); }
     } else {
       try { await fetch('/api/push/disable', { method: 'POST' }); } catch (e) {}
-      try { localStorage.setItem('mm_push_optout', '1'); } catch (e) {}
       mmToast('알림을 껐어요.');
     }
   });

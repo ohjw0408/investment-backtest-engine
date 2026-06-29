@@ -61,10 +61,52 @@ ok("POST 비로그인 → 401", r.status_code == 401)
 
 with cl.session_transaction() as s:
     s["user_id"] = 999999
+am._get_conn().execute(
+    "INSERT INTO users (id, google_id, email, name, picture, created_at, last_login) "
+    "VALUES (999999, 'test-home-widget', '', 'test', '', '2026-06-29', '2026-06-29')"
+)
+am._get_conn().commit()
+am.set_user_consent(999999)
 r = cl.post("/api/home-config", json={"widgets": []})
 ok("POST 로그인+잘못된 바디 → 400", r.status_code == 400)
 
-# ── 4. _watchlist_quote 통합 (네트워크/DB — 관대) ──
+# ── 4. 지수 fallback은 yfinance 성공 시 index_ohlc에 저장 ──
+import sqlite3
+import pandas as pd
+import yfinance as yf
+
+tmp_idx = sqlite3.connect(":memory:")
+tmp_idx.execute("CREATE TABLE index_daily (code TEXT, date TEXT, close REAL)")
+old_idx_conn = appmod.portfolio_engine.loader.index_conn
+old_yf_download = yf.download
+
+def fake_yf_download(code, start=None, progress=False, auto_adjust=False, threads=False, **kwargs):
+    return pd.DataFrame(
+        {
+            "Open": [100.0, 104.0],
+            "High": [101.0, 106.0],
+            "Low": [99.0, 103.0],
+            "Close": [100.0, 105.0],
+            "Volume": [10.0, 20.0],
+        },
+        index=pd.to_datetime(["2026-06-26", "2026-06-29"]),
+    )
+
+try:
+    appmod.portfolio_engine.loader.index_conn = tmp_idx
+    yf.download = fake_yf_download
+    closes, currency = appmod._wl_recent_closes("^KS11")
+    saved = tmp_idx.execute(
+        "SELECT date, close FROM index_ohlc WHERE code='^KS11' ORDER BY date"
+    ).fetchall()
+    ok("지수 fallback → closes 반환", closes == [100.0, 105.0] and currency == "KRW")
+    ok("지수 fallback → index_ohlc upsert", saved == [("2026-06-26", 100.0), ("2026-06-29", 105.0)])
+finally:
+    yf.download = old_yf_download
+    appmod.portfolio_engine.loader.index_conn = old_idx_conn
+    tmp_idx.close()
+
+# ── 5. _watchlist_quote 통합 (네트워크/DB — 관대) ──
 q = appmod._watchlist_quote("^GSPC")
 if q is None:
     print("SKIP  _watchlist_quote(^GSPC) None (오프라인/데이터없음)")

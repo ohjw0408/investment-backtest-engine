@@ -17,6 +17,17 @@
       <input type="checkbox" id="agreePrivacy" style="width:18px;height:18px;flex-shrink:0;">
       <span>(필수) <a href="/privacy" target="_blank" style="color:var(--brand);">개인정보처리방침</a>에 동의합니다</span>
     </label>
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 0;cursor:pointer;font-size:0.9rem;
+           border-top:1px solid var(--ds-hairline);">
+      <input type="checkbox" id="agreePush" style="width:18px;height:18px;flex-shrink:0;margin-top:2px;">
+      <span>
+        (선택) 서비스 푸시 알림 수신에 동의합니다
+        <span style="display:block;margin-top:4px;font-size:0.78rem;color:var(--ds-body);line-height:1.5;">
+          광고·마케팅 동의가 아닙니다. 내가 설정한 가격·신고가/신저가·리밸런싱·캘린더 알림만 보내며,
+          동의하지 않아도 앱을 이용할 수 있어요.
+        </span>
+      </span>
+    </label>
 
     <button id="consentBtn" onclick="submitConsent()" disabled
       style="width:100%;margin-top:20px;padding:13px;border:none;border-radius:var(--r-md);
@@ -28,6 +39,7 @@
 <script>
   const _t = document.getElementById('agreeTerms');
   const _p = document.getElementById('agreePrivacy');
+  const _push = document.getElementById('agreePush');
   const _b = document.getElementById('consentBtn');
   function _sync() { const ok = _t.checked && _p.checked; _b.disabled = !ok; _b.style.opacity = ok ? '1' : '0.5'; }
   _t.addEventListener('change', _sync); _p.addEventListener('change', _sync);
@@ -35,7 +47,11 @@
     if (!(_t.checked && _p.checked)) return;
     _b.disabled = true;
     try {
-      const r = await fetch('/consent', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const r = await fetch('/consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ push_notifications: !!(_push && _push.checked) })
+      });
       const j = await r.json();
       if (j.ok) { location.href = '/'; }
       else { document.getElementById('consentErr').textContent = '오류가 발생했어요. 다시 시도해주세요.'; _b.disabled = false; }

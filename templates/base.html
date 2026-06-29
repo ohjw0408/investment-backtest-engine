@@ -486,7 +486,7 @@ function handleGoogleLogin(e) {
     if (!App) return;
     App.addListener('appUrlOpen', function (data) {
       const u = (data && data.url) || '';
-      if (u.indexOf('moneymilestone://auth') === 0) {
+      if (u.indexOf('moneymilestone://auth') === 0 || u.indexOf('intent://auth') === 0) {
         try { if (Browser) Browser.close(); } catch (e) {}
         const m = u.match(/[?&]token=([^&]+)/);
         if (m) location.href = '/auth/exchange?token=' + encodeURIComponent(m[1]);
@@ -502,27 +502,35 @@ async function mmInitPush(force) {
     const Cap = window.Capacitor;
     if (!(Cap && Cap.isNativePlatform && Cap.isNativePlatform())) return false;  // 앱에서만
     if (!window.MM_LOGGED_IN) return false;                                       // 로그인 후만
-    if (!force && localStorage.getItem('mm_push_optout')) return false;           // 설정서 끔 → 자동등록 안함
     const Push = Cap.Plugins && Cap.Plugins.PushNotifications;
     if (!Push) return false;
+    if (!force) {
+      let st = null;
+      try { st = await fetch('/api/push/status').then(r => r.ok ? r.json() : null); } catch (e) {}
+      if (!(st && st.consented)) return false;                                    // 기본값 OFF
+    } else {
+      const cr = await fetch('/api/push/consent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true })
+      });
+      if (!cr.ok) return false;
+    }
 
     let perm = await Push.checkPermissions();
     if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
-      if (!force) {
-        // 소프트 프리프롬프트 1회 — 거절해도 앱 정상, 다시 안 물음
-        if (localStorage.getItem('mm_push_asked')) return false;
-        localStorage.setItem('mm_push_asked', '1');
-        const yes = await mmConfirm('서비스 알림을 받을까요?', {
-          sub: '관심 종목 가격·신고가/신저가·리밸런싱 등 내가 설정한 알림만 보내드려요. ' +
-               '광고·마케팅 알림이 아니에요. 받지 않아도 앱은 그대로 쓸 수 있고, ' +
-               '나중에 설정 › 계정에서 언제든 켜고 끌 수 있어요.',
-          ok: '알림 받기', cancel: '안 받기' });
-        if (!yes) return false;
-      }
       perm = await Push.requestPermissions();
     }
-    if (perm.receive !== 'granted') return false;   // 거절 → 인앱 알림만(푸시 없음)
-    localStorage.removeItem('mm_push_optout');
+    if (perm.receive !== 'granted') {
+      if (force) {
+        try {
+          await fetch('/api/push/consent', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: false })
+          });
+        } catch (e) {}
+      }
+      return false;
+    }
 
     // 리스너 먼저 등록(토큰 이벤트 누락 방지) → register
     Push.addListener('registration', function (t) {

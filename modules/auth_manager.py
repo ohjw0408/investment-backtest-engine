@@ -52,15 +52,26 @@ def init_db():
         _conn.execute("ALTER TABLE users ADD COLUMN agreed_terms_at TEXT")
     if "agreed_privacy_at" not in ucols:
         _conn.execute("ALTER TABLE users ADD COLUMN agreed_privacy_at TEXT")
+    if "push_consent_at" not in ucols:
+        _conn.execute("ALTER TABLE users ADD COLUMN push_consent_at TEXT")
+    if "push_revoked_at" not in ucols:
+        _conn.execute("ALTER TABLE users ADD COLUMN push_revoked_at TEXT")
     _conn.commit()
 
 
-def set_user_consent(user_id):
+def set_user_consent(user_id, push_notifications=False):
     """약관·개인정보 동의 기록(현재 시각)."""
     now = datetime.now().isoformat()
     c = _get_conn()
-    c.execute("UPDATE users SET agreed_terms_at=?, agreed_privacy_at=? WHERE id=?",
-              (now, now, user_id))
+    if push_notifications:
+        c.execute(
+            "UPDATE users SET agreed_terms_at=?, agreed_privacy_at=?, "
+            "push_consent_at=?, push_revoked_at=NULL WHERE id=?",
+            (now, now, now, user_id),
+        )
+    else:
+        c.execute("UPDATE users SET agreed_terms_at=?, agreed_privacy_at=? WHERE id=?",
+                  (now, now, user_id))
     c.commit()
 
 
@@ -72,6 +83,31 @@ def has_consented(user_id):
     return bool(row and row["agreed_terms_at"] and row["agreed_privacy_at"])
 
 
+def set_push_consent(user_id, enabled):
+    """서비스 푸시 알림 선택 동의/철회. 광고·마케팅 동의가 아니다."""
+    now = datetime.now().isoformat()
+    c = _get_conn()
+    if enabled:
+        c.execute(
+            "UPDATE users SET push_consent_at=?, push_revoked_at=NULL WHERE id=?",
+            (now, user_id),
+        )
+    else:
+        c.execute(
+            "UPDATE users SET push_consent_at=NULL, push_revoked_at=? WHERE id=?",
+            (now, user_id),
+        )
+    c.commit()
+
+
+def has_push_consent(user_id):
+    """서비스 푸시 알림 수신에 명시적으로 동의했는지."""
+    row = _get_conn().execute(
+        "SELECT push_consent_at FROM users WHERE id=?", (user_id,)
+    ).fetchone()
+    return bool(row and row["push_consent_at"])
+
+
 def delete_user(user_id):
     """회원 탈퇴 — 해당 사용자의 모든 개인데이터 삭제(개인정보보호법 이용자 권리)."""
     c = _get_conn()
@@ -81,6 +117,7 @@ def delete_user(user_id):
         "DELETE FROM saved_portfolios WHERE user_id=?",
         "DELETE FROM alert_rules WHERE user_id=?",
         "DELETE FROM alert_events WHERE user_id=?",
+        "DELETE FROM device_tokens WHERE user_id=?",
         "DELETE FROM user_settings WHERE user_id=?",
         "DELETE FROM users WHERE id=?",
     ):

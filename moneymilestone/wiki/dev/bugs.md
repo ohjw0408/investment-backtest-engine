@@ -1,5 +1,5 @@
 ---
-updated: 2026-06-28
+updated: 2026-06-29
 tags: [dev, bug]
 ---
 
@@ -13,10 +13,11 @@ tags: [dev, bug]
 
 ## 활성 버그 목록
 
-> updated: 2026-06-19
+> updated: 2026-06-29
 
 | # | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|---|
+| BUG-HOME-KOSPI-WEEKEND-DASH | 홈 화면 코스피 타일이 2026-06-27~28(토·일) `—`로 표시되고 클릭 시 `^KS11` 정보를 찾을 수 없음(오너 보고) | 정확한 운영 로그는 없음. 코드상 홈 위젯은 `/api/watchlist/quotes`→`_wl_recent_closes()`에서 `index_ohlc`/`index_daily`를 읽고 둘 다 없을 때 yfinance fallback을 쓰는데, 기존 fallback은 성공해도 DB에 저장하지 않고 표시만 했다. `^KS11`은 `KS200` alias 제거 후 `index_daily` 구제도 약해, 운영 DB의 `index_ohlc`가 비었거나 조회 실패한 상태에서 주말/외부 API 빈 응답이 겹치면 quote `None`→홈 `—`, 상세도 yfinance 실패 시 “종목을 찾을 수 없습니다”로 이어질 수 있음 | `app.py`, `tests/test_home_widgets.py` | ✅ 수정 (2026-06-29): 홈 지수 fallback yfinance 성공 시 실제 거래일 OHLCV를 `index_ohlc`에 `INSERT OR REPLACE` 저장하도록 변경. 주말 날짜 가짜행은 만들지 않고 yfinance가 반환한 거래일만 저장. 회귀 테스트 추가: 빈 임시 index DB + fake yfinance로 `^KS11` fallback 반환과 DB upsert 확인. 검증 `.\venv\Scripts\python.exe tests\test_home_widgets.py` → 18 PASS / 0 FAIL. (Codex) |
 | BUG-COMPARE-DEEP-SYNTH | 비교 심화 아코디언(P3) — SHY/IEF 등 단기채 ETF가 연수익 +172%(SHY)·−85%, SCHD 배당성장 +270% 등 비현실 스파이크로 차트 Y축 박살 (코덱스 후속수정 중 잔존) | 손상 합성백필(volume=0) 자체가 구간 전체 쓰레기(SHY 합성 일변동성 실데이터 **20×**, 하루 +122% / IEF 2.9×). 코덱스 `_clean_deep_points` 45% **단일일** 점프필터는 9121→9102(19행)만 제거 → 잔여 노이즈가 연 +172% 생성. 배당은 SCHD 2011 상장 **부분 첫해**(dindex 0.00594)가 저베이스필터(median×0.15) 통과 → 2012 +270% | `risk_return_logic.py` | ✅ 수정 (2026-06-27): **①종목별 합성손상 게이트**(`_clean_deep_points`): 합성 일변동성 실데이터 대비 >2.5× OR 단일일 >30%면 그 종목 합성 전부 드롭→real-only 폴백(원래 안전동작). 정상 합성(SPY/QQQ/SCHD/GLD/TLT ratio 0.9~1.3·max≤0.21)은 긴이력 보존. **②배당성장** 저베이스 0.15→0.30(부분 inception 컷)+spike캡 3.0→1.0. 검증: SHY 연수익 [−85.7%,+172.6%]→[−3.9%,+4.9%]·SCHD 배당 +270%→max+44.8%·Playwright adhoc 아코디언5 ret/divg max 49/53%·콘솔0. 신규 `tests/check_rr_deep.js`. (Claude) |
 | BUG-OVERLAY-SPIKE | 포트폴리오 비교 "추세 겹쳐보기"에서 올웨더·영구·골드버터플라이·60/40·멀티에셋 등 6월 중순 델타 스파이크(차트 전부 깨져 보임) (오너 발견 2026-06-26) | **BUG-BACKTEST-SPY-SPIKE 재발(다른 읽기경로)**: `price_daily`의 SPY `2026-06-17 close=346500`(=같은날 삼성전자 005930값) 오틱이 `get_price`에선 `_drop_isolated_price_spikes`로 걸러지나, 겹쳐보기 `_portfolio_index_series`(app.py)는 price_daily를 **raw SQL 직접** 읽어 필터 미적용. 실제 스파이크는 SPY 포함분(영구·60/40)뿐인데 겹친 차트 Y축이 ~28000까지 늘어 전 라인이 찌그러져 "전부 스파이크"로 보임 | `app.py`(`_portfolio_index_series`), `modules/price_loader.py`, `tasks.py`, `celery_app.py` | ✅ 수정 (2026-06-26): **①읽기경로** 겹쳐보기 시계열에 종목별 `_drop_isolated_price_spikes`(get_price와 동일·즉시 마스킹). **②근본(오너 지시)**: 쓰기경로 `fetch_from_api`에 동일 필터(풀레인지 오틱 1차 차단) + 신규 `PriceLoader.purge_isolated_spikes()`(DB 전체 이웃 보고 오틱 행 **DELETE**, 단일일 증분 오틱까지 self-heal) + Beat `purge_price_spikes` 매일 10:00 UTC. **③클린업**: 로컬 DB SPY 06-17 행 삭제 완료. prod=배포 시 읽기필터로 즉시 마스킹 + 익일 beat가 물리 삭제. 검증=giant-spike 0·purge가 오틱만 삭제(이웃보존)·targeted 3 PASS·콘솔0 | 
 | BUG-005930-SPIKE | 삼성전자(005930) 6월 가격이 230만원(2,382,000)까지 ~7배 급등 (오너 발견 2026-06-23) | prod `price_daily` `005930 2026-06-16` 행 전체 오염(O/H/L/C 모두 238만대, vol 3.6M, 양옆 33.7만/36.25만). yfinance bad tick이 `INSERT OR IGNORE`로 박혀 안 지워짐. `_drop_isolated_price_spikes` 임계가 **25배**라 ~7배 오틱을 못 잡음(전 BUG-BACKTEST-SPY-SPIKE 25배 설정의 사각지대) | `modules/price_loader.py` | ✅ 수정 (2026-06-23): 임계 **25.0→4.0**(한국 ±30%상한·서킷브레이커상 reverting 4배+는 오틱 확정, 분할/병합은 neighbors_same_scale 가드로 보존). read-time 필터라 차트·백테·계산기·위젯 전 경로 자동정정+self-heal. 회귀 2 PASS + 005930 시나리오 06-16 drop 확인. prod 오염행 DELETE. (Claude) |
@@ -168,3 +169,12 @@ tags: [dev, bug]
 | 추세 겹쳐보기 — 워런 버핏 포폴 지수가 2021-06-25에 +85% 점프 | ① `price_daily`에 **내부 NULL홀**(KO/AXP/BAC/CVX/OXY/GOOGL의 2000~2020 close=NULL). 긴 구간 1회 다운로드 시 yfinance가 중간을 NaN으로 주면 `INSERT OR IGNORE`로 NULL행이 박히고 `get_price`는 내부 갭 재페치 안 함 → 영구 잔존. ② `_portfolio_index_series`가 `closes.pct_change()` 기본 `fill_method='pad'` → 홀을 forward-fill 후 변동률 → 홀 닫히는 날 +150~250% 가짜수익(AXP +249%) → 포폴 +85% 점프 | ① `app.py`: `pct_change(fill_method=None)` → 홀 종료일 NaN(그날 제외). ② `price_loader.fetch_from_api`: NaN close 행 저장 전 `dropna`(홀 근원 차단). ③ prod `price_daily` 전수 복구(홀 0행). 검증: 2021 최대 일변동 85%→4.25%, 라이브 API 점프 제거 | `4e990e2` `87299cf` | ✅ |
 | `ensure_full_history` — 페치 실패해도 `complete=1` 마킹 | `try/except: pass` 후 무조건 `_mark_history_complete` → yfinance 실패 시 얕은 데이터 영구 고착 | 예외 시 마킹 안 하고 `return False`(다음 접근 재시도) | `87299cf` | ✅ |
 | 추세 겹쳐보기 툴팁 — hover 시 같은 x인데 일부 시리즈만 표시 | 다운샘플로 시리즈마다 샘플 날짜 어긋남 → union 라벨에서 자기 포인트 없는 날 `null` → Chart.js `index` 툴팁이 null 데이터셋 스킵 | `rrOvFill` 보간(구간내 빈 라벨 날짜기준 선형보간, 선 모양 불변) + 공유 크로스헤어 툴팁(값 정렬) | `95ca52c` | ✅ (로직검증, 시각검증은 오너 육안) |
+
+---
+
+## 2026-06-29 세션 (Codex) — 앱 출시 실기기 피드백
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| 신규 계정 푸시 알림 기본 ON/동의 누락 | 최초 약관 동의 화면에 푸시 선택 동의가 없고, 기존 클라이언트가 로그인 후 자동 FCM 등록을 시도할 수 있었음 | `users.push_consent_at/push_revoked_at` 추가. `(선택)` 푸시 동의 UI 추가. 동의 전 `/api/push/register` 403, 전송 대상 조회 빈 배열, 설정 OFF 시 동의 철회+토큰 삭제 | 미커밋 | ✅ 테스트 PASS |
+| Android OAuth 후 메일앱 chooser 노출 | 앱 복귀용 커스텀 스킴이 Android resolver에서 이상 앱 후보와 엮인 사례 보고 | 앱 플로우 콜백을 `intent://auth?...#Intent;scheme=moneymilestone;package=com.moneymilestone.app;end`로 패키지 지정 | 미커밋 | ⚠️ 실기기 재검증 필요 |

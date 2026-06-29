@@ -16,6 +16,7 @@ from modules.auth_manager import (
     get_home_widgets, save_home_widgets,
     get_calendar_config, save_calendar_config,
     set_user_consent, has_consented, delete_user,
+    set_push_consent, has_push_consent,
 )
 
 load_dotenv()
@@ -322,6 +323,11 @@ def google_callback():
         import secrets
         tok = secrets.token_urlsafe(24)
         if _oauth_handoff_set(tok, user['id']):
+            if 'Android' in request.headers.get('User-Agent', ''):
+                return redirect(
+                    f"intent://auth?token={tok}"
+                    "#Intent;scheme=moneymilestone;package=com.moneymilestone.app;end"
+                )
             return redirect(f"moneymilestone://auth?token={tok}")
         # redis 없으면 핸드오프 불가 → 일반 세션 폴백
     session['user_id'] = user['id']
@@ -398,7 +404,8 @@ def consent_submit():
     uid = session.get('user_id')
     if not uid:
         return jsonify({'error': '로그인 필요'}), 401
-    set_user_consent(uid)
+    body = request.get_json(silent=True) or {}
+    set_user_consent(uid, push_notifications=bool(body.get('push_notifications')))
     return jsonify({'ok': True})
 
 
@@ -1452,6 +1459,47 @@ def _wl_recent_closes(code):
                 _s = (_d3.today() - _t3(days=45)).strftime("%Y-%m-%d")
                 df = _yf.download(code, start=_s, progress=False, auto_adjust=False, threads=False)
                 if not df.empty:
+                    if hasattr(df, "columns") and getattr(df.columns, "nlevels", 1) > 1:
+                        df.columns = df.columns.get_level_values(0)
+                    try:
+                        conn.execute(
+                            "CREATE TABLE IF NOT EXISTS index_ohlc ("
+                            "code TEXT, date TEXT, open REAL, high REAL, low REAL, "
+                            "close REAL, volume REAL, PRIMARY KEY(code, date))")
+
+                        def _num(v, default=None):
+                            try:
+                                if hasattr(v, "iloc"):
+                                    v = v.iloc[0]
+                                if v is None:
+                                    return default
+                                f = float(v)
+                                return default if f != f else f
+                            except (TypeError, ValueError):
+                                return default
+
+                        seed = []
+                        for idx, r in df.iterrows():
+                            close = _num(r.get("Close"))
+                            if close is None:
+                                continue
+                            d = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx)[:10]
+                            seed.append((
+                                code, d,
+                                _num(r.get("Open"), close),
+                                _num(r.get("High"), close),
+                                _num(r.get("Low"), close),
+                                close,
+                                _num(r.get("Volume"), 0.0),
+                            ))
+                        if seed:
+                            conn.executemany(
+                                "INSERT OR REPLACE INTO index_ohlc "
+                                "(code, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)",
+                                seed)
+                            conn.commit()
+                    except Exception:
+                        pass
                     cl = df["Close"]
                     if hasattr(cl, "columns"):
                         cl = cl.iloc[:, 0]
@@ -1966,6 +2014,8 @@ def push_register():
     uid = session.get('user_id')
     if not uid:
         return jsonify({'error': '로그인 필요'}), 401
+    if not has_push_consent(uid):
+        return jsonify({'error': 'push_consent_required'}), 403
     body = request.get_json(silent=True) or {}
     token = str(body.get('token', '')).strip()
     platform = str(body.get('platform', 'android')).strip().lower()
@@ -1995,8 +2045,23 @@ def push_status():
     """푸시 알림 켜짐 여부(설정 토글용)."""
     uid = session.get('user_id')
     if not uid:
-        return jsonify({'enabled': False}), 401
-    return jsonify({'enabled': alert_store.has_device_tokens(uid)})
+        return jsonify({'consented': False, 'enabled': False}), 401
+    consented = has_push_consent(uid)
+    return jsonify({'consented': consented, 'enabled': consented and alert_store.has_device_tokens(uid)})
+
+
+@app.route('/api/push/consent', methods=['POST'])
+def push_consent():
+    """서비스 푸시 알림 선택 동의/철회. 광고·마케팅 동의와 별개."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'error': '로그인 필요'}), 401
+    body = request.get_json(silent=True) or {}
+    enabled = bool(body.get('enabled'))
+    set_push_consent(uid, enabled)
+    if not enabled:
+        alert_store.delete_user_device_tokens(uid)
+    return jsonify({'ok': True, 'consented': enabled})
 
 
 @app.route('/api/push/disable', methods=['POST'])
@@ -2005,6 +2070,7 @@ def push_disable():
     uid = session.get('user_id')
     if not uid:
         return jsonify({'error': '로그인 필요'}), 401
+    set_push_consent(uid, False)
     alert_store.delete_user_device_tokens(uid)
     return jsonify({'ok': True})
 

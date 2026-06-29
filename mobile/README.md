@@ -10,13 +10,13 @@ UI/로직은 전부 서버에 있음 → **서버 코드 수정 = 앱에 자동 
 - `android/` — 네이티브 Gradle 프로젝트 (Capacitor 생성).
 - `assets/` — 아이콘/스플래시 원본(`logo.png`). `npx @capacitor/assets generate --android`로 재생성.
 
-## 빌드 사전 준비 (이 PC에 아직 없음)
+## 빌드 사전 준비
 
-1. **Android Studio 설치** (Android SDK + JDK 17 번들). https://developer.android.com/studio
-2. 설치 후 환경변수:
+1. **Android Studio 설치** (Android SDK + JDK 17+ 번들). https://developer.android.com/studio
+2. 환경변수:
    - `ANDROID_HOME` = `%LOCALAPPDATA%\Android\Sdk`
    - `JAVA_HOME` = Android Studio 번들 JDK (예: `C:\Program Files\Android\Android Studio\jbr`)
-   - 현재 이 PC는 **Java 8뿐** → AGP가 요구하는 **JDK 17+** 필요.
+   - 이 PC는 Gradle 빌드용 `JAVA_HOME`을 Android Studio JBR로 설정함. 일반 PowerShell `java -version`이 Java 8을 보여도 Gradle은 `JAVA_HOME`을 우선 사용.
 
 ## 개발 빌드 (디버그 APK, 실기기 테스트)
 
@@ -46,13 +46,20 @@ cd mobile/android
    keyAlias=upload
    keyPassword=<비밀번호>
    ```
-3. `android/app/build.gradle`에 서명 설정 연결 (signingConfigs → release). *Android Studio: Build > Generate Signed Bundle 메뉴가 더 쉬움.*
+3. `android/app/build.gradle`에 서명 설정 연결 (signingConfigs → release).
 4. 빌드:
    ```bash
    cd mobile/android && ./gradlew bundleRelease
    # 산출물: app/build/outputs/bundle/release/app-release.aab
    ```
 5. Play Console(개발자계정 $25 1회) → 앱 생성 → AAB 업로드 → 스토어 등록정보 작성 → 심사.
+
+현재 로컬 상태:
+
+- 업로드 키: `mobile/moneymilestone-upload.jks`
+- 서명 설정: `mobile/android/keystore.properties`
+- Play 업로드 파일: `mobile/android/app/build/outputs/bundle/release/app-release.aab`
+- 위 두 키 파일은 gitignore됨. 별도 백업 필수.
 
 ## ⚠️ 미해결 — 출시 전 반드시 확인
 
@@ -63,4 +70,4 @@ cd mobile/android
 2. **Play "최소 기능" 정책** — 순수 웹뷰 앱은 반려 가능. 푸시알림 등 네이티브 기능 추가하면 통과율↑.
    - 이미 인앱 알림(celery) 있음 → FCM 푸시 연동이 다음 강화 포인트.
 3. **딥링크/뒤로가기** — `@capacitor/app`로 안드로이드 백버튼 → WebView history.back 처리 추가 권장.
-4. **앱 아이콘 화질** — 원본 logo.png가 390×390. 스토어용 512×512+ 권장 → 1024×1024 로고로 `assets generate` 재실행하면 선명.
+4. **앱 아이콘 화질** — 현재 원본은 2000×2000. 새 로고 기준으로 Play 아이콘과 Android 아이콘을 재생성함.

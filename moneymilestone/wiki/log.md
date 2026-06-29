@@ -1,5 +1,28 @@
 # Log
 
+## [2026-06-29] FIX | 홈 위젯 코스피 주말 `—` 방지
+
+오너가 2026-06-27~28(토·일) 홈 화면 코스피 타일에 숫자 대신 `—`가 보였고, 클릭하면 `^KS11` 정보를 찾을 수 없었다고 보고.
+- 확인: 현재 홈은 예전 `/api/market`이 아니라 `/api/home-config` → `/api/watchlist/quotes`를 사용. S&P(`^GSPC`), 나스닥(`^IXIC`), 코스피(`^KS11`) 모두 같은 `_wl_recent_closes()` 경로에서 `index_ohlc` → `index_daily` → yfinance fallback 순서로 quote를 만든다.
+- 차이: 상세 페이지의 지수 lazy-backfill은 yfinance 성공분을 `index_ohlc`에 저장하지만, 홈 위젯 fallback은 성공해도 표시만 하고 저장하지 않았다. 따라서 `^KS11`의 `index_ohlc`가 비어 있거나 조회 실패한 상태에서 주말/외부 API 빈 응답이 겹치면 `—`가 재발 가능했다.
+- 수정: 홈 지수 fallback yfinance 성공 시 실제 거래일 OHLCV를 `index_ohlc`에 `INSERT OR REPLACE` 저장. 주말 날짜 가짜행은 만들지 않고 yfinance가 반환한 거래일만 저장한다.
+- 테스트: `tests/test_home_widgets.py`에 빈 임시 index DB + fake yfinance로 `^KS11` fallback 반환과 `index_ohlc` upsert 검증 추가. 최근 동의 게이트 때문에 기존 로그인 라우트 테스트가 본문까지 도달하도록 테스트 사용자 동의 세팅도 보정.
+- 검증: `.\venv\Scripts\python.exe tests\test_home_widgets.py` → 18 PASS / 0 FAIL.
+- 변경: `app.py`, `tests/test_home_widgets.py`, `moneymilestone/wiki/dev/status.md`, `moneymilestone/wiki/dev/bugs.md`, `moneymilestone/wiki/log.md`.
+
+_작성: Codex_
+
+## [2026-06-28] UX | 비교 심화 P3 — 손실확률 면책문구 + 아코디언 기본 펼침
+
+오너 피드백 반영.
+- 수익률 아코디언의 기간별 손실확률 설명을 “미래 손실 가능성 보장/예측”이 아니라 과거 표본에서 해당 기간 보유 결과가 손실로 끝난 비율임을 명시.
+- 0.0%도 “과거 표본에 손실 사례가 없었다”는 뜻일 뿐, 앞으로 손실이 나지 않는다는 의미가 아님을 표 하단에 추가.
+- 비교 분석 완료 후 심화 비교 아코디언 5개가 기본으로 모두 펼쳐지도록 변경해 빈 화면처럼 보이는 문제 제거.
+- 검증: `node --check tests/check_rr_deep.js`, Playwright `tests/check_rr_deep.js` PASS(12/12: 기본 전체 펼침·손실확률 면책문구·콘솔0), 라이트/다크 스크린샷 육안 확인.
+- 변경: `templates/risk_return.html`, `tests/check_rr_deep.js`.
+
+_작성: Codex_
+
 ## [2026-06-28] FIX | 비교 심화 P3 — 가격 기반 아코디언 지표 actual-only 산출
 
 오너 확인 후 비교 심화 아코디언의 합성/추정 데이터 처리 기준을 배당 지표에서 가격 기반 지표까지 확장.
@@ -235,6 +258,14 @@ _작성: Codex_
 - 배포: push(main). [[reference-prod-deploy-access]]
 
 _작성: Claude_
+
+## 2026-06-29 — 앱 출시 실기기 피드백: OAuth chooser 완화 + 푸시 선택 동의
+
+- 신규 계정 실기기 테스트에서 Google 로그인 후 메일앱 chooser가 뜬 사례 보고 → 앱 OAuth 핸드오프를 Android package-scoped intent로 변경.
+- 최초 동의 화면에 `(선택)` 서비스 푸시 알림 수신 동의 추가. 광고·마케팅 동의가 아님을 명시.
+- 푸시 기본값 OFF로 변경: `users.push_consent_at/push_revoked_at` 추가, 동의 전 FCM 토큰 등록 403, 전송 대상 조회도 차단.
+- 설정 토글은 서버 동의값을 진실원천으로 사용. 끄면 동의 철회 + 전 기기 토큰 삭제.
+- 검증: `tests/test_push_consent.py` 15 PASS, `tests/test_home_widgets.py` 18 PASS.
 
 ## [2026-06-24] FEAT | 내 자산 — 절세계좌 해외종목 경고 + mmConfirm 충돌 픽스 (오너)
 

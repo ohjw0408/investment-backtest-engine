@@ -58,7 +58,10 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('PASS  ' + n); } else { f
         dirty: horizonRows.filter(r => r.n > 0 && r.syn_frac !== 0).length,
       };
     }
-    return { items: data.items.length, names: data.items.map(i => i.name), divStats, annualStats, rollingStats };
+    const defaultOpen = document.querySelectorAll('.rr-acc.open').length;
+    const defaultCharts = Object.keys(rrAccCharts).length;
+    const lossNote = document.getElementById('rrLP_ret')?.textContent || '';
+    return { items: data.items.length, names: data.items.map(i => i.name), divStats, annualStats, rollingStats, defaultOpen, defaultCharts, lossNote };
   });
 
   ok('compare 응답 items>0', setup.items > 0, setup.err || JSON.stringify(setup));
@@ -70,10 +73,11 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('PASS  ' + n); } else { f
     JSON.stringify(setup.annualStats));
   ok('롤링 손실확률 합성 윈도우 제외', Object.values(setup.rollingStats || {}).every(s => s.rows > 0 && s.dirty === 0),
     JSON.stringify(setup.rollingStats));
+  ok('아코디언 기본 전체 펼침', setup.defaultOpen === 5 && setup.defaultCharts === 5,
+    JSON.stringify({ open: setup.defaultOpen, charts: setup.defaultCharts }));
+  ok('손실확률 과거표본 면책문구 표시', setup.lossNote.includes('미래 손실 가능성을 보장하거나 예측하지 않으며') && setup.lossNote.includes('앞으로 손실이 나지 않는다는 의미가 아닙니다'),
+    setup.lossNote);
 
-  for (const k of ['ret', 'vol', 'mdd', 'div', 'divg']) {
-    await page.click(`.rr-acc[data-acc="${k}"] .rr-acc-head`);
-  }
   await page.waitForTimeout(500);
 
   const result = await page.evaluate(() => {

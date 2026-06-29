@@ -1,5 +1,5 @@
 ---
-updated: 2026-06-28
+updated: 2026-06-29
 tags: [dev]
 ---
 
@@ -20,6 +20,10 @@ tags: [dev]
 ---
 
 ## 한 줄 요약
+
+> ✅ **2026-06-29 업데이트 120 (홈 위젯 — 코스피 주말 `—` 방지):** 오너가 2026-06-27~28(토·일) 홈 코스피 타일이 `—`로 보이고 클릭 시 `^KS11` 종목/가격 정보를 찾을 수 없었다고 보고. 확인 결과 현재 홈은 `/api/market`이 아니라 `/api/home-config`→`/api/watchlist/quotes` 경로를 쓰며, `^GSPC`·`^IXIC`·`^KS11` 모두 `_wl_recent_closes()`에서 `index_ohlc`→`index_daily`→yfinance fallback 순서로 읽음. 상세 페이지의 지수 lazy-backfill은 yfinance 성공분을 `index_ohlc`에 저장하지만, 홈 fallback은 성공해도 표시만 하고 저장하지 않아 `^KS11` DB가 비어 있거나 조회 실패한 상태에서 주말/외부 API 빈 응답이 겹치면 `—`가 재발 가능. 수정: 홈 지수 fallback yfinance 성공 시 실제 거래일 OHLCV를 `index_ohlc`에 `INSERT OR REPLACE` 저장. 테스트: `tests/test_home_widgets.py`에 빈 임시 index DB + fake yfinance로 `^KS11` fallback 저장 검증 추가, 동의 게이트 반영. 검증 `.\venv\Scripts\python.exe tests\test_home_widgets.py` → 18 PASS / 0 FAIL. 변경=`app.py`, `tests/test_home_widgets.py`. (Codex)
+
+> ✅ **2026-06-28 업데이트 119 (비교 심화 P3 — 손실확률 면책문구 + 기본 펼침):** 오너 피드백 반영. 수익률 아코디언의 기간별 손실확률을 “미래 보장/예측”이 아니라 **과거 표본에서 해당 기간 보유 결과가 손실로 끝난 비율**로 명시하고, 0.0%도 “과거 표본에 손실 사례가 없었다”는 뜻일 뿐 앞으로 손실이 나지 않는다는 의미가 아님을 표 하단에 추가. 비교 분석 완료 후 심화 비교 아코디언 5개가 기본으로 모두 펼쳐지도록 변경. 검증 `node --check tests/check_rr_deep.js`, Playwright `tests/check_rr_deep.js` 12/12 PASS(기본 전체 펼침·손실확률 면책문구·콘솔0), 라이트/다크 스크린샷 육안 확인. (Codex)
 
 > ✅ **2026-06-28 업데이트 118 (비교 심화 P3 — 가격 기반 actual-only 산출):** 오너가 지적한 “합성 데이터가 수익률/MDD/배당률 같은 아코디언 지표를 달라지게 할 가능성”을 가격 기반 지표까지 정리. `risk_return_logic._annual_from_points(actual_only=True)`로 수익률·변동성·MDD 연간 오차막대에서 `syn_frac>0` 연도와 진행 중인 부분연도를 제외하고, `modules.rolling.horizon_table(actual_only=True)`로 기간별 손실확률에서도 합성/백필 플래그가 포함된 롤링 윈도우를 제외. 프론트 `_rrBoxValues`에도 방어 필터를 남기고 안내 문구를 “합성/추정 구간 제외”로 정정. 검증 `py_compile`, `pytest tests/test_rolling.py` 9 PASS, `node --check`, Playwright `tests/check_rr_deep.js` 10/10 PASS(가격 기반 연도지표 합성/부분연도 제외·롤링 손실확률 합성 윈도우 제외·콘솔0), 라이트/다크 스크린샷 육안 확인. (Codex)
 
@@ -525,3 +529,13 @@ tags: [dev]
 → 상세 Phase 기록: [[dev/phases]]
 → 버그 목록: [[dev/bugs]]
 → 아이디어: [[dev/ideas]]
+
+---
+
+## 2026-06-29 업데이트 121 — 앱 출시 실기기 피드백 수정
+
+- Android 앱 Google 로그인 후 메일앱 chooser가 뜬 사례 완화: OAuth 앱 핸드오프를 package-scoped intent로 변경.
+- 최초 동의 화면에 `(선택)` 서비스 푸시 알림 수신 동의 추가. 광고·마케팅 동의 아님을 명시.
+- 푸시 기본값 OFF: 서버 `push_consent_at` 없으면 FCM 토큰 등록/전송 대상 조회 불가.
+- 설정 푸시 토글은 서버 동의값을 기준으로 ON/OFF. OFF 시 동의 철회 + 전 기기 토큰 삭제.
+- 검증: `tests/test_push_consent.py` 15 PASS, `tests/test_home_widgets.py` 18 PASS.

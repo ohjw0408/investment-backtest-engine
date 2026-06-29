@@ -137,8 +137,16 @@
 .rr-acc-body { padding: 4px 16px 18px; }
 .rr-acc-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px; }
 .rr-acc-desc b { color: var(--text); }
+.rr-sample-guide { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 12px; }
+.rr-sample-guide-item { border: 1px solid var(--border); border-radius: 9px; background: var(--bg); padding: 10px 12px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.55; }
+.rr-sample-guide-item b { color: var(--text); font-size: 0.82rem; }
+.rr-sample-ctrl { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin: 0 0 12px; font-size: 0.78rem; color: var(--text-muted); }
+.rr-sample-ctrl .lbl { font-weight: 700; color: var(--text-muted); margin-right: 2px; }
+.rr-sample-ctrl .qr { padding: 4px 9px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text-muted); font-size: 0.74rem; cursor: pointer; font-family: inherit; }
+.rr-sample-ctrl .qr.on { border-color: var(--blue); color: var(--blue); font-weight: 800; background: rgba(25,118,210,0.08); }
+.rr-sample-caption { flex-basis: 100%; font-size: 0.72rem; color: var(--text-muted); line-height: 1.45; }
 .rr-acc-2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
-@media (max-width: 760px) { .rr-acc-2 { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .rr-acc-2, .rr-sample-guide { grid-template-columns: 1fr; } }
 .rr-acc-chart { position: relative; height: 380px; }
 .rr-lp-panel { margin-top: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--bg); }
 .rr-lp-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
@@ -284,7 +292,11 @@
 
     <!-- 심화 비교 아코디언 (P3) — 지표별 분포 오차막대 + 수익률 롤링 -->
     <div class="rr-card" id="rrAccordions" style="display:none;">
-      <div class="rr-card-title">🔎 지표별 심화 비교 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 항목을 펼쳐 전체 가용기간의 분포 오차막대를 비교하세요</span></div>
+      <div class="rr-card-title">🔎 지표별 심화 비교 <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 항목별 표본 길이를 맞춰 분포 오차막대를 비교하세요</span></div>
+      <div class="rr-sample-guide">
+        <div class="rr-sample-guide-item"><b>자동</b><br>가장 짧은 실제 표본 길이에 맞춰 모두 같은 최근 N년으로 비교합니다. 표본 길이 왜곡은 줄지만, 신생 종목이 있으면 분석 기간이 2~3년까지 짧아질 수 있어 장기 결론은 달라질 수 있어요.</div>
+        <div class="rr-sample-guide-item"><b>최대 · 기본값</b><br>각 항목의 모든 실제 가용 데이터를 사용합니다. 장기 국면을 가장 많이 담지만, 이력이 긴 항목은 위기와 호황을 더 많이 겪어 꼬리가 길고 더 불안정해 보일 수 있어요.</div>
+      </div>
       <div id="rrAccHost"></div>
     </div>
 
@@ -475,6 +487,7 @@ async function rrCompare(){
 // ── 심화 비교 아코디언 (P3) ──
 let rrAutoScroll = false;
 let rrAccCharts = {};
+let rrAccSample = {};
 const RR_ACC = [
   { key:'ret',  title:'수익률',        sub:'분포 오차막대 + 기간별 손실확률',
     desc:'연도별 수익률 분포를 오차막대로 요약합니다. <b>박스는 흔한 범위(p25~p75), 수염은 최저~최고, 굵은 선은 중앙값</b>입니다. 오른쪽 표는 과거 데이터상 같은 기간을 보유했을 때 손실로 끝난 사례 비율입니다.',
@@ -492,11 +505,13 @@ const RR_ACC = [
 function rrRenderAccordions(data){
   Object.values(rrAccCharts).forEach(c=>{ try{ c.destroy(); }catch(e){} });
   rrAccCharts = {};
+  rrAccSample = {};
   const items = (data.items||[]).filter(it=> (it.annual&&it.annual.length) || (it.annual_div&&it.annual_div.length));
   const host = document.getElementById('rrAccHost');
   const card = document.getElementById('rrAccordions');
   if (!items.length){ card.style.display='none'; return; }
   card.style.display='block';
+  window._rrAccItems = items;
   host.innerHTML = RR_ACC.map((m,idx)=>`
     <div class="rr-acc" data-acc="${m.key}">
       <div class="rr-acc-head" onclick="rrAccToggle('${m.key}')">
@@ -505,13 +520,13 @@ function rrRenderAccordions(data){
       </div>
       <div class="rr-acc-wrap"><div class="rr-acc-body">
         <div class="rr-acc-desc">${m.desc}</div>
+        ${rrRenderSampleCtrl(m, items)}
         ${m.roll
           ? `<div class="rr-acc-chart"><canvas id="rrAcc_${m.key}"></canvas></div>`
             + `<div id="rrLP_${m.key}" class="rr-lp-panel"></div>`
           : `<div class="rr-acc-chart"><canvas id="rrAcc_${m.key}"></canvas></div>`}
       </div></div>
     </div>`).join('');
-  window._rrAccItems = items;
   RR_ACC.forEach(m=>rrAccToggle(m.key));
 }
 
@@ -535,12 +550,66 @@ function rrAccDraw(key){
 // 전체기간 값 분포를 항목별 오차막대 1개로 — 박스=[p25,p75], 수염=[최저,최고], 중앙선.
 // 연도별 겹침선 대신 "이 포트가 그 지표에서 보통 어디였나 + 좋을 때~나쁠 때"를 한눈에 비교.
 const RR_YTITLE = {ret:'연 수익률', vol:'연 변동성', mdd:'연 낙폭', div:'연 배당수익률', divg:'연 배당성장률'};
+const RR_SAMPLE_CHOICES = [
+  ['max','최대'], ['auto','자동'], ['5','5년'], ['10','10년'], ['15','15년'],
+  ['20','20년'], ['25','25년'], ['30','30년'],
+];
+function _rrBoxRows(it, m){
+  let rows;
+  if (m.divg) rows = ((it.divgrowth&&it.divgrowth.yoy)||[]).map(p=>({ year:+p.year, v:p.growth }));
+  else if (m.div) rows = (it.annual_div||[]).filter(a=>!a.partial).map(a=>({ year:+a.year, v:a.dyield }));
+  else rows = (it.annual||[]).filter(a=>!a.partial && !(a.syn_frac>0)).map(a=>({ year:+a.year, v:m.get(a) }));
+  return rows
+    .filter(r=>Number.isFinite(r.year) && r.v!=null && isFinite(r.v))
+    .sort((a,b)=>a.year-b.year);
+}
+function rrAccAutoYears(items, m){
+  const counts = items.map(it=>_rrBoxRows(it,m).length).filter(n=>n>0);
+  return counts.length ? Math.min(...counts) : 0;
+}
+function rrSampleCaption(mode, items, m){
+  if (mode === 'auto') {
+    const n = rrAccAutoYears(items, m);
+    return n ? `현재: 자동 · 가장 짧은 유효 표본 ${n}년에 맞춰 각 항목의 최근 ${n}개 연도만 비교합니다.`
+             : '현재: 자동 · 비교할 유효 표본이 아직 부족합니다.';
+  }
+  if (mode === 'max') return '현재: 최대 · 각 항목의 모든 실제 가용 연도를 사용합니다.';
+  return `현재: 최근 ${mode}년 · 이력이 더 짧은 항목은 가진 실제 연도만 사용합니다.`;
+}
+function rrRenderSampleCtrl(m, items){
+  const mode = rrAccSample[m.key] || 'max';
+  const buttons = RR_SAMPLE_CHOICES.map(([key,label]) =>
+    `<button class="qr${mode===key?' on':''}" type="button" data-mode="${key}" onclick="rrSetAccSample('${m.key}','${key}')">${label}</button>`).join('');
+  return `<div class="rr-sample-ctrl" id="rrSample_${m.key}">
+    <span class="lbl">표본 길이</span>${buttons}
+    <span class="rr-sample-caption">${esc(rrSampleCaption(mode, items, m))}</span>
+  </div>`;
+}
+function rrSetAccSample(key, mode){
+  rrAccSample[key] = mode;
+  const m = RR_ACC.find(x=>x.key===key);
+  const items = window._rrAccItems || [];
+  const ctrl = document.getElementById('rrSample_'+key);
+  if (ctrl && m) {
+    ctrl.querySelectorAll('.qr').forEach(b=>b.classList.toggle('on', b.dataset.mode === mode));
+    const cap = ctrl.querySelector('.rr-sample-caption');
+    if (cap) cap.textContent = rrSampleCaption(mode, items, m);
+  }
+  if (rrAccCharts[key]) { try{ rrAccCharts[key].destroy(); }catch(e){} delete rrAccCharts[key]; }
+  rrAccDraw(key);
+}
 function _rrBoxValues(it, m){
-  let arr;
-  if (m.divg) arr = ((it.divgrowth&&it.divgrowth.yoy)||[]).map(p=>p.growth);
-  else if (m.div) arr = (it.annual_div||[]).filter(a=>!a.partial).map(a=>a.dyield);
-  else arr = (it.annual||[]).filter(a=>!a.partial && !(a.syn_frac>0)).map(a=>m.get(a));
-  return arr.filter(v=>v!=null && isFinite(v)).map(v=>v*100).sort((a,b)=>a-b);
+  const mode = rrAccSample[m.key] || 'max';
+  const rows = _rrBoxRows(it, m);
+  let sliced = rows;
+  if (mode === 'auto') {
+    const n = rrAccAutoYears(window._rrAccItems || [], m);
+    sliced = n ? rows.slice(-n) : [];
+  } else if (mode !== 'max') {
+    const n = parseInt(mode, 10);
+    if (Number.isFinite(n) && n > 0) sliced = rows.slice(-n);
+  }
+  return sliced.map(r=>r.v*100).sort((a,b)=>a-b);
 }
 function _rrPctl(sorted, p){
   if (!sorted.length) return null;

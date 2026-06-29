@@ -1,5 +1,15 @@
 # Log
 
+## [2026-06-30] FIX | 백테스트 — SCHD 배당성장률 부분연도 스파이크 제거
+
+오너가 백테스트 배당 성장률 그래프에서 SCHD 2012년 값이 크게 튀는 문제를 보고.
+- 원인: SCHD는 2011년 10월 상장이라 2011년 배당이 12월 1회뿐이다. 2012년 full-year 배당과 단순 비교하면 `2012 / 2011 - 1 = +563.9%` 착시가 생긴다. 백테스트 프론트는 첫 해/저베이스/미완료 연도를 걸러내지 않고 `annual_dividends`를 바로 전년 대비로 계산했다.
+- 수정: `templates/backtest.html`의 배당 성장률 차트에 `btCleanDividendGrowthRows()` 추가. 시작/종료 부분연도, 중앙값 30% 미만 저베이스 선행연도, 연속 full-year 체인 이전의 고립 연도를 제외하고, 성장률 막대도 연속 연도끼리만 계산한다.
+- 검증: 실제 SCHD 백테스트 엔진 출력(raw 2010~2026)으로 Playwright DOM 검증 PASS(cleaned 2012~2025, chart labels 2013~2025, maxAbs 33%, 2012 스파이크 없음, 콘솔 에러 0). JS 문법 체크 OK, `git diff --check` OK.
+- 변경: `templates/backtest.html`, `moneymilestone/wiki/dev/status.md`, `moneymilestone/wiki/dev/bugs.md`, `moneymilestone/wiki/log.md`.
+
+_작성: Codex_
+
 ## [2026-06-30] UX | 포트폴리오 비교 — 지표별 심화 오차막대 표본 길이 선택
 
 오너 요청 반영.

@@ -1651,7 +1651,7 @@ function renderBacktest(data) {
 
   // 연간 배당금 + 배당 성장률 (낙폭 아래)
   renderAnnualDividendChart(data.annual_dividends, m.total_dividend);
-  renderDividendGrowthChart(data.annual_dividends);
+  renderDividendGrowthChart(data.annual_dividends, window._btLastBody || {});
 
   // 심화 분석 (롤링/분포) — P2
   renderRolling(data.rolling);
@@ -1930,12 +1930,40 @@ function renderAnnualDividendChart(annualDiv, totalDiv) {
     `총 배당금 ${fmtKRW(totalDiv || 0)} · 그 해 보유 수량 기준 실제 수령 배당입니다.`;
 }
 
-function renderDividendGrowthChart(annualDiv) {
+function btCleanDividendGrowthRows(annualDiv, body) {
+  const raw = (annualDiv || [])
+    .filter(a => a && a.dividend > 0 && Number.isFinite(Number(a.dividend)))
+    .map(a => ({ year: Number(a.year), dividend: Number(a.dividend) }))
+    .filter(a => Number.isFinite(a.year))
+    .sort((a, b) => a.year - b.year);
+  if (!raw.length) return { rows: [], skipped: 0 };
+
+  const start = body?.start_date ? new Date(body.start_date) : null;
+  const end = body?.end_date ? new Date(body.end_date) : null;
+  let rows = raw.filter(a => {
+    if (start && a.year === start.getFullYear() && (start.getMonth() !== 0 || start.getDate() !== 1)) return false;
+    if (end && a.year === end.getFullYear() && (end.getMonth() !== 11 || end.getDate() !== 31)) return false;
+    return true;
+  });
+  if (!end && rows.length) rows = rows.slice(0, -1);
+
+  // SCHD처럼 상장 첫해 배당이 1회뿐이면 다음 full-year 대비 +500%대 착시가 생긴다.
+  // 중앙값의 30% 미만인 저베이스 선행연도는 성장률 분모에서 제외한다.
+  if (rows.length >= 3) {
+    const vals = rows.map(a => a.dividend).sort((a, b) => a - b);
+    const mid = vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2;
+    const minBase = mid > 0 ? mid * 0.30 : 0;
+    rows = rows.filter(a => a.dividend >= minBase);
+  }
+  while (rows.length >= 2 && rows[1].year - rows[0].year !== 1) rows.shift();
+  return { rows, skipped: raw.length - rows.length };
+}
+
+function renderDividendGrowthChart(annualDiv, body = {}) {
   const card = document.getElementById('btDivGrowthCard');
   if (btCharts.divGrowth) { btCharts.divGrowth.destroy(); btCharts.divGrowth = null; }
-  // 마지막 연도는 그 해 배당을 다 못 받아 낮게 보이므로 제외
-  const full = (annualDiv || []).filter(a => a.dividend > 0);
-  const rows = full.slice(0, -1);
+  const cleaned = btCleanDividendGrowthRows(annualDiv, body);
+  const rows = cleaned.rows;
   if (rows.length < 2) { card.style.display = 'none'; return; }   // 성장률 막대 1개 이상 필요
   card.style.display = 'block';
 
@@ -1943,9 +1971,11 @@ function renderDividendGrowthChart(annualDiv) {
   const labels = [], values = [];
   for (let i = 1; i < rows.length; i++) {
     const prev = rows[i-1].dividend, cur = rows[i].dividend;
+    if (rows[i].year - rows[i-1].year !== 1) continue;
     labels.push(rows[i].year + '년');
     values.push(prev > 0 ? +((cur / prev - 1) * 100).toFixed(1) : 0);
   }
+  if (!labels.length) { card.style.display = 'none'; return; }
   const colors = values.map(v => v >= 0 ? _btRgba(_btUp, 0.85) : _btRgba(_btDown, 0.85));
 
   btCharts.divGrowth = new Chart(document.getElementById('btDivGrowthChart').getContext('2d'), {
@@ -1966,8 +1996,9 @@ function renderDividendGrowthChart(annualDiv) {
   const first = rows[0].dividend, last = rows[rows.length-1].dividend, n = rows.length - 1;
   let cagr = null;
   if (first > 0 && n > 0) cagr = (Math.pow(last / first, 1 / n) - 1) * 100;
+  const skipNote = cleaned.skipped > 0 ? ` · 부분연도/저베이스 ${cleaned.skipped}개 제외` : '';
   document.getElementById('btDivGrowthNote').innerHTML = cagr != null
-    ? `전체 배당 성장률(CAGR) ${cagr >= 0 ? '+' : ''}${cagr.toFixed(1)}% · ${rows[0].year}년 → ${rows[rows.length-1].year}년 기준`
+    ? `전체 배당 성장률(CAGR) ${cagr >= 0 ? '+' : ''}${cagr.toFixed(1)}% · ${rows[0].year}년 → ${rows[rows.length-1].year}년 기준${skipNote}`
     : '';
 }
 

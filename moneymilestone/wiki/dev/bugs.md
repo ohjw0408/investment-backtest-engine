@@ -1,5 +1,5 @@
 ---
-updated: 2026-06-29
+updated: 2026-06-30
 tags: [dev, bug]
 ---
 
@@ -13,10 +13,11 @@ tags: [dev, bug]
 
 ## 활성 버그 목록
 
-> updated: 2026-06-29
+> updated: 2026-06-30
 
 | # | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|---|
+| BUG-BACKTEST-SCHD-DIVG-PARTIAL | 백테스트 결과의 배당 성장률 그래프에서 SCHD 2012년 막대가 비정상적으로 크게 튀어 보임(오너 보고) | 백테스트 프론트가 `annual_dividends`의 첫 해를 무조건 전년 대비 성장률 분모로 사용. SCHD는 2011년 10월 상장/부분연도라 2012 full-year와 단순 비교하면 +563.9% 착시 발생. 또한 2010~2011 합성/저베이스 배당이 남으면 2012가 여전히 왜곡된 시작구간 막대로 남을 수 있었음 | `templates/backtest.html` | ✅ 수정 (2026-06-30): 배당 성장률 차트 계산 전에 시작/종료 부분연도, 중앙값 30% 미만 저베이스 선행연도, 연속 full-year 체인 이전의 고립 연도를 제외. 성장률 막대도 연속 연도끼리만 계산. 실제 SCHD 백테스트 출력 검증: raw 2010~2026 중 2010·2011·2026 제외, cleaned 2012~2025, 차트 라벨 2013~2025, maxAbs 33%, 2012 스파이크 제거. JS 문법 체크와 `git diff --check` 통과. (Codex) |
 | BUG-HOME-KOSPI-WEEKEND-DASH | 홈 화면 코스피 타일이 2026-06-27~28(토·일) `—`로 표시되고 클릭 시 `^KS11` 정보를 찾을 수 없음(오너 보고) | 정확한 운영 로그는 없음. 코드상 홈 위젯은 `/api/watchlist/quotes`→`_wl_recent_closes()`에서 `index_ohlc`/`index_daily`를 읽고 둘 다 없을 때 yfinance fallback을 쓰는데, 기존 fallback은 성공해도 DB에 저장하지 않고 표시만 했다. `^KS11`은 `KS200` alias 제거 후 `index_daily` 구제도 약해, 운영 DB의 `index_ohlc`가 비었거나 조회 실패한 상태에서 주말/외부 API 빈 응답이 겹치면 quote `None`→홈 `—`, 상세도 yfinance 실패 시 “종목을 찾을 수 없습니다”로 이어질 수 있음 | `app.py`, `tests/test_home_widgets.py` | ✅ 수정 (2026-06-29): 홈 지수 fallback yfinance 성공 시 실제 거래일 OHLCV를 `index_ohlc`에 `INSERT OR REPLACE` 저장하도록 변경. 주말 날짜 가짜행은 만들지 않고 yfinance가 반환한 거래일만 저장. 회귀 테스트 추가: 빈 임시 index DB + fake yfinance로 `^KS11` fallback 반환과 DB upsert 확인. 검증 `.\venv\Scripts\python.exe tests\test_home_widgets.py` → 18 PASS / 0 FAIL. (Codex) |
 | BUG-COMPARE-DEEP-SYNTH | 비교 심화 아코디언(P3) — SHY/IEF 등 단기채 ETF가 연수익 +172%(SHY)·−85%, SCHD 배당성장 +270% 등 비현실 스파이크로 차트 Y축 박살 (코덱스 후속수정 중 잔존) | 손상 합성백필(volume=0) 자체가 구간 전체 쓰레기(SHY 합성 일변동성 실데이터 **20×**, 하루 +122% / IEF 2.9×). 코덱스 `_clean_deep_points` 45% **단일일** 점프필터는 9121→9102(19행)만 제거 → 잔여 노이즈가 연 +172% 생성. 배당은 SCHD 2011 상장 **부분 첫해**(dindex 0.00594)가 저베이스필터(median×0.15) 통과 → 2012 +270% | `risk_return_logic.py` | ✅ 수정 (2026-06-27): **①종목별 합성손상 게이트**(`_clean_deep_points`): 합성 일변동성 실데이터 대비 >2.5× OR 단일일 >30%면 그 종목 합성 전부 드롭→real-only 폴백(원래 안전동작). 정상 합성(SPY/QQQ/SCHD/GLD/TLT ratio 0.9~1.3·max≤0.21)은 긴이력 보존. **②배당성장** 저베이스 0.15→0.30(부분 inception 컷)+spike캡 3.0→1.0. 검증: SHY 연수익 [−85.7%,+172.6%]→[−3.9%,+4.9%]·SCHD 배당 +270%→max+44.8%·Playwright adhoc 아코디언5 ret/divg max 49/53%·콘솔0. 신규 `tests/check_rr_deep.js`. (Claude) |
 | BUG-OVERLAY-SPIKE | 포트폴리오 비교 "추세 겹쳐보기"에서 올웨더·영구·골드버터플라이·60/40·멀티에셋 등 6월 중순 델타 스파이크(차트 전부 깨져 보임) (오너 발견 2026-06-26) | **BUG-BACKTEST-SPY-SPIKE 재발(다른 읽기경로)**: `price_daily`의 SPY `2026-06-17 close=346500`(=같은날 삼성전자 005930값) 오틱이 `get_price`에선 `_drop_isolated_price_spikes`로 걸러지나, 겹쳐보기 `_portfolio_index_series`(app.py)는 price_daily를 **raw SQL 직접** 읽어 필터 미적용. 실제 스파이크는 SPY 포함분(영구·60/40)뿐인데 겹친 차트 Y축이 ~28000까지 늘어 전 라인이 찌그러져 "전부 스파이크"로 보임 | `app.py`(`_portfolio_index_series`), `modules/price_loader.py`, `tasks.py`, `celery_app.py` | ✅ 수정 (2026-06-26): **①읽기경로** 겹쳐보기 시계열에 종목별 `_drop_isolated_price_spikes`(get_price와 동일·즉시 마스킹). **②근본(오너 지시)**: 쓰기경로 `fetch_from_api`에 동일 필터(풀레인지 오틱 1차 차단) + 신규 `PriceLoader.purge_isolated_spikes()`(DB 전체 이웃 보고 오틱 행 **DELETE**, 단일일 증분 오틱까지 self-heal) + Beat `purge_price_spikes` 매일 10:00 UTC. **③클린업**: 로컬 DB SPY 06-17 행 삭제 완료. prod=배포 시 읽기필터로 즉시 마스킹 + 익일 beat가 물리 삭제. 검증=giant-spike 0·purge가 오틱만 삭제(이웃보존)·targeted 3 PASS·콘솔0 | 

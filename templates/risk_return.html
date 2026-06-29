@@ -89,6 +89,17 @@
 .rr-corr-table th:first-child, .rr-corr-table td:first-child { text-align: left; }
 .rr-corr-cell { font-weight: 800; border-radius: 6px; }
 .rr-corr-note { font-size: 0.72rem; color: var(--text-muted); line-height: 1.45; margin-top: 8px; }
+.rr-chart-loading { border-color: rgba(25,118,210,0.35); }
+.rr-chart-loading-inner { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.rr-chart-loading-title { font-size: 0.92rem; font-weight: 800; color: var(--text); }
+.rr-chart-loading-sub { font-size: 0.78rem; color: var(--text-muted); }
+.rr-chart-dots { display: inline-flex; gap: 4px; margin-left: 2px; }
+.rr-chart-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--blue); opacity: 0.35; animation: rrDotPulse 1s infinite ease-in-out; }
+.rr-chart-dots span:nth-child(2) { animation-delay: .15s; }
+.rr-chart-dots span:nth-child(3) { animation-delay: .3s; }
+.rr-chart-reveal { animation: rrFadeUp .28s ease both; }
+@keyframes rrFadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes rrDotPulse { 0%,80%,100% { opacity: 0.28; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
 
 /* 스파이더 컨트롤 */
 .rr-spider-ctrl { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 12px; }
@@ -200,6 +211,14 @@
     </div>
     <div id="rrCorrCtrl" class="rr-ov-ctrl"></div>
     <div id="rrCorrHost"></div>
+  </div>
+
+  <div class="rr-card rr-chart-loading" id="rrCompareChartsLoading" style="display:none;">
+    <div class="rr-chart-loading-inner">
+      <span class="ds-spinner"></span>
+      <div class="rr-chart-loading-title">정밀 비교 도표 산출 중<span class="rr-chart-dots"><span></span><span></span><span></span></span></div>
+      <div class="rr-chart-loading-sub">리스크-리턴 도표와 레이더 차트를 준비하고 있어요.</div>
+    </div>
   </div>
 
   <div id="rrCompareCharts" style="display:none;">
@@ -383,13 +402,40 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.rr-search-wrap')) document.getElementById('rrDropdown').style.display = 'none';
 });
 
+function rrSetCompareChartsLoading(on){
+  const loading = document.getElementById('rrCompareChartsLoading');
+  const charts = document.getElementById('rrCompareCharts');
+  if (!loading || !charts) return;
+  if (on){
+    charts.style.display = 'none';
+    loading.style.display = 'block';
+    loading.classList.remove('rr-chart-reveal');
+    void loading.offsetWidth;
+    loading.classList.add('rr-chart-reveal');
+  } else {
+    loading.style.display = 'none';
+  }
+}
+function rrShowCompareCharts(){
+  const loading = document.getElementById('rrCompareChartsLoading');
+  const charts = document.getElementById('rrCompareCharts');
+  if (loading) loading.style.display = 'none';
+  if (!charts) return;
+  charts.style.display = 'block';
+  charts.classList.remove('rr-chart-reveal');
+  void charts.offsetWidth;
+  charts.classList.add('rr-chart-reveal');
+}
+
 // ── 비교 실행 ──
 async function rrCompare(){
   const btn = document.getElementById('rrCompareBtn');
   const status = document.getElementById('rrStatus');
   document.getElementById('rrResults').style.display = 'none';
-  document.getElementById('rrCompareCharts').style.display = 'none';
-  status.style.display = 'block'; status.textContent = '⏳ 산출 중...';
+  rrSetCompareChartsLoading(true);
+  const loading = document.getElementById('rrCompareChartsLoading');
+  if (loading) loading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  status.style.display = 'none'; status.textContent = '';
   btn.disabled = true;
   try {
     // 즉석 빌더에 포폴이 있으면(비로그인 or 예시 프리로드) portfolios 모드, 아니면 저장 포폴 id 모드
@@ -402,15 +448,17 @@ async function rrCompare(){
         : { portfolio_ids: [...rrSelected], benchmarks: rrBench }),
     });
     const data = await res.json();
-    if (!res.ok) { status.textContent = data.error || '산출에 실패했어요.'; return; }
+    if (!res.ok) { rrSetCompareChartsLoading(false); status.style.display = 'block'; status.textContent = data.error || '산출에 실패했어요.'; return; }
     if (!data.items || !data.items.length) {
+      rrSetCompareChartsLoading(false);
+      status.style.display = 'block';
       status.innerHTML = '<div class="rr-empty"><div style="font-size:1.8rem;margin-bottom:10px;">📊</div><div style="font-weight:700;">표시할 데이터가 없어요</div><div style="font-size:0.82rem;margin-top:6px;">포트폴리오를 선택하거나 벤치마크를 추가해 보세요.</div></div>';
       return;
     }
     rrItems = data.items;
     rrVisible = rrItems.map(() => true);
     status.style.display = 'none';
-    document.getElementById('rrCompareCharts').style.display = 'block';
+    rrShowCompareCharts();
     document.getElementById('rrResults').style.display = 'block';
     rrRenderTable(data);
     rrRenderScatter();
@@ -420,7 +468,7 @@ async function rrCompare(){
     const chartBlock = document.getElementById('rrCompareCharts');
     if (chartBlock) chartBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (rrAutoScroll) rrAutoScroll = false;
-  } catch(e){ status.textContent = '산출에 실패했어요. 네트워크를 확인해주세요.'; }
+  } catch(e){ rrSetCompareChartsLoading(false); status.style.display = 'block'; status.textContent = '산출에 실패했어요. 네트워크를 확인해주세요.'; }
   finally { btn.disabled = false; }
 }
 

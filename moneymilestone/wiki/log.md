@@ -1,5 +1,16 @@
 # Log
 
+## [2026-06-30] UX | 포트폴리오 비교 — 도표 로딩 상태/등장 애니메이션
+
+오너 요청 반영.
+- `/risk-return` 정밀 비교 실행 직후 리스크-리턴 도표와 레이더/다각형 영역 대신 로딩 패널을 먼저 표시하도록 추가.
+- API 응답 완료 후 로딩 패널을 숨기고 차트 영역이 짧은 페이드업 애니메이션으로 나타나게 변경.
+- 비교 중 버튼 disabled, 오류/빈 데이터 시 로딩 해제 흐름도 함께 정리.
+- 검증: 로컬 Playwright DOM 검증 PASS(초기 로딩 숨김, 비교 중 로딩 표시·차트 숨김·버튼 잠김, 완료 후 로딩 숨김·차트 표시·산점도/레이더 생성·콘솔 에러 0), JS 문법 체크 OK, `git diff --check` OK.
+- 변경: `templates/risk_return.html`, `moneymilestone/wiki/dev/status.md`, `moneymilestone/wiki/log.md`.
+
+_작성: Codex_
+
 ## [2026-06-30] UX | 포트폴리오 비교 — 상관계수 중심 배치 + 기간 입력 동기화
 
 오너 요청 반영.

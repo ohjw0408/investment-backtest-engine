@@ -84,6 +84,11 @@
 .rr-ov-ctrl .qr.on { border-color: var(--blue); color: var(--blue); font-weight: 700; }
 .rr-ov-ctrl label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .rr-ov-warn { color: var(--gold-deep, #B26A00); font-size: 0.74rem; }
+.rr-corr-grid { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(280px,0.95fr); gap: 14px; align-items: start; }
+.rr-corr-table th, .rr-corr-table td { text-align: center; }
+.rr-corr-table th:first-child, .rr-corr-table td:first-child { text-align: left; }
+.rr-corr-cell { font-weight: 800; border-radius: 6px; }
+.rr-corr-note { font-size: 0.72rem; color: var(--text-muted); line-height: 1.45; margin-top: 8px; }
 
 /* 스파이더 컨트롤 */
 .rr-spider-ctrl { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 12px; }
@@ -107,6 +112,7 @@
   .rr-opacity input[type=range] { flex: 1; }
   .rr-pf-list { gap: 6px; }
   .rr-pf-chk { padding: 6px 10px; font-size: 0.8rem; }
+  .rr-corr-grid { grid-template-columns: 1fr; }
 }
 /* 심화 비교 아코디언 (P3) */
 .rr-acc { border: 1px solid var(--border); border-radius: 12px; margin-top: 10px; overflow: hidden; background: var(--card); }
@@ -186,6 +192,14 @@
     </div>
     <div id="rrOvEmpty" class="rr-empty" style="display:none;padding:30px 20px;">위에서 항목을 추가하면 추세 차트가 그려집니다.</div>
     <div class="rr-ov-synhint" style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">┄┄ 점선 = 상장 전 <b>합성(추정)</b> 구간 · 시작이 늦은 포트는 진입 시점 다른 포트들의 중앙값으로 맞춰 그립니다.</div>
+  </div>
+
+  <div class="rr-card" id="rrCorrCard" style="display:none;">
+    <div class="rr-card-title">상관계수 계산기
+      <span style="font-weight:400;color:var(--text-muted);font-size:0.76rem;">· 위 추세 겹쳐보기 항목의 월간 수익률 기준</span>
+    </div>
+    <div id="rrCorrCtrl" class="rr-ov-ctrl"></div>
+    <div id="rrCorrHost"></div>
   </div>
 
   <!-- 포트폴리오 정밀 비교 (선택 + 결과) -->
@@ -804,6 +818,7 @@ window.addEventListener('resize', () => {
 
 // ── 추세 겹쳐보기 오버레이 ──
 const rrOv = { items: [], raw: {}, start: null, end: null, mode: 'norm', activeY: 5, macros: [], chart: null };
+const rrCorr = { start: null, end: null, activeY: 5 };
 const RR_OV_QUICK = [['SYM:SPY','S&P500'],['SYM:069500','코스피200'],['SYM:GLD','금'],['SYM:TLT','미국 장기채']];
 function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function rrOvRecolor(){ rrOv.items.forEach((it,i)=>it.color = colorOf(i)); }
@@ -988,7 +1003,7 @@ function rrOvFill(labels, map){
 
 function rrOvDraw(){
   const canvas=document.getElementById('rrOvChart'), empty=document.getElementById('rrOvEmpty');
-  if (!rrOv.items.length){ if(rrOv.chart){rrOv.chart.destroy();rrOv.chart=null;} canvas.style.display='none'; empty.style.display='block'; return; }
+  if (!rrOv.items.length){ if(rrOv.chart){rrOv.chart.destroy();rrOv.chart=null;} canvas.style.display='none'; empty.style.display='block'; rrCorrRender(); return; }
   canvas.style.display=''; empty.style.display='none';
   const inR = d => (!rrOv.start || d>=rrOv.start) && (!rrOv.end || d<=rrOv.end);
   const dset=new Set();
@@ -1035,6 +1050,165 @@ function rrOvDraw(){
         tooltip:{ mode:'index', intersect:false, itemSort:(a,b)=>b.parsed.y-a.parsed.y,
           callbacks:{ label:c=> `${c.dataset.label}: ${c.parsed.y!=null ? c.parsed.y.toLocaleString(undefined,{maximumFractionDigits:2}) : '–'}` } },
         zoom:{ zoom:{ drag:{enabled:true, backgroundColor:'rgba(31,111,235,0.15)', borderColor:'rgba(31,111,235,0.45)', borderWidth:1}, mode:'x' } } }, scales } });
+  rrCorrRender();
+}
+
+// ── 상관계수 계산기: 추세 겹쳐보기 항목의 월간 수익률 기준 ──
+function rrCorrPointList(it){
+  const pts = (rrOv.raw[it.key]?.points || [])
+    .map(p => ({ d: String(p[0]), v: Number(p[1]) }))
+    .filter(p => p.d && Number.isFinite(p.v) && p.v > 0)
+    .sort((a,b) => a.d.localeCompare(b.d));
+  return pts;
+}
+function rrCorrValidItems(){
+  return rrOv.items.filter(it => rrCorrPointList(it).length >= 3);
+}
+function rrCorrBounds(){
+  const starts = [], ends = [];
+  rrCorrValidItems().forEach(it => {
+    const pts = rrCorrPointList(it);
+    starts.push(pts[0].d);
+    ends.push(pts[pts.length - 1].d);
+  });
+  if (starts.length < 2) return null;
+  starts.sort(); ends.sort();
+  const mn = starts[starts.length - 1], mx = ends[0];
+  return (mn && mx && mn < mx) ? { mn, mx } : null;
+}
+function rrCorrSetYears(yrs){
+  const b = rrCorrBounds();
+  if (!b) return;
+  rrCorr.activeY = yrs;
+  rrCorr.end = b.mx;
+  if (yrs === 0) rrCorr.start = b.mn;
+  else {
+    const d = new Date(b.mx + 'T00:00:00');
+    d.setFullYear(d.getFullYear() - yrs);
+    const cap = d.toISOString().slice(0,10);
+    rrCorr.start = cap > b.mn ? cap : b.mn;
+  }
+}
+function rrCorrClamp(){
+  const b = rrCorrBounds();
+  if (!b) return null;
+  if (!rrCorr.start || !rrCorr.end) rrCorrSetYears(rrCorr.activeY >= 0 ? rrCorr.activeY : 5);
+  if (rrCorr.start < b.mn) rrCorr.start = b.mn;
+  if (rrCorr.end > b.mx) rrCorr.end = b.mx;
+  if (rrCorr.start >= rrCorr.end) rrCorrSetYears(0);
+  return b;
+}
+function rrCorrMonthly(it){
+  const pts = rrCorrPointList(it).filter(p => !rrCorr.end || p.d <= rrCorr.end);
+  const byMonth = {};
+  pts.forEach(p => { byMonth[p.d.slice(0,7)] = p; });
+  const months = Object.keys(byMonth).sort();
+  const out = [];
+  for (let i=1; i<months.length; i++){
+    const prev = byMonth[months[i-1]], cur = byMonth[months[i]];
+    if ((rrCorr.start && cur.d < rrCorr.start) || (rrCorr.end && cur.d > rrCorr.end)) continue;
+    const ret = cur.v / prev.v - 1;
+    if (Number.isFinite(ret) && ret > -0.9999 && Math.abs(ret) < 10) out.push({ m: months[i], date: cur.d, ret });
+  }
+  return out;
+}
+function rrCorrPair(a, b){
+  const bm = new Map(b.map(x => [x.m, x.ret]));
+  const xs = [], ys = [];
+  a.forEach(x => { if (bm.has(x.m)){ xs.push(x.ret); ys.push(bm.get(x.m)); } });
+  const n = xs.length;
+  if (n < 3) return null;
+  const ax = xs.reduce((s,v)=>s+v,0) / n, ay = ys.reduce((s,v)=>s+v,0) / n;
+  let cov = 0, vx = 0, vy = 0;
+  for (let i=0; i<n; i++){ const dx = xs[i] - ax, dy = ys[i] - ay; cov += dx * dy; vx += dx * dx; vy += dy * dy; }
+  if (vx <= 1e-14 || vy <= 1e-14) return null;
+  return { rho: cov / Math.sqrt(vx * vy), n };
+}
+function rrCorrStats(rows){
+  if (!rows.length) return null;
+  let eq = 1, peak = 1, mdd = 0;
+  rows.forEach(r => { eq *= (1 + r.ret); peak = Math.max(peak, eq); mdd = Math.min(mdd, eq / peak - 1); });
+  const mean = rows.reduce((s,r)=>s+r.ret,0) / rows.length;
+  const variance = rows.length > 1 ? rows.reduce((s,r)=>s+Math.pow(r.ret - mean, 2),0) / (rows.length - 1) : 0;
+  const best = rows.reduce((a,b)=> b.ret > a.ret ? b : a, rows[0]);
+  const worst = rows.reduce((a,b)=> b.ret < a.ret ? b : a, rows[0]);
+  return { cum: eq - 1, vol: Math.sqrt(variance) * Math.sqrt(12), mdd, best, worst, n: rows.length };
+}
+function rrCorrCellStyle(v){
+  if (v == null) return 'color:var(--text-muted);';
+  const a = Math.min(Math.abs(v), 1);
+  const alpha = a >= 0.7 ? 0.18 : (a >= 0.4 ? 0.11 : 0.05);
+  const bg = v < 0 ? `rgba(198,40,40,${alpha})` : `rgba(25,118,210,${alpha})`;
+  const fg = v < -0.25 ? 'var(--red,#C62828)' : 'var(--text)';
+  return `background:${bg};color:${fg};`;
+}
+function rrCorrShort(s, n=8){ s = String(s || ''); return s.length > n ? s.slice(0,n) + '…' : s; }
+function rrCorrRender(){
+  const card = document.getElementById('rrCorrCard');
+  const ctrl = document.getElementById('rrCorrCtrl');
+  const host = document.getElementById('rrCorrHost');
+  if (!card || !ctrl || !host) return;
+  const items = rrCorrValidItems();
+  if (rrOv.items.length === 0){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  if (items.length < 2){
+    ctrl.innerHTML = '';
+    host.innerHTML = '<div class="rr-empty" style="padding:24px 12px;">상관계수는 데이터가 있는 항목 2개 이상부터 계산됩니다.</div>';
+    return;
+  }
+  const b = rrCorrClamp();
+  if (!b){
+    ctrl.innerHTML = '';
+    host.innerHTML = '<div class="rr-empty" style="padding:24px 12px;">공통으로 겹치는 기간이 부족합니다.</div>';
+    return;
+  }
+  ctrl.innerHTML = `
+    <span class="grp">기간 <input type="date" id="rrCorrStart" value="${rrCorr.start || ''}"> ~ <input type="date" id="rrCorrEnd" value="${rrCorr.end || ''}"></span>
+    <span class="grp">
+      <button class="qr${rrCorr.activeY===1?' on':''}" data-y="1">1년</button>
+      <button class="qr${rrCorr.activeY===3?' on':''}" data-y="3">3년</button>
+      <button class="qr${rrCorr.activeY===5?' on':''}" data-y="5">5년</button>
+      <button class="qr${rrCorr.activeY===10?' on':''}" data-y="10">10년</button>
+      <button class="qr${rrCorr.activeY===0?' on':''}" data-y="0">전체</button></span>
+    <span class="grp">사건구간:
+      <button class="qr ev" data-range="2000-01-01:2002-12-31">닷컴</button>
+      <button class="qr ev" data-range="2007-06-01:2009-06-30">금융위기</button>
+      <button class="qr ev" data-range="2020-01-01:2020-12-31">코로나</button>
+      <button class="qr ev" data-range="2022-01-01:2022-12-31">'22 긴축</button></span>`;
+  document.getElementById('rrCorrStart').addEventListener('change', e => { rrCorr.start = e.target.value; rrCorr.activeY = -1; rrCorrRender(); });
+  document.getElementById('rrCorrEnd').addEventListener('change', e => { rrCorr.end = e.target.value; rrCorr.activeY = -1; rrCorrRender(); });
+  ctrl.querySelectorAll('.qr[data-y]').forEach(btn => btn.addEventListener('click', () => { rrCorrSetYears(+btn.dataset.y); rrCorrRender(); }));
+  ctrl.querySelectorAll('.ev').forEach(btn => btn.addEventListener('click', () => {
+    const [s,e] = btn.dataset.range.split(':');
+    const st = s < b.mn ? b.mn : s, en = e > b.mx ? b.mx : e;
+    if (st >= en){ if (typeof mmToast === 'function') mmToast('그 기간에 겹치는 데이터가 없어요.', 'err'); return; }
+    rrCorr.start = st; rrCorr.end = en; rrCorr.activeY = -1; rrCorrRender();
+  }));
+
+  const series = items.map(it => ({ it, idx: Math.max(0, rrOv.items.indexOf(it)), rows: rrCorrMonthly(it) })).filter(x => x.rows.length >= 3);
+  if (series.length < 2){
+    host.innerHTML = '<div class="rr-empty" style="padding:24px 12px;">선택한 기간의 월간 표본이 부족합니다.</div>';
+    return;
+  }
+  const head = '<tr><th>대상</th>' + series.map(s => `<th title="${esc(s.it.label)}">${esc(rrCorrShort(s.it.label, 7))}</th>`).join('') + '</tr>';
+  const body = series.map((a,i) => '<tr><td><span class="rr-dot" style="background:'+colorOf(a.idx)+'"></span>'+esc(rrCorrShort(a.it.label, 12))+'</td>'
+    + series.map((b,j) => {
+      if (i === j) return '<td class="rr-corr-cell" style="background:rgba(25,118,210,0.18);">1.00</td>';
+      const p = rrCorrPair(a.rows, b.rows);
+      return `<td class="rr-corr-cell" style="${rrCorrCellStyle(p?.rho)}">${p ? p.rho.toFixed(2) : '—'}</td>`;
+    }).join('') + '</tr>').join('');
+  const matrix = `<div class="rr-table-wrap"><table class="rr-table rr-corr-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+
+  const statRows = series.map(s => {
+    const st = rrCorrStats(s.rows);
+    if (!st) return '';
+    return `<tr><td><span class="rr-dot" style="background:${colorOf(s.idx)}"></span>${esc(rrCorrShort(s.it.label, 12))}</td>
+      <td>${pct(st.cum, 1)}</td><td>${pct(st.vol, 1)}</td><td>${pct(st.mdd, 1)}</td>
+      <td>${esc(st.worst.m)} · ${pct(st.worst.ret, 1)}</td><td>${esc(st.best.m)} · ${pct(st.best.ret, 1)}</td><td>${st.n}</td></tr>`;
+  }).join('');
+  const stats = `<div style="overflow-x:auto;"><table class="rr-lp-table"><thead><tr><th>대상</th><th>누적수익</th><th>연변동성</th><th>MDD</th><th>최악월</th><th>최고월</th><th>월수</th></tr></thead><tbody>${statRows}</tbody></table></div>`;
+  host.innerHTML = `<div class="rr-corr-grid"><div>${matrix}</div><div>${stats}</div></div>
+    <div class="rr-corr-note">상관계수는 월말 값으로 계산한 월간 수익률 기준입니다. 1에 가까울수록 같이 움직이고, 0에 가까울수록 관계가 약하며, 음수면 반대로 움직인 표본이 많았다는 뜻입니다.</div>`;
 }
 
 function rrOvBindSearch(){

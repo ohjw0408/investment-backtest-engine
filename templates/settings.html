@@ -91,6 +91,14 @@
 .set-nav-btn.active { background: var(--brand); color: var(--on-brand); }
 .set-panel { display: none; }
 .set-panel.active { display: block; }
+@media (max-width: 560px) {
+  .set-nav { width: 100%; max-width: none; gap: 4px; padding: 4px; box-sizing: border-box; }
+  .set-nav-btn { min-width: 0; gap: 4px; padding: 9px 6px; white-space: nowrap; font-size: 0.78rem; }
+  .set-nav-btn .si-ic { width: 16px; height: 16px; }
+}
+@media (max-width: 380px) {
+  .set-nav-btn { padding-inline: 4px; font-size: 0.72rem; }
+}
 /* 세금 요약/링크 카드 */
 .set-tax-summary { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-bottom: 16px; }
 .set-tax-item { display: flex; flex-direction: column; gap: 2px; }

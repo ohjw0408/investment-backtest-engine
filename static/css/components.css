@@ -199,6 +199,12 @@
   width:40px; height:40px; }
 .nav-icon-btn:hover { background:var(--ds-hairline); }
 .user-greeting { color:var(--ds-ink); }
+@media (max-width:768px) {
+  .nav-icon-btn { width:36px; height:36px; }
+}
+@media (max-width:480px) {
+  .nav-icon-btn { width:34px; height:34px; font-size:14px; }
+}
 
 /* 사이드바 */
 .sidebar { background:var(--ds-canvas); border-right:1px solid var(--ds-hairline);

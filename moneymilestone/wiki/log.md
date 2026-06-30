@@ -1,5 +1,17 @@
 # Log
 
+## [2026-06-30] UX | 모바일 설정 탭 줄바꿈 제거 + 상단바 오른쪽 정렬
+
+오너가 모바일 설정 화면에서 `홈 화면`, `캘린더` 탭이 줄바꿈되고, 테마 변경 버튼이 오른쪽 끝에 붙지 않아 완성도가 떨어져 보인다고 지적.
+- 수정: `templates/settings.html` 설정 탭에 560px 이하 전용 폭/gap/padding/font/icon 크기 조정을 추가해 4개 탭이 한 줄로 유지되게 했다.
+- 수정: `.nav-right`에 `margin-left:auto`, `justify-content:flex-end`, `flex-shrink:0`을 적용해 로고는 현 위치에 두고 알림/프로필/로그인·로그아웃/테마 버튼 묶음만 오른쪽 끝으로 정렬했다.
+- 수정: 로그인/로그아웃 링크에 `nav-auth-link` 클래스를 붙이고 모바일에서 패딩/폰트만 줄여 좁은 화면에서도 오른쪽 액션 묶음이 안정적으로 들어오게 했다.
+- 배포 반영 안정화: CSS 캐시 버전을 `20260630nav1`로 올려 기존 모바일 캐시가 예전 상단바 CSS를 붙잡지 않게 했다.
+- 검증: 로컬 Playwright DOM 검사 PASS. 비로그인 390/360/320px에서 설정 탭 전부 `nowrap`, overflow 없음, 콘솔 에러 0. 로그인 390/360/320px에서 알림→프로필→로그아웃→테마 순서 유지, 오른쪽 여백 10px, 콘솔 에러 0.
+- 변경: `templates/settings.html`, `templates/base.html`, `static/css/style.css`, `static/css/components.css`, `moneymilestone/wiki/dev/status.md`, `moneymilestone/wiki/log.md`.
+
+_작성: Codex_
+
 ## [2026-06-30] FIX | 백테스트 — SCHD 배당성장률 부분연도 스파이크 제거
 
 오너가 백테스트 배당 성장률 그래프에서 SCHD 2012년 값이 크게 튀는 문제를 보고.

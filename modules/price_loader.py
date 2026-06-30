@@ -1192,7 +1192,7 @@ class PriceLoader:
         else:
             divs_raw = self.conn.execute(
                 "SELECT date, dividend FROM corporate_actions "
-                "WHERE code=? AND dividend > 0 ORDER BY date DESC LIMIT 12",
+                "WHERE code=? AND dividend > 0 ORDER BY date DESC",
                 (code,)
             ).fetchall()
             dividends   = [{"date": r[0], "dividend": round(float(r[1]), 6)} for r in divs_raw]

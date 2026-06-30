@@ -563,3 +563,9 @@ tags: [dev]
 - 구성종목은 파이차트로 먼저 보여주고, 기존 비중표는 파이차트 아래에 붙였다. 파이 hover tooltip은 `티커 · 종목명: 비중%` 형식.
 - 상위 구성종목 합계가 100% 미만이면 남은 비중을 `기타 보유종목`으로 표시해 파이 총합 착시를 줄였다.
 - 검증: Playwright DOM 확인(SPY 파이 type=pie, slice 11개, tooltip `NVDA · NVIDIA Corp: 7.89%`, 표 10행, JS 에러 0).
+
+## 2026-06-30 종목 상세 배당 내역 더보기
+
+- 종목 상세 API의 배당 내역 조회를 최근 12개 제한에서 전체 이력 조회로 변경했다.
+- 화면은 처음 12개만 보여주고, `더보기 (N개)` 버튼으로 전체 지급 내역을 펼치며 `접기`로 원래 상태로 돌아간다.
+- 검증: SCHD 로컬 상세 DOM에서 초기 12행, 더보기 후 394행, 접기 후 12행, JS 에러 0. `pytest tests/test_etf_holdings.py -q`, `python -m py_compile app.py modules/price_loader.py`.

@@ -4225,3 +4225,9 @@ ETF 종목 상세 화면에 구성종목 카드를 추가했다. US ETF는 yfina
 종목 상세 ETF 구성종목 카드를 가격차트 아래 왼쪽 컬럼으로 옮기고, 파이차트 + 하단 비중표 구조로 바꿨다. 파이차트는 상위 보유종목과 `기타`를 함께 보여주며, hover tooltip은 `티커 · 종목명: 비중%` 형식이다.
 
 검증: Playwright DOM 확인(SPY 파이 type=pie, slice 11개, tooltip `NVDA · NVIDIA Corp: 7.89%`, 비중표 10행, JS 에러 0). 국내 ETF 데이터는 pykrx 없이 KRX/SEIBro/KOFIA/운용사 직접 원천으로 별도 설계 필요.
+
+## 2026-06-30 종목 상세 배당 내역 더보기
+
+종목 상세의 배당 지급 내역을 전체 이력으로 내려주고, 화면에서는 초기 12개만 표시한 뒤 `더보기` 버튼으로 전체를 펼치도록 바꿨다. 펼친 뒤에는 `접기`로 다시 최근 12개만 볼 수 있다.
+
+검증: SCHD 로컬 DOM에서 초기 12행, 더보기 후 394행, 접기 후 12행, JS 에러 0. `pytest tests/test_etf_holdings.py -q`, `python -m py_compile app.py modules/price_loader.py`.

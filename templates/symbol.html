@@ -137,6 +137,19 @@
 }
 .div-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
 .div-table tr:last-child td { border-bottom: none; }
+.div-more-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.div-more-btn:hover { border-color: var(--blue); color: var(--blue); }
 
 .holding-list { display: flex; flex-direction: column; gap: 8px; }
 .holding-row {
@@ -186,6 +199,7 @@
 {% block scripts %}
 <script>
 const CODE = "{{ code }}";
+const DIV_INITIAL_ROWS = 12;
 
 function fmtPrice(v, currency) {
   if (v === null || v === undefined) return '—';
@@ -228,6 +242,40 @@ function validHoldings(holdings) {
     ...h,
     weight_pct: Number(h.weight_pct)
   })).filter(h => h.code && Number.isFinite(h.weight_pct) && h.weight_pct > 0);
+}
+
+function dividendRowsHtml(dividends, currency, expanded) {
+  const list = expanded ? (dividends || []) : (dividends || []).slice(0, DIV_INITIAL_ROWS);
+  return list.map(d => `
+    <tr>
+      <td>${escHtml(d.date)}</td>
+      <td>${fmtDiv(d.dividend, currency)}</td>
+    </tr>
+  `).join('');
+}
+
+function dividendTableHtml(dividends, currency) {
+  const list = dividends || [];
+  if (!list.length) return '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">배당 데이터 없음</div>';
+  const hiddenCount = Math.max(0, list.length - DIV_INITIAL_ROWS);
+  return `
+    <table class="div-table">
+      <thead><tr><th>배당일</th><th>주당 배당금</th></tr></thead>
+      <tbody id="dividendRows">${dividendRowsHtml(list, currency, false)}</tbody>
+    </table>
+    ${hiddenCount ? `<button class="div-more-btn" id="divMoreBtn" type="button" data-expanded="false" onclick="toggleDividendHistory()">더보기 (${hiddenCount}개)</button>` : ''}
+  `;
+}
+
+function toggleDividendHistory() {
+  const btn = document.getElementById('divMoreBtn');
+  const rows = document.getElementById('dividendRows');
+  if (!btn || !rows || !allData) return;
+  const nextExpanded = btn.dataset.expanded !== 'true';
+  rows.innerHTML = dividendRowsHtml(allData.dividends || [], allData.currency, nextExpanded);
+  btn.dataset.expanded = nextExpanded ? 'true' : 'false';
+  const hiddenCount = Math.max(0, (allData.dividends || []).length - DIV_INITIAL_ROWS);
+  btn.textContent = nextExpanded ? '접기' : `더보기 (${hiddenCount}개)`;
 }
 
 let chartInst    = null;   // Chart.js (라인)
@@ -369,18 +417,7 @@ function renderPage(data) {
         ${(isStock || isETF) ? `
         <div class="symbol-card">
           <div class="symbol-card-title">💰 배당 내역</div>
-          ${data.dividends && data.dividends.length ? `
-          <table class="div-table">
-            <thead><tr><th>배당일</th><th>주당 배당금</th></tr></thead>
-            <tbody>
-              ${data.dividends.map(d => `
-                <tr>
-                  <td>${d.date}</td>
-                  <td>${fmtDiv(d.dividend, curr)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>` : '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">배당 데이터 없음</div>'}
+          ${dividendTableHtml(data.dividends, curr)}
         </div>` : ''}
       </div>
     </div>

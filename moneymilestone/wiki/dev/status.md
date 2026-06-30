@@ -547,3 +547,12 @@ tags: [dev]
 - 푸시 기본값 OFF: 서버 `push_consent_at` 없으면 FCM 토큰 등록/전송 대상 조회 불가.
 - 설정 푸시 토글은 서버 동의값을 기준으로 ON/OFF. OFF 시 동의 철회 + 전 기기 토큰 삭제.
 - 검증: `tests/test_push_consent.py` 15 PASS, `tests/test_home_widgets.py` 18 PASS.
+
+---
+
+## 2026-06-30 ETF 상세 구성종목 표시
+
+- ETF 종목 상세 화면에 `구성종목` 카드를 추가했다. US ETF는 yfinance `funds_data.top_holdings` 기준 상위 10개 보유종목과 비중을 보여준다.
+- 보유종목은 `symbol_master.db`의 `etf_holdings_cache` 테이블에 24시간 캐시한다. 테이블은 런타임에 자동 생성되며, 네트워크 실패 시 기존 캐시가 있으면 그대로 사용한다.
+- 국내상장 ETF는 현재 repo/DB에 구성종목 원천이 없어 `구성종목 데이터 없음`으로 표시한다. 국내 ETF 지원은 KRX/운용사별 원천 확정 후 별도 작업 필요.
+- 검증: `python -m py_compile modules/price_loader.py app.py`, `pytest tests/test_etf_holdings.py -q`, Playwright DOM 확인(SPY 구성종목 10개, 069500 빈 상태, JS 에러 0).

@@ -4213,3 +4213,9 @@ _작성: Claude_
 - ⚠️ **데이터 손상 별건(오너 결정 필요)**: SHY·IEF 등 일부 ETF의 **합성 백필이 손상**(2008 진동). 분석탭 P2 롤링(합성 포함)·백테에도 영향 가능. 합성 생성 로직 점검 또는 손상 합성 제외 필요. 미배포→push 대기.
 
 _작성: Claude_
+
+## 2026-06-30 ETF 상세 구성종목 카드
+
+ETF 종목 상세 화면에 구성종목 카드를 추가했다. US ETF는 yfinance `funds_data.top_holdings`에서 상위 10개 보유종목/비중을 가져오고, `symbol_master.db`의 `etf_holdings_cache`에 24시간 캐시한다. 국내상장 ETF는 현재 구성종목 원천이 없어 빈 상태 안내만 표시한다.
+
+검증: `python -m py_compile modules/price_loader.py app.py`, `pytest tests/test_etf_holdings.py -q`, Playwright DOM 확인(SPY 구성종목 10개, 069500 빈 상태, JS 에러 0).

@@ -17,6 +17,7 @@ PRICE_CACHE_DIR = DATA_DIR / "price_cache"
 META_DIR        = DATA_DIR / "meta"
 DB_PATH         = PRICE_CACHE_DIR / "price_daily.db"
 INDEX_DB_PATH   = META_DIR / "index_master.db"
+ETF_HOLDINGS_TTL_HOURS = 24
 
 # 캔들(OHLCV)을 index_ohlc에 보관·갱신하는 시장지수/선물/환율 집합.
 # get_symbol_data(라인·캔들 공용)와 refresh_index_ohlc(beat 갱신)가 공유.
@@ -795,6 +796,135 @@ class PriceLoader:
     # 종목 상세 데이터 (symbol detail page용)
     # -------------------------------------------------
 
+    def _ensure_etf_holdings_cache(self) -> bool:
+        try:
+            META_DIR.mkdir(parents=True, exist_ok=True)
+            with sqlite3.connect(str(META_DIR / "symbol_master.db")) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS etf_holdings_cache (
+                        code TEXT NOT NULL,
+                        rank INTEGER NOT NULL,
+                        holding_code TEXT,
+                        holding_name TEXT,
+                        weight_pct REAL,
+                        source TEXT,
+                        fetched_at TEXT NOT NULL,
+                        PRIMARY KEY (code, rank)
+                    )
+                """)
+                conn.commit()
+            return True
+        except Exception:
+            return False
+
+    def _read_etf_holdings_cache(self, code: str, max_age_hours: int | None = None) -> list[dict]:
+        if not self._ensure_etf_holdings_cache():
+            return []
+        try:
+            with sqlite3.connect(str(META_DIR / "symbol_master.db")) as conn:
+                rows = conn.execute("""
+                    SELECT rank, holding_code, holding_name, weight_pct, source, fetched_at
+                    FROM etf_holdings_cache
+                    WHERE code=?
+                    ORDER BY rank
+                """, (code.upper(),)).fetchall()
+        except Exception:
+            return []
+        if not rows:
+            return []
+        if max_age_hours is not None:
+            try:
+                fetched_at = datetime.fromisoformat(str(rows[0][5]).replace("Z", ""))
+                if datetime.utcnow() - fetched_at > timedelta(hours=max_age_hours):
+                    return []
+            except Exception:
+                return []
+        return [
+            {
+                "rank": int(r[0]),
+                "code": r[1] or "",
+                "name": r[2] or "",
+                "weight_pct": float(r[3]) if r[3] is not None else None,
+                "source": r[4] or "",
+                "fetched_at": r[5],
+            }
+            for r in rows
+        ]
+
+    def _write_etf_holdings_cache(self, code: str, holdings: list[dict]) -> None:
+        if not holdings or not self._ensure_etf_holdings_cache():
+            return
+        fetched_at = datetime.utcnow().replace(microsecond=0).isoformat()
+        rows = [
+            (
+                code.upper(),
+                int(h.get("rank") or i + 1),
+                str(h.get("code") or ""),
+                str(h.get("name") or ""),
+                h.get("weight_pct"),
+                str(h.get("source") or "Yahoo Finance"),
+                fetched_at,
+            )
+            for i, h in enumerate(holdings)
+        ]
+        try:
+            with sqlite3.connect(str(META_DIR / "symbol_master.db")) as conn:
+                conn.execute("DELETE FROM etf_holdings_cache WHERE code=?", (code.upper(),))
+                conn.executemany("""
+                    INSERT OR REPLACE INTO etf_holdings_cache
+                    (code, rank, holding_code, holding_name, weight_pct, source, fetched_at)
+                    VALUES (?,?,?,?,?,?,?)
+                """, rows)
+                conn.commit()
+        except Exception:
+            pass
+
+    def _fetch_yfinance_etf_holdings(self, code: str, ticker_obj=None, limit: int = 10) -> list[dict]:
+        ticker = ticker_obj or yf.Ticker(_yf_dl_ticker(code))
+        df = getattr(getattr(ticker, "funds_data", None), "top_holdings", None)
+        if df is None or getattr(df, "empty", True):
+            return []
+        holdings = []
+        for rank, (idx, row) in enumerate(df.head(limit).iterrows(), start=1):
+            holding_code = str(row.get("Symbol") or idx or "").strip()
+            holding_name = str(row.get("Name") or "").strip()
+            raw_weight = row.get("Holding Percent")
+            try:
+                weight_pct = float(raw_weight)
+                if not np.isfinite(weight_pct):
+                    weight_pct = None
+                elif abs(weight_pct) <= 1:
+                    weight_pct *= 100
+            except Exception:
+                weight_pct = None
+            if not holding_code and not holding_name:
+                continue
+            holdings.append({
+                "rank": rank,
+                "code": holding_code,
+                "name": holding_name,
+                "weight_pct": weight_pct,
+                "source": "Yahoo Finance",
+            })
+        return holdings
+
+    def _get_etf_holdings(self, code: str, *, is_kr: bool, ticker_obj=None, limit: int = 10) -> list[dict]:
+        if is_kr:
+            return []
+        code = code.upper()
+        cached = self._read_etf_holdings_cache(code, ETF_HOLDINGS_TTL_HOURS)
+        if cached:
+            return cached[:limit]
+        stale = self._read_etf_holdings_cache(code, None)
+        try:
+            holdings = self._fetch_yfinance_etf_holdings(code, ticker_obj=ticker_obj, limit=limit)
+            if holdings:
+                self._write_etf_holdings_cache(code, holdings)
+                return holdings[:limit]
+        except Exception:
+            pass
+        return stale[:limit]
+
     def get_symbol_data(self, code: str) -> dict:
         """
         종목 상세 페이지용 데이터 반환
@@ -1120,11 +1250,13 @@ class PriceLoader:
                 pass
 
         # yfinance 메타 (AUM, 보수율, 이름 보완 + 개별주식 기초지표)
+        yf_ticker = None
         aum = expense_ratio = None
         market_cap = per = pbr = sector = None
         try:
             yf_code = self._kr_yf_ticker(code) if is_kr else _yf_dl_ticker(code)
-            info    = yf.Ticker(yf_code).info
+            yf_ticker = yf.Ticker(yf_code)
+            info    = yf_ticker.info
             if not name: name = info.get("longName", code)
             if not issuer:
                 issuer = info.get("fundFamily", "") or info.get("company", "")
@@ -1161,6 +1293,7 @@ class PriceLoader:
             asset_type = "KR_ETF" if is_etf else "KR_STOCK"
         else:
             asset_type = "US_ETF" if is_etf else "US_STOCK"
+        holdings = self._get_etf_holdings(code, is_kr=is_kr, ticker_obj=yf_ticker) if is_etf else []
 
         return {
             "code": code, "name": name,
@@ -1171,7 +1304,7 @@ class PriceLoader:
             "expense_ratio": expense_ratio, "aum": aum,
             "market_cap": market_cap, "per": per, "pbr": pbr, "sector": sector,
             "is_etf": is_etf, "asset_type": asset_type,
-            "dividends": dividends, "prices": prices,
+            "dividends": dividends, "holdings": holdings, "prices": prices,
             "is_index": is_index,
         }
 

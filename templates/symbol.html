@@ -131,6 +131,19 @@
 .div-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
 .div-table tr:last-child td { border-bottom: none; }
 
+.holding-list { display: flex; flex-direction: column; gap: 8px; }
+.holding-row {
+  display: grid; grid-template-columns: 28px minmax(58px, 74px) 1fr auto;
+  align-items: center; gap: 8px; padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.holding-row:last-child { border-bottom: none; }
+.holding-rank { font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); }
+.holding-code { font-size: 0.82rem; font-weight: 800; color: var(--text); font-family: var(--font-mono); }
+.holding-name { min-width: 0; font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.holding-weight { font-size: 0.82rem; font-weight: 800; color: var(--blue); font-family: var(--font-mono); }
+.holding-source { margin-top: 10px; font-size: 0.72rem; color: var(--text-muted); }
+
 /* 빈 상태 */
 .symbol-empty {
   display: flex; align-items: center; justify-content: center;
@@ -185,6 +198,17 @@ function fmtMcap(v, currency) {
   if (v >= 1e9)  return '$' + (v / 1e9).toFixed(1) + 'B';
   if (v >= 1e6)  return '$' + (v / 1e6).toFixed(1) + 'M';
   return '$' + Math.round(v).toLocaleString();
+}
+
+function fmtWeight(v) {
+  if (v === null || v === undefined || Number.isNaN(Number(v))) return '—';
+  return Number(v).toFixed(2) + '%';
+}
+
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
 }
 
 let chartInst    = null;   // Chart.js (라인)
@@ -298,6 +322,24 @@ function renderPage(data) {
           <div class="symbol-card-title">📊 핵심 지표</div>
           <div class="stats-grid">${statItems.join('')}</div>
         </div>
+
+        ${isETF ? `
+        <div class="symbol-card">
+          <div class="symbol-card-title">🧩 구성종목</div>
+          ${data.holdings && data.holdings.length ? `
+          <div class="holding-list">
+            ${data.holdings.map(h => `
+              <div class="holding-row">
+                <span class="holding-rank">#${h.rank}</span>
+                <span class="holding-code">${escHtml(h.code || '-')}</span>
+                <span class="holding-name" title="${escHtml(h.name || '')}">${escHtml(h.name || '')}</span>
+                <span class="holding-weight">${fmtWeight(h.weight_pct)}</span>
+              </div>
+            `).join('')}
+          </div>
+          <div class="holding-source">${escHtml(data.holdings[0].source || 'Yahoo Finance')} 기준 · 상위 보유종목</div>` :
+          '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">구성종목 데이터 없음</div>'}
+        </div>` : ''}
 
         ${(isStock || isETF) ? `
         <div class="symbol-card">

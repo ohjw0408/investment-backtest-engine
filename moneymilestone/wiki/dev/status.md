@@ -556,3 +556,10 @@ tags: [dev]
 - 보유종목은 `symbol_master.db`의 `etf_holdings_cache` 테이블에 24시간 캐시한다. 테이블은 런타임에 자동 생성되며, 네트워크 실패 시 기존 캐시가 있으면 그대로 사용한다.
 - 국내상장 ETF는 현재 repo/DB에 구성종목 원천이 없어 `구성종목 데이터 없음`으로 표시한다. 국내 ETF 지원은 KRX/운용사별 원천 확정 후 별도 작업 필요.
 - 검증: `python -m py_compile modules/price_loader.py app.py`, `pytest tests/test_etf_holdings.py -q`, Playwright DOM 확인(SPY 구성종목 10개, 069500 빈 상태, JS 에러 0).
+
+## 2026-06-30 ETF 구성종목 파이차트 배치
+
+- ETF 구성종목 카드를 종목 상세 오른쪽 지표 영역에서 왼쪽 가격차트 하단으로 이동했다.
+- 구성종목은 파이차트로 먼저 보여주고, 기존 비중표는 파이차트 아래에 붙였다. 파이 hover tooltip은 `티커 · 종목명: 비중%` 형식.
+- 상위 구성종목 합계가 100% 미만이면 남은 비중을 `기타 보유종목`으로 표시해 파이 총합 착시를 줄였다.
+- 검증: Playwright DOM 확인(SPY 파이 type=pie, slice 11개, tooltip `NVDA · NVIDIA Corp: 7.89%`, 표 10행, JS 에러 0).

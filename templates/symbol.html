@@ -49,6 +49,11 @@
   height: 530px;
   position: relative;
 }
+.symbol-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
 /* 오른쪽 컬럼 — 스택 전체 높이 채우기 */
 .symbol-right-col {
@@ -56,6 +61,8 @@
   flex-direction: column;
   gap: 16px;
 }
+.symbol-left-col .symbol-card + .symbol-card,
+.symbol-right-col .symbol-card + .symbol-card { margin-top: 0; }
 .symbol-right-col .symbol-card:last-child {
   flex: 1;
   overflow-y: auto;
@@ -143,6 +150,11 @@
 .holding-name { min-width: 0; font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .holding-weight { font-size: 0.82rem; font-weight: 800; color: var(--blue); font-family: var(--font-mono); }
 .holding-source { margin-top: 10px; font-size: 0.72rem; color: var(--text-muted); }
+.holding-pie-wrap {
+  height: 300px;
+  position: relative;
+  margin-bottom: 12px;
+}
 
 /* 빈 상태 */
 .symbol-empty {
@@ -211,7 +223,15 @@ function escHtml(s) {
   }[ch]));
 }
 
+function validHoldings(holdings) {
+  return (holdings || []).map(h => ({
+    ...h,
+    weight_pct: Number(h.weight_pct)
+  })).filter(h => h.code && Number.isFinite(h.weight_pct) && h.weight_pct > 0);
+}
+
 let chartInst    = null;   // Chart.js (라인)
+let holdingsChart = null;  // Chart.js (ETF 구성종목 파이)
 let candleChart  = null;   // Lightweight Charts (캔들)
 let candleSeries = null;
 let allData        = null;
@@ -297,38 +317,35 @@ function renderPage(data) {
     <!-- 2열 본문 -->
     <div class="symbol-body">
       <!-- 왼쪽: 차트 -->
-      <div class="symbol-card chart-card" id="chartCard">
-        <div class="chart-card-head">
-          <div class="symbol-card-title">📈 가격 차트</div>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <div class="chart-type-toggle" id="chartTypeToggle">
-              <button class="ctype-btn active" data-ctype="line">라인</button>
-              <button class="ctype-btn" data-ctype="candle">캔들</button>
+      <div class="symbol-left-col">
+        <div class="symbol-card chart-card" id="chartCard">
+          <div class="chart-card-head">
+            <div class="symbol-card-title">📈 가격 차트</div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <div class="chart-type-toggle" id="chartTypeToggle">
+                <button class="ctype-btn active" data-ctype="line">라인</button>
+                <button class="ctype-btn" data-ctype="candle">캔들</button>
+              </div>
+              <button class="fs-btn" id="fsBtn" title="전체화면">⛶</button>
             </div>
-            <button class="fs-btn" id="fsBtn" title="전체화면">⛶</button>
           </div>
-        </div>
-        <div class="period-tabs" id="periodTabs"></div>
-        <div class="chart-hint" id="chartHint"></div>
-        <div class="chart-canvas-wrap">
-          <canvas id="priceChart"></canvas>
-          <div id="candleChart" style="position:absolute; inset:0; display:none;"></div>
-        </div>
-      </div>
-
-      <!-- 오른쪽: 지표 + 배당 -->
-      <div class="symbol-right-col">
-        <div class="symbol-card">
-          <div class="symbol-card-title">📊 핵심 지표</div>
-          <div class="stats-grid">${statItems.join('')}</div>
+          <div class="period-tabs" id="periodTabs"></div>
+          <div class="chart-hint" id="chartHint"></div>
+          <div class="chart-canvas-wrap">
+            <canvas id="priceChart"></canvas>
+            <div id="candleChart" style="position:absolute; inset:0; display:none;"></div>
+          </div>
         </div>
 
         ${isETF ? `
-        <div class="symbol-card">
+        <div class="symbol-card holdings-card">
           <div class="symbol-card-title">🧩 구성종목</div>
-          ${data.holdings && data.holdings.length ? `
+          ${validHoldings(data.holdings).length ? `
+          <div class="holding-pie-wrap">
+            <canvas id="holdingsPieChart"></canvas>
+          </div>
           <div class="holding-list">
-            ${data.holdings.map(h => `
+            ${validHoldings(data.holdings).map(h => `
               <div class="holding-row">
                 <span class="holding-rank">#${h.rank}</span>
                 <span class="holding-code">${escHtml(h.code || '-')}</span>
@@ -340,6 +357,14 @@ function renderPage(data) {
           <div class="holding-source">${escHtml(data.holdings[0].source || 'Yahoo Finance')} 기준 · 상위 보유종목</div>` :
           '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">구성종목 데이터 없음</div>'}
         </div>` : ''}
+      </div>
+
+      <!-- 오른쪽: 지표 + 배당 -->
+      <div class="symbol-right-col">
+        <div class="symbol-card">
+          <div class="symbol-card-title">📊 핵심 지표</div>
+          <div class="stats-grid">${statItems.join('')}</div>
+        </div>
 
         ${(isStock || isETF) ? `
         <div class="symbol-card">
@@ -362,11 +387,70 @@ function renderPage(data) {
   `;
 
   renderTabs();
+  renderHoldingsPie(data);
   renderActive();
 }
 
 // ── 차트 엔진 ────────────────────────────────────────────
 // 라인 = 표시 기간(시간봉/일봉). 캔들 = 캔들 1개의 간격, 기간은 항상 전체.
+function renderHoldingsPie(data) {
+  if (holdingsChart) {
+    holdingsChart.destroy();
+    holdingsChart = null;
+  }
+  const canvas = document.getElementById('holdingsPieChart');
+  if (!canvas) return;
+
+  const holdings = validHoldings(data.holdings);
+  if (!holdings.length) return;
+
+  const slices = holdings.map(h => ({
+    code: h.code,
+    name: h.name || h.code,
+    weight: h.weight_pct
+  }));
+  const total = slices.reduce((sum, h) => sum + h.weight, 0);
+  if (total > 0 && total < 99) {
+    slices.push({ code: '기타', name: '기타 보유종목', weight: 100 - total });
+  }
+
+  const colors = [
+    '#1976D2', '#2E7D32', '#F57C00', '#7B1FA2', '#00838F',
+    '#C62828', '#5D6D7E', '#AFB42B', '#6D4C41', '#AD1457',
+    '#90A4AE'
+  ];
+  holdingsChart = new Chart(canvas.getContext('2d'), {
+    type: 'pie',
+    data: {
+      labels: slices.map(h => h.code),
+      datasets: [{
+        data: slices.map(h => h.weight),
+        backgroundColor: slices.map((_, i) => colors[i % colors.length]),
+        borderColor: (typeof MM_DARK !== 'undefined' && MM_DARK) ? '#18202B' : '#FFFFFF',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { color: MM_AXIS, boxWidth: 12, padding: 12, font: { size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const h = slices[ctx.dataIndex];
+              return `${h.code} · ${h.name}: ${fmtWeight(h.weight)}`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
 const MM_AXIS = (typeof MM_DARK !== 'undefined' && MM_DARK) ? '#8FA3B8' : '#90A4AE';
 const intradayCache = {};   // {'1d':resp,'1w':resp,'max':resp}
 
@@ -599,6 +683,7 @@ function resizeCharts() {
     candleChart.timeScale().fitContent();
   }
   if (chartInst) chartInst.resize();
+  if (holdingsChart) holdingsChart.resize();
 }
 window.addEventListener('resize', resizeCharts);
 document.addEventListener('fullscreenchange', () => setTimeout(resizeCharts, 120));

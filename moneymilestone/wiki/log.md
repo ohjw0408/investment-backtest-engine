@@ -4219,3 +4219,9 @@ _작성: Claude_
 ETF 종목 상세 화면에 구성종목 카드를 추가했다. US ETF는 yfinance `funds_data.top_holdings`에서 상위 10개 보유종목/비중을 가져오고, `symbol_master.db`의 `etf_holdings_cache`에 24시간 캐시한다. 국내상장 ETF는 현재 구성종목 원천이 없어 빈 상태 안내만 표시한다.
 
 검증: `python -m py_compile modules/price_loader.py app.py`, `pytest tests/test_etf_holdings.py -q`, Playwright DOM 확인(SPY 구성종목 10개, 069500 빈 상태, JS 에러 0).
+
+## 2026-06-30 ETF 구성종목 파이차트 배치
+
+종목 상세 ETF 구성종목 카드를 가격차트 아래 왼쪽 컬럼으로 옮기고, 파이차트 + 하단 비중표 구조로 바꿨다. 파이차트는 상위 보유종목과 `기타`를 함께 보여주며, hover tooltip은 `티커 · 종목명: 비중%` 형식이다.
+
+검증: Playwright DOM 확인(SPY 파이 type=pie, slice 11개, tooltip `NVDA · NVIDIA Corp: 7.89%`, 비중표 10행, JS 에러 0). 국내 ETF 데이터는 pykrx 없이 KRX/SEIBro/KOFIA/운용사 직접 원천으로 별도 설계 필요.

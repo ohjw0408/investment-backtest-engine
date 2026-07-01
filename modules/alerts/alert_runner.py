@@ -162,6 +162,16 @@ def build_portfolio_bundle(loader, tickers, name):
     }
 
 
+def _target_for_rule(rule):
+    if rule.get("scope") == "symbol" and rule.get("code"):
+        return "/symbol/%s" % str(rule["code"]).upper()
+    if rule.get("rule_type") == "rebalance_band":
+        return "/myassets"
+    if rule.get("scope") == "portfolio" and rule.get("portfolio_id") is not None:
+        return "/myportfolios/%s" % rule["portfolio_id"]
+    return "/alerts#inbox"
+
+
 def compute_user_groups(loader, user_id):
     """리밸런싱용 — 사용자 보유자산 그룹별 현재비중 vs 목표비중.
 
@@ -266,8 +276,20 @@ def run_alert_evaluation(loader, rules=None, now=None):
                 ev = evaluate_rule(r, _ctx_for_rule(bundle, r), now)
             if not ev:
                 continue
+            target_url = _target_for_rule(r)
+            meta = dict(ev.get("meta") or {})
+            meta.update({
+                "target_url": target_url,
+                "type": r.get("rule_type"),
+                "rule_type": r.get("rule_type"),
+                "scope": r.get("scope"),
+            })
+            if r.get("code"):
+                meta["code"] = str(r.get("code")).upper()
+            if r.get("portfolio_id") is not None:
+                meta["portfolio_id"] = r.get("portfolio_id")
             alert_store.add_event(r["user_id"], ev["title"], ev["body"],
-                                  code=r.get("code"), rule_id=r["id"], meta=ev.get("meta"))
+                                  code=r.get("code"), rule_id=r["id"], meta=meta)
             alert_store.mark_rule_fired(r["id"], now_iso, new_extreme=ev.get("new_extreme"))
             fired += 1
             # 앱 푸시(FCM) — 비활성/실패해도 인앱 수신함엔 영향 없음
@@ -275,7 +297,13 @@ def run_alert_evaluation(loader, rules=None, now=None):
                 from modules.alerts import push_sender
                 push_sender.send_to_user(
                     r["user_id"], ev["title"], ev["body"],
-                    data={"code": r.get("code") or "", "rule_id": str(r["id"])})
+                    data={
+                        "code": r.get("code") or "",
+                        "rule_id": str(r["id"]),
+                        "type": r.get("rule_type") or "",
+                        "target_url": target_url,
+                        "portfolio_id": r.get("portfolio_id") or "",
+                    })
             except Exception as pe:
                 print(f"[alert_runner] 룰 {r.get('id')} 푸시 실패(무시): {pe}")
         except Exception as e:

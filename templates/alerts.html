@@ -32,6 +32,8 @@
 .al-item-d { font-size: 0.74rem; color: var(--ds-muted); margin-top: 2px; overflow-wrap: anywhere; }
 .al-pill { font-size: 0.66rem; font-weight: 600; padding: 3px 10px; border-radius: var(--r-pill); background: var(--brand-tint); color: var(--brand-text); flex-shrink: 0; white-space: nowrap; }
 .al-ev { border-left: 3px solid var(--brand); padding: 8px 12px; background: var(--ds-soft); border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+.al-ev-link { cursor: pointer; transition: background .12s, transform .12s; }
+.al-ev-link:hover { background: var(--brand-tint); transform: translateX(1px); }
 .al-ev.read { border-left-color: var(--ds-hairline); opacity: 0.6; }
 .al-ev-t { font-size: 0.86rem; font-weight: 600; overflow-wrap: anywhere; }
 .al-ev-b { font-size: 0.76rem; color: var(--ds-muted); margin-top: 2px; overflow-wrap: anywhere; }
@@ -41,6 +43,14 @@
 .al-toggle { cursor: pointer; }
 .al-login { text-align: center; padding: 60px 20px; color: var(--ds-muted); }
 .al-cal-edit { padding: 5px 10px !important; font-size: 0.74rem !important; }
+.al-tabs { display: flex; gap: 6px; padding: 5px; margin-top: 18px; border: 1px solid var(--ds-hairline);
+  border-radius: var(--r-pill); background: var(--ds-canvas); overflow-x: auto; }
+.al-tab { flex: 1 0 auto; min-width: 0; border: 0; border-radius: var(--r-pill); padding: 9px 14px;
+  background: transparent; color: var(--ds-muted); font-size: 0.86rem; font-weight: 700; cursor: pointer;
+  font-family: var(--font-sans); white-space: nowrap; }
+.al-tab.active { background: var(--brand); color: var(--on-brand); box-shadow: var(--ds-shadow-sm); }
+.al-panel { display: none; }
+.al-panel.active { display: block; }
 /* 종목 검색 콤보 */
 .al-search-wrap { position: relative; }
 .al-search-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
@@ -92,6 +102,13 @@
   <div class="al-card"><div class="al-login">알림은 로그인 후 사용할 수 있어요.</div></div>
   {% else %}
 
+  <div class="al-tabs" role="tablist" aria-label="알림 메뉴">
+    <button type="button" class="al-tab active" data-alert-tab="settings" role="tab" aria-selected="true">알림 설정</button>
+    <button type="button" class="al-tab" data-alert-tab="rules" role="tab" aria-selected="false">내 알림</button>
+    <button type="button" class="al-tab" data-alert-tab="inbox" role="tab" aria-selected="false">수신함</button>
+  </div>
+
+  <section class="al-panel active" data-alert-panel="settings" role="tabpanel">
   <!-- 종목 알림 -->
   <div class="al-card">
     <h3>종목 알림</h3>
@@ -181,18 +198,23 @@
       </div>
     </div>
   </div>
+  </section>
 
+  <section class="al-panel" data-alert-panel="rules" role="tabpanel">
   <!-- 내 알림 -->
   <div class="al-card">
     <h3>내 알림 <span class="al-sub" id="alRuleCount"></span></h3>
     <div class="al-list" id="alRules"><div class="al-empty">불러오는 중…</div></div>
   </div>
+  </section>
 
+  <section class="al-panel" data-alert-panel="inbox" role="tabpanel">
   <!-- 수신함 -->
   <div class="al-card">
     <h3>수신함 <button class="al-btn ghost" id="alReadAll" style="margin-left:auto;padding:5px 12px;font-size:0.76rem;">모두 읽음</button></h3>
     <div class="al-list" id="alEvents"><div class="al-empty">불러오는 중…</div></div>
   </div>
+  </section>
 
   {% endif %}
 </div>
@@ -212,6 +234,36 @@ let CAL_ALERT_VIEW = null;
 
 function $(id){ return document.getElementById(id); }
 function htmlEsc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function normalizeAlertTab(raw) {
+  const v = String(raw || '').replace(/^#/, '').toLowerCase();
+  if (['settings', 'setting', 'config'].includes(v)) return 'settings';
+  if (['rules', 'mine', 'my', 'my-alerts'].includes(v)) return 'rules';
+  if (['inbox', 'received', 'events'].includes(v)) return 'inbox';
+  return 'settings';
+}
+function setAlertTab(tab, opts) {
+  const next = normalizeAlertTab(tab);
+  document.querySelectorAll('[data-alert-tab]').forEach(b => {
+    const on = b.dataset.alertTab === next;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('[data-alert-panel]').forEach(p => {
+    p.classList.toggle('active', p.dataset.alertPanel === next);
+  });
+  if (!opts || !opts.silent) {
+    const url = new URL(location.href);
+    url.hash = next;
+    history.replaceState(null, '', url);
+  }
+  if (next === 'rules') loadRules();
+  if (next === 'inbox') loadEvents();
+}
+document.querySelectorAll('[data-alert-tab]').forEach(b => {
+  b.addEventListener('click', () => setAlertTab(b.dataset.alertTab));
+});
+window.addEventListener('hashchange', () => setAlertTab(location.hash, { silent: true }));
+setAlertTab(new URLSearchParams(location.search).get('tab') || location.hash || 'settings', { silent: true });
 
 // 종목 셀렉트 채우기 (보유/관심 종목 빠른선택)
 (function(){
@@ -295,7 +347,8 @@ async function createRule(){
   const r = await fetch('/api/alerts/rules', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   const j = await r.json();
   if (!r.ok) { $('alErr').textContent = j.error || '추가 실패'; return; }
-  loadRules();
+  await loadRules();
+  setAlertTab('rules');
 }
 $('alCreate').addEventListener('click', createRule);
 
@@ -305,7 +358,8 @@ async function createRebalance(){
   const r = await fetch('/api/alerts/rules', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   const j = await r.json();
   if (!r.ok) { $('alRebErr').textContent = j.error || '추가 실패'; return; }
-  loadRules();
+  await loadRules();
+  setAlertTab('rules');
 }
 $('alRebCreate').addEventListener('click', createRebalance);
 
@@ -375,18 +429,44 @@ function timeAgo(iso){
   if (s < 86400) return Math.floor(s/3600)+'시간 전'; return d.toLocaleDateString('ko-KR');
 }
 
+function alertTargetUrl(e) {
+  const meta = e && e.meta && typeof e.meta === 'object' ? e.meta : {};
+  const explicit = String(meta.target_url || meta.targetUrl || '');
+  if (explicit.startsWith('/')) return explicit;
+  if (e && e.code) return '/symbol/' + encodeURIComponent(e.code);
+  if (meta.cal || meta.type === 'calendar') return '/calendar';
+  if (meta.portfolio_id) return '/myportfolios/' + encodeURIComponent(meta.portfolio_id);
+  if (meta.breaches || meta.rule_type === 'rebalance_band' || meta.type === 'rebalance_band') return '/myassets';
+  return '';
+}
+
 async function loadEvents(){
   const r = await fetch('/api/alerts/events?limit=50');
   const j = await r.json();
   const evs = j.events || [];
   const box = $('alEvents');
   if (!evs.length) { box.innerHTML = '<div class="al-empty">아직 받은 알림이 없어요. 캘린더 알림은 저장 직후 생기지 않고, 매일 08:00 KST에 오늘 일정이 있을 때 여기에 쌓입니다.</div>'; return; }
-  box.innerHTML = evs.map(e => `
-    <div class="al-ev ${e.read_at ? 'read' : ''}">
-      <div class="al-ev-t">${e.title}</div>
-      <div class="al-ev-b">${e.body}</div>
+  box.innerHTML = evs.map(e => {
+    const target = alertTargetUrl(e);
+    return `
+    <div class="al-ev ${e.read_at ? 'read' : ''} ${target ? 'al-ev-link' : ''}" data-id="${e.id}" data-target="${htmlEsc(target)}" tabindex="${target ? '0' : '-1'}">
+      <div class="al-ev-t">${htmlEsc(e.title)}</div>
+      <div class="al-ev-b">${htmlEsc(e.body)}</div>
       <div class="al-ev-time">${timeAgo(e.created_at)}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.al-ev[data-id]').forEach(el => {
+    const openTarget = async () => {
+      await fetch(`/api/alerts/events/${el.dataset.id}/read`, { method: 'POST' });
+      el.classList.add('read');
+      if (window.mmRefreshBell) window.mmRefreshBell();
+      if (el.dataset.target) location.href = el.dataset.target;
+    };
+    el.addEventListener('click', openTarget);
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTarget(); }
+    });
+  });
 }
 $('alReadAll').addEventListener('click', async () => {
   await fetch('/api/alerts/read-all', { method:'POST' });
@@ -563,8 +643,11 @@ loadEvents();
     return saveCalendarPrefs();
   };
   window.mmFocusCalendarAlerts = function () {
-    document.getElementById('calendarAlertCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    enabled.focus({ preventScroll: true });
+    setAlertTab('settings');
+    requestAnimationFrame(() => {
+      document.getElementById('calendarAlertCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      enabled.focus({ preventScroll: true });
+    });
   };
 })();
 </script>

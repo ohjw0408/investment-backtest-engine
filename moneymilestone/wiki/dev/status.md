@@ -581,3 +581,10 @@ tags: [dev]
 - 종목 상세 API의 배당 내역 조회를 최근 12개 제한에서 전체 이력 조회로 변경했다.
 - 화면은 처음 12개만 보여주고, `더보기 (N개)` 버튼으로 전체 지급 내역을 펼치며 `접기`로 원래 상태로 돌아간다.
 - 검증: SCHD 로컬 상세 DOM에서 초기 12행, 더보기 후 394행, 접기 후 12행, JS 에러 0. `pytest tests/test_etf_holdings.py -q`, `python -m py_compile app.py modules/price_loader.py`.
+
+## 2026-07-02 업데이트 131 — 알림 탭 분리 + 알림 클릭 딥링크
+
+- `/alerts` 화면을 `알림 설정` / `내 알림` / `수신함` 3탭으로 분리했다. 상단 종의 `전체 보기`는 바로 `/alerts#inbox`로 이동한다.
+- 수신함 항목과 상단 알림 드롭다운 항목을 클릭하면 가능한 목적지로 바로 이동한다.
+- 새 푸시 payload에 `target_url`을 추가했다. 종목 알림은 종목 상세, 리밸런싱은 내 자산, 저장 포트폴리오 알림은 포트폴리오 상세, 캘린더 알림은 캘린더로 이동한다.
+- 검증: `python tests/test_alerts_api.py` 39 PASS, `python tests/test_alert_runner.py` 10 PASS, 렌더된 실행 JS syntax OK, `git diff --check` OK.

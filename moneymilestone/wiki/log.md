@@ -4308,3 +4308,9 @@ ETF 종목 상세 화면에 구성종목 카드를 추가했다. US ETF는 yfina
 종목 상세의 배당 지급 내역을 전체 이력으로 내려주고, 화면에서는 초기 12개만 표시한 뒤 `더보기` 버튼으로 전체를 펼치도록 바꿨다. 펼친 뒤에는 `접기`로 다시 최근 12개만 볼 수 있다.
 
 검증: SCHD 로컬 DOM에서 초기 12행, 더보기 후 394행, 접기 후 12행, JS 에러 0. `pytest tests/test_etf_holdings.py -q`, `python -m py_compile app.py modules/price_loader.py`.
+
+## 2026-07-02 알림 탭 분리 + 목적지 이동
+
+알림 페이지를 설정/내 알림/수신함 탭으로 나눴다. 상단 알림의 전체 보기는 수신함으로 바로 들어가고, 드롭다운/수신함/푸시 클릭은 `target_url` 우선으로 관련 화면에 이동한다. 새 알림은 종목 상세, 내 자산, 저장 포트폴리오 상세, 캘린더 목적지를 payload/meta에 함께 저장한다.
+
+검증: `python tests/test_alerts_api.py` 39 PASS, `python tests/test_alert_runner.py` 10 PASS, 렌더된 실행 JS syntax OK, `git diff --check` OK.

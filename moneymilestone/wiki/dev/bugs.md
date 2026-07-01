@@ -186,3 +186,11 @@ tags: [dev, bug]
 |---|---|---|---|---|
 | 신규 계정 푸시 알림 기본 ON/동의 누락 | 최초 약관 동의 화면에 푸시 선택 동의가 없고, 기존 클라이언트가 로그인 후 자동 FCM 등록을 시도할 수 있었음 | `users.push_consent_at/push_revoked_at` 추가. `(선택)` 푸시 동의 UI 추가. 동의 전 `/api/push/register` 403, 전송 대상 조회 빈 배열, 설정 OFF 시 동의 철회+토큰 삭제 | 미커밋 | ✅ 테스트 PASS |
 | Android OAuth 후 메일앱 chooser 노출 | 앱 복귀용 커스텀 스킴이 Android resolver에서 이상 앱 후보와 엮인 사례 보고 | 앱 플로우 콜백을 `intent://auth?...#Intent;scheme=moneymilestone;package=com.moneymilestone.app;end`로 패키지 지정 | 미커밋 | ⚠️ 실기기 재검증 필요 |
+
+---
+
+## 2026-07-02 세션 (Codex) — 알림 UX
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| 알림 페이지에서 수신함까지 스크롤해야 함 | `/alerts`가 설정 폼, 내 알림, 수신함을 한 페이지에 세로 배치했고 상단 종 `전체 보기`도 기본 `/alerts`로 이동 | `/alerts`를 `알림 설정`/`내 알림`/`수신함` 탭으로 분리. `전체 보기`는 `/alerts#inbox`. 수신함/드롭다운/푸시 클릭은 `target_url`로 관련 화면 이동 | 이번 커밋 | ✅ |

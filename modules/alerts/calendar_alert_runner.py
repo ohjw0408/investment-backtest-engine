@@ -107,12 +107,14 @@ def run_calendar_alerts(loader, today=None, prefs_list=None):
                 continue
             title, body = _compose(todays)
             alert_store.add_event(uid, title, body,
-                                  meta={"cal": True, "date": today, "count": len(todays)})
+                                  meta={"cal": True, "type": "calendar", "target_url": "/calendar",
+                                        "date": today, "count": len(todays)})
             alert_store.mark_cal_alert_sent(uid, today)
             fired += 1
             try:
                 from modules.alerts import push_sender
-                push_sender.send_to_user(uid, title, body, data={"type": "calendar"})
+                push_sender.send_to_user(uid, title, body,
+                                         data={"type": "calendar", "target_url": "/calendar"})
             except Exception as pe:
                 print(f"[cal_alert] user {uid} 푸시 실패(무시): {pe}")
         except Exception as e:

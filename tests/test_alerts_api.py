@@ -22,6 +22,13 @@ from modules.alerts import alert_store
 import app as appmod
 
 UID = 4242
+now = "2026-07-02T00:00:00"
+am._get_conn().execute(
+    "INSERT INTO users (id, google_id, email, name, picture, created_at, last_login, agreed_terms_at, agreed_privacy_at) "
+    "VALUES (?,?,?,?,?,?,?,?,?)",
+    (UID, "alert-api-user", "alert-api@test.local", "Alert API", "", now, now, now, now),
+)
+am._get_conn().commit()
 
 # ── 1. 스토어 직접 ──
 rid = alert_store.create_rule(UID, scope="symbol", rule_type="daily_pct",

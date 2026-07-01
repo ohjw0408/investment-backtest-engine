@@ -223,7 +223,7 @@
         <div class="mm-bell-dd" id="mmBellDd">
           <div class="mm-bell-head">
             <span>알림</span>
-            <a href="/alerts" class="mm-bell-all">전체 보기</a>
+            <a href="/alerts#inbox" class="mm-bell-all">전체 보기</a>
           </div>
           <div class="mm-bell-list" id="mmBellList"></div>
         </div>
@@ -495,6 +495,20 @@ function handleGoogleLogin(e) {
   } catch (e) {}
 })();
 
+function mmAlertTargetUrl(data) {
+  data = data || {};
+  const meta = data.meta && typeof data.meta === 'object' ? data.meta : data;
+  const explicit = String(data.target_url || data.targetUrl || meta.target_url || meta.targetUrl || '');
+  if (explicit.startsWith('/')) return explicit;
+  const code = data.code || meta.code;
+  if (code) return '/symbol/' + encodeURIComponent(code);
+  if (meta.cal || meta.type === 'calendar') return '/calendar';
+  if (meta.portfolio_id) return '/myportfolios/' + encodeURIComponent(meta.portfolio_id);
+  if (meta.breaches || meta.rule_type === 'rebalance_band' || meta.type === 'rebalance_band') return '/myassets';
+  return '/alerts#inbox';
+}
+window.mmAlertTargetUrl = mmAlertTargetUrl;
+
 // ── Capacitor 앱: 푸시 알림(FCM) 등록 — 로그인 후 권한 동의 시 토큰 서버 등록 ──
 // force=true(설정서 직접 켤 때): asked/opt-out 무시하고 강제 권한요청·등록. 반환=성공 여부.
 async function mmInitPush(force) {
@@ -586,7 +600,7 @@ async function mmInitPush(force) {
       // 알림 탭 -> 관련 화면 이동(종목 알림=종목 페이지, 그 외=수신함)
       await Push.addListener('pushNotificationActionPerformed', function (a) {
         const d = (a && a.notification && a.notification.data) || {};
-        location.href = d.code ? ('/symbol/' + encodeURIComponent(d.code)) : '/alerts';
+        location.href = mmAlertTargetUrl(d);
       });
     }
     await Push.register();
@@ -739,16 +753,20 @@ function mmPrompt(title, opts) {
       const j = await (await fetch('/api/alerts/events?limit=12')).json();
       const evs = j.events || [];
       if (!evs.length) { list.innerHTML = '<div class="mm-bell-empty">받은 알림이 없어요.</div>'; return; }
-      list.innerHTML = evs.map(e => `
-        <div class="mm-bell-it ${e.read_at ? '' : 'unread'}" data-id="${e.id}">
-          <div class="mm-bell-it-t">${e.title}</div>
-          <div class="mm-bell-it-b">${e.body}</div>
+      list.innerHTML = evs.map(e => {
+        const target = mmAlertTargetUrl(e);
+        return `
+        <div class="mm-bell-it ${e.read_at ? '' : 'unread'}" data-id="${e.id}" data-target="${_mmEscH(target)}">
+          <div class="mm-bell-it-t">${_mmEscH(e.title)}</div>
+          <div class="mm-bell-it-b">${_mmEscH(e.body)}</div>
           <div class="mm-bell-it-time">${fmtAgo(e.created_at)}</div>
-        </div>`).join('');
-      list.querySelectorAll('.mm-bell-it.unread').forEach(el => el.onclick = async () => {
+        </div>`;
+      }).join('');
+      list.querySelectorAll('.mm-bell-it').forEach(el => el.onclick = async () => {
         await fetch(`/api/alerts/events/${el.dataset.id}/read`, { method: 'POST' });
         el.classList.remove('unread');
         refreshCount();
+        location.href = el.dataset.target || '/alerts#inbox';
       });
     } catch (e) { list.innerHTML = '<div class="mm-bell-empty">오류가 발생했어요.</div>'; }
   }

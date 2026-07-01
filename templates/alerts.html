@@ -67,6 +67,15 @@
 .ca-subtitle { font-size: 0.8rem; font-weight: 700; color: var(--ds-ink); margin: 0 0 8px; }
 .ca-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .ca-src-card { border: 1px solid var(--ds-hairline); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 10px; background: var(--ds-canvas); }
+.ca-note { border-left: 3px solid var(--brand); background: var(--ds-soft); padding: 11px 13px; margin: 0 0 12px; font-size: 0.78rem; line-height: 1.55; color: var(--ds-body); }
+.ca-note b { color: var(--ds-ink); }
+.ca-kind { align-items: flex-start; min-width: 150px; }
+.ca-kind span { display: flex; flex-direction: column; gap: 2px; }
+.ca-kind b { color: var(--ds-ink); font-size: 0.83rem; }
+.ca-kind small { color: var(--ds-muted); font-size: 0.68rem; font-weight: 500; line-height: 1.35; }
+.ca-summary { width: 100%; margin-top: 4px; padding: 10px 12px; background: var(--brand-tint); color: var(--brand-text); border-radius: var(--r-md); font-size: 0.78rem; line-height: 1.5; }
+.ca-summary.off { background: var(--ds-soft); color: var(--ds-muted); }
+.ca-status-line { flex-basis: 100%; margin-left: 0 !important; line-height: 1.5; }
 </style>
 {% endblock %}
 
@@ -137,14 +146,19 @@
   <!-- 증시 캘린더 알림 -->
   <div class="al-card">
     <h3>📅 증시 캘린더 알림</h3>
-    <div class="al-sub" style="margin-bottom:12px;">매일 아침 8시, 그날 있는 일정(경제지표·실적·통화정책·배당락)을 알려드려요. 대상은 아래에서 <b>알림 전용</b>으로 골라요(캘린더 설정과 별개).</div>
+    <div class="al-sub" style="margin-bottom:12px;">오늘 날짜에 잡힌 시장 일정을 매일 한국시간 08:00에 한 번 묶어서 알려드려요.</div>
+    <div class="ca-note">
+      <b>저장 직후 알림 내역이 바로 생기지는 않습니다.</b><br>
+      다음 08:00 KST 실행 때, 선택한 항목 중 오늘 일정이 있으면 알림함과 푸시로 들어옵니다.
+      한국 주식은 장 시작 전, 미국 주식은 그날 밤 정규장 시작 전입니다.
+    </div>
     <label class="ca-master"><input type="checkbox" id="caEnabled"> <b>증시 일정 알림 받기</b></label>
     <div id="caBody" style="display:none;margin-top:16px;">
       <div class="ca-kinds">
-        <label class="ca-chk"><input type="checkbox" id="caEcon"> 경제지표</label>
-        <label class="ca-chk"><input type="checkbox" id="caPolicy"> 통화정책</label>
-        <label class="ca-chk"><input type="checkbox" id="caEarn"> 실적 발표</label>
-        <label class="ca-chk"><input type="checkbox" id="caDiv"> 배당락</label>
+        <label class="ca-chk ca-kind"><input type="checkbox" id="caEcon"><span><b>경제지표</b><small>CPI·고용·소매판매 등</small></span></label>
+        <label class="ca-chk ca-kind"><input type="checkbox" id="caPolicy"><span><b>통화정책</b><small>FOMC·금리 결정 일정</small></span></label>
+        <label class="ca-chk ca-kind"><input type="checkbox" id="caEarn"><span><b>실적 발표</b><small>선택 종목의 발표 예정일</small></span></label>
+        <label class="ca-chk ca-kind"><input type="checkbox" id="caDiv"><span><b>배당락일</b><small>선택 종목의 배당락 예정일</small></span></label>
       </div>
       <div id="caEconWrap" style="margin-top:16px;">
         <div class="ca-subtitle">알림받을 경제지표</div>
@@ -156,7 +170,8 @@
       </div>
       <div class="al-row" style="margin-top:16px;align-items:center;">
         <button class="al-btn" id="caSave">저장</button>
-        <span id="caStatus" class="al-sub" style="margin-left:10px;"></span>
+        <span id="caStatus" class="al-sub ca-status-line" style="margin-left:10px;"></span>
+        <div id="caSummary" class="ca-summary off"></div>
       </div>
     </div>
   </div>
@@ -332,7 +347,7 @@ async function loadEvents(){
   const j = await r.json();
   const evs = j.events || [];
   const box = $('alEvents');
-  if (!evs.length) { box.innerHTML = '<div class="al-empty">받은 알림이 없어요.</div>'; return; }
+  if (!evs.length) { box.innerHTML = '<div class="al-empty">아직 받은 알림이 없어요. 캘린더 알림은 저장 직후 생기지 않고, 매일 08:00 KST에 오늘 일정이 있을 때 여기에 쌓입니다.</div>'; return; }
   box.innerHTML = evs.map(e => `
     <div class="al-ev ${e.read_at ? 'read' : ''}">
       <div class="al-ev-t">${e.title}</div>
@@ -353,13 +368,39 @@ loadEvents();
 (function () {
   const enabled = $('caEnabled'), body = $('caBody');
   const kEcon = $('caEcon'), kPol = $('caPolicy'), kEarn = $('caEarn'), kDiv = $('caDiv');
-  const econWrap = $('caEconWrap'), symWrap = $('caSymWrap');
+  const econWrap = $('caEconWrap'), symWrap = $('caSymWrap'), summary = $('caSummary');
   if (!enabled) return;
   function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function renderSummary(prefix) {
+    if (!summary) return;
+    if (!enabled.checked) {
+      summary.classList.add('off');
+      summary.innerHTML = '<b>알림 꺼짐</b> 저장해도 일정 알림은 발송되지 않습니다.';
+      return;
+    }
+    const types = [];
+    if (kEcon.checked) types.push('경제지표 ' + document.querySelectorAll('.ca-econ:checked').length + '개');
+    if (kPol.checked) types.push('통화정책');
+    if (kEarn.checked) types.push('실적 발표');
+    if (kDiv.checked) types.push('배당락일');
+    const sourceParts = [];
+    if (kEarn.checked || kDiv.checked) {
+      document.querySelectorAll('#caSymbols .ca-src-card').forEach(card => {
+        const name = (card.querySelector('.ca-src-name')?.textContent || '').trim();
+        const syms = [...card.querySelectorAll('.ca-sym')];
+        const checked = syms.filter(s => s.checked).length;
+        if (checked > 0) sourceParts.push(name + (checked === syms.length ? ' 전체' : ` ${checked}/${syms.length}`));
+      });
+    }
+    summary.classList.remove('off');
+    summary.innerHTML = `<b>${prefix || '현재 선택'}</b> ${types.length ? types.join(' · ') : '선택한 일정 종류 없음'}`
+      + `<br><span>${sourceParts.length ? '종목 일정 대상: ' + sourceParts.join(', ') : '종목 일정 대상 없음'} · 08:00 KST 실행 때 오늘 일정이 있을 때만 알림함에 생깁니다.</span>`;
+  }
   function sync() {
     body.style.display = enabled.checked ? 'block' : 'none';
     econWrap.style.display = kEcon.checked ? 'block' : 'none';
     symWrap.style.display = (kEarn.checked || kDiv.checked) ? 'block' : 'none';
+    renderSummary();
   }
   [enabled, kEcon, kPol, kEarn, kDiv].forEach(el => el.addEventListener('change', sync));
 
@@ -372,9 +413,12 @@ loadEvents();
     enabled.checked = !!p.enabled;
     kEcon.checked = p.show_econ !== false; kPol.checked = p.show_policy !== false;
     kEarn.checked = p.show_earnings !== false; kDiv.checked = p.show_dividend !== false;
-    const ids = new Set(p.econ_ids || []);
+    const econIds = (p.econ_ids || []).map(String);
+    const ids = new Set((p.show_econ !== false && !econIds.length)
+      ? (r.available_econ || []).map(e => String(e.id))
+      : econIds);
     $('caEconList').innerHTML = (r.available_econ || []).map(e =>
-      `<label class="ca-chk"><input type="checkbox" class="ca-econ" value="${e.id}" ${ids.has(e.id) ? 'checked' : ''}> ${esc(e.label)}</label>`).join('');
+      `<label class="ca-chk"><input type="checkbox" class="ca-econ" value="${e.id}" ${ids.has(String(e.id)) ? 'checked' : ''}> ${esc(e.label)}</label>`).join('');
     const src = p.sources || {}, excl = new Set(p.excluded || []), sym = r.symbols || {},
           labels = r.group_labels || {}, order = r.group_order || [];
     let html = '';
@@ -383,12 +427,13 @@ loadEvents();
       if (!items.length) continue;
       html += `<div class="ca-src-card">
         <label class="ca-chk" style="font-weight:700;border:none;background:none;padding:0;">
-          <input type="checkbox" class="ca-src" data-g="${esc(g)}" ${src[g] !== false ? 'checked' : ''}> ${esc(labels[g] || g)} <span style="color:var(--ds-muted);font-weight:400">(${items.length})</span></label>
+          <input type="checkbox" class="ca-src" data-g="${esc(g)}" ${src[g] !== false ? 'checked' : ''}> <span class="ca-src-name">${esc(labels[g] || g)}</span> <span style="color:var(--ds-muted);font-weight:400">(${items.length})</span></label>
         <div class="ca-grid" style="margin-top:10px;">
           ${items.map(it => `<label class="ca-chk"><input type="checkbox" class="ca-sym" value="${esc(it.code)}" ${excl.has(it.code) ? '' : 'checked'}> ${esc(it.name)}</label>`).join('')}
         </div></div>`;
     }
     $('caSymbols').innerHTML = html || '<div class="al-sub">대상 종목이 없어요. 내 자산·포트폴리오·관심목록에 종목을 추가하세요.</div>';
+    document.querySelectorAll('.ca-econ').forEach(c => c.addEventListener('change', () => renderSummary()));
     function syncParent(card) {
       const src = card.querySelector('.ca-src');
       const syms = [...card.querySelectorAll('.ca-sym')];
@@ -402,8 +447,12 @@ loadEvents();
       if (src) src.addEventListener('change', () => {
         card.querySelectorAll('.ca-sym').forEach(s => s.checked = src.checked);
         src.indeterminate = false;
+        renderSummary();
       });
-      card.querySelectorAll('.ca-sym').forEach(s => s.addEventListener('change', () => syncParent(card)));
+      card.querySelectorAll('.ca-sym').forEach(s => s.addEventListener('change', () => {
+        syncParent(card);
+        renderSummary();
+      }));
       syncParent(card);
     });
     sync();
@@ -419,8 +468,9 @@ loadEvents();
     const st = $('caStatus'); st.textContent = '저장 중…';
     try {
       const res = await fetch('/api/alerts/calendar-prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      st.textContent = res.ok ? '저장됐어요. 매일 아침 8시에 알려드려요.' : '저장 실패';
+      st.textContent = res.ok ? '저장됐어요. 알림 내역은 다음 08:00 KST 실행 때 오늘 일정이 있으면 생성됩니다.' : '저장 실패';
       st.style.color = res.ok ? 'var(--up)' : 'var(--down)';
+      if (res.ok) renderSummary('저장됨');
     } catch (e) { st.textContent = '저장 실패'; }
   });
 })();

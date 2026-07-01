@@ -4,4 +4,5 @@
     <string name="title_activity_main">Money Milestone</string>
     <string name="package_name">com.moneymilestone.app</string>
     <string name="custom_url_scheme">com.moneymilestone.app</string>
+    <string name="default_notification_channel_id">money_alerts_high_v1</string>
 </resources>

@@ -1,5 +1,20 @@
 # Log
 
+## [2026-07-02] FIX | 모바일 푸시 heads-up/소리/진동용 HIGH 알림 채널
+
+오너가 푸시가 폰 알림함에는 뜨지만 유튜브/인스타처럼 상단 배너, 소리, 진동, 화면 꺼짐 상태의 주의 환기가 약해 기대한 알림과 다르다고 보고.
+- 확인: 운영 FCM 테스트 푸시는 정상 도착했고 Android notification manager에도 posted 됐지만, 채널이 Google 기본 `fcm_fallback_notification_channel`(`Miscellaneous`)이고 importance가 `3 DEFAULT`라 heads-up/소리/진동이 약할 수 있었다.
+- 근거: FCM HTTP v1 문서는 Android 8+에서 notification priority보다 notification channel importance가 표시 우선순위를 좌우하며, 지정한 channel id는 앱이 미리 만들어야 한다고 설명한다.
+- 수정: Android `MainActivity`에서 `money_alerts_high_v1` 채널을 앱 시작 시 생성. importance HIGH(4), 기본 알림음, 진동 패턴, lights ON, lockscreen PUBLIC을 설정.
+- 수정: AndroidManifest에 FCM 기본 notification channel meta-data와 `VIBRATE` 권한을 추가.
+- 수정: 서버 `push_sender`가 FCM HTTP v1 `android.priority=HIGH`, `android.notification.channel_id=money_alerts_high_v1`, `notification_priority=PRIORITY_HIGH`, default sound/vibration/light, visibility PUBLIC을 보내도록 변경.
+- 수정: 앱 포그라운드에서 푸시를 로컬 알림으로 재현할 때도 같은 `channelId`를 사용.
+- 검증: `py_compile push_sender.py` OK, `tests/test_push_consent.py` 15 PASS, `gradlew assembleDebug` BUILD SUCCESSFUL, 새 APK 실기기 설치 성공. 실기기 `dumpsys notification`에서 `money_alerts_high_v1` 채널이 `mImportance=4`, 기본 sound, `mVibrationPattern=[0,250,150,250]`, `mVibrationEnabled=true`로 생성됨을 확인.
+- 제한: Android/삼성의 무음·진동·방해금지·앱별 알림 카테고리 설정은 사용자가 정한 시스템 정책이라 앱이 강제로 우회할 수 없다.
+- 변경: `mobile/android/app/src/main/java/com/moneymilestone/app/MainActivity.java`, `mobile/android/app/src/main/AndroidManifest.xml`, `mobile/android/app/src/main/res/values/strings.xml`, `modules/alerts/push_sender.py`, `templates/base.html`, `moneymilestone/wiki/dev/status.md`, `moneymilestone/wiki/dev/bugs.md`, `moneymilestone/wiki/log.md`.
+
+_작성: Codex_
+
 ## [2026-07-02] FIX | 모바일 푸시 알림 권한 요청 + 토큰 등록 흐름 보강
 
 오너가 앱 안 알림함에는 알림이 오지만 휴대폰 푸시가 오지 않고, Android 시스템 알림 권한 팝업도 뜬 적이 없다고 보고.

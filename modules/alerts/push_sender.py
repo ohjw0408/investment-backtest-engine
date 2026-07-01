@@ -18,6 +18,7 @@ import requests
 _CREDS_ENV = "FCM_SERVICE_ACCOUNT_FILE"
 _SCOPE = "https://www.googleapis.com/auth/firebase.messaging"
 _TIMEOUT = 10
+_ANDROID_ALERT_CHANNEL_ID = "money_alerts_high_v1"
 
 _lock = threading.Lock()
 _state = {"creds": None, "project_id": None, "loaded": False, "ok": False}
@@ -62,7 +63,23 @@ def send(token, title, body, data=None):
     """단일 토큰 전송. 반환: 'ok' | 'unregistered'(토큰 삭제 대상) | 'error'."""
     if not _load():
         return "error"
-    message = {"message": {"token": token, "notification": {"title": title, "body": body}}}
+    message = {
+        "message": {
+            "token": token,
+            "notification": {"title": title, "body": body},
+            "android": {
+                "priority": "HIGH",
+                "notification": {
+                    "channel_id": _ANDROID_ALERT_CHANNEL_ID,
+                    "notification_priority": "PRIORITY_HIGH",
+                    "default_sound": True,
+                    "default_vibrate_timings": True,
+                    "default_light_settings": True,
+                    "visibility": "PUBLIC",
+                },
+            },
+        }
+    }
     if data:
         message["message"]["data"] = {k: str(v) for k, v in data.items()}
     url = f"https://fcm.googleapis.com/v1/projects/{_state['project_id']}/messages:send"

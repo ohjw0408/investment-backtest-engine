@@ -575,7 +575,12 @@ async function mmInitPush(force) {
           if (typeof mmToast === 'function') mmToast('🔔 ' + t + (bd ? ' · ' + bd : ''), 'ok');
           if (window.mmRefreshBell) window.mmRefreshBell();
           const LN = Cap.Plugins && Cap.Plugins.LocalNotifications;
-          if (LN) LN.schedule({ notifications: [{ id: Math.floor(Math.random() * 2000000000) + 1, title: t, body: bd }] });
+          if (LN) LN.schedule({ notifications: [{
+            id: Math.floor(Math.random() * 2000000000) + 1,
+            title: t,
+            body: bd,
+            channelId: 'money_alerts_high_v1'
+          }] });
         } catch (e) {}
       });
       // 알림 탭 -> 관련 화면 이동(종목 알림=종목 페이지, 그 외=수신함)

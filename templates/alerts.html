@@ -389,6 +389,23 @@ loadEvents();
         </div></div>`;
     }
     $('caSymbols').innerHTML = html || '<div class="al-sub">대상 종목이 없어요. 내 자산·포트폴리오·관심목록에 종목을 추가하세요.</div>';
+    function syncParent(card) {
+      const src = card.querySelector('.ca-src');
+      const syms = [...card.querySelectorAll('.ca-sym')];
+      if (!src || !syms.length) return;
+      const checked = syms.filter(s => s.checked).length;
+      src.checked = checked > 0;
+      src.indeterminate = checked > 0 && checked < syms.length;
+    }
+    document.querySelectorAll('#caSymbols .ca-src-card').forEach(card => {
+      const src = card.querySelector('.ca-src');
+      if (src) src.addEventListener('change', () => {
+        card.querySelectorAll('.ca-sym').forEach(s => s.checked = src.checked);
+        src.indeterminate = false;
+      });
+      card.querySelectorAll('.ca-sym').forEach(s => s.addEventListener('change', () => syncParent(card)));
+      syncParent(card);
+    });
     sync();
   })();
 

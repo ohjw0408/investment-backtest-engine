@@ -1,5 +1,5 @@
 ---
-updated: 2026-06-30
+updated: 2026-07-01
 tags: [dev]
 ---
 
@@ -20,6 +20,8 @@ tags: [dev]
 ---
 
 ## 한 줄 요약
+
+> ✅ **2026-07-01 업데이트 126 (알림 설정 — 증시 캘린더 소스 전체 체크박스 동기화):** 오너가 `/alerts` 증시 캘린더 알림 설정에서 `내 자산`이나 `내 포트폴리오` 전체 체크박스를 눌러도 하위 종목들이 일괄 선택/해제되지 않는다고 보고. 원인: `/settings` 캘린더 표시 설정에는 상위 소스 체크박스와 하위 종목 체크박스를 동기화하는 JS가 있었지만, `/alerts` 캘린더 알림 설정에는 같은 UI 구조만 있고 동기화 이벤트 바인딩이 빠져 있었음. 수정: `templates/alerts.html`에서 캘린더 알림 소스 카드 렌더 후 상위 `.ca-src` 변경 시 카드 안의 `.ca-sym` 전체를 같은 값으로 토글하고, 하위 체크박스 변경 시 상위 checked/indeterminate 상태를 재계산하도록 추가. 검증: 로컬 Playwright DOM 검사 PASS(로그인 세션에 AAPL 보유종목 + SPY/QQQ 포트폴리오 생성, `holdings` off/on 시 하위 5개 0/5·5/5 동기화, `pf:*` off/on 시 0/2·2/2 동기화, 하위 1개 해제 시 상위 indeterminate=true, 콘솔 에러 0), `git diff --check` OK. 변경=`templates/alerts.html`. (Codex)
 
 > ✅ **2026-06-30 업데이트 125 (모바일 설정 탭 줄바꿈 제거 + 상단바 오른쪽 정렬):** 오너가 모바일 설정 화면에서 `홈 화면`, `캘린더` 탭이 줄바꿈되고, 테마 변경 버튼이 오른쪽 끝에 붙지 않아 완성도가 떨어져 보인다고 지적. 수정: 설정 탭은 560px 이하에서 전체 폭을 쓰고 gap/padding/icon/font를 모바일 전용으로 줄여 4개 탭 모두 한 줄 유지. 상단바는 `.nav-right`에 `margin-left:auto`, `justify-content:flex-end`, `flex-shrink:0`을 적용하고, 모바일에서 알림/프로필/로그인·로그아웃/테마 버튼 크기와 간격을 고정. 로그인/로그아웃 링크에는 `nav-auth-link` 클래스를 추가해 모바일 패딩만 제어. CSS 캐시 버전도 `20260630nav1`로 올림. 검증: 로컬 Playwright DOM 검사 PASS(비로그인 390/360/320px 설정 탭 전부 `nowrap`·overflow 없음·콘솔 에러 0, 로그인 390/360/320px 알림→프로필→로그아웃→테마 순서 유지·오른쪽 여백 10px·콘솔 에러 0). 변경=`templates/settings.html`, `templates/base.html`, `static/css/style.css`, `static/css/components.css`. (Codex)
 

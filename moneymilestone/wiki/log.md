@@ -1,5 +1,16 @@
 # Log
 
+## [2026-07-01] FIX | 알림 설정 증시 캘린더 소스 전체 체크박스 동기화
+
+오너가 `/alerts` 증시 캘린더 알림 설정에서 `내 자산`이나 `내 포트폴리오` 전체 체크박스를 선택/해제해도 하위 종목들이 일괄로 따라오지 않는다고 보고.
+- 원인: `/settings`의 캘린더 표시 설정에는 상위 소스 체크박스와 하위 종목 체크박스를 동기화하는 코드가 있었지만, `/alerts`의 캘린더 알림 설정에는 같은 카드 구조만 있고 이벤트 바인딩이 빠져 있었다.
+- 수정: 알림 페이지에서 캘린더 알림 소스 카드를 렌더한 뒤 `.ca-src` 변경 시 해당 카드의 `.ca-sym` 전체를 같은 checked 값으로 토글하도록 추가.
+- 수정: 하위 `.ca-sym`을 개별 변경하면 상위 `.ca-src`가 전체 선택/전체 해제/일부 선택(indeterminate) 상태를 즉시 반영하도록 추가.
+- 검증: 로컬 Playwright DOM 검사 PASS. 로그인 세션에 AAPL 보유종목과 SPY/QQQ 포트폴리오를 만든 뒤 `holdings` off/on은 하위 5개 0/5·5/5, `pf:*` off/on은 0/2·2/2로 동기화. 포트폴리오 하위 1개 해제 시 상위 indeterminate=true. 콘솔 에러 0. `git diff --check` OK.
+- 변경: `templates/alerts.html`, `moneymilestone/wiki/dev/status.md`, `moneymilestone/wiki/dev/bugs.md`, `moneymilestone/wiki/log.md`.
+
+_작성: Codex_
+
 ## [2026-06-30] UX | 모바일 설정 탭 줄바꿈 제거 + 상단바 오른쪽 정렬
 
 오너가 모바일 설정 화면에서 `홈 화면`, `캘린더` 탭이 줄바꿈되고, 테마 변경 버튼이 오른쪽 끝에 붙지 않아 완성도가 떨어져 보인다고 지적.

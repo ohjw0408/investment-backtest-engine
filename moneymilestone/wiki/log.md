@@ -1,5 +1,20 @@
 # Log
 
+## [2026-07-02] FIX | 모바일 푸시 알림 권한 요청 + 토큰 등록 흐름 보강
+
+오너가 앱 안 알림함에는 알림이 오지만 휴대폰 푸시가 오지 않고, Android 시스템 알림 권한 팝업도 뜬 적이 없다고 보고.
+- 원인: Android target SDK 36 앱인데 manifest에 Android 13+ 필수 런타임 권한 `android.permission.POST_NOTIFICATIONS`가 없어 시스템 알림 권한 팝업이 뜰 수 없었다.
+- 확인: 서버의 푸시 API와 Celery 발송 훅은 이미 존재. 운영 `domino-celery`는 `FCM_SERVICE_ACCOUNT_FILE=/root/secrets/fcm.json`을 받고 있었고, 같은 환경변수로 `push_sender.enabled()==True`를 확인했다.
+- 수정: AndroidManifest에 `POST_NOTIFICATIONS` 권한을 추가.
+- 수정: `mmInitPush(force)`가 PushNotifications 권한을 확인/요청하고, 포그라운드 푸시를 로컬 알림으로 보여줄 때 필요한 LocalNotifications 권한도 확인하도록 보강했다.
+- 수정: FCM registration 이벤트에서 `/api/push/register` 응답을 기다려 서버 토큰 저장 성공 여부를 반환하도록 했다.
+- 수정: 최초 동의 화면에서 선택 푸시 알림을 체크하면 `알림 권한 확인 중...` 상태로 native 권한 요청과 FCM 토큰 등록을 실행한 뒤 홈으로 이동하게 했다.
+- 검증: `tests/test_push_consent.py` 15 PASS, `git diff --check` OK, `mobile/android` `gradlew assembleDebug` BUILD SUCCESSFUL. merged debug/release manifest에 `POST_NOTIFICATIONS` 포함 확인.
+- 제한: 현재 ADB 연결 기기가 없어 실기기 설치/수신 검증은 미실행. `adb devices -l` 결과 빈 목록.
+- 변경: `mobile/android/app/src/main/AndroidManifest.xml`, `templates/base.html`, `templates/legal/consent.html`, `moneymilestone/wiki/dev/status.md`, `moneymilestone/wiki/dev/bugs.md`, `moneymilestone/wiki/log.md`.
+
+_작성: Codex_
+
 ## [2026-07-01] UX/FIX | 거시경제지표 알림을 내 알림에 표시 + 비대상 자산 제외 표시
 
 오너가 증시 캘린더/거시경제지표 알림이 별도 설정 카드에만 있어 `내 알림`에 직접 보이지 않는 점이 애매하다고 지적. 또 지수·원자재처럼 실적 발표를 하지 않는 자산이 실적/배당락 대상에서 선택 가능한 것처럼 보이는 점을 질문.

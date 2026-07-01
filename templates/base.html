@@ -516,11 +516,19 @@ async function mmInitPush(force) {
       if (!cr.ok) return false;
     }
 
-    let perm = await Push.checkPermissions();
-    if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
-      perm = await Push.requestPermissions();
+    async function ensurePluginPermission(plugin, key) {
+      if (!plugin || !plugin.checkPermissions || !plugin.requestPermissions) return true;
+      let p = await plugin.checkPermissions();
+      let v = p && p[key];
+      if (v === 'prompt' || v === 'prompt-with-rationale') {
+        p = await plugin.requestPermissions();
+        v = p && p[key];
+      }
+      return v === 'granted';
     }
-    if (perm.receive !== 'granted') {
+
+    const pushGranted = await ensurePluginPermission(Push, 'receive');
+    if (!pushGranted) {
       if (force) {
         try {
           await fetch('/api/push/consent', {
@@ -531,35 +539,53 @@ async function mmInitPush(force) {
       }
       return false;
     }
+    // Foreground push is mirrored via LocalNotifications, which also needs notification permission.
+    const LN = Cap.Plugins && Cap.Plugins.LocalNotifications;
+    await ensurePluginPermission(LN, 'display');
 
-    // 리스너 먼저 등록(토큰 이벤트 누락 방지) → register
-    Push.addListener('registration', function (t) {
+    // 리스너 먼저 등록(토큰 이벤트 누락 방지) -> register
+    let settled = false;
+    let finishRegistration = function () {};
+    const waitForRegistration = new Promise(function (resolve) {
+      finishRegistration = function (ok) {
+        if (settled) return;
+        settled = true;
+        resolve(!!ok);
+      };
+    });
+    await Push.addListener('registration', async function (t) {
       try {
-        fetch('/api/push/register', {
+        const r = await fetch('/api/push/register', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token: t.value, platform: 'android' })
         });
-      } catch (e) {}
+        finishRegistration(r.ok);
+      } catch (e) { finishRegistration(false); }
     });
-    Push.addListener('registrationError', function (e) { console.warn('[push] reg error', e); });
-    // 앱 포그라운드서 푸시 수신 → 시스템 알림 재현(로컬 알림) + 인앱 토스트 + 종 갱신
-    Push.addListener('pushNotificationReceived', function (n) {
-      try {
-        const t = (n && n.title) || (n && n.notification && n.notification.title) || '알림';
-        const bd = (n && n.body) || (n && n.notification && n.notification.body) || '';
-        if (typeof mmToast === 'function') mmToast('🔔 ' + t + (bd ? ' · ' + bd : ''), 'ok');
-        if (window.mmRefreshBell) window.mmRefreshBell();
-        const LN = Cap.Plugins && Cap.Plugins.LocalNotifications;
-        if (LN) LN.schedule({ notifications: [{ id: Math.floor(Math.random() * 2000000000) + 1, title: t, body: bd }] });
-      } catch (e) {}
-    });
-    // 알림 탭 → 관련 화면 이동(종목 알림=종목 페이지, 그 외=수신함)
-    Push.addListener('pushNotificationActionPerformed', function (a) {
-      const d = (a && a.notification && a.notification.data) || {};
-      location.href = d.code ? ('/symbol/' + encodeURIComponent(d.code)) : '/alerts';
-    });
+    await Push.addListener('registrationError', function (e) { console.warn('[push] reg error', e); finishRegistration(false); });
+    setTimeout(function () { finishRegistration(false); }, 10000);
+
+    if (!window.MM_PUSH_EVENT_LISTENERS_BOUND) {
+      window.MM_PUSH_EVENT_LISTENERS_BOUND = true;
+      // 앱 포그라운드서 푸시 수신 -> 시스템 알림 재현(로컬 알림) + 인앱 토스트 + 종 갱신
+      await Push.addListener('pushNotificationReceived', function (n) {
+        try {
+          const t = (n && n.title) || (n && n.notification && n.notification.title) || '알림';
+          const bd = (n && n.body) || (n && n.notification && n.notification.body) || '';
+          if (typeof mmToast === 'function') mmToast('🔔 ' + t + (bd ? ' · ' + bd : ''), 'ok');
+          if (window.mmRefreshBell) window.mmRefreshBell();
+          const LN = Cap.Plugins && Cap.Plugins.LocalNotifications;
+          if (LN) LN.schedule({ notifications: [{ id: Math.floor(Math.random() * 2000000000) + 1, title: t, body: bd }] });
+        } catch (e) {}
+      });
+      // 알림 탭 -> 관련 화면 이동(종목 알림=종목 페이지, 그 외=수신함)
+      await Push.addListener('pushNotificationActionPerformed', function (a) {
+        const d = (a && a.notification && a.notification.data) || {};
+        location.href = d.code ? ('/symbol/' + encodeURIComponent(d.code)) : '/alerts';
+      });
+    }
     await Push.register();
-    return true;
+    return await waitForRegistration;
   } catch (e) { return false; }   // 푸시 실패해도 앱 정상
 }
 window.mmInitPush = mmInitPush;

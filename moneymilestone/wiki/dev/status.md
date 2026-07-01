@@ -1,5 +1,5 @@
 ---
-updated: 2026-07-01
+updated: 2026-07-02
 tags: [dev]
 ---
 
@@ -20,6 +20,8 @@ tags: [dev]
 ---
 
 ## 한 줄 요약
+
+> ✅ **2026-07-02 업데이트 129 (모바일 푸시 — Android 알림 권한 요청 + FCM 토큰 등록 흐름 보강):** 오너가 앱 안 `내 알림`에는 알림이 쌓이지만 휴대폰 푸시가 오지 않고, Android 시스템의 “알림 권한을 허용하시겠습니까?” 팝업도 본 적이 없다고 보고. 확인: 서버의 푸시 API(`/api/push/register/status/consent/disable`)와 Celery FCM 발송 설정은 존재했고, 운영 worker의 `FCM_SERVICE_ACCOUNT_FILE=/root/secrets/fcm.json` 및 `push_sender.enabled()==True`도 확인. 문제는 Android target SDK 36 앱 manifest에 Android 13+ 런타임 알림 권한 `POST_NOTIFICATIONS`가 선언되어 있지 않아 OS 권한 팝업이 뜰 수 없던 점, 그리고 첫 동의 화면에서 선택 푸시 동의 후 바로 native 권한 요청과 FCM 토큰 등록까지 이어지지 않던 점이었다. 수정: AndroidManifest에 `android.permission.POST_NOTIFICATIONS` 추가. `mmInitPush(force)`가 PushNotifications 권한을 확인/요청하고, 포그라운드 로컬 알림 표시용 LocalNotifications 권한도 확인하도록 보강. FCM registration 이벤트에서 `/api/push/register` 성공 여부를 기다려 토큰 저장까지 완료된 경우에만 true를 반환하게 했다. 최초 약관/개인정보/선택 푸시 동의 화면에서 선택 푸시를 체크하면 “알림 권한 확인 중…” 상태로 native 권한 요청과 토큰 등록을 즉시 실행한 뒤 홈으로 이동한다. 검증: `tests/test_push_consent.py` 15 PASS, `git diff --check` OK, `mobile/android` `gradlew assembleDebug` BUILD SUCCESSFUL, merged debug/release manifest에 `POST_NOTIFICATIONS` 포함 확인. ADB는 현재 연결 기기 없음(`adb devices -l` 빈 목록)이라 실기기 설치/수신 검증은 폰 연결 후 진행 필요. 변경=`mobile/android/app/src/main/AndroidManifest.xml`, `templates/base.html`, `templates/legal/consent.html`. (Codex)
 
 > ✅ **2026-07-01 업데이트 128 (알림 — 거시경제지표/증시 일정도 `내 알림`에 표시 + 비대상 자산 제외 표시):** 오너가 증시 캘린더 알림이 별도 설정 카드에만 있어 개별종목 알림(`일간 변동률`, `목표가`, `신고가/신저가`)처럼 `내 알림`에 보이지 않아 애매하다고 지적. 또한 실적 발표를 하지 않는 지수·원자재 등이 캘린더 알림 대상에서 선택 가능한 것처럼 보이는 점을 질문. 확인: 서버 로직상 실적/배당락 이벤트는 `^` 지수, `KRX_GOLD`, `=F` 원자재선물, `=X` 환율, `-` 포함 크립토/비대상 코드를 자동 제외하고 있었지만 UI에는 이 사실이 드러나지 않았다. 수정: `/alerts`의 `내 알림` 목록 렌더러가 일반 가격 알림 룰과 함께 캘린더 prefs를 가상 알림 행으로 표시하도록 확장. 저장된 증시 캘린더/거시경제지표 알림은 `거시경제지표` pill로 `내 알림`에 나타나며, 행 안에서 08:00 KST 발화 조건과 선택 항목 요약을 보여주고 바로 켜기/끄기 및 수정 위치 이동을 지원. 실적·배당락 대상 종목 목록에는 지수·원자재선물·환율·크립토·KRX 금을 disabled 처리하고 `일정 없음` 표시 및 “가격 알림은 위 종목 알림에서 가능” 안내를 추가. 저장 시 disabled 비대상 자산은 수동 제외 목록에 섞지 않는다. 검증: 로컬 Playwright DOM 검사 PASS(테스트 홈 위젯에 `AAPL`, `^GSPC`, `GC=F`, `KRX_GOLD`, `BTC-USD` 추가 후 `^GSPC/GC=F/KRX_GOLD/BTC-USD` disabled, `AAPL` selectable, `내 알림`에 캘린더/거시경제지표 행 1개 + 수정 버튼 + `08:00` 표시, 콘솔 에러 0), 캘린더 행 켜기/끄기 prefs 저장 확인 PASS, `tests/test_alert_runner.py` 10 PASS, `git diff --check` OK. 변경=`templates/alerts.html`. (Codex)
 

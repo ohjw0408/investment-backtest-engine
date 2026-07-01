@@ -53,7 +53,13 @@
         body: JSON.stringify({ push_notifications: !!(_push && _push.checked) })
       });
       const j = await r.json();
-      if (j.ok) { location.href = '/'; }
+      if (j.ok) {
+        if (_push && _push.checked && window.mmInitPush) {
+          _b.textContent = '알림 권한 확인 중…';
+          try { await window.mmInitPush(true); } catch (e) {}
+        }
+        location.href = '/';
+      }
       else { document.getElementById('consentErr').textContent = '오류가 발생했어요. 다시 시도해주세요.'; _b.disabled = false; }
     } catch (e) { document.getElementById('consentErr').textContent = '네트워크 오류. 다시 시도해주세요.'; _b.disabled = false; }
   }

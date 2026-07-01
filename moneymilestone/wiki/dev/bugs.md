@@ -1,5 +1,5 @@
 ---
-updated: 2026-07-01
+updated: 2026-07-02
 tags: [dev, bug]
 ---
 
@@ -13,10 +13,11 @@ tags: [dev, bug]
 
 ## 활성 버그 목록
 
-> updated: 2026-07-01
+> updated: 2026-07-02
 
 | # | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|---|
+| BUG-MOBILE-PUSH-NO-OS-PERMISSION | 앱 안 `내 알림`에는 알림이 쌓이지만 Android 휴대폰 푸시가 오지 않고, 시스템 “알림 권한 허용” 팝업도 뜨지 않음(오너 보고) | Android target SDK 36 앱인데 manifest에 Android 13+ 런타임 알림 권한 `POST_NOTIFICATIONS`가 없어 OS 권한 요청이 성립하지 않았다. 또한 최초 선택 푸시 동의 화면이 서버 동의 저장 후 바로 native 권한 요청/FCM 토큰 등록까지 강하게 이어지지 않았다. 운영 Celery FCM 키(`/root/secrets/fcm.json`)와 발송 모듈은 정상 확인 | `mobile/android/app/src/main/AndroidManifest.xml`, `templates/base.html`, `templates/legal/consent.html` | ✅ 수정 (2026-07-02): AndroidManifest에 `android.permission.POST_NOTIFICATIONS` 추가. `mmInitPush(force)`가 PushNotifications/LocalNotifications 권한을 확인·요청하고, FCM registration 이벤트의 `/api/push/register` 성공을 기다려 토큰 저장 완료 여부를 반환하도록 보강. 최초 동의 화면에서 선택 푸시를 체크하면 `알림 권한 확인 중...` 상태로 native 권한 요청과 토큰 등록을 실행한 뒤 홈으로 이동. 검증: `tests/test_push_consent.py` 15 PASS, `gradlew assembleDebug` BUILD SUCCESSFUL, merged manifests에 `POST_NOTIFICATIONS` 포함. ADB 연결 기기 없음으로 실기기 설치/수신 검증은 폰 연결 후 필요. (Codex) |
 | BUG-ALERT-CALENDAR-NOT-IN-MY-ALERTS | 증시 캘린더/거시경제지표 알림이 별도 설정 카드에만 있고 `내 알림` 목록에는 표시되지 않아 실제 알림 룰로 저장됐는지 애매함(오너 보고) | 가격 알림 룰은 `/api/alerts/rules` 기반으로 `내 알림`에 렌더되지만, 증시 캘린더 알림은 별도 prefs(`/api/alerts/calendar-prefs`)라 같은 목록에 합쳐 보여주는 UI 계층이 없었음 | `templates/alerts.html` | ✅ 수정 (2026-07-01): `내 알림` 렌더러가 일반 가격 알림 룰과 캘린더 prefs를 함께 렌더하도록 확장. 저장된 캘린더/거시경제지표 알림은 `거시경제지표` pill, 08:00 KST 발화 조건, 선택 항목 요약과 함께 표시되며 행에서 바로 켜기/끄기 및 수정 위치 이동 가능. Playwright DOM 검증: 캘린더 행 1개, 수정 버튼 1개, `08:00` 표시, 켜기/끄기 prefs 저장, 콘솔 에러 0. (Codex) |
 | BUG-ALERT-CALENDAR-NONCORP-SELECTABLE | 실적·배당락 알림 대상에서 지수·원자재·환율·크립토·KRX 금처럼 실적/배당락 일정이 없는 자산도 선택 가능한 것처럼 보여 동작이 불명확함(오너 질문) | 서버 `market_calendar`는 `^` 지수, `KRX_GOLD`, `=F`, `=X`, `-` 포함 코드를 실적/배당락 계산에서 자동 제외하지만, 프론트 목록은 모든 종목을 동일한 체크박스로 렌더해 사용자가 제외 사실을 알 수 없었음 | `templates/alerts.html`, `modules/market_calendar.py` | ✅ 수정 (2026-07-01): 프론트가 서버 제외 규칙과 같은 기준으로 비대상 자산을 disabled 처리하고 `일정 없음` 표시를 붙임. 저장 시 disabled 비대상 자산은 수동 excluded 목록에 섞지 않음. 안내문에 가격 변동률·목표가·신고가/신저가 알림은 위 종목 알림에서 계속 만들 수 있음을 명시. Playwright 검증: `^GSPC`, `GC=F`, `KRX_GOLD`, `BTC-USD` disabled, `AAPL` selectable, 콘솔 에러 0. (Codex) |
 | BUG-ALERT-CALENDAR-FEEDBACK | `/alerts` 증시 캘린더 알림에서 저장 후 “잘 저장됐는지”, “08:00 KST가 무엇을 의미하는지”, “왜 내 알림/수신함에 바로 안 뜨는지”가 화면상 명확하지 않음(오너 보고) | 기존 UI가 일정 종류 이름과 단순 저장 문구만 보여주고, 캘린더 알림이 매일 08:00 KST에 오늘 일정이 있을 때만 수신함/푸시로 생성된다는 조건과 한국/미국 장 기준을 설명하지 않았음 | `templates/alerts.html` | ✅ 수정 (2026-07-01): 저장 직후 알림 내역이 바로 생기지 않는다는 안내, 다음 08:00 KST 실행 조건, 한국 주식 장 시작 전/미국 주식 그날 밤 정규장 전 설명을 추가. 일정 종류 4개에 보조 설명을 붙이고, 저장 상태 문구와 현재/저장된 선택 요약을 표시. Playwright DOM 검증: 안내 문구·설명형 라벨·FOMC 보조문구·경제지표 8/8 선택·저장 POST 200·서버 `econ_ids` 저장·콘솔 에러 0. (Codex) |

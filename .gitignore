@@ -84,3 +84,7 @@ tests/e2e_multitax/results/shots/
 # 디자인 검증 스샷(로컬 전용)
 design-shots/
 _shot.mjs
+
+# SQLite WAL sidecar (index_master.db 등 untracked 런타임 DB용)
+*.db-wal
+*.db-shm

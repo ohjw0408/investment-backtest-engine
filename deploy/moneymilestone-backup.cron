@@ -1,0 +1,11 @@
+# Money Milestone DB 백업 (서버 설치 위치: /etc/cron.d/moneymilestone-backup)
+# 스크립트 = /root/ops/db_backup.py (repo 사본: deploy/db_backup.py)
+# 로그 = /root/backups/backup.log
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# 매일 04:10 UTC (13:10 KST) — users.db, 30일 보존
+10 4 * * * root /usr/bin/python3 /root/ops/db_backup.py daily >> /root/backups/backup.log 2>&1
+
+# 일요일 04:30 UTC — price_daily.db + index_master.db, 4주 보존
+30 4 * * 0 root /usr/bin/python3 /root/ops/db_backup.py weekly >> /root/backups/backup.log 2>&1

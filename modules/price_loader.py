@@ -149,9 +149,19 @@ class PriceLoader:
     def __init__(self):
         PRICE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+        # WAL: 파일 영속 속성(1회 설정이면 유지) — gunicorn+celery 동시 접근 시
+        # "database is locked" 방지. 새로 생성된 DB에도 자기치유로 재적용.
+        try:
+            self.conn.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.Error:
+            pass
         self.index_conn = None
         if INDEX_DB_PATH.exists():
             self.index_conn = sqlite3.connect(str(INDEX_DB_PATH), check_same_thread=False)
+            try:
+                self.index_conn.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.Error:
+                pass
 
         self._us_tickers      = _load_us_tickers()
         self._kr_tickers      = _load_kr_tickers()

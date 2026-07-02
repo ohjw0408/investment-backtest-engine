@@ -39,6 +39,12 @@ def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     _conn.row_factory = sqlite3.Row
+    # WAL: 파일 영속 속성(1회 설정 후 유지) — gunicorn 스레드 + celery(alert_store 등)
+    # 동시 접근 시 "database is locked" 방지. 새 DB 생성 시에도 자기치유.
+    try:
+        _conn.execute("PRAGMA journal_mode=WAL")
+    except sqlite3.Error:
+        pass
     _conn.executescript(DDL)
     # 마이그레이션: 홈 화면 위젯 설정(JSON) 컬럼
     cols = [r[1] for r in _conn.execute("PRAGMA table_info(user_settings)").fetchall()]

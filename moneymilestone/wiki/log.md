@@ -4314,3 +4314,46 @@ ETF 종목 상세 화면에 구성종목 카드를 추가했다. US ETF는 yfina
 알림 페이지를 설정/내 알림/수신함 탭으로 나눴다. 상단 알림의 전체 보기는 수신함으로 바로 들어가고, 드롭다운/수신함/푸시 클릭은 `target_url` 우선으로 관련 화면에 이동한다. 새 알림은 종목 상세, 내 자산, 저장 포트폴리오 상세, 캘린더 목적지를 payload/meta에 함께 저장한다.
 
 검증: `python tests/test_alerts_api.py` 39 PASS, `python tests/test_alert_runner.py` 10 PASS, 렌더된 실행 JS syntax OK, `git diff --check` OK.
+
+## 2026-07-02 — 출시 완성도 마스터플랜 작성 (전수 감사)
+
+오너 지시: 정식 출시를 위해 프로젝트 전체(프론트·백엔드·UX/UI·보안·최적화)의 부족한 부분을 카테고리별로 파악한 계획 파일 작성.
+- 감사 범위: app.py(3660줄·라우트116)·modules·templates(17.5k줄)·tests(125)·deploy·기존 플랜 문서 전부. 보안 grep(SQL 파라미터화·CSP·쿠키·limiter·CSRF 확인), XSS escape 갭(myassets:1427), SQLite WAL 부재, DB 백업 부재(추정), CI 테스트 게이트 0 등 발견.
+- 산출물: `출시완성도_개선_plan.md` — A보안/B데이터무결성/C인프라운영/D백엔드구조/E프론트위생/F UX완성도/G성능잔여/H테스트체계/I출시게이팅. P0=백업·WAL·합성손상(SHY/IEF 오너결정)·실기기검증. "A 고치다 B 깨짐 방지" 프로토콜(골든마스터·타겟테스트·실클릭검증·라이브probe·raw SQL 경로 전수) 명문화. 오너 결정점 7건 표.
+- 미커밋 — 오너 리뷰 후 진행.
+
+_작성: Claude_
+
+## 2026-07-02 — C-1 DB 백업 구축 완료 (출시완성도 P0 #1)
+
+백업 0 확정(서버 crontab 없음) → 3계층 구축:
+- **서버**: `/root/ops/db_backup.py`(sqlite3 backup API — WAL 안전, 파일 cp 아님) + `/etc/cron.d/moneymilestone-backup`. users.db 매일 04:10 UTC(30일 보존)·price_daily+index_master 일요일 04:30(4주). gzip. repo 사본=`deploy/db_backup.py`·`deploy/moneymilestone-backup.cron`.
+- **오너 PC(오프박스)**: `tools/backup_pull.ps1` — 서버 목록 대비 없는 파일만 scp pull, 90일 로컬 보존, 로그 `~\MoneyMilestoneBackups\pull.log`. 작업 스케줄러 `schtasks DAILY 14:00` 등록(Register-ScheduledTask·ONLOGON은 PC 정책 거부 → daily만, 서버 30일 보존이 누락일 커버).
+- **복구 리허설 PASS**: pull된 users gz → 압축해제 → `PRAGMA integrity_check`=ok, 10테이블·users 2·holdings 12 실데이터 확인.
+- 첫 스냅샷: users 5KB·price_daily 93MB·index_master 25MB(gz). 서버 디스크 31G 여유.
+- 미커밋(deploy/·tools/ 신규 4파일) — 다음 push에 포함.
+
+_작성: Claude_
+
+## 2026-07-02 — C-2 SQLite WAL 적용 (출시완성도 P0 #2)
+
+gunicorn+celery 동시 쓰기 `database is locked` 예방.
+- **통찰로 수정 최소화**: WAL=DB 파일 영속 속성(파일당 1회) + Python `sqlite3.connect` 기본 timeout=5.0초(=busy 5초 대기, `timeout=0` 사용처 0 확인) → 100곳 connect 전수 수정 불필요. **init 지점 2곳만**: `auth_manager.init_db`(users.db)·`PriceLoader.__init__`(price_daily+index_master)에 `PRAGMA journal_mode=WAL`(try/except, 자기치유).
+- **git 추적 seed DB(symbol_master·guru)는 의도적 제외** — deploy reset --hard로 본체 교체 시 stale `-wal` 충돌 위험. 쓰기 잦은 런타임 DB만 적용.
+- `.gitignore`에 `*.db-wal`/`*.db-shm` 추가(index_master 등 untracked DB sidecar 노이즈 방지).
+- 검증(로컬): init 경로 3 DB 전부 `journal_mode=wal` + 동시쓰기 스트레스(스레드20×50건)=1000행·locked 0·1.1s + 회귀 spikes/fx 3·home_widgets 18·alerts_api 39 전부 PASS.
+- ⚠️ **prod 반영 = 다음 배포 시 자동**(앱 시작 init PRAGMA가 파일 전환). 수동 ssh 불필요. 백업(C-1)은 backup API라 WAL 호환.
+- 미커밋 — 다음 push에 포함.
+
+_작성: Claude_
+
+## 2026-07-02 — B-1 구세대 손상 백필 수술 완료 (출시완성도 P0 #3)
+
+BUG-COMPARE-DEEP-SYNTH 후속 — 오너 결정 (a) 근본 재생성 실행. 신규 `scripts/scan_backfill_corruption.py`(스캔) + `scripts/fix_corrupt_backfill.py`(수술+내장검증).
+- **원인 확정**: 손상 = **bond_model(Stage B) 이전 구세대 백필**(provenance 0건). ①채권 5종(SHY·IEF·HYG·LQD·TLT) 금리 시계열을 가격처럼 스케일링 → **방향 반대**(TLT Volcker 1979-81 금리 9→15%에 +67.5%, 진짜는 폭락) + SHY close=0 행 19개. TLT는 통계 정상으로 보여 기존 게이트 전부 통과하던 **은닉 손상**(영구/올웨더 장기 백테 왜곡). ②KR 상장 미국지수 ETF 6종(360200/360750/379800/402970/446720/458730) USD_KRW_START(1964-05-04) 이전 환율 미적용 행 9096개씩 잔존 → 봉합점 +25572%. INSERT OR IGNORE라 신형 엔진이 못 덮어씀.
+- **수술**: 채권 5종 상장전 합성 전삭(9002~13985행) → SHY/IEF/TLT/LQD는 BackfillEngine(bond_model 듀레이션+쿠폰) 재생성, HYG는 real-only(bond_config 없음 — 실측 검증 없는 즉석 모델 금지). KR 6종 pre-1964 삭제. `ticker_return_stats` 오염 캐시 무효화.
+- **스캔 방법론 교훈**: 1차 스캔 19종 중 11종 오탐 — 산재 vol=0 행을 날짜 갭 건너 pct_change(000660 +450% 가짜) + 실제 역사(1980 금파동 +37.8%, 걸프전 유가 -33.4%)를 손상 오인. 수정=연속거래일(갭≤7일)만·임계 30→50%·close≤0 룰.
+- **검증 ALL PASS**: 재스캔 손상 0(SHY volx 168→0.52) + TLT Volcker **-69.6%**(방향 정상화) + 봉합점 전부 ≤2.5% + get_price(FX) 소비자 경로 max|ret| 20~23%(=원화절하·블랙먼데이 실역사) + lazy 백필 재오염 0행.
+- ⚠️ **prod DB 동일 수술 필요** — 배포 후 서버에서 `python scripts/fix_corrupt_backfill.py` 실행(스크립트 멱등·내장검증 포함).
+
+_작성: Claude_

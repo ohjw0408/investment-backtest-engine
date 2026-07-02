@@ -3,7 +3,7 @@
 {% block meta_desc %}포트폴리오 백테스트 — 과거 30년 실제 데이터로 수익률·최대낙폭(MDD)·변동성을 검증. 내 자산배분 전략이 통했을지 테스트하세요.{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260618ds">
+<link rel="stylesheet" href="{{ static_v('css/calculator.css') }}">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 /* ── 포트폴리오 분석 — 코인베이스 분석 아키타입 (입력↔결과 뷰 전환) ── */
@@ -714,9 +714,9 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260619ds"></script>
-<script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260619ds"></script>
-<script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
+<script src="{{ static_v('js/multi_account_ui.js') }}"></script>
+<script src="{{ static_v('js/portfolio_favorites.js') }}"></script>
+<script src="{{ static_v('js/limit_guard.js') }}"></script>
 <script>
 // 오늘 날짜 기본값
 document.getElementById('btEndDate').value = new Date().toISOString().split('T')[0];
@@ -727,7 +727,7 @@ let btCharts  = {};
 const BT_TASK_KEY = 'mm_task_backtest';
 const BT_RESULT_KEY = 'mm_result_backtest';
 const btStateStore = window.sessionStorage;
-const BT_FEE_PRESETS_URL = "{{ url_for('static', filename='data/broker_fee_presets.json') }}?v=20260619fees";
+const BT_FEE_PRESETS_URL = "{{ static_v('data/broker_fee_presets.json') }}";
 const BT_FEE_MARKET_LABELS = {
   domestic_stock: '국내주식',
   domestic_etf: '국내 ETF/ETN',

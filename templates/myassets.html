@@ -23,7 +23,7 @@
 {%- endmacro -%}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260618ds">
+<link rel="stylesheet" href="{{ static_v('css/calculator.css') }}">
 <style>
 /* 깊이: 배경 한 톤 낮춤(후경) + 카드 띄움(전경) — 홈과 동일 패턴 */
 .main-content { background: var(--ds-soft); }

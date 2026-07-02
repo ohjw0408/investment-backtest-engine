@@ -95,8 +95,8 @@
     })();
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260701nav2">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}?v=20260701nav2">
+  <link rel="stylesheet" href="{{ static_v('css/style.css') }}">
+  <link rel="stylesheet" href="{{ static_v('css/components.css') }}">
   <style>
   .mm-bell-wrap { position: relative; }
   .mm-bell-badge { position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px;
@@ -341,7 +341,7 @@ try {
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.2.0/chartjs-plugin-zoom.min.js"></script>
-<script src="{{ url_for('static', filename='js/charts.js') }}?v=20260611ui"></script>
+<script src="{{ static_v('js/charts.js') }}"></script>
 <script>
 window.MM_LOGGED_IN = {{ 'true' if user else 'false' }};
 // 전역 XSS escape 유틸 (출시완성도 A-1). innerHTML 템플릿 리터럴에 문자열 삽입 시 필수.
@@ -349,8 +349,8 @@ window.MM_LOGGED_IN = {{ 'true' if user else 'false' }};
 window.mmEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 window.mmJs = v => window.mmEsc(JSON.stringify(String(v ?? '')));
 </script>
-<script src="{{ url_for('static', filename='js/alert_widget.js') }}?v=20260617"></script>
-<script src="{{ url_for('static', filename='js/mm_datepicker.js') }}?v=20260626"></script>
+<script src="{{ static_v('js/alert_widget.js') }}"></script>
+<script src="{{ static_v('js/mm_datepicker.js') }}"></script>
 {% block scripts %}{% endblock %}
 
 <script>

@@ -199,6 +199,20 @@ SEO_PUBLIC_PATHS = [
 ]
 
 # 모든 템플릿에 user + canonical URL 자동 주입
+@app.template_global()
+def static_v(filename):
+    """static 자산 URL + 파일 mtime 버전 쿼리 (E-2 캐시버스팅 자동화 2026-07-03).
+
+    수동 `?v=문자열` 갱신 누락으로 유저가 구버전 JS/CSS를 쓰는 재발 사고 방지.
+    배포(git reset --hard)는 변경된 파일만 mtime을 갱신 → 바뀐 자산만 캐시 무효화.
+    """
+    try:
+        v = int((Path(app.static_folder) / filename).stat().st_mtime)
+    except OSError:
+        v = 0
+    return f"{url_for('static', filename=filename)}?v={v}"
+
+
 @app.context_processor
 def inject_user():
     scheme = 'https' if IS_PROD else request.scheme

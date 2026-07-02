@@ -3,7 +3,7 @@
 {% block meta_desc %}투자 계산기 — 매달 적립과 기대 수익률로 10년·30년 뒤 내 자산을 시뮬레이션. 포트폴리오를 짜고 미래 가치를 계산하세요.{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/calculator.css') }}?v=20260618ds">
+<link rel="stylesheet" href="{{ static_v('css/calculator.css') }}">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 /* ── 투자 계산기 — 코인베이스 분석 아키타입 (입력↔결과 뷰 전환, 포트폴리오 분석 탭과 동일 결) ── */
@@ -642,8 +642,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/multi_account_ui.js') }}?v=20260619ds2"></script>
-<script src="{{ url_for('static', filename='js/portfolio_favorites.js') }}?v=20260619ds"></script>
-<script src="{{ url_for('static', filename='js/limit_guard.js') }}?v=20260613lim"></script>
-<script src="{{ url_for('static', filename='js/calculator.js') }}?v=20260620ds2"></script>
+<script src="{{ static_v('js/multi_account_ui.js') }}"></script>
+<script src="{{ static_v('js/portfolio_favorites.js') }}"></script>
+<script src="{{ static_v('js/limit_guard.js') }}"></script>
+<script src="{{ static_v('js/calculator.js') }}"></script>
 {% endblock %}

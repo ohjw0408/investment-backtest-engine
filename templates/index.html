@@ -710,7 +710,7 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/guru_avatar.js') }}?v=20260625"></script>
+<script src="{{ static_v('js/guru_avatar.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   if (window.MM_LOGGED_IN) { loadPortfolio(); loadActions(); }

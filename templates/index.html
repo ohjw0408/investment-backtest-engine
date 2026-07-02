@@ -82,6 +82,8 @@
 .portfolio-amount { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .portfolio-change { background: var(--up-tint); color: var(--up); padding: 3px 11px; border-radius: var(--r-pill); font-size: 14px; font-weight: 600; }
 .portfolio-change.down { background: var(--down-tint); color: var(--down); }
+.portfolio-change-stack { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.portfolio-change .lab { font-weight: 600; opacity: .72; margin-right: 5px; }
 .chart-wrap { padding: 8px 16px 4px; }
 .home-cta { display: flex; gap: 10px; padding: 4px 24px 24px; }
 .home-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-family: var(--font-sans); font-size: 15px; font-weight: 600; padding: 12px 22px; border-radius: var(--r-pill); border: none; cursor: pointer; text-decoration: none; }
@@ -376,24 +378,24 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
         <div class="card-label">내 포트폴리오</div>
         <div class="portfolio-amount">
           <span id="portfolioValue" class="mm-skel mm-skel-val"></span>
-          <span class="portfolio-change up" id="portfolioChange" style="display:none;"></span>
+          <span class="portfolio-change-stack">
+            <span class="portfolio-change up" id="portfolioDailyChange" style="display:none;"></span>
+            <span class="portfolio-change up" id="portfolioPeriodChange" style="display:none;"></span>
+          </span>
           <button class="peek-btn" id="peekBtn" title="금액 보기" style="display:none;" onclick="togglePeek()">👁</button>
         </div>
       </div>
       <div class="period-selector">
-        <button class="period-btn active" data-period="1d">1일</button>
-        <button class="period-btn" data-period="1w">1주</button>
+        <button class="period-btn active" data-period="1w">1주</button>
         <button class="period-btn" data-period="1m">1개월</button>
-        <button class="period-btn" data-period="3m">3개월</button>
         <button class="period-btn" data-period="1y">1년</button>
-        <button class="period-btn" data-period="all">전체</button>
       </div>
     </div>
     <div class="chart-wrap">
       <canvas id="portfolioChart"></canvas>
     </div>
     <div class="home-cta">
-      <a href="/backtest" class="home-btn home-btn-primary">백테스트 시작</a>
+      <a href="/myassets" class="home-btn home-btn-primary">내 자산</a>
       <a href="/myassets" class="home-btn home-btn-ghost">자산 추가</a>
     </div>
   </div>
@@ -502,16 +504,16 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
         <div class="card-label">내 포트폴리오 <span class="demo-badge">예시</span></div>
         <div class="portfolio-amount">
           <span>₩13,428,500</span>
-          <span class="portfolio-change up">+12.4%</span>
+          <span class="portfolio-change-stack">
+            <span class="portfolio-change up"><span class="lab">1일</span>+0.4%</span>
+            <span class="portfolio-change up"><span class="lab">1주</span>+1.8%</span>
+          </span>
         </div>
       </div>
       <div class="period-selector">
-        <button class="period-btn active">1일</button>
-        <button class="period-btn">1주</button>
+        <button class="period-btn active">1주</button>
         <button class="period-btn">1개월</button>
-        <button class="period-btn">3개월</button>
         <button class="period-btn">1년</button>
-        <button class="period-btn">전체</button>
       </div>
     </div>
     <div class="chart-wrap demo-wrap">
@@ -733,7 +735,7 @@ let portfolioChart = null;
 let _portfolioData = null;
 let _homeHideAmounts = true;
 let _homePeek = false;   // 로컬 금액 보기 (개인 가림설정 임시 해제, 저장 안 함)
-let _homePortfolioPeriod = '1d';
+let _homePortfolioPeriod = '1w';
 
 function togglePeek() {
   _homePeek = !_homePeek;
@@ -777,7 +779,22 @@ function fmtMaskedKRW(v) {
   return '₩' + Math.round(v || 0).toLocaleString();
 }
 
-async function loadPortfolio(period = '1d') {
+function setPortfolioChange(id, label, series) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!series || series.length < 2 || !series[0]) {
+    el.textContent = '';
+    el.style.display = 'none';
+    return;
+  }
+  const pct = (series[series.length - 1] - series[0]) / series[0] * 100;
+  const sign = pct >= 0 ? '+' : '';
+  el.innerHTML = `<span class="lab">${label}</span>${sign}${pct.toFixed(2)}%`;
+  el.className = 'portfolio-change ' + (pct >= 0 ? 'up' : 'down');
+  el.style.display = '';
+}
+
+async function loadPortfolio(period = '1w') {
   _homePortfolioPeriod = period;
   const res = await fetch('/api/portfolio/history', { cache: 'no-store' });
   _portfolioData = await res.json();
@@ -796,27 +813,17 @@ async function loadPortfolio(period = '1d') {
   if (card) card.style.display = '';
 
   const { labels, values } = data;
-  const slices = { '1d': 2, '1w': 7, '1m': 22, '3m': 66, '1y': 252, 'all': values.length };
-  const n = slices[period] || 2;
+  const slices = { '1w': 7, '1m': 22, '1y': 252 };
+  const periodLabels = { '1w': '1주', '1m': '1개월', '1y': '1년' };
+  const n = slices[period] || 7;
   const slicedLabels = labels.slice(-n);
   const slicedValues = values.slice(-n);
 
   const valEl = document.getElementById('portfolioValue');
   valEl.classList.remove('mm-skel', 'mm-skel-val');   // 로딩 스켈레톤 해제
   valEl.textContent = fmtMaskedKRW(slicedValues[slicedValues.length - 1] || 0);
-  const periodChange = slicedValues.length > 1
-    ? ((slicedValues[slicedValues.length - 1] - slicedValues[0]) / slicedValues[0] * 100).toFixed(2)
-    : null;
-  const changeEl = document.getElementById('portfolioChange');
-  if (periodChange !== null) {
-    const sign = periodChange >= 0 ? '+' : '';
-    changeEl.textContent = sign + periodChange + '%';
-    changeEl.className = 'portfolio-change ' + (periodChange >= 0 ? 'up' : 'down');
-    changeEl.style.display = '';
-  } else {
-    changeEl.textContent = '';
-    changeEl.style.display = 'none';
-  }
+  setPortfolioChange('portfolioDailyChange', '1일', values.slice(-2));
+  setPortfolioChange('portfolioPeriodChange', periodLabels[period] || '1주', slicedValues);
 
   const canvas = document.getElementById('portfolioChart');
   const ctx = canvas.getContext('2d');

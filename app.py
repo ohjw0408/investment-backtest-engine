@@ -458,6 +458,8 @@ def _get_current_asset_prices(codes):
     from pathlib import Path as _P
     import sqlite3 as _sq
     import yfinance as _yf
+    import json as _json
+    import math as _math
     from modules.krx.krx_client import KRXClient as _KRXC
 
     codes = list({c for c in codes if c})
@@ -465,22 +467,59 @@ def _get_current_asset_prices(codes):
     if not codes:
         return prices
 
+    def _asset_ttl():
+        return 20 * 60
+
+    _r = getattr(market_quote_service, '_redis', None)
+
+    def _cache_get(code):
+        if not _r:
+            return None
+        try:
+            raw = _r.get(f'asset_px:{code}')
+            return float(_json.loads(raw)['p']) if raw else None
+        except Exception:
+            return None
+
+    def _cache_set(code, price_krw):
+        if not _r:
+            return
+        try:
+            p = float(price_krw)
+            if not _math.isfinite(p) or p <= 0:
+                return
+            _r.setex(f'asset_px:{code}', _asset_ttl(), _json.dumps({'p': p}))
+        except Exception:
+            pass
+
     try:
         idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
-        ic = _sq.connect(str(idx_db))
-        row = ic.execute("SELECT close FROM index_daily WHERE code='USD/KRW' ORDER BY date DESC LIMIT 1").fetchone()
-        ic.close()
-        usdkrw = float(row[0]) if row else 1300.0
+        usdkrw = _cache_get('USD/KRW')
+        if usdkrw is None:
+            ic = _sq.connect(str(idx_db))
+            row = ic.execute("SELECT close FROM index_daily WHERE code='USD/KRW' ORDER BY date DESC LIMIT 1").fetchone()
+            ic.close()
+            usdkrw = float(row[0]) if row else 1300.0
+            _cache_set('USD/KRW', usdkrw)
     except Exception:
         usdkrw = 1300.0
 
-    kr_codes = [c for c in codes if c != 'KRX_GOLD' and portfolio_engine.loader.is_kr_etf(c)]
-    us_codes = [c for c in codes if c != 'KRX_GOLD' and not portfolio_engine.loader.is_kr_etf(c)]
+    for code in codes:
+        cached = _cache_get(code)
+        if cached is not None:
+            prices[code] = cached
+
+    miss_codes = [c for c in codes if c not in prices]
+    kr_codes = [c for c in miss_codes if c != 'KRX_GOLD' and portfolio_engine.loader.is_kr_etf(c)]
+    us_codes = [c for c in miss_codes if c != 'KRX_GOLD' and not portfolio_engine.loader.is_kr_etf(c)]
 
     if kr_codes:
         try:
             krx = _KRXC(debug=False)
-            prices.update(krx.get_current_prices_kr(kr_codes))
+            for code, px in krx.get_current_prices_kr(kr_codes).items():
+                if px:
+                    prices[code] = px
+                    _cache_set(code, px)
         except Exception:
             pass
         for code in kr_codes:
@@ -489,6 +528,7 @@ def _get_current_asset_prices(codes):
                     hist = _yf.Ticker(f"{code}.KS").history(period="2d")
                     if not hist.empty:
                         prices[code] = float(hist["Close"].iloc[-1])
+                        _cache_set(code, prices[code])
                 except Exception:
                     prices[code] = 0
 
@@ -496,16 +536,18 @@ def _get_current_asset_prices(codes):
         try:
             hist = _yf.Ticker(code).history(period="2d")
             prices[code] = float(hist["Close"].iloc[-1]) * usdkrw if not hist.empty else 0
+            _cache_set(code, prices[code])
         except Exception:
             prices[code] = 0
 
-    if 'KRX_GOLD' in codes:
+    if 'KRX_GOLD' in miss_codes:
         try:
             idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
             ic = _sq.connect(str(idx_db))
             row = ic.execute("SELECT close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date DESC LIMIT 1").fetchone()
             ic.close()
             prices['KRX_GOLD'] = round(float(row[0])) if row else 0
+            _cache_set('KRX_GOLD', prices['KRX_GOLD'])
         except Exception:
             prices['KRX_GOLD'] = 0
 
@@ -2363,9 +2405,9 @@ def myassets_data():
     codes  = list({h['code'] for h in holdings})
     prices = {}
 
-    # ── TTL 15분 고정 = 새로고침 floor (yfinance 15분 지연과 동일, 더 자주 호출해도 같은 값) ──
+    # ── TTL 20분 고정 = 새로고침 floor (다른 사용자의 최근 조회값도 공유) ──
     def _asset_ttl():
-        return 15 * 60
+        return 20 * 60
 
     # ── Redis 캐시 helpers (market_quote_service의 Redis 재사용) ──
     _r = getattr(market_quote_service, '_redis', None)

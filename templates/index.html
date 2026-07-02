@@ -50,6 +50,8 @@
 .widget-cog .ic { width: 18px; height: 18px; transition: transform .2s; }
 #widgetRefreshBtn:hover .ic { transform: rotate(-45deg); }
 #widgetRefreshBtn.spinning .ic { animation: ds-spin .7s linear infinite; }
+#portfolioRefreshBtn:hover .ic { transform: rotate(-45deg); }
+#portfolioRefreshBtn.spinning .ic { animation: ds-spin .7s linear infinite; }
 
 /* 위젯 탭 */
 .widget-tabs { border-bottom-color: var(--ds-hairline); }
@@ -389,6 +391,7 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
         <button class="period-btn" data-period="1w">1주</button>
         <button class="period-btn active" data-period="1m">1개월</button>
         <button class="period-btn" data-period="1y">1년</button>
+        <button id="portfolioRefreshBtn" class="widget-cog" title="현재 시세로 새로고침 (서버 캐시 20분)" onclick="refreshPortfolioPrices()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v5h-5"/></svg></button>
       </div>
     </div>
     <div class="chart-wrap">
@@ -794,6 +797,15 @@ function setPortfolioChange(id, label, series) {
   el.style.display = '';
 }
 
+function fmtChartKRW(v) {
+  if (!Number.isFinite(v)) return '';
+  const sign = v < 0 ? '-' : '';
+  const n = Math.abs(v);
+  const trim = x => (Math.round(x * 10) / 10).toString();
+  if (n >= 1e8) return sign + trim(n / 1e8) + '억';
+  return sign + Math.round(n / 1e4) + '만';
+}
+
 async function loadPortfolio(period = '1m') {
   const res = await fetch('/api/portfolio/history', { cache: 'no-store' });
   _portfolioData = await res.json();
@@ -872,13 +884,23 @@ function renderPortfolio(period = '1m') {
           ticks: {
             font: { family: 'JetBrains Mono', size: 10 },
             color: '#90A4AE',
-            callback: v => _homeHideAmounts ? '***' : '₩' + (v / 1000000).toFixed(1) + 'M'
+            callback: v => _homeHideAmounts ? '***' : fmtChartKRW(v)
           },
           grid: { color: MM_CHART_GRID }
         }
       }
     }
   });
+}
+
+async function refreshPortfolioPrices() {
+  const btn = document.getElementById('portfolioRefreshBtn');
+  if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
+  try {
+    await loadPortfolio(_homePortfolioPeriod);
+    await loadActions();
+  } catch (e) {}
+  if (btn) setTimeout(() => { btn.classList.remove('spinning'); btn.disabled = false; }, 700);
 }
 
 // ── "다음 할 일" 액션 사다리 ──

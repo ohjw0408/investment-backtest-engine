@@ -476,7 +476,7 @@
             <button class="mt-btn" onclick="setRowMetric('today',this)">오늘</button>
             <button class="mt-btn active" onclick="setRowMetric('total',this)">전체</button>
           </span>
-          <button id="refreshHoldingsBtn" class="icon-btn" title="최신 시세로 새로고침 (서버 캐시 15분)" onclick="refreshHoldings()">{{ mi('refresh') }}</button>
+          <button id="refreshHoldingsBtn" class="icon-btn" title="최신 시세로 새로고침 (서버 캐시 20분)" onclick="refreshHoldings()">{{ mi('refresh') }}</button>
           <button class="btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="openAddHolding()">+ 종목 추가</button>
         </span>
       </div>
@@ -936,7 +936,7 @@ function maEsc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
-// ── 새로고침 (서버 공유 캐시 15분 floor — 더 자주 눌러도 같은 값) ──
+// ── 새로고침 (서버 공유 캐시 20분 floor — 더 자주 눌러도 같은 값) ──
 async function refreshHoldings() {
   const btn = document.getElementById('refreshHoldingsBtn');
   if (btn) { btn.disabled = true; btn.classList.add('spinning'); }

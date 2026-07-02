@@ -109,6 +109,29 @@ try:
 finally:
     lq.get_live_price = _orig
 
+# ── 4.5 ANY 자산 상시 평가 (자산군 커버 2026-07-02) ──
+UID5 = 25
+any_loader = FakeLoader({"BTC-USD": [100, 100, 107]})  # +7%
+alert_store.create_rule(UID5, scope="symbol", rule_type="daily_pct",
+                        code="BTC-USD", direction="both", threshold=5)
+# 주말/장외 = markets 빈 집합이어도 ANY(크립토)는 평가·발화
+fired_any = alert_runner.run_alert_evaluation(any_loader, markets=set())
+ok("주말(장 전부 닫힘)에도 크립토 발화", fired_any == 1)
+# 빈 markets에서 portfolio/rebalance 룰은 게이팅(평가 안 함)
+UID6 = 26
+am.upsert_group(UID6, "주식", target_pct=60)
+am.upsert_group(UID6, "채권", target_pct=40)
+gs = am.get_groups(UID6)
+am.upsert_holding(UID6, "AAA", quantity=72, avg_price=1, group_id=gs[0]["id"])
+am.upsert_holding(UID6, "BBB", quantity=28, avg_price=1, group_id=gs[1]["id"])
+for h in am.get_holdings(UID6):
+    am.set_manual_price(UID6, h["id"], 1)
+alert_store.create_rule(UID6, scope="portfolio", rule_type="rebalance_band", threshold=5)
+fired_reb_closed = alert_runner.run_alert_evaluation(any_loader, markets=set())
+ok("장 닫힘: 리밸런싱 룰 미평가", not alert_store.get_events(UID6))
+fired_reb_open = alert_runner.run_alert_evaluation(any_loader, markets={"KR"})
+ok("장 열림: 리밸런싱 발화", any("리밸런싱" in e["title"] for e in alert_store.get_events(UID6)))
+
 # ── 5. 마감 요약 ─────────────────────────────────────
 UID4 = 24
 loader4 = FakeLoader({"069500": [100, 100, 98.5], "AAPL": [100, 100, 99.9]})  # KR -1.5% / US -0.1%

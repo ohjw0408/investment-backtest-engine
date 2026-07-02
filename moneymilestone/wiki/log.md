@@ -4400,3 +4400,15 @@ _작성: Claude_
 - 배포 시 beat 재시작으로 신규 스케줄 자동 적재. alert_rules 컬럼 2개 ALTER는 init에서 멱등.
 
 _작성: Claude_
+
+## 2026-07-02 — 알림 자산군 커버 보강 (오너 질문 "환율 24시간? 전부 커버?")
+
+점검 결과 구멍 3개 → 즉시 수정.
+- **beat 24/7 확장**: `evaluate-alerts` `*/15 hour 0-6,13-20 mon-fri` → `*/15` 상시. KR/US 룰은 task 내 `_open_markets()` 게이팅 그대로(자기 장중만), **ANY(크립토 -USD·환율 =X·선물 =F)는 상시 평가** — 주말 비트코인 급변 커버. 장외 슬롯 = ANY 룰 없으면 수 ms no-op. `markets=∅`일 때 portfolio/rebalance 룰은 게이팅(일봉 기반이라 장외 평가 무의미).
+- **US 겨울 서머타임 구멍**: 창 13:30~20:00 UTC 고정 = 겨울(EST) 마감 21:00의 **마지막 1시간 미커버** → 21:00까지 확장(여름 이른 슬롯 오발화는 cur_is_today 가드가 차단). US 마감요약 20:30→**21:30 UTC**(연중 확정 종가).
+- **환율/선물 시세 축**: index_ohlc 경유였는데 refresh beat가 장중에만 돔 → 24시간 자산에 공백 → **yf 직접**(상시 신선)으로 전환. `_yf_symbol`에 `USD/KRW→KRW=X` 별칭. 고아(_FUT·_any_market_open) 제거.
+- 검증: 히스테리시스 스위트 21→**24 PASS**(주말 크립토 발화·장닫힘 리밸 게이팅·장열림 리밸 발화 추가) + runner 10·engine 19. 실스모크 KRW=X 1542.67·GC=F 4133 (cur_is_today=True).
+
+최종 자산군 매트릭스: KR주식/ETF·^KS·금현물=KR장 / US주식/ETF·^GSPC=US장(서머타임 양계절) / 크립토·환율·선물=24/7(주말 포함) / 포폴·리밸=KR∪US 장중.
+
+_작성: Claude_

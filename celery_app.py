@@ -54,10 +54,13 @@ celery.conf.beat_schedule = {
         'task': 'tasks.refresh_index_ohlc',
         'schedule': crontab(minute='*/20', hour='0-6,13-21', day_of_week='mon-fri'),
     },
-    # 알림 룰 평가 — 장중 15분마다(US 13:30~20:00 + KR 00:00~06:30 UTC). task 내부서 장시간 재확인.
+    # 알림 룰 평가 — 15분마다 24/7 (자산군 커버 2026-07-02):
+    # KR/US 주식은 task 내부 _open_markets()가 자기 장중만, 크립토(-USD)·환율(=X)·
+    # 선물(=F) = ANY 시장은 상시(주말 비트코인 급변도 커버). 장 밖 슬롯은 ANY 룰
+    # 없으면 사실상 no-op(수 ms 쿼리 1회).
     'evaluate-alerts': {
         'task': 'tasks.evaluate_alerts',
-        'schedule': crontab(minute='*/15', hour='0-6,13-20', day_of_week='mon-fri'),
+        'schedule': crontab(minute='*/15'),
     },
     # 장 마감 확정 등락 요약 (알림 교통정리 2026-07-02) — daily_pct 룰 대상, 장중과 별도 레인.
     'close-summary-kr': {
@@ -67,7 +70,8 @@ celery.conf.beat_schedule = {
     },
     'close-summary-us': {
         'task': 'tasks.evaluate_close_alerts',
-        'schedule': crontab(hour=20, minute=30, day_of_week='mon-fri'),  # US 마감 20:00 UTC + 여유
+        # 21:30 UTC = 겨울(EST) 마감 21:00 + 30분 / 여름(EDT) 마감 20:00 + 1.5h — 연중 확정 종가.
+        'schedule': crontab(hour=21, minute=30, day_of_week='mon-fri'),
         'args': ('US',),
     },
     # 증시 캘린더 일정 알림 — 매일 08:00 KST(=23:00 UTC). 당일 일정 묶음 1건.

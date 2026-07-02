@@ -266,9 +266,11 @@ def run_alert_evaluation(loader, rules=None, now=None, markets=None):
     now_iso = now.isoformat()
     rules = rules if rules is not None else alert_store.get_all_enabled_rules()
     if markets is not None:
+        # symbol 룰: 자기 시장이 열렸거나 ANY(크립토·환율·선물=상시).
+        # portfolio/rebalance 룰: 일봉 기반 혼합 자산 → KR/US 아무 장이나 열려있을 때만.
         rules = [r for r in rules
-                 if r.get("scope") != "symbol"
-                 or rule_market(r.get("code")) in (markets | {"ANY"})]
+                 if (rule_market(r.get("code")) in (markets | {"ANY"})
+                     if r.get("scope") == "symbol" else bool(markets))]
     if not rules:
         return 0
 

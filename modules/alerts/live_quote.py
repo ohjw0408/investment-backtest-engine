@@ -24,19 +24,24 @@ from datetime import datetime
 _CACHE: dict = {}          # code -> (fetched_ts, data)
 _TTL = 600                 # 10분
 
-_FUT = {"GC=F", "SI=F", "CL=F", "NG=F", "HG=F", "KRW=X"}
-
 
 def is_index_like(code: str) -> bool:
+    """index_ohlc 경유 대상 — 지수·금현물만. 환율(=X)·선물(=F)은 24시간 거래라
+    장중에만 도는 refresh beat의 index_ohlc가 아니라 yf 직접(상시 신선)으로 간다
+    (2026-07-02 자산군 커버 수정)."""
     code = str(code).upper()
-    return code.startswith("^") or code in _FUT or code == "KRX_GOLD" or "/" in code
+    return code.startswith("^") or code == "KRX_GOLD" or "/" in code
 
 
 def _yf_symbol(code: str) -> str:
-    """yfinance 심볼 변환 — KR 6자리는 .KS, US 점 티커는 하이픈."""
+    """yfinance 심볼 변환 — KR 6자리는 .KS, US 점 티커는 하이픈, USD/KRW 계열은 KRW=X."""
     code = str(code).upper()
+    if code == "USD/KRW":
+        return "KRW=X"
     if code.isdigit() or (len(code) == 6 and code[:1].isdigit()):
         return f"{code}.KS"
+    if "=" in code:                     # KRW=X, GC=F 등은 yf 심볼 그대로
+        return code
     if "." in code and not code.endswith((".KS", ".KQ")):
         return code.replace(".", "-")   # BRK.B -> BRK-B
     return code

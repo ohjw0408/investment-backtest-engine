@@ -312,7 +312,9 @@ def refresh_krx_gold():
 def _open_markets(now_utc=None):
     """현재 열린 시장 집합: {'KR','US'} 부분집합. 월~금 기준.
 
-    KR 정규장 09:00~15:30 KST = 00:00~06:30 UTC / US 정규장 13:30~20:00 UTC(서머타임 여유).
+    KR 정규장 09:00~15:30 KST = 00:00~06:30 UTC / US 정규장 13:30~21:00 UTC
+    (여름 EDT 09:30~16:00 = 13:30~20:00Z, 겨울 EST = 14:30~21:00Z — 둘 다 커버.
+    창 밖 이른 슬롯의 오발화는 cur_is_today 가드가 차단).
     알림 교통정리(2026-07-02): 룰별 자기 시장 게이팅용 — "아무 장이나 열림" 전역
     게이트가 코스피 룰을 미국장 시간(22:30 KST)에 평가하던 문제의 근본 수정.
     """
@@ -324,20 +326,18 @@ def _open_markets(now_utc=None):
     open_ = set()
     if 0 <= m <= 6 * 60 + 30:
         open_.add("KR")
-    if 13 * 60 + 30 <= m <= 20 * 60:
+    if 13 * 60 + 30 <= m <= 21 * 60:
         open_.add("US")
     return open_
 
 
-def _any_market_open(now_utc=None):
-    return bool(_open_markets(now_utc))
-
 
 @celery.task
 def evaluate_alerts():
-    """장중 15분마다 Celery Beat 실행 — 사용자 알림 룰 평가, 발화 시 수신함 적재."""
-    if not _any_market_open():
-        return {"status": "market_closed"}
+    """15분마다 Celery Beat 실행(24/7) — 사용자 알림 룰 평가, 발화 시 수신함 적재.
+
+    KR/US 룰은 자기 장중만(markets 게이팅), ANY(크립토·환율·선물) 룰은 상시.
+    조기리턴 없음 — 주말·장외에도 ANY 룰 커버(2026-07-02 자산군 커버 수정)."""
     try:
         from modules.alerts.alert_runner import run_alert_evaluation
         from modules.price_loader import PriceLoader

@@ -6,13 +6,13 @@
 
 `python -m pytest tests/test_X.py` 로 실행. **CI(deploy.yml test job)에 포함된 DB-독립 서브셋:**
 
-- `test_engine_integrity.py` · `test_basic_simulation.py` · `test_cash_and_dividend_engine.py`
-- `test_dca_engine.py` · `test_engine_dca_simulation.py` · `test_band_dca_dividend.py`
-- `test_d4_fee_logic.py` · `test_saved_portfolios.py` (임시 users.db 패치)
+- `test_engine_integrity.py` · `test_basic_simulation.py` · `test_engine_dca_simulation.py`
+- `test_band_dca_dividend.py` · `test_d4_fee_logic.py` · `test_saved_portfolios.py` (임시 users.db 패치)
+- ❌ 제외: `test_cash_and_dividend_engine.py`·`test_dca_engine.py` — USD/KRW(index_master.db, untracked) 의존 → CI에서 실패 (2026-07-02 첫 CI 실행에서 확인)
 - `scripts/perf_golden.py check` (골든마스터 — 엔진 결과불변, _FakeLoader라 DB 0)
 
 나머지 pytest 파일은 로컬 `price_daily.db`/네트워크 의존 가능 → 로컬 타겟 실행 전용.
-CI 추가 기준: **`data/price_cache`·`data/private` 없는 상태에서 PASS** (검증 방법: 두 폴더 임시 리네임 후 실행).
+CI 추가 기준: **`data/price_cache`·`data/private`·`data/meta/index_master.db` 전부 없는 상태에서 PASS** (검증 방법: 셋 다 임시 리네임 후 실행 — price/private만 숨기면 index_master 의존을 놓침, 2026-07-02 교훈).
 
 ## 2. 스크립트식 자체 러너 (`python tests/test_X.py` 직접 실행)
 

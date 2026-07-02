@@ -30,13 +30,14 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
 
+      # 선정 기준: data/price_cache·data/private·data/meta/index_master.db 전부 없는
+      # 상태에서 PASS (검증 절차 = tests/README.md). cash_and_dividend·dca_engine은
+      # USD/KRW(index_master) 의존이라 제외 — 로컬 타겟 테스트로 커버.
       - name: Engine unit tests (DB-independent subset)
         run: >
           python -m pytest -q
           tests/test_engine_integrity.py
           tests/test_basic_simulation.py
-          tests/test_cash_and_dividend_engine.py
-          tests/test_dca_engine.py
           tests/test_engine_dca_simulation.py
           tests/test_band_dca_dividend.py
           tests/test_d4_fee_logic.py

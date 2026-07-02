@@ -1863,7 +1863,6 @@ function renderHistoryChart(days) {
     labels = labels.slice(-days);
     values = values.slice(-days);
   }
-  updateAssetHeroTotal(values[values.length - 1] || 0);
   updateHeroMetric(values);
 
   const ctx = document.getElementById('maHistoryChart').getContext('2d');

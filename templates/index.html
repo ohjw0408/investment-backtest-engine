@@ -386,8 +386,8 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
         </div>
       </div>
       <div class="period-selector">
-        <button class="period-btn active" data-period="1w">1주</button>
-        <button class="period-btn" data-period="1m">1개월</button>
+        <button class="period-btn" data-period="1w">1주</button>
+        <button class="period-btn active" data-period="1m">1개월</button>
         <button class="period-btn" data-period="1y">1년</button>
       </div>
     </div>
@@ -511,8 +511,8 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
         </div>
       </div>
       <div class="period-selector">
-        <button class="period-btn active">1주</button>
-        <button class="period-btn">1개월</button>
+        <button class="period-btn">1주</button>
+        <button class="period-btn active">1개월</button>
         <button class="period-btn">1년</button>
       </div>
     </div>
@@ -725,7 +725,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#portfolioCard .period-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      loadPortfolio(btn.dataset.period);
+      renderPortfolio(btn.dataset.period);
     });
   });
 });
@@ -735,13 +735,13 @@ let portfolioChart = null;
 let _portfolioData = null;
 let _homeHideAmounts = true;
 let _homePeek = false;   // 로컬 금액 보기 (개인 가림설정 임시 해제, 저장 안 함)
-let _homePortfolioPeriod = '1w';
+let _homePortfolioPeriod = '1m';
 
 function togglePeek() {
   _homePeek = !_homePeek;
   const b = document.getElementById('peekBtn');
   if (b) b.textContent = _homePeek ? '🙈' : '👁';
-  loadPortfolio(_homePortfolioPeriod);
+  renderPortfolio(_homePortfolioPeriod);
   loadActions();
 }
 
@@ -794,11 +794,16 @@ function setPortfolioChange(id, label, series) {
   el.style.display = '';
 }
 
-async function loadPortfolio(period = '1w') {
-  _homePortfolioPeriod = period;
+async function loadPortfolio(period = '1m') {
   const res = await fetch('/api/portfolio/history', { cache: 'no-store' });
   _portfolioData = await res.json();
+  renderPortfolio(period);
+}
+
+function renderPortfolio(period = '1m') {
+  _homePortfolioPeriod = period;
   const data = _portfolioData;
+  if (!data) return;
   _homeHideAmounts = data.hide_amounts !== false;
   if (_homePeek) _homeHideAmounts = false;
   const peekBtn = document.getElementById('peekBtn');
@@ -821,7 +826,7 @@ async function loadPortfolio(period = '1w') {
 
   const valEl = document.getElementById('portfolioValue');
   valEl.classList.remove('mm-skel', 'mm-skel-val');   // 로딩 스켈레톤 해제
-  valEl.textContent = fmtMaskedKRW(slicedValues[slicedValues.length - 1] || 0);
+  valEl.textContent = fmtMaskedKRW(data.current || values[values.length - 1] || 0);
   setPortfolioChange('portfolioDailyChange', '1일', values.slice(-2));
   setPortfolioChange('portfolioPeriodChange', periodLabels[period] || '1주', slicedValues);
 

@@ -94,7 +94,7 @@
 .rebal-sell  { background:var(--red-pale); color:var(--red); }
 .rebal-ok    { background:var(--bg); color:var(--text-muted); }
 .rebal-alert { background:var(--gold-pale); color:var(--gold-deep); font-weight: 600; }
-.ma-period-btn { font-size:0.78rem; font-weight:700; padding:7px 12px; border:1px solid var(--ds-hairline); border-radius:var(--r-pill); background:transparent; color:var(--ds-body); cursor:pointer; font-family:inherit; }
+.ma-period-btn { font-size:0.78rem; font-weight:700; padding:7px 12px; border:1px solid var(--ds-hairline); border-radius:var(--r-pill); background:transparent; color:var(--ds-body); cursor:pointer; font-family:inherit; white-space:nowrap; flex:0 0 auto; }
 .ma-period-btn:hover { border-color:var(--ds-muted); color:var(--ds-ink); }
 .ma-period-btn.active { background:var(--ds-ink); color:var(--ds-canvas); border-color:var(--ds-ink); }
 .div-tgl { font-size:0.75rem; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:var(--card); color:var(--text-muted); cursor:pointer; }
@@ -150,7 +150,8 @@
 .mt-btn { border: none; background: transparent; color: var(--ds-body); font-weight: 700; font-size: .8rem;
   padding: 6px 18px; border-radius: var(--r-pill); cursor: pointer; font-family: inherit; }
 .mt-btn.active { background: var(--ds-ink); color: var(--ds-canvas); }
-.ma-period-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 20px 0; }
+.ma-period-chips { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding: 12px 20px 0; }
+.ma-period-chips::-webkit-scrollbar { display: none; }
 
 /* 보유 종목 = 한 줄 카드 + 탭하면 펼침 */
 .hold-list { display: flex; flex-direction: column; }
@@ -351,7 +352,7 @@
   .ma-asset-value { font-size: 30px; }
   .ma-metric-toggle { align-self: flex-start; margin-top: 10px; }
   .ma-period-chips { padding: 12px 14px 0; }
-  .ma-period-chips .ma-period-btn { flex: 1; min-width: 0; }
+  .ma-period-chips .ma-period-btn { flex: 0 0 auto; }
   .ma-asset-chart { height: 180px; padding: 8px 10px 14px; }
 
   /* 리밸런싱 — 밴드 카드·계산 행 줄바꿈 허용 */

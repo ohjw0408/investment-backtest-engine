@@ -31,8 +31,10 @@
 .portfolio-change.down { color: var(--down); }
 
 /* 기간 pill */
+.period-selector { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.period-selector::-webkit-scrollbar { display: none; }
 .period-btn { background: transparent; border: 1px solid var(--ds-hairline); color: var(--ds-body);
-  border-radius: var(--r-pill); padding: 7px 14px; font-family: var(--font-sans); font-weight: 600; }
+  border-radius: var(--r-pill); padding: 7px 14px; font-family: var(--font-sans); font-weight: 600; white-space: nowrap; flex: 0 0 auto; }
 .period-btn:hover { background: transparent; border-color: var(--ds-muted); color: var(--ds-ink); }
 .period-btn.active { background: var(--ds-ink); color: var(--ds-canvas); border-color: var(--ds-ink); }
 
@@ -379,7 +381,9 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
         </div>
       </div>
       <div class="period-selector">
-        <button class="period-btn active" data-period="1m">1개월</button>
+        <button class="period-btn active" data-period="1d">1일</button>
+        <button class="period-btn" data-period="1w">1주</button>
+        <button class="period-btn" data-period="1m">1개월</button>
         <button class="period-btn" data-period="3m">3개월</button>
         <button class="period-btn" data-period="1y">1년</button>
         <button class="period-btn" data-period="all">전체</button>
@@ -502,7 +506,9 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
         </div>
       </div>
       <div class="period-selector">
-        <button class="period-btn active">1개월</button>
+        <button class="period-btn active">1일</button>
+        <button class="period-btn">1주</button>
+        <button class="period-btn">1개월</button>
         <button class="period-btn">3개월</button>
         <button class="period-btn">1년</button>
         <button class="period-btn">전체</button>
@@ -713,9 +719,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadActions();
   }, 60 * 1000);
 
-  document.querySelectorAll('.period-btn').forEach(btn => {
+  document.querySelectorAll('#portfolioCard .period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#portfolioCard .period-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       loadPortfolio(btn.dataset.period);
     });
@@ -727,7 +733,7 @@ let portfolioChart = null;
 let _portfolioData = null;
 let _homeHideAmounts = true;
 let _homePeek = false;   // 로컬 금액 보기 (개인 가림설정 임시 해제, 저장 안 함)
-let _homePortfolioPeriod = '1m';
+let _homePortfolioPeriod = '1d';
 
 function togglePeek() {
   _homePeek = !_homePeek;
@@ -771,7 +777,7 @@ function fmtMaskedKRW(v) {
   return '₩' + Math.round(v || 0).toLocaleString();
 }
 
-async function loadPortfolio(period = '1m') {
+async function loadPortfolio(period = '1d') {
   _homePortfolioPeriod = period;
   const res = await fetch('/api/portfolio/history', { cache: 'no-store' });
   _portfolioData = await res.json();
@@ -790,8 +796,8 @@ async function loadPortfolio(period = '1m') {
   if (card) card.style.display = '';
 
   const { labels, values } = data;
-  const slices = { '1m': 22, '3m': 66, '1y': 252, 'all': values.length };
-  const n = slices[period] || 22;
+  const slices = { '1d': 2, '1w': 7, '1m': 22, '3m': 66, '1y': 252, 'all': values.length };
+  const n = slices[period] || 2;
   const slicedLabels = labels.slice(-n);
   const slicedValues = values.slice(-n);
 

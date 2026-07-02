@@ -288,8 +288,15 @@ let lineRange      = '1M';     // 라인 탭 = 표시 기간
 let candleInterval = '1D';     // 캔들 탭 = 캔들 1개의 간격 (기간은 항상 전체)
 
 async function loadSymbol() {
-  const res  = await fetch(`/api/symbol/${CODE}`);
-  const data = await res.json();
+  let res, data;
+  try {
+    res  = await fetch(`/api/symbol/${CODE}`);
+    data = await res.json();
+  } catch (e) {
+    document.getElementById('symbolContent').innerHTML =
+      '<div class="symbol-empty">일시적으로 불러오지 못했어요. 잠시 후 새로고침 해주세요.</div>';
+    return;
+  }
   if (data.error) {
     document.getElementById('symbolContent').innerHTML =
       `<div class="symbol-empty">종목을 찾을 수 없습니다: ${CODE}</div>`;

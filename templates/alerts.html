@@ -373,8 +373,15 @@ function ruleDesc(r){
 }
 
 async function loadRules(){
-  const r = await fetch('/api/alerts/rules');
-  const j = await r.json();
+  let j;
+  try {
+    const r = await fetch('/api/alerts/rules');
+    j = await r.json();
+  } catch (e) {
+    const box = $('alRules');
+    if (box) box.innerHTML = '<div class="al-empty">일시적으로 불러오지 못했어요. 잠시 후 새로고침 해주세요.</div>';
+    return;
+  }
   LAST_ALERT_RULES = j.rules || [];
   renderRules();
 }
@@ -441,8 +448,15 @@ function alertTargetUrl(e) {
 }
 
 async function loadEvents(){
-  const r = await fetch('/api/alerts/events?limit=50');
-  const j = await r.json();
+  let j;
+  try {
+    const r = await fetch('/api/alerts/events?limit=50');
+    j = await r.json();
+  } catch (e) {
+    const b = $('alEvents');
+    if (b) b.innerHTML = '<div class="al-empty">일시적으로 불러오지 못했어요. 잠시 후 새로고침 해주세요.</div>';
+    return;
+  }
   const evs = j.events || [];
   const box = $('alEvents');
   if (!evs.length) { box.innerHTML = '<div class="al-empty">아직 받은 알림이 없어요. 캘린더 알림은 저장 직후 생기지 않고, 매일 08:00 KST에 오늘 일정이 있을 때 여기에 쌓입니다.</div>'; return; }

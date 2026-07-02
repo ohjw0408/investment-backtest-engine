@@ -4412,3 +4412,13 @@ _작성: Claude_
 최종 자산군 매트릭스: KR주식/ETF·^KS·금현물=KR장 / US주식/ETF·^GSPC=US장(서머타임 양계절) / 크립토·환율·선물=24/7(주말 포함) / 포폴·리밸=KR∪US 장중.
 
 _작성: Claude_
+
+## 2026-07-03 — F-1 3-상태 전수 감사 + 갭 수정 (출시완성도 P2 #1)
+
+전 22페이지 × 4상태(data/empty/anon/apifail) Playwright 자동 감사(88셀). 상세=[[dev/state-audit]].
+- **양호**: 정상·빈유저·비로그인 66셀 전부 클린 — native dialog 0·빈 흰화면 0·JS에러 0. 기존 상태 처리(온보딩·al-empty 등)가 잘 돼 있었음.
+- **갭 = apifail(서버/네트워크 다운) 5셀 → 수정 4 + 오탐 1(macro)**: 홈 loadPortfolio+위젯 placeholder 영구·myassets loadAll·alerts loadRules/loadEvents·symbol loadSymbol — 전부 로드 fetch 미가드. try/catch + 공통 카피("일시적으로 불러오지 못했어요...") 부착.
+- 재검: apifail 5/5 해소(JS에러 0·에러UI 표시) + 정상 상태 회귀 4페이지 PASS.
+- 규칙 신설(위키): 신규 페이지 로드 fetch = try/catch+에러문구 필수, placeholder 영구 방치 금지.
+
+_작성: Claude_

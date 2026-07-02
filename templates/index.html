@@ -807,9 +807,15 @@ function fmtChartKRW(v) {
 }
 
 async function loadPortfolio(period = '1m') {
-  const res = await fetch('/api/portfolio/history', { cache: 'no-store' });
-  _portfolioData = await res.json();
-  renderPortfolio(period);
+  try {
+    const res = await fetch('/api/portfolio/history', { cache: 'no-store' });
+    _portfolioData = await res.json();
+    renderPortfolio(period);
+  } catch (e) {
+    // 네트워크/서버 실패 — 빈 카드 방치 대신 숨김(아래 온보딩/다른 카드가 안내)
+    const card = document.getElementById('portfolioCard');
+    if (card) card.style.display = 'none';
+  }
 }
 
 function renderPortfolio(period = '1m') {
@@ -1017,7 +1023,11 @@ async function loadWidgets() {
       _quoteMap = Object.fromEntries(qs.map(q => [q.code, q]));
     }
     renderWidgets();
-  } catch (e) { /* 네트워크 실패 시 무시 */ }
+  } catch (e) {
+    // 실패 시 "불러오는 중..." 영구 방치 금지 — 에러 문구로 교체
+    const body = document.getElementById('widgetBody');
+    if (body) body.innerHTML = '<div class="market-loading">일시적으로 불러오지 못했어요. 잠시 후 새로고침 해주세요.</div>';
+  }
 }
 
 function _itemsWithQuote(w) {

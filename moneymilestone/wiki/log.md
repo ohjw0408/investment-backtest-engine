@@ -4357,3 +4357,13 @@ BUG-COMPARE-DEEP-SYNTH 후속 — 오너 결정 (a) 근본 재생성 실행. 신
 - ⚠️ **prod DB 동일 수술 필요** — 배포 후 서버에서 `python scripts/fix_corrupt_backfill.py` 실행(스크립트 멱등·내장검증 포함).
 
 _작성: Claude_
+
+## 2026-07-02 — P0 3종 prod 반영 완료 (백업·WAL·B-1 수술)
+
+2eef1bd 배포 후 prod 마감:
+- **B-1 prod 수술 ALL PASS**: dry-run으로 prod 상태 확인(로컬과 상이 — 실데이터 2002-07-30~, HYG 부재, KR 잔재 360200/360750만) → 본실행. 채권 4종 재생성(TLT 6355·IEF 10125·SHY 5142·LQD 4176행) + KR pre-1964 9096×2 삭제. 내장검증=재스캔 손상0·TLT Volcker -69.6%·봉합점 ≤1.0%.
+- **WAL prod 활성 확인**: users/price_daily/index_master 3개 모두 `journal_mode=wal`(배포 시 init PRAGMA 자동 전환).
+- 수술 후 서비스 재시작(워커 인메모리 가격캐시 플러시) → 3 서비스 active·홈 HTTP 200.
+- 서버 백업 cron은 이미 가동 중(/etc/cron.d/moneymilestone-backup) — 다음 04:10 UTC 자동.
+
+_작성: Claude_

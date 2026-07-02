@@ -343,7 +343,7 @@ let rrVisible = [];             // 스파이더 표시여부(items와 동일 인
 let rrOpacity = 0.18;
 let rrScatterChart = null, rrSpiderChart = null;
 
-function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const esc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03)
 function pct(v, d=1){ return v==null ? '—' : (v*100).toFixed(d)+'%'; }
 function colorOf(i){ return RR_COLORS[i % RR_COLORS.length]; }
 function hexA(hex, a){ const n=Math.round(a*255).toString(16).padStart(2,'0'); return hex+n; }

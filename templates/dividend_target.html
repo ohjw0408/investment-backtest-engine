@@ -1209,7 +1209,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function buildDtCondSummary(body) {
   const el = document.getElementById('dtCondSummary');
   if (!el || !body) return;
-  const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
+  const esc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03) (기존은 따옴표 미이스케이프 — 강화됨)
   const items = [];
   const tk = (body.tickers || []).map(t => `${t.code} ${Math.round((t.weight || 0) * 100)}%`).join(' · ');
   if (tk) items.push(['종목', tk]);

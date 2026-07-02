@@ -940,9 +940,7 @@ async function loadAttribution() {
   } catch (e) { _attrHasData = false; card.style.display = 'none'; }
 }
 
-function maEsc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-}
+const maEsc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03)
 
 // ── 새로고침 (서버 공유 캐시 20분 floor — 더 자주 눌러도 같은 값) ──
 async function refreshHoldings() {

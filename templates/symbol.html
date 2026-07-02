@@ -231,11 +231,7 @@ function fmtWeight(v) {
   return Number(v).toFixed(2) + '%';
 }
 
-function escHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, ch => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[ch]));
-}
+const escHtml = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03)
 
 function validHoldings(holdings) {
   return (holdings || []).map(h => ({

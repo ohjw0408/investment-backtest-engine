@@ -113,8 +113,7 @@ window.MMLimit = (function () {
   // 결과 하단 경고 배너 HTML — 작지 않게(오너 요구)
   function banner(warnings) {
     if (!warnings || !warnings.length) return '';
-    const esc = s => String(s).replace(/[&<>"']/g, c =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const esc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03)
     return `
       <div style="margin-top:14px;padding:14px 16px;background:var(--red-pale,#FDECEA);border:1.5px solid var(--red,#C62828);border-radius:10px;">
         <div style="font-size:0.92rem;font-weight:800;color:var(--red,#C62828);margin-bottom:8px;">⚠️ 납입 한도 초과 시뮬레이션</div>

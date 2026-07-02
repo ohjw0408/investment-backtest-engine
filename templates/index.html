@@ -1006,10 +1006,7 @@ let _widgets = [];
 let _quoteMap = {};
 let _activeWidget = 0;
 
-function _esc(s) {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-}
+const _esc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03)
 
 async function loadWidgets() {
   try {

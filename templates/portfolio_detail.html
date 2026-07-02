@@ -187,7 +187,7 @@ let pdAmount = 0;
 let hideAmounts = false;
 const PALETTE = ['#1976D2','#2E7D32','#F57C00','#7B1FA2','#00838F','#C62828','#5D4037','#455A64','#AD1457','#558B2F'];
 
-function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const esc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03)
 function badgeColor(b){
   if (b==='KR ETF'||b==='KOSPI'||b==='KOSDAQ') return '#1976D2';
   if (b==='US ETF'||b==='NASDAQ'||b==='NYSE')   return '#2E7D32';

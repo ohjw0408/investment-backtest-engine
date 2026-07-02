@@ -12,8 +12,7 @@
   function readTickers(card) { return readJSON(card.dataset.tickers); }
   function readCmp() { return readJSON(sessionStorage.getItem(RR_KEY)); }
   function writeCmp(list) { sessionStorage.setItem(RR_KEY, JSON.stringify(list)); }
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var esc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03)
 
   // ── 지역 탭 ──
   function selectTab(region) {

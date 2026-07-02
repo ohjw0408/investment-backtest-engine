@@ -126,10 +126,7 @@ let mpItems = [];                 // 서버 목록
 let mpEdit  = { id: null, tickers: [] };   // 모달 편집 상태 (weight = %)
 let mpSearchTimer = null;
 
-function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c =>
-    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-}
+const esc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03)
 function badgeColor(b) {
   if (b==='KR ETF'||b==='KOSPI'||b==='KOSDAQ') return '#1976D2';
   if (b==='US ETF'||b==='NASDAQ'||b==='NYSE')   return '#2E7D32';

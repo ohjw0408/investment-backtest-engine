@@ -497,7 +497,7 @@ loadEvents();
   const kEcon = $('caEcon'), kPol = $('caPolicy'), kEarn = $('caEarn'), kDiv = $('caDiv');
   const econWrap = $('caEconWrap'), symWrap = $('caSymWrap'), summary = $('caSummary');
   if (!enabled) return;
-  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  const esc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03)
   function calSymbolEligible(code) {
     const c = String(code || '').toUpperCase();
     return !(c.startsWith('^') || c === 'KRX_GOLD' || c.endsWith('=X') || c.endsWith('=F') || c.includes('-'));

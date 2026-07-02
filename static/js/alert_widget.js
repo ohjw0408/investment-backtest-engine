@@ -313,7 +313,7 @@
   }
 
   // ── 헬퍼 ──
-  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  var esc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03) (기존은 작은따옴표 미이스케이프 — 강화됨)
   function seg(id, opts, def) {
     return '<span class="mmal-seg" id="' + id + '">' + opts.map(function (o) {
       return '<button data-v="' + o[0] + '" class="' + (o[0] === def ? 'on' : '') + '">' + o[1] + '</button>';

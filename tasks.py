@@ -309,16 +309,28 @@ def refresh_krx_gold():
             conn.close()
 
 
-def _any_market_open(now_utc=None):
-    """US 정규장(13:30~20:00 UTC) 또는 KR 정규장(00:00~06:30 UTC), 월~금."""
+def _open_markets(now_utc=None):
+    """현재 열린 시장 집합: {'KR','US'} 부분집합. 월~금 기준.
+
+    KR 정규장 09:00~15:30 KST = 00:00~06:30 UTC / US 정규장 13:30~20:00 UTC(서머타임 여유).
+    알림 교통정리(2026-07-02): 룰별 자기 시장 게이팅용 — "아무 장이나 열림" 전역
+    게이트가 코스피 룰을 미국장 시간(22:30 KST)에 평가하던 문제의 근본 수정.
+    """
     from datetime import datetime as _dt
     now = now_utc or _dt.utcnow()
     if now.weekday() >= 5:
-        return False
+        return set()
     m = now.hour * 60 + now.minute
-    us = 13 * 60 + 30 <= m <= 20 * 60
-    kr = 0 <= m <= 6 * 60 + 30
-    return us or kr
+    open_ = set()
+    if 0 <= m <= 6 * 60 + 30:
+        open_.add("KR")
+    if 13 * 60 + 30 <= m <= 20 * 60:
+        open_.add("US")
+    return open_
+
+
+def _any_market_open(now_utc=None):
+    return bool(_open_markets(now_utc))
 
 
 @celery.task
@@ -333,11 +345,33 @@ def evaluate_alerts():
         auth_manager.init_db()  # 워커 프로세스에서 users.db 연결 보장
         from modules.alerts import alert_store
         alert_store.init_alerts_db()
-        fired = run_alert_evaluation(PriceLoader())
+        fired = run_alert_evaluation(PriceLoader(), markets=_open_markets())
         print(f"[evaluate_alerts] {fired} alerts fired")
         return {"status": "ok", "fired": fired}
     except Exception as e:
         print(f"[evaluate_alerts] 오류: {e}")
+        raise
+
+
+@celery.task
+def evaluate_close_alerts(market):
+    """장 마감 직후 Celery Beat — 해당 시장 daily_pct 룰의 확정 등락 요약 알림.
+
+    KR: 06:50 UTC(15:50 KST — 마감 15:30 + 지수 당일봉 확정 여유),
+    US: 20:30 UTC(마감 20:00 + 여유). 장중 발화와 독립("마감" 타이틀 별도 레인).
+    """
+    try:
+        from modules.alerts.alert_runner import run_close_summary
+        from modules.price_loader import PriceLoader
+        from modules import auth_manager
+        auth_manager.init_db()
+        from modules.alerts import alert_store
+        alert_store.init_alerts_db()
+        fired = run_close_summary(PriceLoader(), str(market).upper())
+        print(f"[evaluate_close_alerts] {market} {fired} alerts fired")
+        return {"status": "ok", "market": market, "fired": fired}
+    except Exception as e:
+        print(f"[evaluate_close_alerts] 오류: {e}")
         raise
 
 

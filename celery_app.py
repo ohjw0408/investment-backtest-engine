@@ -59,6 +59,17 @@ celery.conf.beat_schedule = {
         'task': 'tasks.evaluate_alerts',
         'schedule': crontab(minute='*/15', hour='0-6,13-20', day_of_week='mon-fri'),
     },
+    # 장 마감 확정 등락 요약 (알림 교통정리 2026-07-02) — daily_pct 룰 대상, 장중과 별도 레인.
+    'close-summary-kr': {
+        'task': 'tasks.evaluate_close_alerts',
+        'schedule': crontab(hour=6, minute=50, day_of_week='mon-fri'),   # 15:50 KST
+        'args': ('KR',),
+    },
+    'close-summary-us': {
+        'task': 'tasks.evaluate_close_alerts',
+        'schedule': crontab(hour=20, minute=30, day_of_week='mon-fri'),  # US 마감 20:00 UTC + 여유
+        'args': ('US',),
+    },
     # 증시 캘린더 일정 알림 — 매일 08:00 KST(=23:00 UTC). 당일 일정 묶음 1건.
     'evaluate-calendar-alerts': {
         'task': 'tasks.evaluate_calendar_alerts',

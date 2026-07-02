@@ -119,11 +119,28 @@ def test_rebalance_ignores_zero_target():
 
 # ── 쿨다운 ─────────────────────────────────────────────
 
-def test_cooldown_blocks_recent():
+def test_hysteresis_same_zone_blocks():
+    """2026-07-02 교통정리: daily_pct는 24h 쿨다운 대신 히스테리시스 —
+    같은 존(up) 유지 중 재발화 없음, 같은 방향 재진입은 45분 가드."""
     recent = (NOW - timedelta(hours=2)).isoformat()
+    # 같은 존 유지(last_state='up') → 재발화 없음
     r = _rule(rule_type="daily_pct", direction="up", threshold=5,
               cooldown_h=24, last_triggered_at=recent)
+    r["last_state"] = "up"
     assert evaluate_rule(r, {"cur": 110, "change_pct": 9.0}, NOW) is None
+    # neutral 복귀 후 같은 방향 재진입 — 마지막 발화 10분 전이면 45분 가드로 억제
+    r2 = _rule(rule_type="daily_pct", direction="up", threshold=5,
+               last_triggered_at=(NOW - timedelta(minutes=10)).isoformat())
+    r2["last_state"] = "neutral"
+    r2["last_fired_dir"] = "up"
+    assert evaluate_rule(r2, {"cur": 110, "change_pct": 9.0}, NOW) is None
+    # 방향 전환(직전 up 발화 10분 전이라도 down 진입은 즉시)
+    r3 = _rule(rule_type="daily_pct", direction="both", threshold=5,
+               last_triggered_at=(NOW - timedelta(minutes=10)).isoformat())
+    r3["last_state"] = "up"
+    r3["last_fired_dir"] = "up"
+    ev = evaluate_rule(r3, {"cur": 90, "change_pct": -8.0}, NOW)
+    assert ev is not None and ev.get("fired_dir") == "down"
 
 
 def test_cooldown_allows_after_window():

@@ -4387,3 +4387,16 @@ _작성: Claude_
 - 로그 추적법: Actions 로그 API는 admin 토큰 필요 → `git credential fill`의 저장 자격증명 사용.
 
 _작성: Claude_
+
+## 2026-07-02 — 알림 교통정리 (오너 보고: 코스피 알림이 22:30에 옴)
+
+오너 증상 = 코스피 ±1% 룰이 장중엔 침묵, 밤 22:30에 발화. 근본 원인 4개 전부 수정.
+- **원인① 시장 구분 없음**: `_any_market_open` 전역 게이트 — 미국장 열리면 코스피 룰도 평가. 22:30 KST = 13:30 UTC = US장 첫 슬롯. → `_open_markets()`(집합) + `rule_market()`(KR=6자리·^KS·KRX_GOLD / ANY=크립토·선물·FX / US) 심볼별 게이팅. `run_alert_evaluation(markets=)`.
+- **원인② 일봉 박제**: 평가가 price_daily 일봉(closes[-1] vs [-2])인데 당일봉은 첫 조회 스냅샷 고정(INSERT OR IGNORE+트레일링 스킵 가드) → 장중 변동 감지 구조적 불능. → 신규 `modules/alerts/live_quote.py`: 지수=index_ohlc(30분 beat 준라이브·코스피 커버), 주식/ETF=yf 5d 직접(10분 프로세스 캐시), 실패 시 일봉 폴백(FakeLoader 테스트 보존, `supports_live_quotes=False` opt-out).
+- **원인③ "어제 등락" 오발화**: 확정 종가가 밤에 늦게 DB 유입 → 그 시점 평가가 어제 등락으로 발화(22:30 사건의 데이터 축). → `cur_is_today` 가드(마지막 봉 날짜=UTC 오늘, 장중 게이팅 하에서 시장 로컬날짜=UTC날짜) — daily_pct는 오늘 봉일 때만.
+- **원인④ 24h 쿨다운**: "1%↑ 후 다시 1%↓" 재알림 불가. → **히스테리시스 존 전이 모델**: zone(up/neutral/down) 전이 시만 발화, `last_state`·`last_fired_dir` 컬럼(ALTER 마이그레이션), 같은 방향 재진입만 45분 가드(`SAME_DIR_REFIRE_MIN`), 방향 전환은 즉시. daily_pct는 전역 쿨다운 제외(다른 룰타입은 기존 유지).
+- **신규(오너 요청) 마감 요약**: beat 2개(KR 06:50 UTC=15:50 KST, US 20:30 UTC) → `evaluate_close_alerts(market)`→`run_close_summary` — 확정 등락 |chg|≥threshold면 "○○ ▼1.50% 마감". 쿨다운/상태 미변경 별도 레인(mark_rule_fired 안 함 — 익일 장중 알림 안 막음).
+- **검증**: 신규 `tests/test_alert_market_hysteresis.py` 21 PASS(시장분류7·게이팅2·히스테리시스6·당일가드2·마감요약4) + 기존 runner 10·engine 19(쿨다운 테스트 1건을 히스테리시스 의미로 갱신)·api 39 전부 PASS. 실데이터 스모크: ^KS11 로컬 stale=today False→가드 차단 확인, AAPL/069500/BTC 라이브 정상.
+- 배포 시 beat 재시작으로 신규 스케줄 자동 적재. alert_rules 컬럼 2개 ALTER는 init에서 멱등.
+
+_작성: Claude_

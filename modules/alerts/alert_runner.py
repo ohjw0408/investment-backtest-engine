@@ -10,11 +10,27 @@ Celery 워커(별 프로세스)에서 호출 — Flask app import 없이 동작.
 
 from datetime import datetime, timedelta
 
-from modules.alerts import alert_store
-from modules.alerts.alert_engine import evaluate_rule
+from modules.alerts import alert_store, live_quote
+from modules.alerts.alert_engine import evaluate_rule, eval_close_summary, daily_pct_zone
 from modules import auth_manager
 
 _KRW_CODES = {"^KS11", "KRW=X", "KRX_GOLD"}
+
+
+def rule_market(code):
+    """심볼 → 거래 시장: 'KR' / 'US' / 'ANY'(크립토·선물·FX = 상시).
+
+    시장 게이팅(알림 교통정리 2026-07-02): 코스피 룰이 미국장 시간(22:30 KST 등)에
+    평가되던 문제의 근본 수정 — 각 룰은 자기 시장이 열린 슬롯에서만 평가.
+    """
+    code = str(code or "").upper()
+    if not code:
+        return "ANY"
+    if code.isdigit() or code.endswith((".KS", ".KQ")) or code.startswith("^KS")             or code == "KRX_GOLD" or (len(code) == 6 and code[:1].isdigit()):
+        return "KR"
+    if code.endswith("-USD") or code.endswith("=X") or code.endswith("=F") or "/" in code:
+        return "ANY"
+    return "US"
 
 
 def _currency(loader, code):
@@ -45,11 +61,25 @@ def _fetch_closes(loader, code, need_all):
 
 
 def _build_symbol_ctx(loader, code, need_all):
-    """종목 1개의 평가 컨텍스트. 데이터 부족 시 None."""
+    """종목 1개의 평가 컨텍스트. 데이터 부족 시 None.
+
+    시세 축(알림 교통정리 2026-07-02): 일봉 DB는 당일봉이 첫 조회 스냅샷으로 박제돼
+    장중 변동 감지가 안 됐음 → live_quote(지수=index_ohlc 준라이브, 주식=yf 직접)로
+    cur/prev/change를 덮어쓴다. 라이브 실패 시 기존 일봉 폴백(테스트 FakeLoader 경로).
+    cur_is_today: 마지막 시세가 오늘 것인지 — daily_pct 장중 평가는 이때만 발화
+    (확정 종가가 밤에 뒤늦게 들어와 "어제 등락"으로 오발화하는 것 차단).
+    """
     closes, currency = _fetch_closes(loader, code, need_all)
     if len(closes) < 2:
         return None
     cur, prev = closes[-1], closes[-2]
+    cur_is_today = True  # 일봉 폴백 시 판단 불가 → 기존 동작 보존
+    # supports_live_quotes=False 로더(테스트 FakeLoader)는 네트워크 라이브 경로 스킵
+    live = (live_quote.get_live_price(loader, code)
+            if getattr(loader, "supports_live_quotes", True) else None)
+    if live is not None:
+        cur, prev = live["cur"], live["prev"]
+        cur_is_today = live["cur_is_today"]
     change_pct = (cur - prev) / prev * 100 if prev else 0.0
     prior = closes[:-1]  # 오늘 제외 → 신고/신저 판정용 직전 극값
     ctx_full_high = max(prior)
@@ -58,7 +88,7 @@ def _build_symbol_ctx(loader, code, need_all):
     win52 = prior[-252:] if len(prior) > 252 else prior
     return {
         "cur": cur, "prev_close": prev, "change_pct": change_pct,
-        "currency": currency, "name": code,
+        "currency": currency, "name": code, "cur_is_today": cur_is_today,
         "high_all": ctx_full_high, "low_all": ctx_full_low,
         "high_52w": max(win52), "low_52w": min(win52),
     }
@@ -226,11 +256,19 @@ def compute_user_groups(loader, user_id):
     return out
 
 
-def run_alert_evaluation(loader, rules=None, now=None):
-    """전 enabled 룰 평가 → 발화 이벤트 적재. 발화 건수 반환."""
+def run_alert_evaluation(loader, rules=None, now=None, markets=None):
+    """전 enabled 룰 평가 → 발화 이벤트 적재. 발화 건수 반환.
+
+    markets: 현재 열린 시장 집합({'KR','US'}) — 지정 시 symbol 룰을 자기 시장이
+    열린 슬롯에서만 평가('ANY' 시장은 항상). None이면 전체 평가(기존 동작·테스트).
+    """
     now = now or datetime.now()
     now_iso = now.isoformat()
     rules = rules if rules is not None else alert_store.get_all_enabled_rules()
+    if markets is not None:
+        rules = [r for r in rules
+                 if r.get("scope") != "symbol"
+                 or rule_market(r.get("code")) in (markets | {"ANY"})]
     if not rules:
         return 0
 
@@ -273,7 +311,22 @@ def run_alert_evaluation(loader, rules=None, now=None):
                 bundle = bundles.get((r.get("code") or "").upper())
                 if not bundle:
                     continue
+                if r.get("rule_type") == "daily_pct" and not bundle.get("cur_is_today", True):
+                    continue  # 마지막 시세가 오늘 것이 아님 — "어제 등락" 오발화 차단
                 ev = evaluate_rule(r, _ctx_for_rule(bundle, r), now)
+            # daily_pct 히스테리시스: 발화 여부와 무관하게 존 상태 저장(재무장 추적)
+            if r.get("rule_type") == "daily_pct":
+                try:
+                    _ctx = _ctx_for_rule(bundle, r) if r.get("scope") == "symbol" else None
+                    change = (_ctx or {}).get("change_pct")
+                    if r.get("scope") == "portfolio" and r.get("portfolio_id") is not None:
+                        b = pf_cache.get((r["user_id"], r["portfolio_id"]))
+                        change = _ctx_for_rule(b, r).get("change_pct") if b else None
+                    zone = daily_pct_zone(r, change)
+                    if zone != (r.get("last_state") or "neutral"):
+                        alert_store.update_rule_state(r["id"], zone)
+                except Exception:
+                    pass
             if not ev:
                 continue
             target_url = _target_for_rule(r)
@@ -290,7 +343,8 @@ def run_alert_evaluation(loader, rules=None, now=None):
                 meta["portfolio_id"] = r.get("portfolio_id")
             alert_store.add_event(r["user_id"], ev["title"], ev["body"],
                                   code=r.get("code"), rule_id=r["id"], meta=meta)
-            alert_store.mark_rule_fired(r["id"], now_iso, new_extreme=ev.get("new_extreme"))
+            alert_store.mark_rule_fired(r["id"], now_iso, new_extreme=ev.get("new_extreme"),
+                                        fired_dir=ev.get("fired_dir"))
             fired += 1
             # 앱 푸시(FCM) — 비활성/실패해도 인앱 수신함엔 영향 없음
             try:
@@ -308,4 +362,49 @@ def run_alert_evaluation(loader, rules=None, now=None):
                 print(f"[alert_runner] 룰 {r.get('id')} 푸시 실패(무시): {pe}")
         except Exception as e:
             print(f"[alert_runner] 룰 {r.get('id')} 평가 오류: {e}")
+    return fired
+
+
+def run_close_summary(loader, market, now=None):
+    """장 마감 확정 등락 요약 (알림 교통정리 2026-07-02, 오너 요청).
+
+    해당 시장(KR/US)의 daily_pct symbol 룰만 — 확정 종가 기준 |등락| >= threshold면
+    "마감" 이벤트. 장중 발화와 독립(쿨다운/상태 미변경 — mark_rule_fired 안 함:
+    24h 쿨다운으로 다음날 장중 알림이 막히는 것 방지). beat가 일 1회라 dedup 불필요.
+    """
+    now = now or datetime.now()
+    rules = [r for r in alert_store.get_all_enabled_rules()
+             if r.get("scope") == "symbol" and r.get("rule_type") == "daily_pct"
+             and rule_market(r.get("code")) == market]
+    if not rules:
+        return 0
+    bundles = {}
+    fired = 0
+    for r in rules:
+        try:
+            code = (r.get("code") or "").upper()
+            if code not in bundles:
+                bundles[code] = _build_symbol_ctx(loader, code, False)
+            bundle = bundles[code]
+            if not bundle:
+                continue
+            ev = eval_close_summary(r, _ctx_for_rule(bundle, r))
+            if not ev:
+                continue
+            meta = dict(ev.get("meta") or {})
+            meta.update({"target_url": _target_for_rule(r), "type": "daily_pct",
+                         "rule_type": "daily_pct", "scope": "symbol", "code": code})
+            alert_store.add_event(r["user_id"], ev["title"], ev["body"],
+                                  code=code, rule_id=r["id"], meta=meta)
+            fired += 1
+            try:
+                from modules.alerts import push_sender
+                push_sender.send_to_user(
+                    r["user_id"], ev["title"], ev["body"],
+                    data={"code": code, "rule_id": str(r["id"]), "type": "daily_pct",
+                          "target_url": _target_for_rule(r), "portfolio_id": ""})
+            except Exception as pe:
+                print(f"[alert_runner] 마감요약 {r.get('id')} 푸시 실패(무시): {pe}")
+        except Exception as e:
+            print(f"[alert_runner] 마감요약 룰 {r.get('id')} 오류: {e}")
     return fired

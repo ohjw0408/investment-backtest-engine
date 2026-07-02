@@ -28,6 +28,7 @@ UID = 7
 
 class FakeLoader:
     """code -> 종가 리스트(오래된→최신)."""
+    supports_live_quotes = False  # 라이브(yf/index_ohlc) 경로 차단 — 결정론
     def __init__(self, series):
         self.series = series
     def get_price(self, code, start, end, apply_fx=True, allow_synthetic=False):

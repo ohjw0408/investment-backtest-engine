@@ -78,6 +78,12 @@ VALID_TYPES = {"daily_pct", "target_price", "new_high", "new_low", "rebalance_ba
 def init_alerts_db():
     c = auth_manager._get_conn()
     c.executescript(ALERTS_DDL)
+    # 마이그레이션: daily_pct 히스테리시스 상태 (알림 교통정리 2026-07-02)
+    cols = [r[1] for r in c.execute("PRAGMA table_info(alert_rules)").fetchall()]
+    if "last_state" not in cols:
+        c.execute("ALTER TABLE alert_rules ADD COLUMN last_state TEXT")
+    if "last_fired_dir" not in cols:
+        c.execute("ALTER TABLE alert_rules ADD COLUMN last_fired_dir TEXT")
     c.commit()
 
 
@@ -150,15 +156,23 @@ def delete_rule(user_id, rule_id):
     c.commit()
 
 
-def mark_rule_fired(rule_id, now_iso, new_extreme=None):
-    """평가 task가 발화 후 호출 — 쿨다운/재무장 추적."""
+def mark_rule_fired(rule_id, now_iso, new_extreme=None, fired_dir=None):
+    """평가 task가 발화 후 호출 — 쿨다운/재무장/방향 추적."""
     c = _conn()
+    sets, vals = ["last_triggered_at=?"], [now_iso]
     if new_extreme is not None:
-        c.execute("UPDATE alert_rules SET last_triggered_at=?, last_extreme=? WHERE id=?",
-                  (now_iso, new_extreme, rule_id))
-    else:
-        c.execute("UPDATE alert_rules SET last_triggered_at=? WHERE id=?",
-                  (now_iso, rule_id))
+        sets.append("last_extreme=?"); vals.append(new_extreme)
+    if fired_dir is not None:
+        sets.append("last_fired_dir=?"); vals.append(fired_dir)
+    vals.append(rule_id)
+    c.execute(f"UPDATE alert_rules SET {', '.join(sets)} WHERE id=?", vals)
+    c.commit()
+
+
+def update_rule_state(rule_id, state):
+    """daily_pct 존 상태 저장 — 발화 여부와 무관하게 매 평가 후 호출(히스테리시스 재무장)."""
+    c = _conn()
+    c.execute("UPDATE alert_rules SET last_state=? WHERE id=?", (state, rule_id))
     c.commit()
 
 

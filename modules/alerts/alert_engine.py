@@ -55,12 +55,14 @@ def evaluate_rule(rule, ctx, now=None):
     now = now or datetime.now()
     if not rule.get("enabled", 1):
         return None
-    if not cooldown_ok(rule, now):
-        return None
 
     rt = rule.get("rule_type")
     if rt == "daily_pct":
-        return _eval_daily_pct(rule, ctx)
+        # daily_pct는 히스테리시스 상태 전이가 자체 재발화 통제 — 전역 쿨다운 미적용.
+        # (24h 쿨다운이면 "1%↑ 후 다시 1%↓" 같은 방향 전환 재알림이 하루 1회로 막힘)
+        return _eval_daily_pct(rule, ctx, now)
+    if not cooldown_ok(rule, now):
+        return None
     if rt == "target_price":
         return _eval_target_price(rule, ctx)
     if rt in ("new_high", "new_low"):
@@ -70,19 +72,54 @@ def evaluate_rule(rule, ctx, now=None):
     return None
 
 
-def _eval_daily_pct(rule, ctx):
+def daily_pct_zone(rule, change):
+    """현재 변동률이 속한 존: 'up' / 'down' / 'neutral' (임계 기준)."""
+    thr = abs(rule.get("threshold") or 0)
+    if change is None:
+        return "neutral"
+    if change >= thr:
+        return "up"
+    if change <= -thr:
+        return "down"
+    return "neutral"
+
+
+# 같은 방향 재발화(neutral 복귀 후 재돌파)의 최소 간격 — 임계 주변 왕복 스팸 방지.
+# 방향이 바뀐 발화(↑→↓)는 이 간격을 무시하고 즉시 알림.
+SAME_DIR_REFIRE_MIN = 45 * 60  # 45분
+
+
+def _eval_daily_pct(rule, ctx, now=None):
+    """히스테리시스 상태 전이 발화 (알림 교통정리 2026-07-02).
+
+    - 존 전이(neutral/down → up, neutral/up → down)일 때만 발화 → 같은 존에
+      머무는 동안 15분마다 재발화하지 않음 (기존 24h 쿨다운 대체).
+    - 존 이탈 후 재진입(재크로싱)은 다시 발화 — "1%↑ 알림 후 다시 1%↓" 지원.
+    - 같은 방향 재발화만 45분 최소 간격(임계 주변 왕복 스팸 방지).
+    - 상태(last_state)는 발화 여부와 무관하게 호출측(runner)이 매 평가마다 저장.
+    """
+    now = now or datetime.now()
     change = ctx.get("change_pct")
     if change is None:
         return None
     thr = abs(rule.get("threshold") or 0)
     direction = rule.get("direction") or "both"
-    hit = False
-    if direction in ("up", "both") and change >= thr:
-        hit = True
-    if direction in ("down", "both") and change <= -thr:
-        hit = True
-    if not hit:
+    zone = daily_pct_zone(rule, change)
+    if zone == "neutral":
         return None
+    if direction == "up" and zone != "up":
+        return None
+    if direction == "down" and zone != "down":
+        return None
+    last_state = rule.get("last_state") or "neutral"
+    if zone == last_state:
+        return None  # 같은 존 유지 — 전이 아님
+    # 같은 방향 재발화 스팸 가드 (방향 전환은 즉시 허용)
+    last_fire = _parse_dt(rule.get("last_triggered_at"))
+    last_dir = rule.get("last_fired_dir")
+    if last_fire is not None and last_dir == zone:
+        if (now - last_fire).total_seconds() < SAME_DIR_REFIRE_MIN:
+            return None
     name = ctx.get("name") or rule.get("code")
     arrow = "▲" if change >= 0 else "▼"
     return {
@@ -90,6 +127,33 @@ def _eval_daily_pct(rule, ctx):
         "body": f"하루 변동률 {change:+.2f}% (기준 ±{thr:.2f}%) — 현재 "
                 f"{_fmt_price(ctx['cur'], ctx.get('currency', 'USD'))}",
         "meta": {"change_pct": change, "price": ctx.get("cur"), "threshold": thr},
+        "fired_dir": zone,
+    }
+
+
+def eval_close_summary(rule, ctx):
+    """장 마감 확정 등락 요약 — daily_pct 룰 전용, 쿨다운/상태 무관 별도 레인.
+
+    |확정 등락| >= threshold 이고 direction 매칭이면 '마감' 이벤트. 하루 1회
+    (beat 스케줄 자체가 일 1회라 별도 dedup 불필요).
+    """
+    change = ctx.get("change_pct")
+    if change is None:
+        return None
+    thr = abs(rule.get("threshold") or 0)
+    direction = rule.get("direction") or "both"
+    hit = (direction in ("up", "both") and change >= thr) or \
+          (direction in ("down", "both") and change <= -thr)
+    if not hit:
+        return None
+    name = ctx.get("name") or rule.get("code")
+    arrow = "▲" if change >= 0 else "▼"
+    return {
+        "title": f"{name} {arrow} {abs(change):.2f}% 마감",
+        "body": f"오늘 {change:+.2f}%로 마감 (기준 ±{thr:.2f}%) — 종가 "
+                f"{_fmt_price(ctx['cur'], ctx.get('currency', 'USD'))}",
+        "meta": {"change_pct": change, "price": ctx.get("cur"), "threshold": thr,
+                 "close_summary": True},
     }
 
 

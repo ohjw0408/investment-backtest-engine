@@ -4378,3 +4378,12 @@ _작성: Claude_
 - **A-1 XSS 갭 10곳 수정**: base.html 전역 `window.mmEsc`/`mmJs` 신설(E-1 공용 유틸 씨앗). nav검색 어퍼스트로피 버그 동시 수정(기존 `replace(/'/g,"\'")`=무효 이스케이프 → McDonald's 클릭 깨졌음 → mmJs로). myassets 6곳(그룹명 option/title·배당리스트)·alerts 셀렉트(mmEsc — 로컬 esc는 사용 시점 미정의였음)·symbol명·portfolio_detail 2곳. **Playwright 검증 전부 PASS**: McDonald's 검색·클릭·심볼렌더 + 실전 페이로드(`<img onerror>` 그룹명 저장→미발화·img 0개) + 콘솔 앱에러 0. 주입 테스트 그룹 DB 정리 완료.
 
 _작성: Claude_
+
+## 2026-07-02 — CI 게이트 첫 가동: 1차 차단 → 서브셋 교정 → 그린 (C-3 마감)
+
+- **1차 실행(903f313) = 의도대로 배포 차단**: `test_cash_and_dividend_engine`·`test_dca_engine`이 USD/KRW(index_master.db, untracked)를 읽어 CI에서 실패 — 게이트가 첫 실행에서 제 역할. compileall·골든마스터·나머지는 CI 그린.
+- **교훈 = 큐레이션 기준 불완전**: 로컬 검증이 price_cache·private만 숨기고 **data/meta/index_master.db를 안 숨김**. 기준을 "3종 전부 없는 상태 PASS"로 갱신(tests/README.md), 동일 조건 로컬 재현(11 fail 재현→2파일 제외→그린).
+- **2차(8eb782d) = CI success → 게이트 통과 → 자동배포 → 서버 도착·3서비스 active·홈 200.** CI 서브셋 최종 = compileall + 골든마스터 + pytest 6파일 + alert_runner (~2분). 제외 2파일은 로컬 타겟 테스트로 커버.
+- 로그 추적법: Actions 로그 API는 admin 토큰 필요 → `git credential fill`의 저장 자격증명 사용.
+
+_작성: Claude_

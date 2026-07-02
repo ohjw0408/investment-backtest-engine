@@ -21,7 +21,9 @@ app.config["TESTING"] = True
 
 
 def _user(google_id, email):
-    return am.get_or_create_user(google_id, email, email.split("@")[0], "")["id"]
+    uid = am.get_or_create_user(google_id, email, email.split("@")[0], "")["id"]
+    am.set_user_consent(uid)  # 동의 게이트(_require_consent) 통과 — 미동의면 API 403
+    return uid
 
 
 UID_A = _user("g-a", "a@test.com")
@@ -31,6 +33,9 @@ TICKERS = [
     {"code": "069500", "name": "KODEX 200", "badge": "KR ETF", "weight": 60},
     {"code": "458730", "name": "TIGER 미국배당다우존스", "badge": "KR ETF", "weight": 40},
 ]
+
+# 서버 저장 정규화 반영본 (update 77: weight float화 + quantity 필드 추가)
+TICKERS_NORM = [{**t, "weight": float(t["weight"]), "quantity": 0.0} for t in TICKERS]
 
 
 def _client(uid=None):
@@ -66,7 +71,7 @@ def test_save_list_update_delete_roundtrip():
     assert len(items) == 1
     p = items[0]
     assert p["name"] == "성장형"
-    assert p["tickers"] == TICKERS  # 한글 이름·badge·weight 그대로 왕복
+    assert p["tickers"] == TICKERS_NORM  # 한글 이름·badge 왕복 + 서버 정규화(weight float·quantity)
 
     # id 지정 수정 — 이름·구성 교체, 개수 불변
     new_tickers = [{"code": "SPY", "name": "SPY", "badge": "US ETF", "weight": 100}]

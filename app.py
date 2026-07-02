@@ -49,6 +49,12 @@ from modules.rebalance.periodic import PeriodicRebalance
 from modules.market_quote_service import MarketQuoteService
 from modules.market_alias import search_market_aliases
 
+import logging
+
+# 구조화 로깅 (출시완성도 C-4): print 대신 logger — gunicorn/journald가 수집.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("moneymilestone")
+
 app = Flask(__name__)
 # x_for=1 추가: 리버스 프록시 뒤에서 실제 클라이언트 IP 복원(rate limit·로그 정확). 없으면
 # remote_addr가 프록시 IP로 고정돼 IP 기반 제한이 전원 한 버킷으로 뭉개짐.
@@ -720,7 +726,7 @@ def _search_attach_prices(items):
             res['change_pct'] = round((cur - prv) / prv * 100, 2) if cur and prv else None
             res['currency'] = 'KRW' if res.get('country') == 'KR' else 'USD'
     except Exception as e:
-        print(f"[search price] {e}")
+        logger.warning(f"[search price] {e}")
 
 
 def _prev_close_krw_map(codes, usdkrw):
@@ -824,7 +830,7 @@ def search():
         _search_attach_prices(results)
         return jsonify(results[:_limit])
     except Exception as e:
-        print(f"[search] 오류: {e}")
+        logger.warning(f"[search] 오류: {e}")
         return jsonify({'items': [], 'total': 0, 'page': 1, 'per': 18}) if request.args.get('page') is not None else jsonify([])
 
 # -----------------------------------------------
@@ -840,7 +846,7 @@ def get_dividend_start(ticker: str):
         row = cur.fetchone()
         return row[0] if row and row[0] else None
     except Exception as e:
-        print(f"[get_dividend_start] {ticker} 오류: {e}")
+        logger.warning(f"[get_dividend_start] {ticker} 오류: {e}")
         return None
 
 
@@ -853,7 +859,7 @@ def get_price_start(ticker: str):
         row = cur.fetchone()
         return row[0] if row and row[0] else None
     except Exception as e:
-        print(f"[get_price_start] {ticker} 오류: {e}")
+        logger.warning(f"[get_price_start] {ticker} 오류: {e}")
         return None
 
 
@@ -906,7 +912,7 @@ def _run_calculator_logic(body: dict, progress_callback=None) -> dict:
                 datetime.date.today().strftime('%Y-%m-%d')
             )
         except Exception as e:
-            print(f"[calculator] {ticker} 데이터 로드 오류: {e}")
+            logger.warning(f"[calculator] {ticker} 데이터 로드 오류: {e}")
 
     price_starts = [get_price_start(t) for t in ticker_codes]
     price_starts = [d for d in price_starts if d]
@@ -1418,7 +1424,7 @@ def _get_krx_gold():
                         "spark":  [],
                     }
             except Exception as e:
-                print(f"[market] KRX 금 최신 조회 실패: {e}")
+                logger.warning(f"[market] KRX 금 최신 조회 실패: {e}")
         else:
             try:
                 from modules.krx.krx_client import KRXClient
@@ -1435,9 +1441,9 @@ def _get_krx_gold():
                         "spark":  [],
                     }
             except Exception as e:
-                print(f"[market] KRX 금 조회 실패: {e}")
+                logger.warning(f"[market] KRX 금 조회 실패: {e}")
     except Exception as e:
-        print(f"[market] KRX 금현물 오류: {e}")
+        logger.warning(f"[market] KRX 금현물 오류: {e}")
     return None
 
 

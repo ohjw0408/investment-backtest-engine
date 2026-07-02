@@ -4367,3 +4367,14 @@ _작성: Claude_
 - 서버 백업 cron은 이미 가동 중(/etc/cron.d/moneymilestone-backup) — 다음 04:10 UTC 자동.
 
 _작성: Claude_
+
+## 2026-07-02 — P1: CI 게이트 + pip-audit + 로깅 + XSS 갭 + 골든 베이스라인 (출시완성도)
+
+- **C-3 CI 테스트 게이트**: `deploy.yml`에 `test` job 신설, `deploy`가 `needs: test` — 깨진 코드 push=배포 차단. 서브셋 = compileall(전 모듈) + 골든마스터 + DB-독립 pytest 8파일(엔진7+saved_portfolios) + alert_runner. 선정 기준 = **data/price_cache·private 리네임 상태에서 PASS**(CI 재현, tests/README.md에 기준 기록). 보너스: deploy가 백업 cron도 repo에서 동기화. **⚠️ 계획변경(오너 승인 "주1회 전체 pytest" → 미구현)**: CI엔 price DB 없고, 서버 실행은 prod DB 오염 리스크 → 전체 회귀는 기존 규칙(로컬 온디맨드) 유지. dep-audit.yml(월1회 pip-audit) 신설.
+- **골든마스터 낡은 베이스라인 발견**: check 실패(withdrawal 52건) → 원인 = 06-20~ 인출 MC 재작성(d413ec9 등, 의도된 변경)인데 베이스라인이 06-16. accum 3종 동일 확인 후 재저장. **내 변경 회귀 아님.**
+- **saved_portfolios 5 PASS 복구**(오너 결정#7): ①테스트 유저가 동의게이트(_require_consent, 그후 추가)에 403 → `set_user_consent` 추가 ②roundtrip = update 77 정규화(weight float·quantity 0.0) 반영 `TICKERS_NORM`.
+- **A-3 pip-audit**: 28건/10패키지 → patch/minor 10개 범프(cryptography·GitPython·idna·joserfc·lxml·pillow·requests·tornado·urllib3) → **1건 잔여**(curl_cffi CVE-2026-33752 = yfinance==1.2.0 충돌, requirements 주석으로 수용 명시, yfinance 업그레이드 시 함께). 스모크 = app import·yfinance 5d fetch·pillow·엔진 테스트 PASS. ⚠️ requirements.txt 주석은 영문만(한글=cp949 Windows pip 파서 크래시).
+- **C-4**: app.py print 8곳 → logging(basicConfig+logger). prod SENTRY_DSN 설정 확인(.env, load_dotenv→init 순서 정상). **UptimeRobot = 오너 액션 잔여**(무료 가입 → https://moneymilestone.co.kr/ 5분 HTTP 모니터 + 이메일).
+- **A-1 XSS 갭 10곳 수정**: base.html 전역 `window.mmEsc`/`mmJs` 신설(E-1 공용 유틸 씨앗). nav검색 어퍼스트로피 버그 동시 수정(기존 `replace(/'/g,"\'")`=무효 이스케이프 → McDonald's 클릭 깨졌음 → mmJs로). myassets 6곳(그룹명 option/title·배당리스트)·alerts 셀렉트(mmEsc — 로컬 esc는 사용 시점 미정의였음)·symbol명·portfolio_detail 2곳. **Playwright 검증 전부 PASS**: McDonald's 검색·클릭·심볼렌더 + 실전 페이로드(`<img onerror>` 그룹명 저장→미발화·img 0개) + 콘솔 앱에러 0. 주입 테스트 그룹 DB 정리 완료.
+
+_작성: Claude_

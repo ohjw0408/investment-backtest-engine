@@ -269,7 +269,7 @@ setAlertTab(new URLSearchParams(location.search).get('tab') || location.hash || 
 (function(){
   const sel = $('alCode');
   if (MM_SYMBOLS.length) {
-    sel.innerHTML = MM_SYMBOLS.map(s => `<option value="${s.code}">${s.name} (${s.code})</option>`).join('');
+    sel.innerHTML = MM_SYMBOLS.map(s => `<option value="${mmEsc(s.code)}">${mmEsc(s.name)} (${mmEsc(s.code)})</option>`).join('');
   } else {
     sel.innerHTML = '<option value="" disabled selected>보유 종목 없음 — 검색으로 추가</option>';
   }

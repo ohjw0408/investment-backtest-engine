@@ -342,7 +342,13 @@ try {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.2.0/chartjs-plugin-zoom.min.js"></script>
 <script src="{{ url_for('static', filename='js/charts.js') }}?v=20260611ui"></script>
-<script>window.MM_LOGGED_IN = {{ 'true' if user else 'false' }};</script>
+<script>
+window.MM_LOGGED_IN = {{ 'true' if user else 'false' }};
+// 전역 XSS escape 유틸 (출시완성도 A-1). innerHTML 템플릿 리터럴에 문자열 삽입 시 필수.
+// mmJs = HTML 속성 안 인라인 JS 인자용(JSON 직렬화 후 HTML escape — 따옴표/주입 안전).
+window.mmEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+window.mmJs = v => window.mmEsc(JSON.stringify(String(v ?? '')));
+</script>
 <script src="{{ url_for('static', filename='js/alert_widget.js') }}?v=20260617"></script>
 <script src="{{ url_for('static', filename='js/mm_datepicker.js') }}?v=20260626"></script>
 {% block scripts %}{% endblock %}
@@ -415,14 +421,14 @@ if (navInput) {
         }
 
         navDropdown.innerHTML = data.map(item => `
-          <div class="nav-search-result" onclick="selectSymbol('${item.code}', '${item.name.replace(/'/g, "\'")}')">
-            <span class="nav-search-badge" style="background:${badgeColor(item.badge)}22; color:${badgeColor(item.badge)}">${item.badge}</span>
+          <div class="nav-search-result" onclick="selectSymbol(${mmJs(item.code)}, ${mmJs(item.name)})">
+            <span class="nav-search-badge" style="background:${badgeColor(item.badge)}22; color:${badgeColor(item.badge)}">${mmEsc(item.badge)}</span>
             <div class="nav-search-info">
-              <div class="nav-search-code">${item.name}</div>
-              <div class="nav-search-name">${item.code}</div>
-              ${item.subtitle ? `<div class="nav-search-sub">${item.subtitle}</div>` : ''}
+              <div class="nav-search-code">${mmEsc(item.name)}</div>
+              <div class="nav-search-name">${mmEsc(item.code)}</div>
+              ${item.subtitle ? `<div class="nav-search-sub">${mmEsc(item.subtitle)}</div>` : ''}
             </div>
-            ${window.MM_LOGGED_IN ? `<button class="nav-search-bell" title="알림 설정" onclick="event.stopPropagation();mmAlert.openSymbol('${item.code}','${item.name.replace(/'/g, "\\'")}')">🔔</button>` : ''}
+            ${window.MM_LOGGED_IN ? `<button class="nav-search-bell" title="알림 설정" onclick="event.stopPropagation();mmAlert.openSymbol(${mmJs(item.code)},${mmJs(item.name)})">🔔</button>` : ''}
           </div>
         `).join('');
 

@@ -1042,7 +1042,7 @@ function renderHoldings() {
         : `<span class="hc-ret ${ret>=0?'up':'down'}">${ret>=0?'+':''}${fmtPct(ret)}</span>`;
     }
 
-    const grpDot  = a.group_name ? `<span class="hc-gdot" style="background:${gc}" title="${a.group_name}"></span>` : '';
+    const grpDot  = a.group_name ? `<span class="hc-gdot" style="background:${gc}" title="${maEsc(a.group_name)}"></span>` : '';
 
     // 펼침 = 계좌별 분해 (각 계좌 수정/삭제)
     const acctRows = a.rows.map(r => {
@@ -1424,7 +1424,7 @@ function closeModal(id) { document.getElementById(id).classList.remove('show'); 
 function renderGroupOptions() {
   const sel = document.getElementById('holdingGroup');
   sel.innerHTML = '<option value="">그룹 없음</option>' +
-    groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+    groups.map(g=>`<option value="${g.id}">${maEsc(g.name)}</option>`).join('');
 }
 
 function openAddHolding() {
@@ -1590,7 +1590,7 @@ document.getElementById('holdingCodeInput').addEventListener('input', e => {
       <div class="nav-search-result" onclick="selectHoldingCode('${item.code}','${item.name.replace(/'/g,"\\'")}')">
         <div class="nav-search-info">
           <div class="nav-search-code">${item.code}</div>
-          <div class="nav-search-name">${item.name}</div>
+          <div class="nav-search-name">${maEsc(item.name)}</div>
         </div>
       </div>`).join('');
     drop.style.display = 'block';
@@ -1737,7 +1737,7 @@ function renderMonthDetail(month) {
   } else {
     rows.forEach(v => {
       html += `<div class="div-list-item"><span class="div-list-date" style="min-width:64px;">${v.dates.join(', ')}</span>` +
-        `<span class="div-list-name">${v.name}${v.proj ? '<span class="div-proj-badge">예측</span>' : ''}</span>` +
+        `<span class="div-list-name">${maEsc(v.name)}${v.proj ? '<span class="div-proj-badge">예측</span>' : ''}</span>` +
         `<span class="div-list-amt">${_fmtDivMoney(v.val)}</span></div>`;
     });
   }
@@ -1760,7 +1760,7 @@ function renderDrill(month) {
     html += '<div style="color:var(--text-muted);font-size:0.82rem;padding:6px 10px;">이 달은 배당이 없습니다.</div>';
   } else {
     rows.forEach(([code, v]) => {
-      html += `<div class="div-drill-item"><span>${v.name} ` +
+      html += `<div class="div-drill-item"><span>${maEsc(v.name)} ` +
         `<span style="color:var(--text-muted);font-size:0.72rem;">(${v.dates.join(', ')})</span></span>` +
         `<b>${_fmtDivMoney(v.val)}</b></div>`;
     });
@@ -1788,7 +1788,7 @@ function renderList(evs) {
     const months = [...g.months].sort((a, b) => a - b).map(m => m + '월').join('·');
     return `<div class="div-list-item">` +
       `<span class="div-list-date" style="width:auto;min-width:78px;">${months}</span>` +
-      `<span class="div-list-name">${g.name}${g.anyProj ? '<span class="div-proj-badge">예측</span>' : ''}</span>` +
+      `<span class="div-list-name">${maEsc(g.name)}${g.anyProj ? '<span class="div-proj-badge">예측</span>' : ''}</span>` +
       `<span class="div-list-amt">${_fmtDivMoney(g.val)}</span>` +
     `</div>`;
   }).join('');

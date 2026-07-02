@@ -446,7 +446,7 @@ function renderMonthDetail(month){
   } else {
     rows.forEach(v => {
       html += `<div class="div-list-item"><span class="div-list-date" style="min-width:64px;">${v.dates.join(', ')}</span>` +
-        `<span class="div-list-name">${v.name}${v.proj?'<span class="div-proj-badge">예측</span>':''}</span>` +
+        `<span class="div-list-name">${esc(v.name)}${v.proj?'<span class="div-proj-badge">예측</span>':''}</span>` +
         `<span class="div-list-amt">${_fmtDivMoney(v.val)}</span></div>`;
     });
   }
@@ -466,7 +466,7 @@ function renderList(evs){
   el.innerHTML = rows.map(g => {
     const months = [...g.months].sort((a,b)=>a-b).map(m=>m+'월').join('·');
     return `<div class="div-list-item"><span class="div-list-date" style="width:auto;min-width:78px;">${months}</span>` +
-      `<span class="div-list-name">${g.name}${g.anyProj?'<span class="div-proj-badge">예측</span>':''}</span>` +
+      `<span class="div-list-name">${esc(g.name)}${g.anyProj?'<span class="div-proj-badge">예측</span>':''}</span>` +
       `<span class="div-list-amt">${_fmtDivMoney(g.val)}</span></div>`;
   }).join('');
 }

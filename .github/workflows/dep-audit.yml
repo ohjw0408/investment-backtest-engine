@@ -1,0 +1,23 @@
+name: Dependency Audit (monthly)
+
+# 출시완성도 A-3: 의존성 취약점 월간 스캔. 실패 = 새 취약점 발견 → Actions 알림으로 확인.
+# 픽스 적용은 수동(patch/minor만, major는 결과불변 하니스 필수 — 출시완성도_개선_plan.md A-3).
+
+on:
+  schedule:
+    - cron: "0 2 1 * *"   # 매월 1일 02:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          # curl_cffi CVE-2026-33752 = 수용 리스크(yfinance 충돌, requirements.txt 주석) → 무시
+          pip-audit -r requirements.txt --desc off --ignore-vuln CVE-2026-33752

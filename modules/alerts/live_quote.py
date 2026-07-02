@@ -60,14 +60,14 @@ def _from_index_ohlc(loader, code: str):
     db_code = "USD/KRW" if code == "KRW=X" else code
     try:
         rows = conn.execute(
-            "SELECT date, close FROM index_ohlc WHERE code=? ORDER BY date DESC LIMIT 2",
+            "SELECT date, close FROM index_ohlc WHERE code=? AND close IS NOT NULL ORDER BY date DESC LIMIT 2",
             (code,)).fetchall()
     except Exception:
         rows = []
     if len(rows) < 2:
         try:
             rows = conn.execute(
-                "SELECT date, close FROM index_daily WHERE code=? ORDER BY date DESC LIMIT 2",
+                "SELECT date, close FROM index_daily WHERE code=? AND close IS NOT NULL ORDER BY date DESC LIMIT 2",
                 (db_code,)).fetchall()
         except Exception:
             return None

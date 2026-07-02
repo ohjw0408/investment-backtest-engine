@@ -1501,14 +1501,14 @@ def _wl_recent_closes(code):
             return [], "USD"
         try:  # index_ohlc 미존재(배포 직후 등) → index_daily 폴백
             rows = conn.execute(
-                "SELECT close FROM index_ohlc WHERE code=? ORDER BY date DESC LIMIT 25", (code,)
+                "SELECT close FROM index_ohlc WHERE code=? AND close IS NOT NULL ORDER BY date DESC LIMIT 25", (code,)
             ).fetchall()
         except Exception:
             rows = []
         if not rows:
             db_code = 'USD/KRW' if code == 'KRW=X' else code
             rows = conn.execute(
-                "SELECT close FROM index_daily WHERE code=? ORDER BY date DESC LIMIT 25", (db_code,)
+                "SELECT close FROM index_daily WHERE code=? AND close IS NOT NULL ORDER BY date DESC LIMIT 25", (db_code,)
             ).fetchall()
         currency = "KRW" if code in ('^KS11', 'KRW=X', 'KRX_GOLD') else "USD"
         if rows:

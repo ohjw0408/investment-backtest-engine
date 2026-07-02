@@ -62,6 +62,9 @@
 /* 위젯 그리드 */
 .market-item { border-right: 1px solid var(--ds-hairline); border-bottom: 1px solid var(--ds-hairline);
   padding: var(--sp-base) var(--sp-md); }
+/* D4(F-6 배치1): 다크에서 hairline 대비가 낮아 셀 구분선이 안 보임.
+   아이템이 인라인 style="...var(--border)..."로 그리므로 변수 자체를 그리드 스코프에서 상향. */
+html[data-theme="dark"] .market-grid { --border: #3a3f49; --ds-hairline: #3a3f49; }
 .market-item:hover { background: var(--ds-soft); }
 .market-name { font-size: var(--fs-sm); font-weight: 600; color: var(--ds-ink); }
 .market-value { font-family: var(--font-mono); font-size: 18px; font-weight: 500;
@@ -988,17 +991,21 @@ async function loadActions() {
   if (data.error || !(data.holdings || []).length) { _renderOnboard(); return; }
 
   const hide = data.hide_amounts !== false && !_homePeek;
+  // D5(F-6 배치1): 배당 API는 콜드 시 10초+ — 기다리지 않고 빠른 행부터 즉시 렌더,
+  // 배당 카드는 도착하면 맨 위에 삽입 ("불러오는 중" 장기 노출 제거).
   const rows = [];
-  try {
-    const dv = await (await fetch('/api/myassets/dividends', { cache: 'no-store' })).json();
-    const c = _divCard(dv, hide); if (c) rows.push(c);
-  } catch (e) { /* 배당 실패 무시 */ }
   const r = _rebalCard(data); if (r) rows.push(r);
   rows.push({ ic: ICON.target, cls: '', t: '은퇴까지 얼마나 왔을까?', s: '목표 정하고 시뮬레이션 돌려보기', href: '/retirement' });
 
   head.style.display = '';
   ladder.className = 'action-ladder';
   ladder.innerHTML = rows.map(_actionRowHtml).join('');
+
+  try {
+    const dv = await (await fetch('/api/myassets/dividends', { cache: 'no-store' })).json();
+    const c = _divCard(dv, hide);
+    if (c) { rows.unshift(c); ladder.innerHTML = rows.map(_actionRowHtml).join(''); }
+  } catch (e) { /* 배당 실패 무시 — 이미 렌더된 행 유지 */ }
 }
 
 // ── 홈 위젯 (시장지수 / 관심목록) ──

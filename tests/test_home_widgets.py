@@ -101,6 +101,33 @@ try:
     ).fetchall()
     ok("지수 fallback → closes 반환", closes == [100.0, 105.0] and currency == "KRW")
     ok("지수 fallback → index_ohlc upsert", saved == [("2026-06-26", 100.0), ("2026-06-29", 105.0)])
+
+    # ── 4b. NULL close 봉이 있어도 위젯이 죽지 않는다 (BUG-KOSPI-NIGHT-NULL 2026-07-03) ──
+    # US장 시간 beat가 마감된 KR지수 당일행을 NaN(=sqlite NULL)으로 upsert하던 오염 시나리오.
+    tmp_idx.execute("INSERT INTO index_ohlc (code, date, open, high, low, close, volume) "
+                    "VALUES ('^KS11', '2026-06-30', NULL, NULL, NULL, NULL, 0)")
+    tmp_idx.commit()
+    closes2, _ = appmod._wl_recent_closes("^KS11")
+    ok("NULL 봉 스킵 — 직전 유효 종가 반환", closes2 == [100.0, 105.0])
+
+    # 쓰기 가드: refresh용 NaN Close 행은 저장 자체가 안 된다
+    import math
+    def fake_yf_nan(code, period=None, progress=False, auto_adjust=False, threads=False, **kw):
+        return pd.DataFrame(
+            {"Open": [104.0, float("nan")], "High": [106.0, float("nan")],
+             "Low": [103.0, float("nan")], "Close": [105.0, float("nan")],
+             "Volume": [20.0, float("nan")]},
+            index=pd.to_datetime(["2026-06-29", "2026-07-01"]))
+    import modules.price_loader as plmod
+    old_dl = plmod.yf.download
+    plmod.yf.download = fake_yf_nan
+    try:
+        appmod.portfolio_engine.loader.refresh_index_ohlc(codes=["^KS11"])
+        nulls = tmp_idx.execute(
+            "SELECT COUNT(*) FROM index_ohlc WHERE code='^KS11' AND date='2026-07-01'").fetchone()[0]
+        ok("쓰기 가드 — NaN 당일봉 미저장", nulls == 0)
+    finally:
+        plmod.yf.download = old_dl
 finally:
     yf.download = old_yf_download
     appmod.portfolio_engine.loader.index_conn = old_idx_conn

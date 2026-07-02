@@ -484,7 +484,7 @@ a { text-decoration: none; color: inherit; }
 .widget-tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
 .widget-carousel { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .widget-carousel::-webkit-scrollbar { display: none; }
-.widget-slide { flex: 0 0 100%; scroll-snap-align: start; }
+.widget-slide { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; } /* 모멘텀이 여러 장 건너뛰지 않게 (오너 2026-07-03) */
 .widget-dots { display: none; justify-content: center; gap: 6px; padding: 9px; }
 .wdot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background 0.2s; }
 .wdot.active { background: var(--blue); }

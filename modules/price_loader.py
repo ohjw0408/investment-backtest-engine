@@ -781,9 +781,18 @@ class PriceLoader:
                 rows = []
                 for _, r in raw.iterrows():
                     d = r["Date"].strftime("%Y-%m-%d") if hasattr(r["Date"], "strftime") else str(r["Date"])[:10]
+                    # NaN 가드: float(NaN)은 예외 없이 통과해 sqlite NULL로 저장됨 —
+                    # US장 시간(한국 밤) beat가 마감된 KR지수 당일행(NaN)을 upsert해
+                    # 코스피 위젯 "데이터 없음" 유발 (BUG-KOSPI-NIGHT-NULL 2026-07-03).
+                    if pd.isna(r["Close"]):
+                        continue
                     try:
-                        rows.append((code, d, float(r["Open"]), float(r["High"]),
-                                     float(r["Low"]), float(r["Close"]),
+                        _c = float(r["Close"])
+                        rows.append((code, d,
+                                     float(r["Open"]) if pd.notna(r["Open"]) else _c,
+                                     float(r["High"]) if pd.notna(r["High"]) else _c,
+                                     float(r["Low"]) if pd.notna(r["Low"]) else _c,
+                                     _c,
                                      float(r["Volume"]) if pd.notna(r["Volume"]) else 0.0))
                     except (ValueError, TypeError):
                         continue
@@ -1017,7 +1026,7 @@ class PriceLoader:
                 pass
             ohlc_rows = self.index_conn.execute(
                 "SELECT date, open, high, low, close, volume FROM index_ohlc "
-                "WHERE code=? ORDER BY date", (code,)
+                "WHERE code=? AND close IS NOT NULL ORDER BY date", (code,)
             ).fetchall()
             if not ohlc_rows and code in _CANDLE_INDEX:
                 # 지연 백필: 최초 1회 전체 OHLCV 적재(이후 위 gap-fill이 최신 유지)
@@ -1031,6 +1040,8 @@ class PriceLoader:
                         seed = []
                         for _, r in raw.iterrows():
                             dd = r["Date"].strftime("%Y-%m-%d") if hasattr(r["Date"], "strftime") else str(r["Date"])[:10]
+                            if pd.isna(r["Close"]):  # NaN=sqlite NULL 오염 방지 (BUG-KOSPI-NIGHT-NULL)
+                                continue
                             try:
                                 seed.append((code, dd, float(r["Open"]), float(r["High"]),
                                              float(r["Low"]), float(r["Close"]),
@@ -1045,7 +1056,7 @@ class PriceLoader:
                             self.index_conn.commit()
                             ohlc_rows = self.index_conn.execute(
                                 "SELECT date, open, high, low, close, volume FROM index_ohlc "
-                                "WHERE code=? ORDER BY date", (code,)
+                                "WHERE code=? AND close IS NOT NULL ORDER BY date", (code,)
                             ).fetchall()
                 except Exception:
                     pass

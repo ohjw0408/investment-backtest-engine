@@ -5,7 +5,8 @@
   let detailChart = null, cmpChart = null, custChart = null;
   const PALETTE = ['#1976D2', '#E65100', '#2E7D32', '#7B1FA2', '#C2185B', '#00838F'];
   let custom = [];          // [{key,label,color}]
-  let custStart = null, custEnd = null, custViewMode = 'raw';  // 구간·표시모드 (기본=원값 개별축)
+  let custStart = null, custEnd = null, custViewMode = 'norm';  // 구간·표시모드 (기본=최근10년·시작100 정규화)
+  let custOwner = 'custom';  // 'cmp'|'custom' — 공용 custom 상태 소유 뷰(전환 시 누수 방지)
   let custRaw = {};         // 최근 fetch 원본 {key:series}
   let activePreset = 0;
   // 큐레이션 예시: 종목·지수·거시지표를 섞어 "겹쳐보기"가 뭔지 한눈에
@@ -83,24 +84,33 @@
   // ── 한·미 비교(고정 쌍) ──
   function renderCompare() {
     const pairs = DATA.compare_pairs;
-    $('mcBody').innerHTML = `<div class="mc-cmp-pairs" id="mcCmpPairs">` +
-      pairs.map((p, i) => `<button data-i="${i}" class="${i === 0 ? 'on' : ''}">${p.label}</button>`).join('') +
-      `</div><div class="mc-cmp-card"><div class="mc-cmp-mode" id="mcCmpMode"></div>
-       <div class="mc-chart-wrap"><canvas id="mcCmpChart"></canvas></div></div>`;
+    // 겹쳐보기 머신 재활용 — 한 쌍 클릭 시 custom=[us,kr]로 로드. 컨트롤(구간·정규화)·차트 공용.
+    $('mcBody').innerHTML = `
+      <div class="mc-cust-hero">
+        <h3>🆚 한·미 지표 비교</h3>
+        <p>미국·한국 같은 지표를 한 차트에 겹쳐 봅니다. 기본 <b>최근 10년·시작=100 정규화</b>. 아래에서 지표를 고르고 구간·표시를 바꿀 수 있어요.</p>
+        <div class="mc-presets" id="mcCmpPairs">${pairs.map((p, i) => `<button class="mc-preset ${i === 0 ? 'on' : ''}" data-i="${i}">${p.label}</button>`).join('')}</div>
+      </div>
+      <div class="mc-cust-ctrl" id="mcCustCtrl"></div>
+      <div class="mc-cmp-card"><div class="mc-chart-wrap"><canvas id="mcCustChart"></canvas></div></div>`;
     $('mcCmpPairs').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
       $('mcCmpPairs').querySelectorAll('button').forEach(x => x.classList.remove('on'));
-      b.classList.add('on'); loadCompare(pairs[+b.dataset.i]);
+      b.classList.add('on'); loadCmpPair(pairs[+b.dataset.i]);
     }));
-    if (pairs.length) loadCompare(pairs[0]);
+    if (pairs.length) loadCmpPair(pairs[0]);
   }
-  async function loadCompare(pair) {
-    $('mcCmpMode').textContent = '불러오는 중…';
-    const d = await (await fetch(`/api/macro/compare?us=${pair.us}&kr=${pair.kr}`)).json();
-    if (d.error) { $('mcCmpMode').textContent = '데이터 없음'; return; }
-    $('mcCmpMode').textContent = d.mode === 'raw' ? `같은 단위(${d.unit}) — 원값 직접 비교` : `단위가 달라 시작점=100으로 정규화 — 추세 비교`;
-    cmpChart = drawLine('mcCmpChart', cmpChart, [
-      lineDS(`🇺🇸 ${d.a.name_ko}`, d.a.points, '#1976D2'),
-      lineDS(`🇰🇷 ${d.b.name_ko}`, d.b.points, '#E65100')], d.unit);
+  function _macroName(code) {
+    for (const c of DATA.categories) for (const s of c.series) if (s.code === code) return s.name_ko;
+    return code;
+  }
+  function loadCmpPair(pair) {
+    custom = [
+      { key: pair.us, label: `🇺🇸 ${_macroName(pair.us)}`, color: PALETTE[0] },
+      { key: pair.kr, label: `🇰🇷 ${_macroName(pair.kr)}`, color: PALETTE[1] },
+    ];
+    custStart = custEnd = null; custViewMode = 'norm';   // 기본 = 최근10년·정규화
+    custOwner = 'cmp';
+    loadCustomChart();
   }
 
   // ── 커스텀 겹쳐보기 ──
@@ -124,14 +134,17 @@
     inp.addEventListener('focus', () => { if (inp.value.trim()) custSearch(inp.value); });
     document.addEventListener('click', (e) => { if (!dd.contains(e.target) && e.target !== inp) dd.classList.remove('open'); });
     $('mcPresets').querySelectorAll('button').forEach(b => b.addEventListener('click', () => loadPreset(+b.dataset.i)));
-    if (!custom.length) loadPreset(activePreset);   // 기본 = 첫 예시
+    // CMP 뷰가 쓰던 custom이 남아있으면 초기화(전환 누수 방지)
+    if (custOwner !== 'custom') { custom = []; custOwner = 'custom'; }
+    if (!custom.length) loadPreset(activePreset < 0 ? 0 : activePreset);   // 기본 = 예시
     else { renderChips(); loadCustomChart(); }
   }
 
   function loadPreset(i) {
     activePreset = i;
     custom = PRESETS[i].items.map(([key, label], idx) => ({ key, label, color: PALETTE[idx % PALETTE.length] }));
-    custStart = custEnd = null; custViewMode = 'raw';
+    custStart = custEnd = null; custViewMode = 'norm';   // 기본 = 최근10년·정규화
+    custOwner = 'custom';
     const ps = $('mcPresets');
     if (ps) ps.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.i === i));
     renderChips(); loadCustomChart();
@@ -180,13 +193,22 @@
     const ctrl = $('mcCustCtrl');
     if (!ctrl) return;
     if (!custom.length) { ctrl.innerHTML = ''; return; }
+    // 현재 구간이 몇 년 프리셋에 해당하는지 — 활성 하이라이트
+    let activeY = null;
+    if (custStart && custEnd) {
+      const yr = (new Date(custEnd) - new Date(custStart)) / (365.25 * 864e5);
+      const mins = Object.values(custRaw).map(s => s.points[0]?.[0]).filter(Boolean).sort();
+      const common = mins.length ? mins.at(-1) : null;
+      if (common && custStart <= common) activeY = 0;
+      else activeY = [1, 5, 10].find(y => Math.abs(yr - y) < 0.3) ?? null;
+    }
+    const qr = (y, t) => `<button class="qr${activeY === y ? ' on' : ''}" data-y="${y}">${t}</button>`;
     ctrl.innerHTML = `
       <span class="grp">📅 구간:
         <input type="date" id="mcStart" value="${custStart || ''}">
         ~ <input type="date" id="mcEnd" value="${custEnd || ''}"></span>
       <span class="grp">
-        <button class="qr" data-y="1">1년</button><button class="qr" data-y="5">5년</button>
-        <button class="qr" data-y="10">10년</button><button class="qr" data-y="0">전체</button></span>
+        ${qr(1, '1년')}${qr(5, '5년')}${qr(10, '10년')}${qr(0, '전체')}</span>
       <span class="grp">표시:
         <label><input type="radio" name="cmode" value="norm" ${custViewMode === 'norm' ? 'checked' : ''}> 정규화(시작=100)</label>
         <label><input type="radio" name="cmode" value="raw" ${custViewMode === 'raw' ? 'checked' : ''}> 원값(개별 축)</label></span>`;
@@ -213,14 +235,19 @@
     const keys = custom.map(c => c.key).join(',');
     const d = await (await fetch(`/api/macro/multi?keys=${encodeURIComponent(keys)}`)).json();
     custRaw = {}; (d.series || []).forEach(s => custRaw[s.key] = s);
-    // 기본 구간: 공통 시작(가장 늦은 시작일) ~ 최신
-    if (!custStart) {
-      const mins = Object.values(custRaw).map(s => s.points[0]?.[0]).filter(Boolean).sort();
-      custStart = mins.length ? mins.at(-1) : null;
-    }
+    // 기본 구간 = 최근 10년 (모바일 좁은 폭에 50년 우겨넣어 짜부되던 문제). 공통시작보다 이르면 공통시작.
     if (!custEnd) {
       const maxs = Object.values(custRaw).map(s => s.points.at(-1)?.[0]).filter(Boolean).sort();
       custEnd = maxs.length ? maxs.at(-1) : null;
+    }
+    if (!custStart) {
+      const mins = Object.values(custRaw).map(s => s.points[0]?.[0]).filter(Boolean).sort();
+      const common = mins.length ? mins.at(-1) : null;   // 공통 시작(가장 늦은 시작일)
+      if (custEnd) {
+        const d10 = new Date(custEnd); d10.setFullYear(d10.getFullYear() - 10);
+        const tenYr = d10.toISOString().slice(0, 10);
+        custStart = (common && tenYr < common) ? common : tenYr;
+      } else custStart = common;
     }
     renderCustCtrl();
     drawCustom();

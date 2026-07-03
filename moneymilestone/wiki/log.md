@@ -4517,3 +4517,9 @@ _작성: Claude_
 검증 = 모바일 390 라이트/다크 실클릭 22항목 PASS·jsErr 0. 다음 = F-6 배치3(계산기/백테).
 
 _작성: Claude_
+
+## 2026-07-03 — 배당 "과거 달 예측" 해소 (저장 갭 self-heal + 예측은 미래만)
+
+오너 제보 2차: 지나간 4월이 예측색. 원인 = corporate_actions 저장 갭(dividend=0 선점행 + INSERT OR IGNORE → 영구 갭) + 과거 달도 예측으로 채우는 로직. 수정 = 갭 감지 시 yfinance 재페치 **조건부 UPSERT**(0/NULL만 갱신) + 예측 채움 이번 달 이후 한정. 상세=[[dev/bugs]]. B-3(IGNORE 정책 감사)에 corporate_actions 케이스 추가 근거 확보.
+
+_작성: Claude_

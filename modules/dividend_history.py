@@ -55,6 +55,37 @@ def _load_names(codes):
     return names
 
 
+_gap_refetched = {}   # code -> date — 갭 재페치는 프로세스당 하루 1회
+
+
+def _refetch_gap_dividends(conn, code, is_kr, rows, cur_year, base_year, today):
+    """올해 지나간 달의 배당 저장 갭 감지 시 yfinance 재페치. 재페치 수행 여부 반환."""
+    cur_months  = {int(d[5:7]) for d, _ in rows if d[:4] == str(cur_year)}
+    base_months = {int(d[5:7]) for d, _ in rows if d[:4] == str(base_year)}
+    gap = any(m in base_months and m not in cur_months for m in range(1, today.month))
+    if not gap or _gap_refetched.get(code) == today.date():
+        return False
+    _gap_refetched[code] = today.date()
+    try:
+        import yfinance as yf
+        div = yf.Ticker(f"{code}.KS" if is_kr else code).dividends
+        if div is None or div.empty:
+            return False
+        new_rows = [(code, d.strftime("%Y-%m-%d"), float(v), 1.0)
+                    for d, v in div.items() if float(v) > 0]
+        # 가격 페치가 전 거래일에 dividend=0 행을 미리 깔아두므로(스플릿 기록 겸용)
+        # INSERT OR IGNORE로는 갭이 영영 안 메워짐 → 0/NULL 행만 실배당값으로 갱신.
+        conn.executemany(
+            "INSERT INTO corporate_actions (code, date, dividend, split) VALUES (?,?,?,?) "
+            "ON CONFLICT(code, date) DO UPDATE SET dividend=excluded.dividend "
+            "WHERE corporate_actions.dividend IS NULL OR corporate_actions.dividend<=0",
+            new_rows)
+        conn.commit()
+        return True
+    except Exception:
+        return False
+
+
 def build_dividend_chart(loader, holdings):
     today      = datetime.today()
     cur_year   = today.year
@@ -113,6 +144,16 @@ def build_dividend_chart(loader, holdings):
         if not rows:
             continue
 
+        # 올해 '지나간 달' 배당 갭 self-heal — 작년엔 지급된 달인데 올해 그 달 행이 없으면
+        # 저장 갭(INSERT OR IGNORE라 자연 복구 안 됨. 예: TLT 2026-04 누락)으로 보고
+        # yfinance 배당 이력을 재페치해 없던 행만 추가한다. 종목당 하루 1회.
+        if _refetch_gap_dividends(conn, code, is_kr, rows, cur_year, base_year, today):
+            rows = conn.execute(
+                "SELECT date, dividend FROM corporate_actions "
+                "WHERE code=? AND dividend>0 AND date>=? ORDER BY date",
+                (code, f"{min_year}-01-01")
+            ).fetchall()
+
         per_year_dps = {}
         for d, dps in rows:
             per_year_dps[int(d[:4])] = per_year_dps.get(int(d[:4]), 0.0) + float(dps)
@@ -134,10 +175,11 @@ def build_dividend_chart(loader, holdings):
             if y == base_year:
                 base_events.append((m, day, float(dps)))
 
-        # 현재연도 예측 부분 — 실데이터 없는 달(corporate_actions 미반영분 포함)을
-        # 작년 같은 달 배당 × (1+cagr)로 채운다. 실데이터 있는 달은 건너뜀.
+        # 현재연도 예측 부분 — 실데이터 없는 달을 작년 같은 달 배당 × (1+cagr)로 채운다.
+        # 단 **이번 달 이후만**: 이미 지나간 달을 '예측'으로 표시하는 건 무의미하고
+        # (오너 제보 2026-07-03), 지나간 달의 진짜 갭은 위 재페치가 실데이터로 채운다.
         for m, day, dps in base_events:
-            if m not in real_months_cur:
+            if m not in real_months_cur and m >= today.month:
                 pdate = f"{cur_year}-{m:02d}-{day:02d}"
                 events[cur_year].append(
                     _event(pdate, m, day, code, dps * qty * (1 + cagr), is_kr, cur_fx, div_tax, True))

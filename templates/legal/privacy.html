@@ -1,50 +1,83 @@
 {% extends "base.html" %}
 {% block title %}개인정보처리방침 — Money Milestone{% endblock %}
 {% block content %}
-<div style="grid-column:1 / -1;max-width:760px;margin:0 auto;padding:28px 20px 64px;line-height:1.75;color:var(--ds-ink);">
+<div style="grid-column:1 / -1;max-width:820px;margin:0 auto;padding:28px 20px 64px;line-height:1.75;color:var(--ds-ink);">
   <h1 style="font-size:1.5rem;font-weight:800;margin:0 0 6px;">개인정보처리방침</h1>
-  <p style="font-size:0.82rem;color:var(--ds-muted);margin:0 0 24px;">최종 개정일: 2026-06-21</p>
+  <p style="font-size:0.82rem;color:var(--ds-muted);margin:0 0 24px;">최종 개정일: 2026-07-04</p>
 
-  <p>Money Milestone(이하 "서비스")은 「개인정보 보호법」에 따라 이용자의 개인정보를 보호하며, 아래와
-  같이 처리방침을 둡니다.</p>
+  <p>Money Milestone(이하 "서비스")은 「개인정보 보호법」 등 관련 법령에 따라 이용자의 개인정보를
+  보호하기 위해 다음과 같이 개인정보처리방침을 공개합니다.</p>
 
-  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">1. 수집하는 개인정보 항목</h2>
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">1. 개인정보처리자</h2>
+  <p>서비스명: Money Milestone<br>개인정보 보호책임자: 오준원<br>문의: moneymilestone@naver.com</p>
+
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">2. 처리하는 개인정보 항목</h2>
   <ul style="padding-left:20px;">
-    <li><strong>계정 정보</strong>(Google 로그인): 구글 고유 식별자, 이메일, 이름, 프로필 사진</li>
-    <li><strong>자산 정보</strong>: 보유 종목 코드·수량·평균단가·수동입력가격·계좌유형·자산 그룹</li>
-    <li><strong>저장 데이터</strong>: 저장한 포트폴리오, 세금 설정, 화면(위젯·캘린더) 설정, 가격 알림 규칙</li>
-    <li><strong>알림 정보</strong>: 푸시 알림 수신에 동의한 경우 기기 푸시 토큰</li>
-    <li><strong>접속 기록</strong>: 가입일시, 최근 로그인일시</li>
+    <li><strong>계정 정보</strong>: Google 고유 식별자, 이메일 주소, 이름, 프로필 사진, 가입일시, 최근 로그인일시, 약관·개인정보처리방침 동의일시</li>
+    <li><strong>사용자 입력 자산 정보</strong>: 보유 종목 코드, 수량, 평균단가, 수동입력가격, 매수일, 계좌유형, 자산 그룹</li>
+    <li><strong>저장·설정 정보</strong>: 저장한 포트폴리오, 세금 설정, 홈 위젯 설정, 캘린더 설정, 가격·리밸런싱·캘린더 알림 규칙과 알림 이력</li>
+    <li><strong>선택 알림 정보</strong>: 푸시 알림 수신에 동의한 경우 기기 푸시 토큰, 플랫폼 정보, 푸시 동의·철회일시</li>
+    <li><strong>자동 생성 정보</strong>: 세션 쿠키, 접속 IP, User-Agent, 요청 일시, 비정상 이용 방지 및 오류 확인을 위한 서버 로그·레이트리밋 기록</li>
+  </ul>
+  <p>서비스는 증권사 계정 비밀번호, 주민등록번호, 신용카드번호, 결제정보, 생체인식정보를 수집하지 않습니다.</p>
+
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">3. 개인정보의 처리 목적</h2>
+  <ul style="padding-left:20px;">
+    <li>Google 로그인 기반 이용자 식별 및 세션 유지</li>
+    <li>포트폴리오 저장, 자산 현황 조회, 리밸런싱 계산, 백테스트·은퇴·배당 등 시뮬레이션 제공</li>
+    <li>사용자 설정 저장, 가격·리밸런싱·경제 캘린더 알림 제공</li>
+    <li>회원 탈퇴, 문의 대응, 서비스 보안, 장애 대응, 남용 방지</li>
   </ul>
 
-  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">2. 수집 · 이용 목적</h2>
-  <p>로그인 식별 및 인증, 포트폴리오 분석·시뮬레이션 제공, 사용자 맞춤 화면 구성, 알림 발송.</p>
-
-  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">3. 보유 · 이용 기간</h2>
-  <p>회원 탈퇴 시까지 보유하며, <strong>탈퇴 시 지체 없이 파기</strong>합니다(관계 법령상 별도 보존
-  의무가 있는 경우 그 기간 동안 분리 보관).</p>
-
-  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">4. 제3자 제공 및 처리위탁</h2>
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">4. 보유 및 이용 기간</h2>
   <ul style="padding-left:20px;">
-    <li><strong>Google</strong>: 로그인(OAuth) 인증 및 Firebase Cloud Messaging을 통한 푸시 알림 발송.
-    이용자가 동의한 범위의 계정 정보와 알림 발송에 필요한 기기 토큰만 처리.</li>
-    <li>시세·거시지표 등 외부 데이터(예: 데이터 제공처) 조회 시 <strong>이용자의 개인정보는 전송되지
-    않습니다.</strong></li>
+    <li>계정·자산·저장·설정 정보: 회원 탈퇴 시까지</li>
+    <li>푸시 토큰: 푸시 알림 동의 철회, 로그아웃 시 토큰 해제, 또는 회원 탈퇴 시까지</li>
+    <li>보안·장애 대응 로그: 서비스 운영 및 보안 목적에 필요한 기간 동안 보관 후 삭제</li>
+    <li>장애복구용 백업: 서버 백업은 최대 35일, 운영자 PC 오프박스 백업은 최대 90일 보관 후 순차 삭제됩니다. 백업은 장애복구 목적 외에는 사용하지 않으며, 복구 시 탈퇴·삭제 요청 내역을 반영합니다.</li>
   </ul>
 
-  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">5. 이용자의 권리</h2>
-  <p>이용자는 자신의 개인정보에 대해 열람·정정·삭제·처리정지를 요구할 수 있으며, 서비스 내
-  <strong>회원 탈퇴</strong>(설정 화면)를 통해 동의를 철회하고 모든 데이터를 삭제할 수 있습니다.</p>
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">5. 제3자 제공, 처리위탁 및 국외 처리</h2>
+  <p>서비스는 이용자의 개인정보를 판매하지 않습니다. 서비스 제공에 필요한 범위에서 다음 외부 서비스를 이용할 수 있습니다.</p>
+  <ul style="padding-left:20px;">
+    <li><strong>Google OAuth</strong>: Google 계정 로그인 인증. 이용자가 Google에서 동의한 계정 정보만 수신합니다.</li>
+    <li><strong>Firebase Cloud Messaging</strong>: 이용자가 푸시 알림에 동의한 경우 기기 토큰을 이용해 서비스 알림을 발송합니다.</li>
+    <li><strong>Hetzner Online GmbH</strong>: 서비스 서버 호스팅 및 데이터베이스 운영 인프라.</li>
+    <li><strong>Sentry</strong>: 장애 분석용 오류 모니터링. 설정된 경우에만 사용하며, 기본 개인정보 전송은 비활성화합니다.</li>
+  </ul>
+  <p>Google, Firebase, Hetzner, Sentry 등 국외 사업자의 인프라를 이용하는 과정에서 개인정보가 국외에서
+  처리될 수 있습니다. 주요 국외 처리 내용은 다음과 같습니다.</p>
+  <ul style="padding-left:20px;">
+    <li>Google/Firebase: 미국 등 Google 인프라 소재 국가, 로그인 계정 정보와 푸시 토큰, 로그인·알림 제공 목적, 서비스 이용 기간 또는 동의 철회 시까지</li>
+    <li>Hetzner Online GmbH: 독일·핀란드 등 서버 소재 국가, 계정·자산·저장·설정 정보, 서비스 호스팅과 데이터베이스 운영 목적, 회원 탈퇴 또는 백업 보유 기간 만료 시까지</li>
+    <li>Sentry: 미국·유럽 등 Sentry 인프라 소재 국가, 오류 발생 시 기술 정보, 장애 분석 목적, 설정된 보관 기간까지</li>
+  </ul>
+  <p>국외 처리되는 항목은 서비스 제공에 필요한 최소 범위이며, 각 사업자의 보안 정책과 계약·정책에 따라 보호됩니다.</p>
+  <p>시세, 거시지표, 종목 정보 등 외부 데이터 제공처 조회에는 이용자의 계정 정보나 보유자산 정보가
+  전송되지 않습니다.</p>
 
-  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">6. 파기 절차 및 방법</h2>
-  <p>탈퇴 요청 시 데이터베이스에서 해당 이용자의 모든 레코드를 삭제합니다.</p>
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">6. 개인정보의 파기</h2>
+  <p>회원 탈퇴 또는 삭제 요청 시 운영 데이터베이스에서 해당 이용자의 계정, 보유자산, 저장 포트폴리오,
+  설정, 알림 규칙, 알림 이력, 푸시 토큰을 삭제합니다. 장애복구용 백업에 남은 정보는 위 보유 기간 내
+  순차적으로 삭제되며, 일반 서비스 조회에는 사용하지 않습니다.</p>
 
-  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">7. 안전성 확보 조치</h2>
-  <p>전송 구간 암호화(HTTPS), 접근 통제, 인증 기반 접근만 허용.</p>
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">7. 이용자의 권리와 행사 방법</h2>
+  <p>이용자는 개인정보의 열람, 정정, 삭제, 처리정지, 동의 철회를 요청할 수 있습니다. 서비스 내
+  설정 화면의 회원 탈퇴 기능으로 계정과 저장 데이터를 삭제할 수 있으며, 추가 요청은
+  moneymilestone@naver.com으로 접수할 수 있습니다.</p>
 
-  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">8. 개인정보 보호책임자</h2>
-  <p>개인정보 보호책임자: 오준원<br>문의: moneymilestone@naver.com</p>
-  <p style="margin-top:8px;font-size:0.78rem;color:var(--ds-muted);">
-    개인정보 열람·정정·삭제·처리정지 및 기타 문의는 위 이메일로 접수해주세요.</p>
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">8. 안전성 확보 조치</h2>
+  <p>서비스는 HTTPS 전송 암호화, 인증 기반 접근 통제, 세션 쿠키의 HttpOnly·SameSite 설정, 보안 헤더,
+  요청 제한, 운영 DB 백업과 복구 점검 등 개인정보 보호를 위한 기술적·관리적 조치를 적용합니다.</p>
+
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">9. 아동의 개인정보</h2>
+  <p>서비스는 만 14세 미만 아동을 대상으로 하지 않으며, 만 14세 미만 아동의 개인정보를 고의로 수집하지 않습니다.</p>
+
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">10. 자동화된 결정</h2>
+  <p>서비스의 계산·시뮬레이션 결과는 이용자가 입력한 조건과 과거 데이터에 따른 정보 제공용 결과이며,
+  이용자에게 법적 또는 중대한 영향을 미치는 자동화된 의사결정을 수행하지 않습니다.</p>
+
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">11. 처리방침 변경</h2>
+  <p>개인정보처리방침이 변경되는 경우 서비스 화면 또는 본 페이지를 통해 고지합니다.</p>
 </div>
 {% endblock %}

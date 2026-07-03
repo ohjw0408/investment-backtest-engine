@@ -9,6 +9,7 @@ const DEFAULT_BENCH = [
 let rrPortfolios = [];          // /api/portfolio/list
 let rrSelected = new Set();     // 선택된 포폴 id
 let rrSelectedOrder = [];       // compare order for selected portfolio ids
+let rrDragPfId = null;
 let rrBench = DEFAULT_BENCH.slice();
 let rrSearchTimer = null;
 let rrItems = [];               // 결과 items
@@ -40,20 +41,29 @@ function rrRenderPfList(){
     return;
   }
   const byId = new Map(rrPortfolios.map(p => [p.id, p]));
-  const ordered = rrSelectedOrder.map(id => byId.get(id)).filter(Boolean);
-  const pfRows = ordered.concat(rrPortfolios.filter(p => !rrSelected.has(p.id)));
-  el.innerHTML = pfRows.map(p => {
-    const on = rrSelected.has(p.id);
-    const orderIdx = rrSelectedOrder.indexOf(p.id);
-    const orderBtns = on ? `<span class="rr-pf-order">
-        <button type="button" class="${orderIdx<=0?'off':''}" aria-disabled="${orderIdx<=0?'true':'false'}" onclick="event.preventDefault();event.stopPropagation();rrMovePf(${p.id},-1)" title="위로">&uarr;</button>
-        <button type="button" class="${orderIdx>=rrSelectedOrder.length-1?'off':''}" aria-disabled="${orderIdx>=rrSelectedOrder.length-1?'true':'false'}" onclick="event.preventDefault();event.stopPropagation();rrMovePf(${p.id},1)" title="아래로">&darr;</button>
-      </span>` : '';
-    return `<label class="rr-pf-chk${on?' on':''}">
-      <input type="checkbox" ${on?'checked':''} onchange="rrTogglePf(${p.id}, this.checked)">
-      ${esc(p.name)} <span style="color:var(--text-muted);">(${p.tickers.length})</span>${orderBtns}
-    </label>`;
-  }).join('');
+  const ordered = rrSelectedOrder.map(id => byId.get(id)).filter(p => p && rrSelected.has(p.id));
+  const unselected = rrPortfolios.filter(p => !rrSelected.has(p.id));
+  const selectedHtml = ordered.length ? `
+    <div class="rr-pf-selected">
+      ${ordered.map((p, i) => `<div class="rr-pf-row" draggable="true"
+          ondragstart="rrPfDragStart(event, ${p.id})"
+          ondragover="rrPfDragOver(event, ${p.id})"
+          ondrop="rrPfDrop(event, ${p.id})"
+          ondragend="rrPfDragEnd()">
+        <span class="rr-pf-rank">${i + 1}</span>
+        <span class="rr-pf-drag" aria-hidden="true">::</span>
+        <input type="checkbox" checked onchange="rrTogglePf(${p.id}, this.checked)">
+        <span class="rr-pf-name">${esc(p.name)}</span>
+        <span class="rr-pf-count">${p.tickers.length}</span>
+      </div>`).join('')}
+    </div>` : '<div class="rr-pf-empty">선택된 포트폴리오가 없습니다.</div>';
+  const availableHtml = unselected.length ? `<div class="rr-pf-available">
+    ${unselected.map(p => `<label class="rr-pf-chk">
+      <input type="checkbox" onchange="rrTogglePf(${p.id}, this.checked)">
+      ${esc(p.name)} <span style="color:var(--text-muted);">(${p.tickers.length})</span>
+    </label>`).join('')}
+  </div>` : '';
+  el.innerHTML = selectedHtml + availableHtml;
 }
 function rrTogglePf(id, on){
   if (on) {
@@ -65,12 +75,33 @@ function rrTogglePf(id, on){
   }
   rrRenderPfList();
 }
-function rrMovePf(id, dir){
-  const i = rrSelectedOrder.indexOf(id);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= rrSelectedOrder.length) return;
-  [rrSelectedOrder[i], rrSelectedOrder[j]] = [rrSelectedOrder[j], rrSelectedOrder[i]];
+function rrPfDragStart(e, id){
+  rrDragPfId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(id));
+  e.currentTarget.classList.add('dragging');
+}
+function rrPfDragOver(e, id){
+  if (rrDragPfId == null || rrDragPfId === id) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.rr-pf-row.over').forEach(row => row.classList.remove('over'));
+  e.currentTarget.classList.add('over');
+}
+function rrPfDrop(e, id){
+  e.preventDefault();
+  const dragged = rrDragPfId == null ? Number(e.dataTransfer.getData('text/plain')) : rrDragPfId;
+  const from = rrSelectedOrder.indexOf(dragged);
+  const to = rrSelectedOrder.indexOf(id);
+  if (from < 0 || to < 0 || from === to) { rrPfDragEnd(); return; }
+  const [moved] = rrSelectedOrder.splice(from, 1);
+  rrSelectedOrder.splice(to, 0, moved);
+  rrPfDragEnd();
   rrRenderPfList();
+}
+function rrPfDragEnd(){
+  rrDragPfId = null;
+  document.querySelectorAll('.rr-pf-row.dragging,.rr-pf-row.over').forEach(row => row.classList.remove('dragging','over'));
 }
 
 // ── 벤치마크 칩 ──

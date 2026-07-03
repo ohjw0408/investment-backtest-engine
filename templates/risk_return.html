@@ -12,14 +12,20 @@
 .rr-card-title { font-size: 0.88rem; font-weight: 700; margin-bottom: 10px; }
 
 /* 포트폴리오 선택 */
-.rr-pf-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.rr-pf-list { display: block; }
+.rr-pf-selected { display: grid; gap: 7px; }
+.rr-pf-row { display: grid; grid-template-columns: 30px 24px 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 42px; padding: 8px 11px; border: 1.5px solid var(--blue); border-radius: 9px; background: rgba(25,118,210,0.08); cursor: grab; user-select: none; }
+.rr-pf-row.dragging { opacity: 0.48; cursor: grabbing; }
+.rr-pf-row.over { border-color: var(--green, #2E7D32); background: rgba(46,125,50,0.10); }
+.rr-pf-rank { color: var(--blue); font-size: 0.78rem; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.rr-pf-drag { color: var(--text-muted); font-size: 0.8rem; letter-spacing: 0; }
+.rr-pf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.84rem; font-weight: 700; }
+.rr-pf-count { color: var(--text-muted); font-size: 0.76rem; }
+.rr-pf-empty { color: var(--text-muted); font-size: 0.82rem; padding: 4px 0; }
+.rr-pf-available { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .rr-pf-chk { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 0.82rem; cursor: pointer; background: var(--bg); }
 .rr-pf-chk input { cursor: pointer; }
 .rr-pf-chk.on { border-color: var(--blue); background: rgba(25,118,210,0.08); }
-.rr-pf-order { display: inline-flex; gap: 3px; margin-left: 3px; }
-.rr-pf-order button { width: 22px; height: 22px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text-muted); cursor: pointer; line-height: 1; padding: 0; font-size: 0.72rem; }
-.rr-pf-order button:hover:not(.off) { border-color: var(--blue); color: var(--blue); }
-.rr-pf-order button.off { opacity: 0.35; cursor: default; }
 
 /* 벤치마크 칩 */
 .rr-bench-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }

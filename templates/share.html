@@ -17,7 +17,7 @@
     {% set og_desc = '중간값 ' + (m.get('p50', 0)|round(1)|string) + '억 | CAGR ' + (m.get('cagr', 0)|round(1)|string) + '% | ' + (data.get('years', 0)|string) + '년 시뮬레이션' %}
   {% elif t == 'div' %}
     {% set og_title = '배당금 계산기 결과' %}
-    {% set og_desc = '목표 월 배당 ' + (m.get('target_monthly', 0)|string) + '만원 | 필요 월 납입 ' + (m.get('solved_monthly', 0)|string) + '만원' %}
+    {% set og_desc = '목표 월 배당 ' + (m.get('target_monthly', 0)|string) + '만원 | 필요 월 적립 ' + (m.get('solved_monthly', 0)|string) + '만원' %}
   {% elif t == 'ret' %}
     {% set og_title = '은퇴 설계 결과' %}
     {% set og_desc = '자산 생존 확률 ' + (m.get('survival', 0)|round(1)|string) + '% | 초기 자산 ' + (m.get('initial', 0)|round(1)|string) + '억 | 월 인출 ' + (m.get('monthly', 0)|string) + '만원' %}
@@ -193,7 +193,7 @@
           <div class="share-metric-value neutral">{{ '{:,}'.format(m.get('target_monthly', 0)) }}만원</div>
         </div>
         <div class="share-metric">
-          <div class="share-metric-label">필요 월 납입</div>
+          <div class="share-metric-label">필요 월 적립</div>
           <div class="share-metric-value up">{{ '{:,}'.format(m.get('solved_monthly', 0)) }}만원</div>
         </div>
       </div>

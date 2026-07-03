@@ -736,7 +736,7 @@ function rrRenderTable(data){
   if (window.matchMedia('(max-width:768px)').matches) {
     // 모바일 — 항목별 카드(가로스크롤 제거)
     host.innerHTML = rrItems.map((it,i) => {
-      const kind = it.kind === 'portfolio' ? '내포폴' : '벤치';
+      const kind = it.kind === 'portfolio' ? '내 포트폴리오' : '벤치';
       const rows = cols.map(c => `<div class="rr-mrow"><span class="l">${c[0]}</span><span class="v">${c[1](it)}</span></div>`).join('');
       return `<div class="rr-mcard"><div class="rr-mcard-head"><span class="rr-dot" style="background:${colorOf(i)}"></span>${esc(it.name)}<span class="rr-kind">${kind}</span></div><div class="rr-mgrid">${rows}</div></div>`;
     }).join('');
@@ -745,7 +745,7 @@ function rrRenderTable(data){
     let html = '<div class="rr-table-wrap"><table class="rr-table"><thead><tr><th>대상</th>'
       + cols.map(c => `<th title="${esc(c[2])}">${c[0]} <span style="opacity:0.5;font-weight:400;">ⓘ</span></th>`).join('') + '</tr></thead><tbody>';
     rrItems.forEach((it,i) => {
-      const kind = it.kind === 'portfolio' ? '내포폴' : '벤치';
+      const kind = it.kind === 'portfolio' ? '내 포트폴리오' : '벤치';
       html += `<tr><td><span class="rr-dot" style="background:${colorOf(i)}"></span>${esc(it.name)}<span class="rr-kind">${kind}</span></td>`
         + cols.map(c => `<td>${c[1](it)}</td>`).join('') + '</tr>';
     });

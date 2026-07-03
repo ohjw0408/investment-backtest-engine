@@ -541,6 +541,10 @@
 
 @media (max-width: 768px) {
   .dist-cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+  /* 3카드 세트(하위/중앙/상위)는 2+1 홀수 배치 대신 한 줄 3열 (F-6 R2) */
+  .dist-cards.dist-cards-3 { grid-template-columns: repeat(3, 1fr); }
+  /* 값은 공백 기준 두 줄 허용(₩11억 / 3,978만) — nowrap은 카드 폭 초과·잘림 유발 */
+  .dist-cards-3 .dist-card-value { font-size: 0.8rem; line-height: 1.35; word-break: keep-all; }
   .dist-card { padding: 12px 8px; }
   .dist-card-value { font-size: 0.95rem; }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }

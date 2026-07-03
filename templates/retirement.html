@@ -698,7 +698,7 @@
       <!-- 축적 결과 (은퇴 시뮬레이션 모드만) -->
       <div class="result-card" id="retAccCard">
         <div class="result-card-title">축적기 종료 자산 분포</div>
-        <div class="dist-cards">
+        <div class="dist-cards dist-cards-3">
           <div class="dist-card pessimistic">
             <div class="dist-card-label">하위 10%</div>
             <div class="dist-card-value" id="retAccP10">—</div>
@@ -738,7 +738,7 @@
       <!-- 인출기 종료자산 분포 -->
       <div class="result-card">
         <div class="result-card-title">인출기 종료 자산 분포 <span style="font-weight:400;color:var(--ds-muted);">(중앙값 축적 시나리오 기준)</span></div>
-        <div class="dist-cards">
+        <div class="dist-cards dist-cards-3">
           <div class="dist-card pessimistic">
             <div class="dist-card-label">하위 10%</div>
             <div class="dist-card-value" id="retWdP10">—</div>
@@ -1832,7 +1832,7 @@ function renderWdInsights(data, body) {
   const depP10 = ins.depletion_p10, depP50 = ins.depletion_p50;
   const depleted10 = depP10 && depP10 < wdYears;
   const depleted50 = depP50 && depP50 < wdYears;
-  const depletionTxt   = depleted10 ? `하위10% ${depP10}년차` : depleted50 ? `중앙값 ${depP50}년차` : `${wdYears}년 유지`;
+  const depletionTxt   = depleted10 ? `하위10% <span style="white-space:nowrap">${depP10}년차</span>` : depleted50 ? `중앙값 <span style="white-space:nowrap">${depP50}년차</span>` : `${wdYears}년 유지`;
   const depletionColor = depleted10 ? 'var(--down)' : depleted50 ? 'var(--gold-deep)' : 'var(--up)';
 
   const cards = [
@@ -1957,7 +1957,11 @@ function renderHistogram(canvasId, values, color) {
     allColors.push('#EF9A9A');
   }
 
-  // 나머지 구간 히스토그램
+  // 나머지 구간 히스토그램 — 모바일은 축약 라벨(₩풀표기가 회전·겹침으로 뭉개짐, F-6 R3)
+  const isMobileHist = window.matchMedia('(max-width: 768px)').matches;
+  const fmtCompact = v => v >= 1e8 ? +(v / 1e8).toFixed(1) + '억'
+                        : v >= 1e4 ? Math.round(v / 1e4).toLocaleString() + '만'
+                        : '₩' + Math.round(v).toLocaleString();
   if (nonZero.length) {
     const min     = Math.min(...nonZero), max = Math.max(...nonZero);
     const nBins   = Math.min(9, nonZero.length);
@@ -1965,7 +1969,8 @@ function renderHistogram(canvasId, values, color) {
     const bins    = Array(nBins).fill(0);
     nonZero.forEach(v => { const i = Math.min(Math.floor((v - min) / binSize), nBins - 1); bins[i]++; });
     bins.forEach((cnt, i) => {
-      allLabels.push(fmtKRW(min + binSize * (i + 0.5)));
+      const mid = min + binSize * (i + 0.5);
+      allLabels.push(isMobileHist ? fmtCompact(mid) : fmtKRW(mid));
       allData.push(cnt);
       allColors.push(color + '99');
     });
@@ -1977,7 +1982,8 @@ function renderHistogram(canvasId, values, color) {
     options: {
       responsive: true, plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { display: false } },
+        x: { ticks: { font: { size: 10 }, color: '#90A4AE',
+                      autoSkip: true, maxTicksLimit: isMobileHist ? 6 : 12 }, grid: { display: false } },
         y: { ticks: { font: { size: 10 }, color: '#90A4AE' }, grid: { color: 'rgba(0,0,0,0.05)' } }
       }
     }

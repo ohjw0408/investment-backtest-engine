@@ -254,8 +254,26 @@
   }
 
   function inRange(p) { return (!custStart || p[0] >= custStart) && (!custEnd || p[0] <= custEnd); }
+  function cmpAlignedPoints(series) {
+    if (custOwner !== 'cmp' || series.length < 2 || series.some(s => !s)) return null;
+    const ranged = series.map(s => s.points.filter(inRange));
+    if (ranged.some(pts => !pts.length)) return null;
+    const targetDates = ranged.reduce((a, b) => (b.length < a.length ? b : a), ranged[0]).map(p => p[0]);
+    const aligned = ranged.map(pts => {
+      let i = 0, last;
+      return targetDates.map(d => {
+        while (i < pts.length && pts[i][0] <= d) {
+          if (pts[i][1] != null) last = pts[i][1];
+          i++;
+        }
+        return [d, last === undefined ? null : last];
+      });
+    });
+    const keep = targetDates.map((_, i) => aligned.every(pts => pts[i][1] != null));
+    return aligned.map(pts => pts.filter((_, i) => keep[i]));
+  }
   function cmpSharedRawUnit(series) {
-    if (custOwner !== 'cmp' || series.length < 2) return null;
+    if (custOwner !== 'cmp' || series.length < 2 || series.some(s => !s)) return null;
     const rawUnits = new Set(['%', '%p', '배']);
     const units = [...new Set(series.map(s => s.unit).filter(Boolean))];
     return units.length === 1 && rawUnits.has(units[0]) ? units[0] : null;
@@ -266,11 +284,12 @@
     if (custViewMode === 'raw') {
       const datasets = [], axes = {};
       const txt = css('--text-muted') || '#888', grid = css('--border') || '#e0e0e0';
-      const seriesForAxis = custom.map(c => custRaw[c.key]).filter(Boolean);
+      const seriesForAxis = custom.map(c => custRaw[c.key]);
       const sharedUnit = cmpSharedRawUnit(seriesForAxis);
+      const alignedPoints = cmpAlignedPoints(seriesForAxis);
       custom.forEach((c, i) => {
         const s = custRaw[c.key]; if (!s) return;
-        const pts = s.points.filter(inRange); if (!pts.length) return;
+        const pts = alignedPoints ? alignedPoints[i] : s.points.filter(inRange); if (!pts.length) return;
         if (sharedUnit) {
           datasets.push(lineDS(`${c.label} (${s.unit || '원값'})`, pts, c.color));
           return;
@@ -284,8 +303,10 @@
         ? drawLine('mcCustChart', custChart, datasets, sharedUnit)
         : drawAxes('mcCustChart', custChart, datasets, axes);
     } else {
-      const ds = custom.map(c => { const s = custRaw[c.key]; if (!s) return null;
-        const pts = s.points.filter(inRange);
+      const seriesForAxis = custom.map(c => custRaw[c.key]);
+      const alignedPoints = cmpAlignedPoints(seriesForAxis);
+      const ds = custom.map((c, i) => { const s = custRaw[c.key]; if (!s) return null;
+        const pts = alignedPoints ? alignedPoints[i] : s.points.filter(inRange);
         const base = pts.find(p => p[1])?.[1]; if (!base) return null;
         return lineDS(c.label, pts.map(p => [p[0], p[1] / base * 100]), c.color); }).filter(Boolean);
       custChart = drawLine('mcCustChart', custChart, ds, '정규화(시작=100)');

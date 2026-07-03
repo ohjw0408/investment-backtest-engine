@@ -352,7 +352,7 @@ function openExternal() {
   if (/KAKAOTALK/i.test(ua)) {
     location.href = 'kakaotalk://web/openExternal?url=' + url;
   } else {
-    alert('브라우저 주소창에 직접 입력해주세요:\n' + location.href);
+    mmToast('브라우저 주소창에 직접 입력해주세요:\n' + location.href);
   }
 }
 

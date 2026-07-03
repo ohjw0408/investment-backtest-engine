@@ -922,7 +922,7 @@ async function rrCopyLink(){
   finally { btn.disabled = false; }
 }
 function rrDownloadImg(){
-  if (typeof html2canvas === 'undefined') { alert('html2canvas 로드 중입니다.'); return; }
+  if (typeof html2canvas === 'undefined') { mmToast('html2canvas 로드 중입니다.'); return; }
   rrMakeCanvas().then(function(canvas){
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');

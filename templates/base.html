@@ -484,7 +484,7 @@ function handleGoogleLogin(e) {
   if (/KAKAOTALK/i.test(ua)) {
     location.href = 'kakaotalk://web/openExternal?url=' + url;
   } else {
-    alert('현재 앱 내 브라우저에서는 Google 로그인이 차단됩니다.\n\n크롬 또는 사파리에서 직접 열어주세요:\nhttps://moneymilestone.co.kr');
+    mmToast('현재 앱 내 브라우저에서는 Google 로그인이 차단됩니다.\n\n크롬 또는 사파리에서 직접 열어주세요:\nhttps://moneymilestone.co.kr');
   }
   return false;
 }

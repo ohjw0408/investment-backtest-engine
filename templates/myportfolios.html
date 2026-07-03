@@ -285,8 +285,8 @@ document.addEventListener('click', e => {
 // ── 저장 / 삭제 ──
 async function mpSave() {
   const name = document.getElementById('mpName').value.trim();
-  if (!name) { alert('이름을 입력해주세요.'); return; }
-  if (!mpEdit.tickers.length) { alert('종목을 1개 이상 추가해주세요.'); return; }
+  if (!name) { mmToast('이름을 입력해주세요.'); return; }
+  if (!mpEdit.tickers.length) { mmToast('종목을 1개 이상 추가해주세요.'); return; }
   // 동명 충돌 (자기 자신 제외)
   const dup = mpItems.find(p => p.name === name && p.id !== mpEdit.id);
   if (dup && !confirm(`"${name}" 이름이 이미 있어요. 그 포트폴리오를 덮어쓸까요?`)) return;
@@ -301,10 +301,10 @@ async function mpSave() {
       }),
     });
     const data = await res.json();
-    if (!res.ok) { alert(data.error || '저장에 실패했어요.'); return; }
+    if (!res.ok) { mmToast(data.error || '저장에 실패했어요.'); return; }
     mpCloseModal();
     await mpLoad();
-  } catch (e) { alert('저장에 실패했어요. 네트워크를 확인해주세요.'); }
+  } catch (e) { mmToast('저장에 실패했어요. 네트워크를 확인해주세요.'); }
 }
 
 async function mpDelete(id) {
@@ -313,9 +313,9 @@ async function mpDelete(id) {
   if (!confirm(`"${p.name}" 포트폴리오를 삭제할까요?`)) return;
   try {
     const res = await fetch(`/api/portfolio/${id}`, { method: 'DELETE' });
-    if (!res.ok) { alert('삭제에 실패했어요.'); return; }
+    if (!res.ok) { mmToast('삭제에 실패했어요.'); return; }
     await mpLoad();
-  } catch (e) { alert('삭제에 실패했어요. 네트워크를 확인해주세요.'); }
+  } catch (e) { mmToast('삭제에 실패했어요. 네트워크를 확인해주세요.'); }
 }
 
 async function mpAddHome(id) {
@@ -325,9 +325,9 @@ async function mpAddHome(id) {
       body: JSON.stringify({ id }),
     });
     const data = await res.json();
-    if (!res.ok) { alert(data.error || '추가에 실패했어요.'); return; }
-    alert(data.already ? '이미 홈 즐겨찾기에 있어요.' : '홈 화면 즐겨찾기에 추가했어요. (수익 추종)');
-  } catch (e) { alert('추가에 실패했어요. 네트워크를 확인해주세요.'); }
+    if (!res.ok) { mmToast(data.error || '추가에 실패했어요.'); return; }
+    mmToast(data.already ? '이미 홈 즐겨찾기에 있어요.' : '홈 화면 즐겨찾기에 추가했어요. (수익 추종)');
+  } catch (e) { mmToast('추가에 실패했어요. 네트워크를 확인해주세요.'); }
 }
 
 mpLoad();

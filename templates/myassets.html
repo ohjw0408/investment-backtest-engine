@@ -1507,7 +1507,7 @@ const _RESTRICTED_ACCOUNTS = ['ISA', '연금저축', 'IRP'];
 
 async function saveHolding() {
   const code    = document.getElementById('holdingCode').value;
-  if (!code) { alert('종목을 선택해주세요.'); return; }
+  if (!code) { mmToast('종목을 선택해주세요.'); return; }
   const account = document.querySelector('input[name="holdingAccount"]:checked').value;
   if (_RESTRICTED_ACCOUNTS.includes(account) && !_isDomesticListed(code)) {
     maConfirm(
@@ -1591,7 +1591,7 @@ function openEditGroup(id) {
 
 async function saveGroup() {
   const name = document.getElementById('groupName').value.trim();
-  if (!name) { alert('그룹명을 입력해주세요.'); return; }
+  if (!name) { mmToast('그룹명을 입력해주세요.'); return; }
   await fetch('/api/myassets/group', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({

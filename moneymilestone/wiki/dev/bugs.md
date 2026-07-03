@@ -224,3 +224,9 @@ tags: [dev, bug]
 | 버그 | 원인 | 수정 | 커밋 | 상태 |
 |---|---|---|---|---|
 | 4월(지나간 달) 배당이 예측(노랑) 표시 | 2겹: ① corporate_actions에 TLT 2026-04-01 배당 **저장 갭** — 가격 페치가 전 거래일에 dividend=0 행을 미리 깔아둬(스플릿 기록 겸용) 진짜 배당값이 와도 INSERT OR IGNORE가 무시(**B-3 IGNORE 정책 감사의 실사례**) ② 로직이 실데이터 없는 달을 과거/미래 구분 없이 작년 패턴×CAGR "예측"으로 채움 | ① `_refetch_gap_dividends`: 작년 지급월인데 올해 그 달 없으면(지나간 달 한정) yfinance 재페치 → **조건부 UPSERT**(dividend 0/NULL 행만 실값으로 갱신, 종목당 하루 1회) ② 예측 채움을 `m >= 이번 달`로 한정 | 이번 커밋 | ✅ TLT 4월 $0.345·SPY 6월 자동복구, 1~7월 전부 실적(파랑)·8~12월만 예측, test_dividend_history 7 PASS·jsErr 0 |
+
+## 2026-07-03 세션 (Claude) — 네이티브 alert() 잔존 일소 (F-6 배치4 착수 중 발견, 오너 즉시 승인)
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| 네이티브 `alert()` 26곳 잔존 (dividend_target 12·myportfolios 9·myassets 2·base/share/risk_return 각 1) — 브랜드 모달/토스트 원칙 위반, 앱 WebView에서 OS 다이얼로그 노출 | F-1 당시 미검출(발화 조건이 검증 경로 밖) | 전부 `mmToast`로 교체(base.html 전역). 줄바꿈·URL 포함 2곳(인앱 로그인 차단·공유 폴백)은 문구 재작성 | 이번 커밋 | ✅ 실클릭: dialog 이벤트 0·토스트 발화·jsErr 0 |

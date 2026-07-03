@@ -1340,7 +1340,7 @@ async function btPollTask(taskId, maxWait = 600000) {
       }
       if (data.status === 'PROGRESS') {
         btUpdateProgressUI({
-          phase:    '분석 중...',
+          phase:    data.phase === 'preparing' ? '데이터 준비 중' : '분석 중...',
           isWaiting: false,
           percent:  data.percent || 0,
           current:  data.current || 0,

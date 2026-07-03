@@ -1321,7 +1321,7 @@ async function retPollTask(taskId, maxWait = 600000) {
         retUpdateProgressUI({ phase: '준비 중', percent: 0, isWaiting: false });
       }
     } else if (data.status === 'PROGRESS') {
-      retUpdateProgressUI({ phase: '계산 중', percent: data.percent, current: data.current, total: data.total, elapsed: data.elapsed, eta: data.eta, isWaiting: false });
+      retUpdateProgressUI({ phase: data.phase === 'preparing' ? '데이터 준비 중' : '계산 중', percent: data.percent, current: data.current, total: data.total, elapsed: data.elapsed, eta: data.eta, isWaiting: false });
     } else if (data.status === 'CANCELLED') {
       throw new Error('CANCELLED');
     } else if (data.status === 'SUCCESS') {

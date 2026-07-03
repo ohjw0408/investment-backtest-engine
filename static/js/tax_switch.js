@@ -235,7 +235,7 @@
       } else if (data.status === 'PROGRESS') {
         const pct = Math.max(3, Math.min(99, data.percent || 0));
         progressBar.style.width = pct + '%';
-        progressText.textContent = `계산 중... ${pct}%`;
+        progressText.textContent = (data.phase === 'preparing' ? '데이터 준비 중... ' : '계산 중... ') + pct + '%';
       } else if (data.status === 'SUCCESS') {
         return data.result;
       } else if (data.status === 'FAILURE') {

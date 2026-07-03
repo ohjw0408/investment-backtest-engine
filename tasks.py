@@ -163,6 +163,15 @@ def _make_progress_callback(task):
     return progress_callback
 
 
+def _mark_preparing(task):
+    """태스크 시작 직후 '데이터 준비 중' 신호 — 가격 로드/백필 동안 PENDING으로 남아
+    프론트가 단계를 못 보여주던 문제 해소 (출시완성도 G-2)."""
+    task.update_state(state='PROGRESS', meta={
+        'current': 0, 'total': 100, 'percent': 1,
+        'elapsed': 0, 'eta': None, 'queue_pos': 0, 'phase': 'preparing',
+    })
+
+
 def _task_wrap(fn, task_id=None):
     """incr/decr mm_active_tasks around fn(); ZREM from queue on start."""
     if task_id:
@@ -189,6 +198,7 @@ def _task_wrap(fn, task_id=None):
 @celery.task(bind=True)
 def run_retirement_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
+    _mark_preparing(self)
     _t = time.time()
     def _run():
         try:
@@ -211,6 +221,7 @@ def run_retirement_task(self, payload: dict) -> dict:
 @celery.task(bind=True)
 def run_tax_switch_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
+    _mark_preparing(self)
     _t = time.time()
     def _run():
         try:
@@ -230,6 +241,7 @@ def run_tax_switch_task(self, payload: dict) -> dict:
 @celery.task(bind=True)
 def run_backtest_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
+    _mark_preparing(self)
     _t = time.time()
     def _run():
         try:
@@ -249,6 +261,7 @@ def run_backtest_task(self, payload: dict) -> dict:
 @celery.task(bind=True)
 def run_dividend_task(self, payload: dict) -> dict:
     cb = _make_progress_callback(self)
+    _mark_preparing(self)
     cc = _make_cancel_check(self)
     _t = time.time()
     def _run():

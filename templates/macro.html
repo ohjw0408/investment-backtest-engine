@@ -127,6 +127,11 @@
 .mc-cmp-card { background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); padding: 18px; margin-top: 8px; }
 .mc-cmp-mode { font-size: 0.76rem; color: var(--ds-muted); margin-bottom: 10px; }
 .mc-chart-wrap { position: relative; height: 380px; }
+@media (max-width: 768px) {
+  /* 모바일: 카드 여백 축소 + 차트에 폭 더 주고 세로 눌림 완화 */
+  .mc-cmp-card { padding: 12px 8px; }
+  .mc-chart-wrap { height: 300px; }
+}
 
 /* 상세 모달 */
 .mc-modal { position: fixed; inset: 0; background: rgba(10,11,13,0.5); display: none; align-items: center; justify-content: center; z-index: 200; padding: 16px; }

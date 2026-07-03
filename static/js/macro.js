@@ -339,25 +339,44 @@
   function lineDS(label, points, color) {
     return { label, data: points.map(p => ({ x: dnum(p[0]), y: p[1] })), borderColor: color, backgroundColor: color, borderWidth: 1.6, pointRadius: 0, tension: 0.1 };
   }
-  function baseOpts(unitLabel, legend) {
+  function _mcMobile() { return window.matchMedia('(max-width: 768px)').matches; }
+  // datasets의 실제 x(분수연도) 경계 — Chart.js가 2040까지 예쁘게 늘여 오른쪽을 비우던 문제 차단
+  function _xBounds(datasets) {
+    let mn = Infinity, mx = -Infinity;
+    for (const ds of datasets) for (const p of ds.data) {
+      if (p.x < mn) mn = p.x; if (p.x > mx) mx = p.x;
+    }
+    // 정수 연도로 반올림 → Chart가 중간 눈금(1960·1980…)을 예쁘게 생성(성긴 2눈금 방지)
+    return isFinite(mn) ? { min: Math.floor(mn), max: Math.ceil(mx) } : {};
+  }
+  function baseOpts(unitLabel, legend, datasets) {
     const grid = css('--border') || '#e0e0e0', txt = css('--text-muted') || '#888';
+    const mobile = _mcMobile();
+    const b = datasets ? _xBounds(datasets) : {};
+    const spanYears = (b.max != null) ? (b.max - b.min) : 0;
+    // 긴 구간(>8년)은 연도만, 짧으면 YYYY-MM — 모바일 라벨 겹침 해소
+    const xfmt = (v) => spanYears > 8 ? String(Math.round(v)) : fracToDate(v);
     return {
       responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: legend, labels: { color: txt, font: { size: 11 } } },
+      plugins: { legend: { display: legend, labels: { color: txt, font: { size: 11 }, boxWidth: 22, padding: mobile ? 8 : 10 } },
         tooltip: { mode: 'index', intersect: false,
           filter: (item, i, arr) => arr.findIndex(a => a.datasetIndex === item.datasetIndex) === i,
           callbacks: { title: (it) => fracToDate(it[0].parsed.x) } } },
-      scales: { x: { type: 'linear', ticks: { color: txt, callback: (v) => fracToDate(v), maxTicksLimit: 9 }, grid: { color: grid } },
-        y: { ticks: { color: txt }, grid: { color: grid }, title: { display: !!unitLabel, text: unitLabel, color: txt } } },
+      scales: { x: { type: 'linear', min: b.min, max: b.max,
+          ticks: { color: txt, callback: xfmt, maxTicksLimit: mobile ? 5 : 9,
+                   maxRotation: 0, minRotation: 0, autoSkip: true, font: { size: mobile ? 10 : 11 } },
+          grid: { color: grid } },
+        y: { ticks: { color: txt, maxTicksLimit: mobile ? 7 : 11, font: { size: mobile ? 10 : 11 } },
+             grid: { color: grid }, title: { display: !!unitLabel, text: unitLabel, color: txt } } },
     };
   }
   function drawLine(id, prev, datasets, unitLabel) {
     if (prev) prev.destroy();
-    return new Chart($(id).getContext('2d'), { type: 'line', data: { datasets }, options: baseOpts(unitLabel, datasets.length > 1) });
+    return new Chart($(id).getContext('2d'), { type: 'line', data: { datasets }, options: baseOpts(unitLabel, datasets.length > 1, datasets) });
   }
   function drawAxes(id, prev, datasets, axes) {
     if (prev) prev.destroy();
-    const o = baseOpts('', true);
+    const o = baseOpts('', true, datasets);
     delete o.scales.y;            // 시리즈별 개별 y축으로 교체
     Object.assign(o.scales, axes);
     return new Chart($(id).getContext('2d'), { type: 'line', data: { datasets }, options: o });

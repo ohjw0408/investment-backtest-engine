@@ -196,3 +196,11 @@ tags: [dev, bug]
 | 버그 | 원인 | 수정 | 커밋 | 상태 |
 |---|---|---|---|---|
 | 알림 페이지에서 수신함까지 스크롤해야 함 | `/alerts`가 설정 폼, 내 알림, 수신함을 한 페이지에 세로 배치했고 상단 종 `전체 보기`도 기본 `/alerts`로 이동 | `/alerts`를 `알림 설정`/`내 알림`/`수신함` 탭으로 분리. `전체 보기`는 `/alerts#inbox`. 수신함/드롭다운/푸시 클릭은 `target_url`로 관련 화면 이동 | 이번 커밋 | ✅ |
+
+---
+
+## 2026-07-03 세션 (Claude) — 내자산 헤더/자산추이 가격 불일치
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| 내자산 헤더와 자산추이 그래프·홈 히어로·자산 파이의 '지금' 값 불일치 (수동가격 설정 시 특히) | 라이브 가격 구현 2벌: `_get_current_asset_prices`(codes, manual_price 미반영·US 개별 fetch) vs myassets 인라인(manual 반영·US 배치). `/api/portfolio/history`·`/api/assets`는 전자를 사용 | 인라인 로직을 `_live_asset_prices(holdings)`로 추출해 단일 진실 소스화. `_get_current_asset_prices`는 wrapper로 위임. history/assets/compute 전부 라이브 맵 주입으로 전환 | 이번 커밋 | ✅ probe 3상태(기본/수동설정/해제) 일치 확인 |

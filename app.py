@@ -474,103 +474,15 @@ def _hide_amounts_for_user(user_id):
 
 
 def _get_current_asset_prices(codes):
-    """Return latest asset prices in KRW for holdings/home views."""
-    from pathlib import Path as _P
-    import sqlite3 as _sq
-    import yfinance as _yf
-    import json as _json
-    import math as _math
-    from modules.krx.krx_client import KRXClient as _KRXC
+    """Return latest asset prices in KRW for holdings/home views.
 
+    코드 목록만 있을 때 쓰는 thin wrapper — 실체는 _live_asset_prices(단일 진실 소스).
+    manual_price 반영이 필요하면 holdings를 그대로 _live_asset_prices에 넘길 것.
+    """
     codes = list({c for c in codes if c})
-    prices = {}
     if not codes:
-        return prices
-
-    def _asset_ttl():
-        return 20 * 60
-
-    _r = getattr(market_quote_service, '_redis', None)
-
-    def _cache_get(code):
-        if not _r:
-            return None
-        try:
-            raw = _r.get(f'asset_px:{code}')
-            return float(_json.loads(raw)['p']) if raw else None
-        except Exception:
-            return None
-
-    def _cache_set(code, price_krw):
-        if not _r:
-            return
-        try:
-            p = float(price_krw)
-            if not _math.isfinite(p) or p <= 0:
-                return
-            _r.setex(f'asset_px:{code}', _asset_ttl(), _json.dumps({'p': p}))
-        except Exception:
-            pass
-
-    try:
-        idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
-        usdkrw = _cache_get('USD/KRW')
-        if usdkrw is None:
-            ic = _sq.connect(str(idx_db))
-            row = ic.execute("SELECT close FROM index_daily WHERE code='USD/KRW' ORDER BY date DESC LIMIT 1").fetchone()
-            ic.close()
-            usdkrw = float(row[0]) if row else 1300.0
-            _cache_set('USD/KRW', usdkrw)
-    except Exception:
-        usdkrw = 1300.0
-
-    for code in codes:
-        cached = _cache_get(code)
-        if cached is not None:
-            prices[code] = cached
-
-    miss_codes = [c for c in codes if c not in prices]
-    kr_codes = [c for c in miss_codes if c != 'KRX_GOLD' and portfolio_engine.loader.is_kr_etf(c)]
-    us_codes = [c for c in miss_codes if c != 'KRX_GOLD' and not portfolio_engine.loader.is_kr_etf(c)]
-
-    if kr_codes:
-        try:
-            krx = _KRXC(debug=False)
-            for code, px in krx.get_current_prices_kr(kr_codes).items():
-                if px:
-                    prices[code] = px
-                    _cache_set(code, px)
-        except Exception:
-            pass
-        for code in kr_codes:
-            if prices.get(code, 0) == 0:
-                try:
-                    hist = _yf.Ticker(f"{code}.KS").history(period="2d")
-                    if not hist.empty:
-                        prices[code] = float(hist["Close"].iloc[-1])
-                        _cache_set(code, prices[code])
-                except Exception:
-                    prices[code] = 0
-
-    for code in us_codes:
-        try:
-            hist = _yf.Ticker(code).history(period="2d")
-            prices[code] = float(hist["Close"].iloc[-1]) * usdkrw if not hist.empty else 0
-            _cache_set(code, prices[code])
-        except Exception:
-            prices[code] = 0
-
-    if 'KRX_GOLD' in miss_codes:
-        try:
-            idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
-            ic = _sq.connect(str(idx_db))
-            row = ic.execute("SELECT close FROM index_daily WHERE code='KRX_GOLD' ORDER BY date DESC LIMIT 1").fetchone()
-            ic.close()
-            prices['KRX_GOLD'] = round(float(row[0])) if row else 0
-            _cache_set('KRX_GOLD', prices['KRX_GOLD'])
-        except Exception:
-            prices['KRX_GOLD'] = 0
-
+        return {}
+    prices, _, _ = _live_asset_prices([{'code': c} for c in codes])
     return prices
 
 
@@ -1236,8 +1148,12 @@ def dividend_target_solve():
 # API - 포트폴리오 히스토리 (실제 역산)
 # -----------------------------------------------
 
-def _compute_portfolio_history(valid):
-    """valid = [(code, qty)] (qty>0). 평가금액 추이 dict 반환 (hide_amounts 미포함)."""
+def _compute_portfolio_history(valid, current_prices=None):
+    """valid = [(code, qty)] (qty>0). 평가금액 추이 dict 반환 (hide_amounts 미포함).
+
+    current_prices: 라이브 KRW 가격 맵('지금' 포인트용, 수동가격 반영분 등).
+    없으면 _get_current_asset_prices로 직접 조회.
+    """
     import sqlite3 as _sq
     from pathlib import Path as _P
     from datetime import datetime, timedelta
@@ -1351,8 +1267,9 @@ def _compute_portfolio_history(valid):
     if not values:
         return {"empty": True, "labels": [], "values": []}
 
-    current_prices = _get_current_asset_prices(codes)
-    current_total = sum(qty * current_prices.get(code, 0) for code, qty in valid)
+    if current_prices is None:
+        current_prices = _get_current_asset_prices(codes)
+    current_total = sum(qty * (current_prices.get(code) or 0) for code, qty in valid)
     if current_total > 0:
         today = datetime.now().strftime('%Y-%m-%d')
         if labels and labels[-1] == today:
@@ -1378,7 +1295,9 @@ def portfolio_history():
         return jsonify({"empty": True, "labels": [], "values": [], "hide_amounts": True})
     holdings = get_holdings(uid)
     valid = [(h['code'], float(h['quantity'])) for h in holdings if h.get('quantity') and h['quantity'] > 0]
-    result = _compute_portfolio_history(valid)
+    # '지금' 포인트 = 내자산 헤더와 동일 소스(_live_asset_prices, 수동가격 포함)
+    live_prices = _live_asset_prices(holdings)[0] if valid else None
+    result = _compute_portfolio_history(valid, current_prices=live_prices)
     result["hide_amounts"] = _hide_amounts_for_user(uid)
     return jsonify(result)
 
@@ -2407,19 +2326,18 @@ def retirement_withdrawal():
 # 내 자산 API
 # -----------------------------------------------
 
-@app.route('/api/myassets/data')
-def myassets_data():
-    if not session.get('user_id'):
-        return jsonify({'error': '로그인 필요'}), 401
-    uid      = session['user_id']
-    holdings = get_holdings(uid)
-    groups   = get_groups(uid)
+def _live_asset_prices(holdings):
+    """보유종목 → 라이브 KRW 가격 맵 (내자산 헤더·자산추이 '지금' 포인트 공용).
 
+    (prices, usdkrw, manual_codes) 반환. Redis asset_px 20분 캐시 공유,
+    수동가격(manual_price) 오버라이드 반영. 2026-07-03: 내자산 헤더(라이브)와
+    그래프/홈 히어로(일봉 종가 시계열)가 어긋나던 문제의 단일 진실 소스.
+    """
     import json as _json
+    import math as _math
     import sqlite3 as _sq
     import yfinance as _yf
     from pathlib import Path as _P
-    from datetime import datetime as _dt
     from modules.krx.krx_client import KRXClient as _KRXC
 
     codes  = list({h['code'] for h in holdings})
@@ -2445,7 +2363,10 @@ def myassets_data():
         if not _r:
             return
         try:
-            _r.setex(f'asset_px:{code}', _asset_ttl(), _json.dumps({'p': price_krw}))
+            p = float(price_krw)
+            if not _math.isfinite(p) or p <= 0:
+                return
+            _r.setex(f'asset_px:{code}', _asset_ttl(), _json.dumps({'p': p}))
         except Exception:
             pass
 
@@ -2543,15 +2464,30 @@ def myassets_data():
                     prices[code] = 0
 
     # ── 수동 가격 override: 설정된 보유종목은 fetch 무시하고 그 값 사용(KRW) ──
-    _nm = _resolve_names([h['code'] for h in holdings])
-    for h in holdings:
-        h['name'] = _nm.get(h['code']) or h.get('name') or h['code']
     manual_codes = []
     for h in holdings:
         mp = h.get('manual_price')
         if mp is not None:
             prices[h['code']] = float(mp)
             manual_codes.append(h['code'])
+    return prices, usdkrw, manual_codes
+
+
+@app.route('/api/myassets/data')
+def myassets_data():
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    uid      = session['user_id']
+    holdings = get_holdings(uid)
+    groups   = get_groups(uid)
+
+    from datetime import datetime as _dt
+
+    codes = list({h['code'] for h in holdings})
+    prices, usdkrw, manual_codes = _live_asset_prices(holdings)
+    _nm = _resolve_names([h['code'] for h in holdings])
+    for h in holdings:
+        h['name'] = _nm.get(h['code']) or h.get('name') or h['code']
 
     # NaN/inf 방어: 가격 하나라도 비유한수면 JSON에 NaN 리터럴이 박혀
     # 프론트 res.json() 파싱이 통째 실패 → 보유종목/자산추이 전멸. None으로 정규화.
@@ -2809,7 +2745,7 @@ def portfolio_compute():
     body = request.get_json(silent=True) or {}
     holdings, prices = _amount_to_holdings(body.get('amount'), body.get('tickers'))
     valid   = [(h['code'], h['quantity']) for h in holdings if h['quantity'] > 0]
-    history = _compute_portfolio_history(valid)
+    history = _compute_portfolio_history(valid, current_prices=prices)
     return jsonify({
         'prices':   prices,
         'holdings': holdings,
@@ -3432,7 +3368,7 @@ def assets():
     if not groups:
         return jsonify([])
     holdings = get_holdings(uid)
-    prices = _get_current_asset_prices([h['code'] for h in holdings])
+    prices = _live_asset_prices(holdings)[0]  # 수동가격 포함 = 내자산 헤더와 동일 기준
     group_values = {}
     for h in holdings:
         gid = h.get('group_id')

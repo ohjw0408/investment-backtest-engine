@@ -4475,3 +4475,13 @@ _작성: Claude_
 검증 = 양 뷰포트×라이트/다크 4컷·ellipsis·클릭 바인딩(.market-row)·jsErr 0. 오너 실기기 확인 대기(스와이프 snap과 함께).
 
 _작성: Claude_
+
+## 2026-07-03 — 내자산 헤더 vs 자산추이/홈히어로 가격 불일치 해소 (라이브가 단일소스화)
+
+증상 = 내자산 헤더(라이브 시세·수동가격 반영)와 자산추이 그래프·홈 히어로(`/api/portfolio/history`)·자산 파이(`/api/assets`)의 '지금' 값이 서로 다름. 원인 = 라이브 가격 구현이 2벌(`_get_current_asset_prices`(codes) / myassets 인라인)이고 전자엔 **manual_price 오버라이드 없음**.
+- myassets 인라인 페치 → **`_live_asset_prices(holdings)`** 헬퍼로 추출(단일 진실 소스, Redis asset_px 20분 캐시·수동가격 포함). `_cache_set`에 비유한수/≤0 가드 추가(구버전 패리티).
+- `_get_current_asset_prices` = thin wrapper로 위임(중복 ~95줄 삭제).
+- `_compute_portfolio_history(valid, current_prices=None)` — 호출자가 라이브 맵 주입 가능. `/api/portfolio/history`는 holdings 기반 주입(수동가격 반영), `/api/portfolio/compute`는 `_amount_to_holdings`가 뽑은 가격 재사용(중복 fetch 제거), `/api/assets`도 `_live_asset_prices`로 전환.
+- 검증 = 로컬 서버+mint 세션 probe: 기본/수동가격 설정/해제 3상태 모두 헤더==추이 마지막 포인트==파이 기준 일치, compute 스모크 PASS. 시드 수동가격 원복 완료.
+
+_작성: Claude_

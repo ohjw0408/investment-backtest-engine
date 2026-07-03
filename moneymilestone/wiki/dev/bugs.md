@@ -204,3 +204,9 @@ tags: [dev, bug]
 | 버그 | 원인 | 수정 | 커밋 | 상태 |
 |---|---|---|---|---|
 | 내자산 헤더와 자산추이 그래프·홈 히어로·자산 파이의 '지금' 값 불일치 (수동가격 설정 시 특히) | 라이브 가격 구현 2벌: `_get_current_asset_prices`(codes, manual_price 미반영·US 개별 fetch) vs myassets 인라인(manual 반영·US 배치). `/api/portfolio/history`·`/api/assets`는 전자를 사용 | 인라인 로직을 `_live_asset_prices(holdings)`로 추출해 단일 진실 소스화. `_get_current_asset_prices`는 wrapper로 위임. history/assets/compute 전부 라이브 맵 주입으로 전환 | 이번 커밋 | ✅ probe 3상태(기본/수동설정/해제) 일치 확인 |
+
+## 2026-07-03 세션 (Claude) — 알림 수신함 "11시간 전" 시간대 버그
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| 수신함/종 드롭다운 상대시간이 실제보다 9시간 과거(장중 발화가 "11시간 전") | `alert_store`가 `datetime.now().isoformat()` = **TZ 없는 naive 서버로컬(prod=UTC)** 저장 → 프론트 `new Date()`가 TZ 없는 ISO를 사용자 로컬(KST)로 해석 → 정확히 -9h | `get_events` 직렬화에서 `_iso_localized`: naive는 서버 로컬로 간주해 오프셋 부착(`astimezone`), aware는 통과. 기존 행·신규 행 모두 커버, 쿨다운 엔진(naive끼리 자기일관)은 무변경 | 이번 커밋 | ✅ 유닛+E2E(2h 전 naive 삽입→API +09:00·나이 2.00h)+알림 테스트 59 PASS |

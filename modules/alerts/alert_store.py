@@ -191,6 +191,21 @@ def add_event(user_id, title, body, code=None, rule_id=None, meta=None):
     return cur.lastrowid
 
 
+def _iso_localized(s):
+    """naive(서버 로컬시간) 저장분 → TZ 오프셋 포함 ISO.
+
+    created_at은 TZ 없는 datetime.now()로 저장돼 브라우저 new Date()가
+    사용자 로컬(KST)로 오해석 → prod(UTC 서버)에서 9시간 과거로 표시되던 버그.
+    """
+    try:
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.astimezone()  # naive = 서버 로컬시간으로 간주해 오프셋 부착
+        return dt.isoformat()
+    except (TypeError, ValueError):
+        return s
+
+
 def get_events(user_id, unread_only=False, limit=50):
     q = "SELECT * FROM alert_events WHERE user_id=?"
     if unread_only:
@@ -204,6 +219,7 @@ def get_events(user_id, unread_only=False, limit=50):
                 d["meta"] = json.loads(d["meta"])
             except Exception:
                 pass
+        d["created_at"] = _iso_localized(d.get("created_at"))
         out.append(d)
     return out
 

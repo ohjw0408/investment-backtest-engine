@@ -4485,3 +4485,11 @@ _작성: Claude_
 - 검증 = 로컬 서버+mint 세션 probe: 기본/수동가격 설정/해제 3상태 모두 헤더==추이 마지막 포인트==파이 기준 일치, compute 스모크 PASS. 시드 수동가격 원복 완료.
 
 _작성: Claude_
+
+## 2026-07-03 — 알림 수신함 상대시간 -9h 버그 수정 (naive UTC → 오프셋 부착)
+
+오너 실사용 제보: 장중 발화 알림이 "11시간 전"(실제 ~2시간 전). 원인 = `alert_store` created_at이 TZ 없는 `datetime.now()`(prod 서버=UTC) → 브라우저 `new Date()`가 KST로 오해석 = 정확히 9시간 차.
+- 수정 = 읽기 경로 한 곳(`get_events`)에 `_iso_localized`: naive → 서버 로컬 TZ 오프셋 부착, aware 통과, 파싱실패 원문 통과. 수신함·종 드롭다운 공용 API라 단일 지점. 레거시 행도 즉시 교정. 쿨다운/히스테리시스 내부는 naive끼리 자기일관이라 무변경(최소수정).
+- 검증 = 유닛(naive/micro/aware/None/garbage) + E2E(2시간 전 naive 이벤트 삽입 → API `+09:00`·브라우저 등가 나이 2.00h) + test_alerts_api 39·engine 10·runner 10 전부 PASS.
+
+_작성: Claude_

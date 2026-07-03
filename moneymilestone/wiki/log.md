@@ -4567,3 +4567,14 @@ _작성: Claude_
 - **F-5**: 다크 토큰 2개 미세 상향(--ds-muted 4.25→4.9:1, --brand-text 4.45→5.5:1, 육안 동일) + **label for= 25곳/6템플릿** 일괄 연결(클릭 포커스 검증) + fav-select aria-label + 벨 뱃지 aria-hidden. **계산기 A11y 82→95**. 125% 확대 4페이지 가로 유출 0. **잔여 = 다크 브랜드 버튼 흰 글자 3.7:1**(로그인·실행 버튼) — 다크 기본 팔레트 변경이라 오너 결정점(예: --on-brand 검정 or 버튼 bg 어둡게, 타 액센트는 이미 검정 글자).
 
 _작성: Claude_
+
+## 2026-07-03 — E-3 인라인 JS 외부화 (페이지 스크립트 전량, 3배치)
+
+17.5k줄 인라인 중 **페이지 스크립트 ~7,100줄을 14개 static/js 파일로 기계 이동**(내용 무변경, static_v 캐시버스팅).
+- 배치1(ff2fb3d): market·tax_settings·myportfolios·search·settings (~917줄, jinja 0)
+- 배치2(13a337e): 홈·심볼·알림·포폴상세 (~1,760줄) — Jinja 값(pid/code/symbols)은 `<script id="page-data" type="application/json">` 주입 패턴
+- 배치3: 비교·백테·내자산·은퇴·배당목표 (~6,470줄 중 5파일) — RR_AUTH·fee presets URL 동일 패턴
+- 검증 = 배치별 실플로우(시뮬 3종 실행→결과·내자산 모달 검색·비교 차트·설정 탭 등) jsErr 0
+- **잔여**: base.html(전 페이지 공용 — 테마 FOUC 방지 등 의도적 인라인 포함, 분리 신중 필요)·share.html(jinja 12개, OG 연동) → 이 둘 처리 후 A-2 CSP unsafe-inline 제거 가능
+
+_작성: Claude_

@@ -80,7 +80,14 @@
 /* 모달 */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: none; align-items: center; justify-content: center; }
 .modal-overlay.show { display: flex; }
-.modal-box { background:var(--card); border-radius: 16px; padding: 24px; width: 440px; max-width: 90vw; box-shadow: 0 8px 40px rgba(0,0,0,0.18); }
+.modal-box { background:var(--card); border-radius: 16px; padding: 24px; width: 440px; max-width: 90vw; box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  max-height: 85vh; max-height: 85dvh; overflow-y: auto; }
+/* 종목 검색 자동완성 — 스타일 미정의로 인라인 블록처럼 자라 취소/저장 버튼을 화면 밖으로
+   밀어내던 문제(오너 제보 2026-07-03). 입력창에 붙는 오버레이 드롭다운 + 자체 스크롤로 교정 */
+.ticker-search-dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 30;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px; margin-top: 4px;
+  max-height: 38vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.14); }
 .modal-title { font-size: 1rem; font-weight: 800; margin-bottom: 16px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .btn-primary { padding: 9px 20px; background: var(--blue); color: white; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
@@ -201,6 +208,13 @@
 .ma-asset-chart { position: relative; height: 210px; padding: 8px 16px 16px; }
 .ma-asset-chart canvas { width: 100% !important; height: 100% !important; }
 #maHistoryEmpty { position: absolute; inset: 8px 16px 16px; display: none; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+/* 콜드 로드(수십 초) 동안 빈 공백 방지 — 스켈레톤 셔머 (F-6 배치2 M4) */
+#maHistoryLoading { position: absolute; inset: 8px 16px 16px; display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; color: var(--text-muted); font-size: 0.8rem;
+  background: linear-gradient(90deg, var(--bg) 25%, var(--border) 50%, var(--bg) 75%);
+  background-size: 200% 100%; animation: maSkel 1.4s ease infinite; }
+@keyframes maSkel { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { #maHistoryLoading { animation: none; } }
 
 .login-required { text-align: center; padding: 60px 20px; color: var(--text-muted); }
 
@@ -360,6 +374,18 @@
   .rebal-band-card > span:last-child { flex-basis: 100%; }
   .rebal-row { flex-wrap: wrap; }
   .rebal-action { min-width: 0; }
+
+  /* 그룹 카드 — 우측 클러스터가 이름 컬럼을 압사시키던 문제(F-6 배치2 M5):
+     목표 비중 블록을 아래 행으로 내려 이름·메타에 폭 확보 */
+  .grp-card { display: grid; grid-template-columns: 38px minmax(0,1fr) auto;
+    grid-template-areas: "em main actions" "tgt tgt tgt"; row-gap: 10px; }
+  .grp-emblem { grid-area: em; }
+  .grp-main { grid-area: main; }
+  .grp-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grp-actions { grid-area: actions; }
+  .grp-tgt { grid-area: tgt; display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; }
+  .grp-tgt-l { white-space: nowrap; order: -1; }
+  .grp-tgt-bar { flex: 1; margin-top: 0; }
 }
 </style>
 {% endblock %}
@@ -465,6 +491,7 @@
       <div class="ma-asset-chart">
         <canvas id="maHistoryChart"></canvas>
         <div id="maHistoryEmpty">보유 종목을 추가하면 자산 추이가 표시됩니다.</div>
+        <div id="maHistoryLoading">자산 추이 계산 중…</div>
       </div>
     </div>
 
@@ -922,16 +949,16 @@ async function loadAttribution() {
     const a = j.attribution;
     const up = a.up_driver, dn = a.down_defender;
     let html = '';
-    if (up) html += `📈 상승장에선 <b>${maEsc(up.name)}</b> 이(가) 가장 많이 끌어올렸어요 <span style="color:var(--text-muted);font-size:0.82rem;">(기여 +${up.contrib.toFixed(1)}%p)</span>`;
+    if (up) html += `📈 상승장을 가장 많이 끌어올린 종목: <b>${maEsc(up.name)}</b> <span style="color:var(--text-muted);font-size:0.82rem;">(기여 +${up.contrib.toFixed(1)}%p)</span>`;
     if (up && dn) html += '<br>';
     if (dn) {
       const dc = dn.down_capture;
       if (dc == null)
-        html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 가장 잘 버텼어요`;
+        html += `🛡️ 하락장에서 가장 잘 버틴 종목: <b>${maEsc(dn.name)}</b>`;
       else if (dc < 0)
-        html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 오히려 올라 <b style="color:var(--blue)">헤지</b> 역할을 했어요`;
+        html += `🛡️ 하락장에서 오히려 올라 <b style="color:var(--blue)">헤지</b>가 된 종목: <b>${maEsc(dn.name)}</b>`;
       else
-        html += `🛡️ 하락장에선 <b>${maEsc(dn.name)}</b> 이(가) 가장 잘 버텼어요 <span style="color:var(--text-muted);font-size:0.82rem;">(포폴이 빠질 때 <b style="color:var(--blue)">${dc.toFixed(1)}배</b>만)</span>`;
+        html += `🛡️ 하락장에서 가장 잘 버틴 종목: <b>${maEsc(dn.name)}</b> <span style="color:var(--text-muted);font-size:0.82rem;">(포폴이 빠질 때 <b style="color:var(--blue)">${dc.toFixed(1)}배</b>만 하락)</span>`;
     }
     body.innerHTML = html || '데이터가 부족해요.';
     _attrHasData = true;
@@ -1126,22 +1153,31 @@ function renderWeightChart(totalValue) {
   if (weightChart) weightChart.destroy();
   if (!holdings.length || !totalValue) return;
 
-  // 그룹별 합산
+  // 그룹별 합산 + 미지정 종목은 코드별 합산(복수 계좌 보유 병합) — 범례 중복 방지
   const grouped = {};
-  const ungrouped = [];
+  const ungrouped = {};
   holdings.forEach(h => {
     const val = (prices[h.code]||0) * h.quantity;
     if (h.group_name) {
       if (!grouped[h.group_name]) grouped[h.group_name] = { val: 0, color: h.group_color||'#90A4AE' };
       grouped[h.group_name].val += val;
     } else {
-      ungrouped.push({ label: h.code, val, color: '#90A4AE' });
+      if (!ungrouped[h.code]) ungrouped[h.code] = { name: h.name || h.code, val: 0, n: 0 };
+      ungrouped[h.code].val += val;
+      ungrouped[h.code].n  += 1;
     }
   });
 
+  // 미지정 종목 고유색(순환 팔레트) — 전부 회색이라 슬라이스 구분 불가하던 문제
+  const UNGROUPED_PALETTE = ['#5C6BC0','#26A69A','#EF6C00','#8D6E63','#7E57C2','#EC407A','#66BB6A','#FFA726'];
+  const _clip = s => s.length > 14 ? s.slice(0, 13) + '…' : s;
   const items = [
     ...Object.entries(grouped).map(([k,v]) => ({ label: k, val: v.val, color: v.color })),
-    ...ungrouped,
+    ...Object.values(ungrouped).map((u, i) => ({
+      label: _clip(u.name) + (u.n > 1 ? ` (${u.n}건)` : ''),
+      val: u.val,
+      color: UNGROUPED_PALETTE[i % UNGROUPED_PALETTE.length],
+    })),
   ].filter(i => i.val > 0);
 
   weightChart = new Chart(document.getElementById('weightChart').getContext('2d'), {
@@ -1659,32 +1695,35 @@ function renderDivYear() {
   document.getElementById('divEmpty').style.display = anyData ? 'none' : 'block';
   document.getElementById('divChart').style.display = anyData ? 'block' : 'none';
 
-  // 월별 합산 + 월별 예측여부(그 달에 예측 이벤트 있으면 예측 색)
-  const monthly  = Array(12).fill(0);
-  const monthProj = Array(12).fill(false);
-  evs.forEach(e => { monthly[e.month - 1] += _valOf(e); if (e.projected) monthProj[e.month - 1] = true; });
+  // 월별 실적/예측 분리 합산 — 한 달에 둘이 섞이면(예: 일부 종목만 실데이터 도착)
+  // 통째로 예측색이 되던 문제 → 스택 바(파랑=실적, 주황=예측분)로 의미 정확화
+  const monthlyReal = Array(12).fill(0);
+  const monthlyProj = Array(12).fill(0);
+  evs.forEach(e => { (e.projected ? monthlyProj : monthlyReal)[e.month - 1] += _valOf(e); });
+  const monthly  = monthlyReal.map((v, i) => v + monthlyProj[i]);
+  const monthProj = monthlyProj.map(v => v > 0);
   const _divBrand = _cssVar('--brand') || '#0052ff';
-  const colors = monthProj.map(p => p ? 'rgba(251,140,0,0.7)' : _divBrand);
 
   const labels = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   const ctx = document.getElementById('divChart').getContext('2d');
   if (_divChart) _divChart.destroy();
   _divChart = new Chart(ctx, {
     type: 'bar',
-    data: { labels, datasets: [{
-      label: _divYear + ' 배당',
-      data: monthly,
-      backgroundColor: colors,
-    }]},
+    data: { labels, datasets: [
+      { label: '실적', data: monthlyReal, backgroundColor: _divBrand, stack: 'div' },
+      { label: '예측', data: monthlyProj, backgroundColor: 'rgba(251,140,0,0.7)', stack: 'div' },
+    ]},
     options: {
       responsive: true, maintainAspectRatio: false,
       onClick: (evt, els) => { if (els.length) renderDrill(els[0].index + 1); },
       plugins: { legend: { display: false },
-                 tooltip: { callbacks: {
-                   label: c => _fmtDivMoney(c.parsed.y) + (monthProj[c.dataIndex] ? ' (예측)' : '') } } },
+                 tooltip: {
+                   filter: c => c.parsed.y > 0,
+                   callbacks: {
+                     label: c => (c.datasetIndex === 1 ? '예측 ' : '실적 ') + _fmtDivMoney(c.parsed.y) } } },
       scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-        y: { beginAtZero: true, grid: { color: MM_CHART_GRID },
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { stacked: true, beginAtZero: true, grid: { color: MM_CHART_GRID },
              ticks: { font: { size: 10 }, callback: v =>
                _divCur === 'USD' ? '$' + v : '₩' + (v / 10000).toFixed(0) + '만' } }
       }
@@ -1695,7 +1734,7 @@ function renderDivYear() {
   const hasProj = monthProj.some(Boolean);
   document.getElementById('divDrill').innerHTML =
     `<div class="div-drill-head">${_divYear}년 합계: ${_fmtDivMoney(total)}` +
-    (hasProj ? ' <span style="color:#FB8C00;font-size:0.76rem;">(주황 = 예측)</span>' : '') +
+    (hasProj ? ' <span style="color:#FB8C00;font-size:0.76rem;">(파랑 = 실적 · 주황 = 예측분)</span>' : '') +
     ` <span style="font-weight:400;color:var(--text-muted);font-size:0.78rem;">· 월 막대를 클릭하면 종목별 내역</span></div>`;
   renderMonthGrid(monthly, monthProj);
   renderList(evs);
@@ -1791,9 +1830,12 @@ function renderList(evs) {
   });
   const rows = Object.values(byCode).sort((a, b) => b.val - a.val);
   el.innerHTML = rows.map(g => {
-    const months = [...g.months].sort((a, b) => a - b).map(m => m + '월').join('·');
+    // 지급월 5개+ 나열은 모바일 행을 부수므로 압축(월배당/연N회). 전체 목록은 title로.
+    const ms = [...g.months].sort((a, b) => a - b);
+    const monthsFull = ms.map(m => m + '월').join('·');
+    const months = ms.length >= 10 ? '월배당' : (ms.length > 4 ? `연 ${ms.length}회` : monthsFull);
     return `<div class="div-list-item">` +
-      `<span class="div-list-date" style="width:auto;min-width:78px;">${months}</span>` +
+      `<span class="div-list-date" style="width:auto;min-width:78px;" title="${monthsFull}">${months}</span>` +
       `<span class="div-list-name">${maEsc(g.name)}${g.anyProj ? '<span class="div-proj-badge">예측</span>' : ''}</span>` +
       `<span class="div-list-amt">${_fmtDivMoney(g.val)}</span>` +
     `</div>`;
@@ -1842,6 +1884,8 @@ async function loadPortfolioHistory(days) {
     renderHistoryChart(days);
   } catch(e) {
     document.getElementById('maHistoryEmpty').style.display = 'flex';
+  } finally {
+    document.getElementById('maHistoryLoading').style.display = 'none';
   }
 }
 

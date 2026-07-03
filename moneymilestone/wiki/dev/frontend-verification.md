@@ -72,3 +72,11 @@ Playwright로 `page.on('pageerror')`·`page.on('console')` 캡처 + 인터랙션
 - 테스트 정책: `CLAUDE.md`(전체 pytest 금지, 타겟+브라우저 중심).
 - 디자인 작업 계획·진행: `../../디자인통일_plan.md` (repo 루트).
 - CSS 주의: **주석 안에 `*/` 시퀀스 금지**(`--brand*/--ds` 같은 표기) — 블록 주석 조기 종료로 룰 드롭.
+
+## 캔버스(Chart.js) 페이지 스크린샷 규칙 (2026-07-03 추가)
+
+**fullPage 스크린샷 금지** — Playwright fullPage는 뷰포트 밖 canvas를 스티칭할 때 애니메이션
+첫 프레임(파이=부채꼴 조각, 막대=바닥 깔림)으로 캡처하는 아티팩트가 있다. F-6 배치2에서
+이걸 실버그로 오진(M1). 차트 검증은 **element 스크린샷**(`locator.screenshot()`) 또는
+해당 위치로 스크롤 후 뷰포트 캡처로. 판정 전 `Chart.getChart(canvas)` 내부 상태(각도·데이터)
+덤프가 확실.

@@ -228,7 +228,12 @@
           <div class="mm-bell-list" id="mmBellList"></div>
         </div>
       </div>
-      <img src="{{ user.picture }}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">
+      {% if user.picture %}
+      <img src="{{ user.picture }}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;"
+           onerror="this.outerHTML='<span style=&quot;width:28px;height:28px;border-radius:50%;background:var(--brand);color:var(--on-brand);display:inline-flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;&quot;>{{ user.name[:1] }}</span>'">
+      {% else %}
+      <span style="width:28px;height:28px;border-radius:50%;background:var(--brand);color:var(--on-brand);display:inline-flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;">{{ user.name[:1] }}</span>
+      {% endif %}
       <span class="user-greeting">안녕하세요, {{ user.name }}님!</span>
       <a href="/auth/logout" class="nav-auth-link" style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;padding:4px 10px;border:1.5px solid var(--border);border-radius:8px;">로그아웃</a>
     {% else %}

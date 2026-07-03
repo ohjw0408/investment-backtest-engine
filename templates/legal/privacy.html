@@ -13,6 +13,7 @@
     <li><strong>계정 정보</strong>(Google 로그인): 구글 고유 식별자, 이메일, 이름, 프로필 사진</li>
     <li><strong>자산 정보</strong>: 보유 종목 코드·수량·평균단가·수동입력가격·계좌유형·자산 그룹</li>
     <li><strong>저장 데이터</strong>: 저장한 포트폴리오, 세금 설정, 화면(위젯·캘린더) 설정, 가격 알림 규칙</li>
+    <li><strong>알림 정보</strong>: 푸시 알림 수신에 동의한 경우 기기 푸시 토큰</li>
     <li><strong>접속 기록</strong>: 가입일시, 최근 로그인일시</li>
   </ul>
 
@@ -25,7 +26,8 @@
 
   <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">4. 제3자 제공 및 처리위탁</h2>
   <ul style="padding-left:20px;">
-    <li><strong>Google</strong>: 로그인(OAuth) 인증. 이용자가 동의한 범위의 계정 정보만 수신.</li>
+    <li><strong>Google</strong>: 로그인(OAuth) 인증 및 Firebase Cloud Messaging을 통한 푸시 알림 발송.
+    이용자가 동의한 범위의 계정 정보와 알림 발송에 필요한 기기 토큰만 처리.</li>
     <li>시세·거시지표 등 외부 데이터(예: 데이터 제공처) 조회 시 <strong>이용자의 개인정보는 전송되지
     않습니다.</strong></li>
   </ul>

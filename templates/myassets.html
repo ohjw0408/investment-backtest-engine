@@ -958,7 +958,7 @@ async function loadAttribution() {
       else if (dc < 0)
         html += `🛡️ 하락장에서 오히려 올라 <b style="color:var(--blue)">헤지</b>가 된 종목: <b>${maEsc(dn.name)}</b>`;
       else
-        html += `🛡️ 하락장에서 가장 잘 버틴 종목: <b>${maEsc(dn.name)}</b> <span style="color:var(--text-muted);font-size:0.82rem;">(포폴이 빠질 때 <b style="color:var(--blue)">${dc.toFixed(1)}배</b>만 하락)</span>`;
+        html += `🛡️ 하락장에서 가장 잘 버틴 종목: <b>${maEsc(dn.name)}</b> <span style="color:var(--text-muted);font-size:0.82rem;">(포트폴리오가 빠질 때 <b style="color:var(--blue)">${dc.toFixed(1)}배</b>만 하락)</span>`;
     }
     body.innerHTML = html || '데이터가 부족해요.';
     _attrHasData = true;

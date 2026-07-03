@@ -60,6 +60,26 @@ def _drop_isolated_price_spikes(df: pd.DataFrame, ratio_threshold: float = 4.0) 
     return out.loc[~bad].copy()
 
 
+def _validate_price_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """저장 직전 단일 검증 훅 (출시완성도 B-2①) — 오염행 유입을 입력 단계서 차단.
+
+    INSERT OR IGNORE 특성상 한 번 박힌 오염행은 재페치로 안 고쳐진다(005930 사례).
+    거르는 것:
+      ① 고립 스파이크(yfinance 오틱 — 단일일 증분 페치는 이웃이 없어 못 거르므로
+        purge_isolated_spikes 주기 태스크가 2차 안전망)
+      ② NULL close(INSERT되면 영구 NULL홀 → pct_change pad 점프의 근원)
+      ③ 0/음수 가격  ④ 미래 날짜(시계열 오염)
+    """
+    if df is None or df.empty:
+        return df
+    df = _drop_isolated_price_spikes(df)
+    df = df.dropna(subset=["close"])
+    df = df[pd.to_numeric(df["close"], errors="coerce") > 0]
+    today = datetime.now().strftime("%Y-%m-%d")
+    df = df[df["date"] <= today]
+    return df
+
+
 def _load_us_tickers() -> set:
     us_etf_path = META_DIR / "us_etf_list.csv"
     tickers = set()
@@ -221,7 +241,7 @@ class PriceLoader:
                 df = pd.DataFrame(all_rows)
                 df["date"]  = pd.to_datetime(df["TIME"], format="%Y%m%d", errors="coerce").dt.strftime("%Y-%m-%d")
                 df["close"] = pd.to_numeric(df["DATA_VALUE"], errors="coerce")
-                df = df[["date", "close"]].dropna()
+                df = _validate_price_rows(df[["date", "close"]].dropna())
                 df["code"] = "USD/KRW"
                 self.index_conn.executemany(
                     "INSERT OR IGNORE INTO index_daily (code, date, close) VALUES (?, ?, ?)",
@@ -500,14 +520,8 @@ class PriceLoader:
         df["dividend"] = df["dividend"].fillna(0)
         df["split"]    = df["split"].replace(0, 1).fillna(1)
         df["code"]     = code
-        # 쓰기 전 고립 스파이크(yfinance 오틱) 제거 — DB에 잘못된 값이 박히는 것을 1차 차단.
-        # (INSERT OR IGNORE라 한번 박히면 재페치로 안 고쳐지므로 입력 단계서 거른다. 단일일 증분
-        #  페치는 이웃이 없어 못 거르니, purge_isolated_spikes 주기 태스크가 2차 안전망.)
-        df = _drop_isolated_price_spikes(df)
-        # NaN close 행은 저장하지 않음 — 긴 구간 1회 다운로드 시 yfinance가 중간 구간을 NaN으로
-        # 돌려주면 INSERT OR IGNORE로 NULL close 행이 박히고(get_price는 내부 갭을 재페치 안 함)
-        # → 영구 NULL홀 → pct_change pad 점프의 근원. 입력 단계서 제거해 홀 자체를 막는다.
-        df = df.dropna(subset=["close"])
+        # 쓰기 전 단일 검증 훅 — 스파이크·NULL close·0/음수가·미래날짜 차단 (근거는 훅 docstring)
+        df = _validate_price_rows(df)
         price_df  = df[["code", "date", "open", "high", "low", "close", "volume"]]
         action_df = df[["code", "date", "dividend", "split"]]
         return price_df, action_df

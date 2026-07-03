@@ -486,3 +486,116 @@ def refresh_macro():
     except Exception as e:
         print(f"[refresh_macro] 오류: {e}")
         raise
+
+
+# ── 데이터 무결성 상시 방어 (출시완성도 B-2②) ─────────────────────────────
+
+def _integrity_notify_owner(issues):
+    """무결성 이상을 오너 인앱 수신함 + FCM 푸시로 통지 (기존 알림 인프라 재사용)."""
+    import sqlite3
+    owner_email = os.environ.get('OWNER_EMAIL', 'ohjw0408@gmail.com')
+    try:
+        from modules.auth_manager import DB_PATH as _users_db
+        conn = sqlite3.connect(str(_users_db))
+        row = conn.execute("SELECT id FROM users WHERE email=?", (owner_email,)).fetchone()
+        conn.close()
+        if not row:
+            return
+        uid = row[0]
+        title = f"⚠️ 데이터 무결성 이상 {len(issues)}건"
+        body = " / ".join(issues)[:500]
+        from modules.alerts import alert_store
+        alert_store.add_event(uid, title, body, meta={'type': 'integrity'})
+        try:
+            from modules.alerts import push_sender
+            push_sender.send_to_user(uid, title, body, data={'type': 'integrity', 'target_url': '/alerts#inbox'})
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"[data_integrity_scan] 오너 알림 실패: {e}")
+
+
+def _sentry_capture(msg):
+    """워커에서 Sentry 이벤트 발송 — DSN 미설정/미설치면 조용히 no-op."""
+    try:
+        import sentry_sdk
+        if sentry_sdk.Hub.current.client is None:
+            dsn = os.environ.get('SENTRY_DSN', '')
+            if not dsn:
+                return
+            sentry_sdk.init(dsn=dsn, traces_sample_rate=0, send_default_pii=False)
+        sentry_sdk.capture_message(msg, level='warning')
+    except Exception:
+        pass
+
+
+@celery.task
+def data_integrity_scan():
+    """매일 실행(Celery Beat) — 데이터 품질 상시 방어. 개별 버그픽스를 체계로 승격.
+
+    ① price_daily 내부 NULL close 행 검출·삭제 (self-heal — pct_change pad 점프의 근원.
+       쓰기경로 _validate_price_rows가 신규 유입을 막으므로 잔존 발견 = 우회 쓰기경로 신호)
+    ② 핵심 시계열 신선도 — USD/KRW(전 환산의 기반)·KRX_GOLD·price_daily 전체 max(date)
+    ③ 합성 백필 손상 스캔 — scripts/scan_backfill_corruption.scan_all 재사용 (B-1 판정 기준)
+    이상 발견 시 오너 인앱 알림+푸시, Sentry 이벤트.
+    """
+    import sqlite3
+    from datetime import datetime, timedelta
+    base = os.path.dirname(os.path.abspath(__file__))
+    price_db = os.path.join(base, 'data', 'price_cache', 'price_daily.db')
+    index_db = os.path.join(base, 'data', 'meta', 'index_master.db')
+    issues = []
+    try:
+        pc = sqlite3.connect(price_db)
+
+        # ① 내부 NULL close 행 — 검출 즉시 삭제(순수 오염, 유용한 경우 없음)
+        null_rows = pc.execute(
+            "SELECT code, COUNT(*) FROM price_daily WHERE close IS NULL GROUP BY code"
+        ).fetchall()
+        if null_rows:
+            pc.execute("DELETE FROM price_daily WHERE close IS NULL")
+            pc.commit()
+            detail = ", ".join(f"{c}×{n}" for c, n in null_rows[:10])
+            issues.append(f"NULL close 행 삭제: {detail} (쓰기경로 우회 유입 의심)")
+
+        # ② 신선도 — 주말+연휴 허용치 반영한 보수적 임계
+        today = datetime.now()
+        def _staleness(conn, sql, args=()):
+            row = conn.execute(sql, args).fetchone()
+            if not row or not row[0]:
+                return None
+            return (today - datetime.strptime(row[0][:10], '%Y-%m-%d')).days
+        ic = sqlite3.connect(index_db)
+        d = _staleness(ic, "SELECT MAX(date) FROM index_daily WHERE code='USD/KRW'")
+        if d is None or d > 6:
+            issues.append(f"USD/KRW 환율 신선도 이상 (last {d}일 전)")
+        d = _staleness(ic, "SELECT MAX(date) FROM index_daily WHERE code='KRX_GOLD'")
+        if d is None or d > 7:
+            issues.append(f"KRX_GOLD 신선도 이상 (last {d}일 전)")
+        ic.close()
+        d = _staleness(pc, "SELECT MAX(date) FROM price_daily")
+        if d is None or d > 6:
+            issues.append(f"price_daily 전체 갱신 정지 의심 (last {d}일 전)")
+
+        # ③ 합성 백필 손상 스캔 (B-1 스크립트 재사용)
+        sys.path.insert(0, os.path.join(base, 'scripts'))
+        try:
+            from scan_backfill_corruption import scan_all
+            corrupt = [r['code'] for r in scan_all(pc) if r['corrupt']]
+            if corrupt:
+                issues.append(f"합성 백필 손상 검출: {corrupt}")
+        except Exception as e:
+            issues.append(f"합성 손상 스캔 실행 실패: {e}")
+        pc.close()
+
+        if issues:
+            print(f"[data_integrity_scan] 이상 {len(issues)}건: {issues}")
+            _integrity_notify_owner(issues)
+            _sentry_capture(f"data_integrity_scan: {issues}")
+        else:
+            print("[data_integrity_scan] 이상 없음")
+        return {"status": "ok", "issues": issues}
+    except Exception as e:
+        print(f"[data_integrity_scan] 오류: {e}")
+        _sentry_capture(f"data_integrity_scan 자체 실패: {e}")
+        raise

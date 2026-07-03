@@ -90,4 +90,10 @@ celery.conf.beat_schedule = {
         'task': 'tasks.warmup_history',
         'schedule': crontab(hour=11, minute=0),
     },
+    # 데이터 무결성 상시 스캔(B-2②) — 매일 10:30 UTC(스파이크 클린업 후, 워밍업 전).
+    # NULL홀 self-heal + 핵심 시계열 신선도 + 합성 손상 스캔. 이상 시 오너 알림+Sentry.
+    'data-integrity-scan': {
+        'task': 'tasks.data_integrity_scan',
+        'schedule': crontab(hour=10, minute=30),
+    },
 }

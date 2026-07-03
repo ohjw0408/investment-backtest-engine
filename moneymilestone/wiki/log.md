@@ -4493,3 +4493,12 @@ _작성: Claude_
 - 검증 = 유닛(naive/micro/aware/None/garbage) + E2E(2시간 전 naive 이벤트 삽입 → API `+09:00`·브라우저 등가 나이 2.00h) + test_alerts_api 39·engine 10·runner 10 전부 PASS.
 
 _작성: Claude_
+
+## 2026-07-03 — B-2 데이터 품질 상시 방어 파이프라인 (출시완성도 P2)
+
+개별 버그픽스(스파이크 필터·purge beat)를 체계로 승격. 3파트:
+- **① 쓰기 검증 일원화**: `_validate_price_rows()`(price_loader) — 고립 스파이크·NULL close·0/음수가·미래날짜를 저장 직전 차단. fetch_from_api + ECOS USD/KRW 경로 적용. 유닛 2건 추가(오염 차단·정상 통과), **골든마스터 18시나리오 결과불변 PASS**.
+- **② 일일 무결성 beat**: `data_integrity_scan`(매일 10:30 UTC, purge 후) — NULL close 검출·삭제(self-heal), USD/KRW·KRX_GOLD·price_daily 신선도, 합성 손상 스캔(scan_backfill_corruption.scan_all 재사용). 이상 시 **오너 인앱 알림+FCM**(alert_store/push_sender 재사용) + Sentry(있으면). 검증 = ZZTEST NULL 3행 주입→검출·삭제·알림 발화 확인. **부수 성과: 로컬 DB 실오염 검출**(005930 등 KR 18행 NULL — 유입원은 app.py `_compute_portfolio_history` KR 폴백의 raw INSERT) → 해당 경로 Close dropna 가드 추가로 근원 차단.
+- **③ raw SQL 인벤토리**: [[dev/raw-sql-inventory]] 신설 — price_daily/index_daily 우회 경로 전수(쓰기 10곳·읽기 20여곳) + 검증 상태 + 신규 코드 원칙(PriceLoader 경유, raw INSERT는 훅 통과).
+
+_작성: Claude_

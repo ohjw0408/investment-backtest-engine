@@ -1215,6 +1215,8 @@ def _compute_portfolio_history(valid, current_prices=None):
                 hist = ticker.history(period="3y", interval="1d", auto_adjust=False, actions=True)
                 if not hist.empty:
                     hist.index = hist.index.tz_localize(None) if hist.index.tz else hist.index
+                    # NaN close 행 저장 금지 — NULL홀 유입 경로(무결성 beat가 실검출한 우회 쓰기)
+                    hist = hist.dropna(subset=['Close'])
                     rows_to_insert = [
                         (code, d.strftime('%Y-%m-%d'), row['Open'], row['High'], row['Low'], row['Close'], row['Volume'])
                         for d, row in hist.iterrows()

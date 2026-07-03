@@ -58,3 +58,40 @@ def test_purge_isolated_spikes_deletes_otick_from_db():
     assert deleted == 1
     assert otick not in remaining
     assert len(remaining) == 5
+
+
+def test_validate_price_rows_filters_poison_rows():
+    # B-2① 단일 검증 훅: NULL close·0/음수가·미래날짜 행 차단, 정상 행 보존.
+    from modules.price_loader import _validate_price_rows
+    future = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+    df = pd.DataFrame(
+        [
+            {"date": "2026-06-16", "close": 100.0},
+            {"date": "2026-06-17", "close": None},    # NULL홀 근원
+            {"date": "2026-06-18", "close": 0.0},     # 0가
+            {"date": "2026-06-19", "close": -5.0},    # 음수가
+            {"date": "2026-06-20", "close": 101.0},
+            {"date": future, "close": 102.0},         # 미래날짜
+        ]
+    )
+
+    out = _validate_price_rows(df)
+
+    assert out["date"].tolist() == ["2026-06-16", "2026-06-20"]
+
+
+def test_validate_price_rows_clean_data_unchanged():
+    # 결과 불변: 정상 데이터는 값·순서 그대로 통과.
+    from modules.price_loader import _validate_price_rows
+    df = pd.DataFrame(
+        [
+            {"date": "2026-06-16", "close": 100.0},
+            {"date": "2026-06-17", "close": 101.5},
+            {"date": "2026-06-18", "close": 99.8},
+        ]
+    )
+
+    out = _validate_price_rows(df)
+
+    assert out["close"].tolist() == [100.0, 101.5, 99.8]
+    assert out["date"].tolist() == df["date"].tolist()

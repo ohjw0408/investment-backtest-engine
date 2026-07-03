@@ -5,7 +5,7 @@
   let detailChart = null, cmpChart = null, custChart = null;
   const PALETTE = ['#1976D2', '#E65100', '#2E7D32', '#7B1FA2', '#C2185B', '#00838F'];
   let custom = [];          // [{key,label,color}]
-  let custStart = null, custEnd = null, custViewMode = 'norm';  // 구간·표시모드 (기본=최근10년·시작100 정규화)
+  let custStart = null, custEnd = null, custViewMode = 'raw';  // 구간·표시모드 (기본=최근10년·원값 개별축)
   let custOwner = 'custom';  // 'cmp'|'custom' — 공용 custom 상태 소유 뷰(전환 시 누수 방지)
   let custRaw = {};         // 최근 fetch 원본 {key:series}
   let activePreset = 0;
@@ -88,7 +88,7 @@
     $('mcBody').innerHTML = `
       <div class="mc-cust-hero">
         <h3>🆚 한·미 지표 비교</h3>
-        <p>미국·한국 같은 지표를 한 차트에 겹쳐 봅니다. 기본 <b>최근 10년·시작=100 정규화</b>. 아래에서 지표를 고르고 구간·표시를 바꿀 수 있어요.</p>
+        <p>미국·한국 같은 지표를 한 차트에 겹쳐 봅니다. 기본 <b>최근 10년·원값(개별 축)</b>. 아래에서 지표를 고르고 구간·표시를 바꿀 수 있어요.</p>
         <div class="mc-presets" id="mcCmpPairs">${pairs.map((p, i) => `<button class="mc-preset ${i === 0 ? 'on' : ''}" data-i="${i}">${p.label}</button>`).join('')}</div>
       </div>
       <div class="mc-cust-ctrl" id="mcCustCtrl"></div>
@@ -108,7 +108,7 @@
       { key: pair.us, label: `🇺🇸 ${_macroName(pair.us)}`, color: PALETTE[0] },
       { key: pair.kr, label: `🇰🇷 ${_macroName(pair.kr)}`, color: PALETTE[1] },
     ];
-    custStart = custEnd = null; custViewMode = 'norm';   // 기본 = 최근10년·정규화
+    custStart = custEnd = null; custViewMode = 'raw';   // 기본 = 최근10년·원값 개별축
     custOwner = 'cmp';
     loadCustomChart();
   }
@@ -143,7 +143,7 @@
   function loadPreset(i) {
     activePreset = i;
     custom = PRESETS[i].items.map(([key, label], idx) => ({ key, label, color: PALETTE[idx % PALETTE.length] }));
-    custStart = custEnd = null; custViewMode = 'norm';   // 기본 = 최근10년·정규화
+    custStart = custEnd = null; custViewMode = 'raw';   // 기본 = 최근10년·원값 개별축
     custOwner = 'custom';
     const ps = $('mcPresets');
     if (ps) ps.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.i === i));

@@ -44,8 +44,9 @@
     if (s.change != null) {
       const up = s.change > 0, dn = s.change < 0;
       chgCls = up ? 'up' : dn ? 'down' : 'flat';
-      const cp = (s.change_pct != null) ? ` (${s.change_pct > 0 ? '+' : ''}${s.change_pct.toFixed(2)}%)` : '';
-      chgTxt = `${up ? '▲' : dn ? '▼' : '–'} ${fmtVal(Math.abs(s.change), s.unit)}${cp}`;
+      const cp = (s.change_pct != null) ? ` <span class="chg-pct">(${s.change_pct > 0 ? '+' : ''}${s.change_pct.toFixed(2)}%)</span>` : '';
+      // 절대 변화값은 span 분리 — 모바일 리스트 행에선 %만 노출(B5-1, 이름 폭 확보)
+      chgTxt = `${up ? '▲' : dn ? '▼' : '–'} <span class="chg-abs">${fmtVal(Math.abs(s.change), s.unit)}</span>${cp}`;
     }
     const flag = mcFlag(s.country);
     const tip = (s.desc || '').replace(/"/g, '&quot;');
@@ -63,11 +64,20 @@
     const cats = DATA.categories
       .map(c => ({ category: c.category, series: c.series.filter(s => s.country === country && (!f || s.name_ko.toLowerCase().includes(f))) }))
       .filter(c => c.series.length);
-    let html = cats.map(c => `<div class="mc-cat"><div class="mc-cat-head"><span class="dot"></span>${c.category}</div>
+    // 모바일 sticky 카테고리 점프 칩 (F-6 B5-1) — 지표 151종 1열 스크롤 탐색성
+    const chips = cats.length > 1
+      ? `<div class="mc-catnav" id="mcCatNav">${cats.map((c, i) =>
+          `<button class="mc-catchip" data-target="mc-cat-${i}">${c.category}</button>`).join('')}</div>`
+      : '';
+    let html = chips + cats.map((c, i) => `<div class="mc-cat" id="mc-cat-${i}"><div class="mc-cat-head"><span class="dot"></span>${c.category}</div>
         <div class="mc-grid">${c.series.map(cardHTML).join('')}</div></div>`).join('');
-    if (!html) html = `<div class="mc-nores">검색 결과 없음${f ? ` ("${filter}")` : ''}</div>`;
+    if (!cats.length) html = `<div class="mc-nores">검색 결과 없음${f ? ` ("${filter}")` : ''}</div>`;
     $('mcBody').innerHTML = html;
     $('mcBody').querySelectorAll('.mc-card').forEach(el => el.addEventListener('click', () => openDetail(el.dataset.code)));
+    $('mcBody').querySelectorAll('.mc-catchip').forEach(b => b.addEventListener('click', () => {
+      const t = document.getElementById(b.dataset.target);
+      if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
   }
 
   // ── 한·미 비교(고정 쌍) ──

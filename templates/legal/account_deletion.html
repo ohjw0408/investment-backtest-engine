@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}계정 및 데이터 삭제 안내 · Money Milestone{% endblock %}
+{% block content %}
+<div style="grid-column:1 / -1;max-width:820px;margin:0 auto;padding:28px 20px 64px;line-height:1.75;color:var(--ds-ink);">
+  <h1 style="font-size:1.5rem;font-weight:800;margin:0 0 6px;">Money Milestone 계정 및 데이터 삭제 안내</h1>
+  <p style="font-size:0.82rem;color:var(--ds-muted);margin:0 0 24px;">최종 개정일: 2026-07-04</p>
+
+  <p>
+    Money Milestone은 사용자가 서비스 계정과 관련 데이터를 삭제할 수 있는 방법을 제공합니다.
+    앱을 사용할 수 없는 경우에도 아래 이메일을 통해 삭제를 요청할 수 있습니다.
+  </p>
+
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">1. 앱에서 계정 삭제하기</h2>
+  <ol style="padding-left:20px;">
+    <li>Money Milestone 앱을 열고 Google 계정으로 로그인합니다.</li>
+    <li>하단 메뉴의 설정으로 이동합니다.</li>
+    <li>계정 탭에서 회원 탈퇴를 선택합니다.</li>
+    <li>확인 버튼을 누르면 계정과 관련 데이터가 삭제됩니다.</li>
+  </ol>
+
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">2. 웹 또는 이메일로 삭제 요청하기</h2>
+  <p>
+    앱에 접근할 수 없거나 앱을 다시 설치하고 싶지 않은 경우
+    <a href="mailto:moneymilestone@naver.com" style="color:var(--brand);">moneymilestone@naver.com</a>으로
+    삭제를 요청할 수 있습니다. 요청 시 제목에 "Money Milestone 계정 삭제 요청"을 적고,
+    로그인에 사용한 Google 이메일 주소를 함께 보내 주세요.
+  </p>
+
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">3. 삭제되는 데이터</h2>
+  <ul style="padding-left:20px;">
+    <li>Google 로그인 기반 계정 정보: Google 사용자 ID, 이메일, 이름, 프로필 사진 URL</li>
+    <li>사용자가 입력한 자산 정보: 보유 종목, 수량, 평균단가, 계좌 유형, 자산 그룹</li>
+    <li>저장한 포트폴리오, 세금 설정, 캘린더 설정, 관심 종목 및 알림 설정</li>
+    <li>푸시 알림 토큰, 알림 규칙, 알림 발송 이력 등 계정에 연결된 서비스 데이터</li>
+  </ul>
+
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">4. 보관될 수 있는 데이터와 기간</h2>
+  <p>
+    계정 삭제 후 일반 서비스 데이터베이스에서는 관련 데이터가 삭제됩니다.
+    다만 보안, 장애 복구, 법적 의무 이행을 위해 필요한 서버 로그와 백업에는 일부 기록이 제한된 기간 남을 수 있습니다.
+    서버 백업은 최대 35일, 별도 보관 백업은 최대 90일 이내 순차적으로 삭제되며,
+    백업 데이터는 일반 서비스 제공이나 마케팅 목적으로 사용하지 않습니다.
+  </p>
+
+  <h2 style="font-size:1.05rem;font-weight:700;margin:24px 0 8px;">5. 문의</h2>
+  <p>
+    계정 삭제 또는 개인정보 처리에 관한 문의는
+    <a href="mailto:moneymilestone@naver.com" style="color:var(--brand);">moneymilestone@naver.com</a>으로 보내 주세요.
+  </p>
+</div>
+{% endblock %}

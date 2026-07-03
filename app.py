@@ -392,9 +392,14 @@ def privacy_page():
     return render_template('legal/privacy.html')
 
 
+@app.route('/account-deletion')
+def account_deletion_page():
+    return render_template('legal/account_deletion.html')
+
+
 # 동의 게이트 면제 경로(로그인했지만 미동의 시에도 접근 허용)
 _CONSENT_EXEMPT = {'consent_page', 'consent_submit', 'terms_page', 'privacy_page',
-                   'logout', 'account_delete', 'me'}
+                   'account_deletion_page', 'logout', 'account_delete', 'me'}
 
 
 @app.before_request

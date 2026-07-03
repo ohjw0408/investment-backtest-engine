@@ -8,6 +8,7 @@ const DEFAULT_BENCH = [
 
 let rrPortfolios = [];          // /api/portfolio/list
 let rrSelected = new Set();     // 선택된 포폴 id
+let rrSelectedOrder = [];       // compare order for selected portfolio ids
 let rrBench = DEFAULT_BENCH.slice();
 let rrSearchTimer = null;
 let rrItems = [];               // 결과 items
@@ -29,6 +30,7 @@ async function rrLoadPortfolios(){
     rrPortfolios = await fetch('/api/portfolio/list').then(r => r.json());
   } catch(e){ rrPortfolios = []; }
   rrSelected = new Set(rrPortfolios.map(p => p.id));   // 기본 전체 선택
+  rrSelectedOrder = rrPortfolios.map(p => p.id);
   rrRenderPfList();
 }
 function rrRenderPfList(){
@@ -37,16 +39,37 @@ function rrRenderPfList(){
     el.innerHTML = '<span style="color:var(--text-muted);font-size:0.82rem;">저장된 포트폴리오가 없어요. ⭐ <a href="/myportfolios" style="color:var(--blue);">내 포트폴리오</a>에서 먼저 저장하세요.</span>';
     return;
   }
-  el.innerHTML = rrPortfolios.map(p => {
+  const byId = new Map(rrPortfolios.map(p => [p.id, p]));
+  const ordered = rrSelectedOrder.map(id => byId.get(id)).filter(Boolean);
+  const pfRows = ordered.concat(rrPortfolios.filter(p => !rrSelected.has(p.id)));
+  el.innerHTML = pfRows.map(p => {
     const on = rrSelected.has(p.id);
+    const orderIdx = rrSelectedOrder.indexOf(p.id);
+    const orderBtns = on ? `<span class="rr-pf-order">
+        <button type="button" class="${orderIdx<=0?'off':''}" aria-disabled="${orderIdx<=0?'true':'false'}" onclick="event.preventDefault();event.stopPropagation();rrMovePf(${p.id},-1)" title="위로">&uarr;</button>
+        <button type="button" class="${orderIdx>=rrSelectedOrder.length-1?'off':''}" aria-disabled="${orderIdx>=rrSelectedOrder.length-1?'true':'false'}" onclick="event.preventDefault();event.stopPropagation();rrMovePf(${p.id},1)" title="아래로">&darr;</button>
+      </span>` : '';
     return `<label class="rr-pf-chk${on?' on':''}">
       <input type="checkbox" ${on?'checked':''} onchange="rrTogglePf(${p.id}, this.checked)">
-      ${esc(p.name)} <span style="color:var(--text-muted);">(${p.tickers.length})</span>
+      ${esc(p.name)} <span style="color:var(--text-muted);">(${p.tickers.length})</span>${orderBtns}
     </label>`;
   }).join('');
 }
 function rrTogglePf(id, on){
-  if (on) rrSelected.add(id); else rrSelected.delete(id);
+  if (on) {
+    rrSelected.add(id);
+    if (!rrSelectedOrder.includes(id)) rrSelectedOrder.push(id);
+  } else {
+    rrSelected.delete(id);
+    rrSelectedOrder = rrSelectedOrder.filter(x => x !== id);
+  }
+  rrRenderPfList();
+}
+function rrMovePf(id, dir){
+  const i = rrSelectedOrder.indexOf(id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= rrSelectedOrder.length) return;
+  [rrSelectedOrder[i], rrSelectedOrder[j]] = [rrSelectedOrder[j], rrSelectedOrder[i]];
   rrRenderPfList();
 }
 
@@ -132,7 +155,7 @@ async function rrCompare(){
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(useAdhoc
         ? { portfolios: adhoc, benchmarks: rrBench }
-        : { portfolio_ids: [...rrSelected], benchmarks: rrBench }),
+        : { portfolio_ids: rrSelectedOrder.filter(id => rrSelected.has(id)), benchmarks: rrBench }),
     });
     const data = await res.json();
     if (!res.ok) { rrSetCompareChartsLoading(false); status.style.display = 'block'; status.textContent = data.error || '산출에 실패했어요.'; return; }

@@ -3280,6 +3280,7 @@ def portfolio_compare():
     """
     from risk_return_logic import compute_comparison, DEFAULT_BENCHMARKS
     body = request.get_json(silent=True) or {}
+    ids = None
 
     adhoc = body.get('portfolios')   # 즉석 포폴(비로그인 찍먹) — 로그인 없이 허용
     if adhoc:
@@ -3298,16 +3299,24 @@ def portfolio_compare():
         if ids is None:
             selected = all_p           # 키 부재 = 전체
         else:
-            idset = {int(i) for i in ids}
-            selected = [p for p in all_p if p['id'] in idset]   # 빈 배열 = 선택 0
+            by_id = {int(p['id']): p for p in all_p}
+            selected, seen_ids = [], set()
+            for raw_id in ids:
+                try:
+                    pid = int(raw_id)
+                except (TypeError, ValueError):
+                    continue
+                if pid in seen_ids:
+                    continue
+                if pid in by_id:
+                    selected.append(by_id[pid])
+                    seen_ids.add(pid)
 
     benchmarks = []
-    for b in (body.get('benchmarks') or [])[:15]:
+    benchmark_input = body.get('benchmarks') if 'benchmarks' in body else DEFAULT_BENCHMARKS
+    for b in (benchmark_input or [])[:15]:
         if isinstance(b, dict) and b.get('code'):
             benchmarks.append({'code': str(b['code']), 'name': str(b.get('name') or b['code'])})
-    if not benchmarks:
-        benchmarks = DEFAULT_BENCHMARKS
-
     try:
         result = compute_comparison(selected, benchmarks, portfolio_engine.loader)
         return jsonify(result)

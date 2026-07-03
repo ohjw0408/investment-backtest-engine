@@ -135,3 +135,21 @@ python scripts/perf_ab.py cmp old.json new.json
 | 1d0e58f | 문서 |
 
 관련: [[status]] · [[bugs]] · repo `성능최적화_plan.md` · `scripts/perf_golden.py` · `scripts/perf_ab.py`
+
+## E-4 프론트 성능 베이스라인 — Lighthouse 모바일 (2026-07-03, 로컬)
+
+| 페이지 | Perf | FCP | LCP | TBT | CLS | SI | A11y |
+|---|---|---|---|---|---|---|---|
+| 홈 | 64 | 4.2s | 5.3s | 0ms | 0.016 | 8.5s | — |
+| 내자산 | 58 | 4.4s | 5.5s | 0ms | **0.129** | 10.8s | 95 |
+| 계산기 | 63 | 4.0s | 5.7s | 0ms | 0.039 | 8.8s | **82** |
+
+**⚠️ 해석 한계**: 지배 요인 = root document **TTFB ~4.0s** — 로컬 Flask dev 서버(werkzeug 디버그) 왜곡.
+prod(gunicorn+nginx) 재측정 전엔 Perf 점수·FCP/LCP 신뢰 불가 → **저비용 개선 착수 보류**.
+로컬에서도 유효한 시그널만:
+- unused CSS 147~180KiB (style.css 통짜 로드) — E-3 인라인 JS 외부화와 같은 계열, P3
+- 내자산 CLS 0.129 (경계 초과) — 로딩 중 레이아웃 점프, M4 스켈레톤 이후 재측정
+- 계산기 A11y 82: color-contrast · label 미연결(form/select) · label-content-name-mismatch — F-5 접근성 최소선 착수 시 대상 목록
+- TBT 0ms·Best-Practices 100 = 양호
+
+다음 액션: prod에서 동일 3페이지 재측정(PageSpeed Insights 웹으로 가능, 오너도 즉시 가능: pagespeed.web.dev에 moneymilestone.co.kr 입력) → 수치 갱신 후 개선 항목 확정.

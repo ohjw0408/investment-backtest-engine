@@ -7,7 +7,7 @@ import numpy as np
 
 from modules.portfolio_engine import PortfolioEngine
 from modules.rebalance.periodic import PeriodicRebalance
-from modules.analyzer.engine_rolling_analyzer import EngineRollingAnalyzer
+from modules.legacy.engine_rolling_analyzer import EngineRollingAnalyzer
 
 
 def main():

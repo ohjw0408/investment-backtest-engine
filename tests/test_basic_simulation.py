@@ -5,7 +5,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from modules.portfolio_engine import PortfolioEngine
 from modules.rebalance.periodic import PeriodicRebalance
-from modules.analyzer.portfolio_analyzer import PortfolioAnalyzer
+from modules.legacy.portfolio_analyzer import PortfolioAnalyzer
 
 
 def main():

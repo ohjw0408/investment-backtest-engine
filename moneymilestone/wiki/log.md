@@ -4530,3 +4530,11 @@ _작성: Claude_
 - **F-6 배치3(계산기/백테)**: 폼 12컷+결과 2컷 촬영. **발견 얇음**(아키타입 이식 완료 상태) — 취향 2건만(모바일 결과 5,400px 분포 접기 / 분포 카드 무지개색 통일). 상세=[[dev/design-critique]] 배치3. 로컬 재현 환경 확보 = WSL redis + celery solo 워커(결과뷰 실행 검증 가능해짐).
 
 _작성: Claude_
+
+## 2026-07-03 — D-2 죽은코드 위생 (오너 승인분)
+
+- 레거시 분석기 4종(engine_rolling·portfolio·retirement·rolling_scenario) → `modules/legacy/`(README 포함, 삭제 금지 원칙 절충). 프로덕션 참조 0 확인, 테스트 import 13파일 기계 수정, 이동분 테스트 전부 PASS.
+- `templates/*.bak` 2개 삭제, `debug_dividend.py`·`imp.py` → `tools/`.
+- **보류**: 루트 계획파일 ~30개 → `docs/plans/` 대이동 — 완결/진행 판별 오류 리스크로 오너와 목록 확정 후 별도 처리 권장.
+
+_작성: Claude_

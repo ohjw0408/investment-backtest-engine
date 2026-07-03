@@ -6,7 +6,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 import numpy as np
 
 from modules.portfolio_engine import PortfolioEngine
-from modules.analyzer.engine_rolling_analyzer import EngineRollingAnalyzer
+from modules.legacy.engine_rolling_analyzer import EngineRollingAnalyzer
 from modules.rebalance.periodic import PeriodicRebalance
 
 

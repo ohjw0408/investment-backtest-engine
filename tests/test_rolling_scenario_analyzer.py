@@ -8,7 +8,7 @@ import numpy as np
 
 from modules.portfolio_engine import PortfolioEngine
 from modules.rebalance.periodic import PeriodicRebalance
-from modules.analyzer.rolling_scenario_analyzer import RollingScenarioAnalyzer
+from modules.legacy.rolling_scenario_analyzer import RollingScenarioAnalyzer
 
 
 # -------------------------------------------------

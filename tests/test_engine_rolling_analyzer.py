@@ -5,7 +5,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from modules.portfolio_engine import PortfolioEngine
 from modules.rebalance.periodic import PeriodicRebalance
-from modules.analyzer.engine_rolling_analyzer import EngineRollingAnalyzer
+from modules.legacy.engine_rolling_analyzer import EngineRollingAnalyzer
 
 
 def run_test(dividend_mode):

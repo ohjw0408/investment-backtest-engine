@@ -13,7 +13,7 @@ from pathlib import Path
 # 프로젝트 루트 경로 추가
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from modules.portfolio_engine import PortfolioEngine
-from modules.analyzer.portfolio_analyzer import PortfolioAnalyzer
+from modules.legacy.portfolio_analyzer import PortfolioAnalyzer
 from modules.rebalance.periodic import PeriodicRebalance
 
 

@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 import pandas as pd
 
 from modules.portfolio_engine import PortfolioEngine
-from modules.analyzer.portfolio_analyzer import PortfolioAnalyzer
+from modules.legacy.portfolio_analyzer import PortfolioAnalyzer
 from modules.rebalance.periodic import PeriodicRebalance
 from modules.price_loader import PriceLoader
 

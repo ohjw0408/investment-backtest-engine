@@ -4523,3 +4523,10 @@ _작성: Claude_
 오너 제보 2차: 지나간 4월이 예측색. 원인 = corporate_actions 저장 갭(dividend=0 선점행 + INSERT OR IGNORE → 영구 갭) + 과거 달도 예측으로 채우는 로직. 수정 = 갭 감지 시 yfinance 재페치 **조건부 UPSERT**(0/NULL만 갱신) + 예측 채움 이번 달 이후 한정. 상세=[[dev/bugs]]. B-3(IGNORE 정책 감사)에 corporate_actions 케이스 추가 근거 확보.
 
 _작성: Claude_
+
+## 2026-07-03 — B-3 감사 완료 + F-6 배치3 크리틱 (오너 승인 대기)
+
+- **B-3**: INSERT OR IGNORE/REPLACE 전수 판정표 = [[dev/raw-sql-inventory]]. 구조 수정 1건 — fetch의 corporate_actions 저장을 조건부 UPSERT(`_upsert_actions`)로: dividend=0/split=1 자리표시만 실값으로 갱신(TLT 4월 갭의 근본 차단, 전 종목 커버). 골든마스터 불변·로더 테스트 6 PASS.
+- **F-6 배치3(계산기/백테)**: 폼 12컷+결과 2컷 촬영. **발견 얇음**(아키타입 이식 완료 상태) — 취향 2건만(모바일 결과 5,400px 분포 접기 / 분포 카드 무지개색 통일). 상세=[[dev/design-critique]] 배치3. 로컬 재현 환경 확보 = WSL redis + celery solo 워커(결과뷰 실행 검증 가능해짐).
+
+_작성: Claude_

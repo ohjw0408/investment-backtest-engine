@@ -88,7 +88,7 @@
     $('mcBody').innerHTML = `
       <div class="mc-cust-hero">
         <h3>🆚 한·미 지표 비교</h3>
-        <p>미국·한국 같은 지표를 한 차트에 겹쳐 봅니다. 기본 <b>최근 10년·원값(개별 축)</b>. 아래에서 지표를 고르고 구간·표시를 바꿀 수 있어요.</p>
+        <p>미국·한국 같은 지표를 한 차트에 겹쳐 봅니다. 금리·실업률처럼 같은 단위는 <b>단일 축</b>, 단위나 스케일이 다르면 개별 축으로 봅니다.</p>
         <div class="mc-presets" id="mcCmpPairs">${pairs.map((p, i) => `<button class="mc-preset ${i === 0 ? 'on' : ''}" data-i="${i}">${p.label}</button>`).join('')}</div>
       </div>
       <div class="mc-cust-ctrl" id="mcCustCtrl"></div>
@@ -108,7 +108,7 @@
       { key: pair.us, label: `🇺🇸 ${_macroName(pair.us)}`, color: PALETTE[0] },
       { key: pair.kr, label: `🇰🇷 ${_macroName(pair.kr)}`, color: PALETTE[1] },
     ];
-    custStart = custEnd = null; custViewMode = 'raw';   // 기본 = 최근10년·원값 개별축
+    custStart = custEnd = null; custViewMode = 'raw';   // 기본 = 최근10년·원값
     custOwner = 'cmp';
     loadCustomChart();
   }
@@ -211,7 +211,7 @@
         ${qr(1, '1년')}${qr(5, '5년')}${qr(10, '10년')}${qr(0, '전체')}</span>
       <span class="grp">표시:
         <label><input type="radio" name="cmode" value="norm" ${custViewMode === 'norm' ? 'checked' : ''}> 정규화(시작=100)</label>
-        <label><input type="radio" name="cmode" value="raw" ${custViewMode === 'raw' ? 'checked' : ''}> 원값(개별 축)</label></span>`;
+        <label><input type="radio" name="cmode" value="raw" ${custViewMode === 'raw' ? 'checked' : ''}> ${custOwner === 'cmp' ? '원값(가능하면 단일 축)' : '원값(개별 축)'}</label></span>`;
     $('mcStart').addEventListener('change', (e) => { custStart = e.target.value; drawCustom(); });
     $('mcEnd').addEventListener('change', (e) => { custEnd = e.target.value; drawCustom(); });
     ctrl.querySelectorAll('input[name=cmode]').forEach(r => r.addEventListener('change', (e) => { custViewMode = e.target.value; drawCustom(); }));
@@ -254,21 +254,35 @@
   }
 
   function inRange(p) { return (!custStart || p[0] >= custStart) && (!custEnd || p[0] <= custEnd); }
+  function cmpSharedRawUnit(series) {
+    if (custOwner !== 'cmp' || series.length < 2) return null;
+    const rawUnits = new Set(['%', '%p', '배']);
+    const units = [...new Set(series.map(s => s.unit).filter(Boolean))];
+    return units.length === 1 && rawUnits.has(units[0]) ? units[0] : null;
+  }
 
   function drawCustom() {
     if (!custom.length) { custChart = drawLine('mcCustChart', custChart, [], ''); return; }
     if (custViewMode === 'raw') {
       const datasets = [], axes = {};
       const txt = css('--text-muted') || '#888', grid = css('--border') || '#e0e0e0';
+      const seriesForAxis = custom.map(c => custRaw[c.key]).filter(Boolean);
+      const sharedUnit = cmpSharedRawUnit(seriesForAxis);
       custom.forEach((c, i) => {
         const s = custRaw[c.key]; if (!s) return;
         const pts = s.points.filter(inRange); if (!pts.length) return;
+        if (sharedUnit) {
+          datasets.push(lineDS(`${c.label} (${s.unit || '원값'})`, pts, c.color));
+          return;
+        }
         const ax = 'y' + i;
         axes[ax] = { position: i % 2 ? 'right' : 'left', ticks: { color: c.color, font: { size: 10 } },
           grid: { drawOnChartArea: i === 0, color: grid } };
         datasets.push({ ...lineDS(`${c.label} (${s.unit || '원값'})`, pts, c.color), yAxisID: ax });
       });
-      custChart = drawAxes('mcCustChart', custChart, datasets, axes);
+      custChart = sharedUnit
+        ? drawLine('mcCustChart', custChart, datasets, sharedUnit)
+        : drawAxes('mcCustChart', custChart, datasets, axes);
     } else {
       const ds = custom.map(c => { const s = custRaw[c.key]; if (!s) return null;
         const pts = s.points.filter(inRange);

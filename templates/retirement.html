@@ -241,7 +241,7 @@
           <section class="bt-fcard ret-money-card">
             <h2 class="bt-fcard-title gap">은퇴 계획</h2>
             <div class="input-row">
-              <label>초기 투자금</label>
+              <label for="simSeed">초기 투자금</label>
               <div class="input-group">
                 <input type="number" id="simSeed" class="calc-input" value="10000000" min="0" step="1000000">
                 <span class="unit">원</span>
@@ -249,7 +249,7 @@
               <div class="input-hint" id="simSeedHint">₩10,000,000</div>
             </div>
             <div class="input-row">
-              <label>월 적립금</label>
+              <label for="simMonthly">월 적립금</label>
               <div class="input-group">
                 <input type="number" id="simMonthly" class="calc-input" value="500000" min="0" step="100000">
                 <span class="unit">원</span>
@@ -274,7 +274,7 @@
               <span id="simAccYearsLabel" style="display:none;">20년</span>
             </div>
             <div class="input-row">
-              <label>월 인출금</label>
+              <label for="simWithdraw">월 인출금</label>
               <div class="input-group">
                 <input type="number" id="simWithdraw" class="calc-input" value="3000000" min="0" step="100000">
                 <span class="unit">원</span>
@@ -320,7 +320,7 @@
               </div>
               <div class="band-settings" id="simBandSettings" style="display:none">
                 <div class="input-row">
-                  <label>밴드 폭 <span id="simBandLabel" class="label-val">5%</span></label>
+                  <label for="simBandSlider">밴드 폭 <span id="simBandLabel" class="label-val">5%</span></label>
                   <input type="range" id="simBandSlider" class="calc-slider" min="1" max="30" value="5">
                   <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
                 </div>
@@ -356,7 +356,7 @@
           <section class="bt-fcard ret-money-card">
             <h2 class="bt-fcard-title gap">인출기 설정</h2>
             <div class="input-row">
-              <label>초기 자산</label>
+              <label for="wdSeed">초기 자산</label>
               <div class="input-group">
                 <input type="number" id="wdSeed" class="calc-input" value="500000000" min="0" step="10000000">
                 <span class="unit">원</span>
@@ -364,7 +364,7 @@
               <div class="input-hint" id="wdSeedHint">₩5억</div>
             </div>
             <div class="input-row">
-              <label>월 인출금</label>
+              <label for="wdWithdraw">월 인출금</label>
               <div class="input-group">
                 <input type="number" id="wdWithdraw" class="calc-input" value="3000000" min="0" step="100000">
                 <span class="unit">원</span>
@@ -425,7 +425,7 @@
               </div>
               <div class="band-settings" id="wdBandSettings" style="display:none">
                 <div class="input-row">
-                  <label>밴드 폭 <span id="wdBandLabel" class="label-val">5%</span></label>
+                  <label for="wdBandSlider">밴드 폭 <span id="wdBandLabel" class="label-val">5%</span></label>
                   <input type="range" id="wdBandSlider" class="calc-slider" min="1" max="30" value="5">
                   <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
                 </div>

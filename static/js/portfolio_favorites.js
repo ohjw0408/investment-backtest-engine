@@ -21,6 +21,7 @@ window.MMFav = (function () {
 
     const select = document.createElement('select');
     select.className = 'fav-select';
+    select.setAttribute('aria-label', '즐겨찾기 포트폴리오 선택');
 
     const saveBtn = document.createElement('button');
     saveBtn.type = 'button';

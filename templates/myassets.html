@@ -643,7 +643,7 @@
       </div>
 
       <div class="input-row">
-        <label>수량</label>
+        <label for="holdingQty">수량</label>
         <div class="input-group">
           <input type="number" id="holdingQty" class="calc-input" value="1" min="0" step="0.001">
           <span class="unit">주</span>
@@ -651,7 +651,7 @@
       </div>
 
       <div class="input-row">
-        <label>평균 단가</label>
+        <label for="holdingAvgPrice">평균 단가</label>
         <div class="input-group">
           <input type="number" id="holdingAvgPrice" class="calc-input" value="0" min="0">
           <span class="unit">원</span>
@@ -659,7 +659,7 @@
       </div>
 
       <div class="input-row">
-        <label>매수일 <span style="font-size:0.75rem;color:var(--text-muted);">(선택)</span></label>
+        <label for="holdingBuyDate">매수일 <span style="font-size:0.75rem;color:var(--text-muted);">(선택)</span></label>
         <input type="date" id="holdingBuyDate" class="calc-input">
       </div>
 
@@ -693,11 +693,11 @@
       <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center;"><span id="modalGroupTitle">그룹 추가</span> <button onclick="closeModal('modalGroup')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);display:inline-flex;">{{ mi('x') }}</button></div>
       <input type="hidden" id="groupId">
       <div class="input-row">
-        <label>그룹명</label>
+        <label for="groupName">그룹명</label>
         <input type="text" id="groupName" class="calc-input" placeholder="예: 미국주식, 금, 채권">
       </div>
       <div class="input-row">
-        <label>색상</label>
+        <label for="groupColor">색상</label>
         <input type="color" id="groupColor" value="#1976D2" style="width:48px;height:36px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;">
       </div>
       <div class="input-row">
@@ -721,7 +721,7 @@
       <input type="hidden" id="manualHoldingId">
       <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5;">원화 ₩ 기준으로 입력하세요. 비우고 저장하면 자동 시세로 복귀합니다.</div>
       <div class="input-row">
-        <label>현재가</label>
+        <label for="manualPriceInput">현재가</label>
         <div class="input-group">
           <input type="number" id="manualPriceInput" class="calc-input" min="0" step="1" placeholder="자동 시세 사용">
           <span class="unit">원</span>

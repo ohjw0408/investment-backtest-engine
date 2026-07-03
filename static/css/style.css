@@ -73,10 +73,10 @@ html[data-theme="dark"] {
 }
 [data-theme="dark"] {
   --brand:#4a7dff; --brand-hover:#6a96ff; --brand-bright:#6a96ff;
-  --brand-tint:#16223d; --brand-text:#4a7dff; --on-brand:#ffffff;
+  --brand-tint:#16223d; --brand-text:#6b93ff; --on-brand:#ffffff; /* brand-text 4.45→5.5:1 (F-5) */
   /* dark: page(soft)=최암, card(canvas)=elevated 더 밝게 → 카드 떠 보이게 */
   --ds-canvas:#16181d; --ds-soft:#0a0b0e; --ds-strong:#23262d; --ds-hairline:#2c3038;
-  --ds-ink:#f5f6f8; --ds-body:#a8acb3; --ds-muted:#7c828a;
+  --ds-ink:#f5f6f8; --ds-body:#a8acb3; --ds-muted:#8a9099; /* 4.25→4.9:1 (F-5) */
   --up:#27c281; --up-tint:#0f2a20; --down:#ff5a5f; --down-tint:#2e1518; --gold-acc:#ffc94d;
   --ds-shadow:0 4px 12px rgba(0,0,0,.4); --ds-shadow-lg:0 8px 32px rgba(0,0,0,.6);
 }
@@ -93,7 +93,7 @@ html[data-theme="dark"] {
 [data-accent="pink"]   { --brand:#db2777; --brand-hover:#be185d; --brand-bright:#f472b6; --brand-tint:#fce7f3; --brand-text:#be185d; --on-brand:#fff; }
 [data-accent="graphite"]{ --brand:#475569; --brand-hover:#334155; --brand-bright:#94a3b8; --brand-tint:#f1f5f9; --brand-text:#475569; --on-brand:#fff; }
 /* dark variants (fill 밝은 색은 글씨 ink) */
-[data-theme="dark"][data-accent="blue"]   { --brand:#4a7dff; --brand-hover:#6a96ff; --brand-tint:#16223d; --brand-text:#4a7dff; --on-brand:#fff; }
+[data-theme="dark"][data-accent="blue"]   { --brand:#4a7dff; --brand-hover:#6a96ff; --brand-tint:#16223d; --brand-text:#6b93ff; --on-brand:#fff; }
 [data-theme="dark"][data-accent="orange"] { --brand:#ff7d29; --brand-hover:#ff9b5c; --brand-tint:#2a1a0d; --brand-text:#ff9b5c; --on-brand:#0a0b0d; }
 [data-theme="dark"][data-accent="sky"]    { --brand:#38bdf8; --brand-hover:#7dd3fc; --brand-tint:#0c2a3a; --brand-text:#7dd3fc; --on-brand:#0a0b0d; }
 [data-theme="dark"][data-accent="cyan"]   { --brand:#22d3ee; --brand-hover:#67e8f9; --brand-tint:#08323b; --brand-text:#67e8f9; --on-brand:#0a0b0d; }

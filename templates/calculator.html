@@ -232,7 +232,7 @@
     <section class="bt-fcard bt-money-card">
       <h2 class="bt-fcard-title gap">투자 금액</h2>
       <div class="input-row">
-        <label>초기 투자금</label>
+        <label for="initialCapital">초기 투자금</label>
         <div class="input-group">
           <input type="number" id="initialCapital" class="calc-input" value="10000000" min="0" step="1000000">
           <span class="unit">원</span>
@@ -240,7 +240,7 @@
         <div class="input-hint" id="initialHint">₩10,000,000</div>
       </div>
       <div class="input-row">
-        <label>월 적립액</label>
+        <label for="monthlyContrib">월 적립액</label>
         <div class="input-group">
           <input type="number" id="monthlyContrib" class="calc-input" value="500000" min="0" step="100000">
           <span class="unit">원</span>
@@ -248,7 +248,7 @@
         <div class="input-hint" id="monthlyHint">₩500,000</div>
       </div>
       <div class="input-row">
-        <label>투자 기간 <span id="yearsLabel" class="label-val">20년</span></label>
+        <label for="yearsSlider">투자 기간 <span id="yearsLabel" class="label-val">20년</span></label>
         <input type="range" id="yearsSlider" class="calc-slider" min="1" max="40" value="20">
         <div class="slider-marks">
           <span>1년</span><span>10년</span><span>20년</span><span>30년</span><span>40년</span>
@@ -271,7 +271,7 @@
         </div>
         <div class="band-settings" id="bandSettings" style="display:none">
           <div class="input-row">
-            <label>밴드 폭 <span id="bandLabel" class="label-val">5%</span></label>
+            <label for="bandSlider">밴드 폭 <span id="bandLabel" class="label-val">5%</span></label>
             <input type="range" id="bandSlider" class="calc-slider" min="1" max="30" value="5">
             <div class="slider-marks"><span>1%</span><span>10%</span><span>20%</span><span>30%</span></div>
           </div>

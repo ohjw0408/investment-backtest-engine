@@ -215,7 +215,7 @@
     <section class="bt-fcard dt-goal-card">
       <h2 class="bt-fcard-title gap">목표 설정</h2>
       <div class="input-row">
-        <label>목표 월 배당금</label>
+        <label for="dtTargetDiv">목표 월 배당금</label>
         <div class="input-group">
           <input type="number" id="dtTargetDiv" class="calc-input" value="1000000" min="0" step="100000">
           <span class="unit">원</span>
@@ -223,7 +223,7 @@
         <div class="input-hint" id="dtTargetDivHint">₩1,000,000</div>
       </div>
       <div class="input-row">
-        <label>목표 신뢰도 <span id="dtProbLabel" class="label-val">50%</span></label>
+        <label for="dtProbSlider">목표 신뢰도 <span id="dtProbLabel" class="label-val">50%</span></label>
         <input type="range" id="dtProbSlider" class="calc-slider" min="0" max="100" value="50" step="1">
         <div class="slider-marks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
         <div style="font-size:11px;color:var(--ds-muted);margin-top:4px;">

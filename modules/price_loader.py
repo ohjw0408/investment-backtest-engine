@@ -537,6 +537,28 @@ class PriceLoader:
         )
         self.conn.commit()
 
+    def _upsert_actions(self, df):
+        """corporate_actions 저장 — 실값이 자리표시 행을 이기는 조건부 UPSERT (B-3).
+
+        가격 페치는 전 거래일에 dividend=0/split=1 행을 깔아두는데, 페치 구간·시점에
+        따라 그 행이 실배당/실스플릿보다 먼저 박히면 INSERT OR IGNORE로는 영구 갭
+        (TLT 2026-04 배당 누락 사례). 기존 값이 자리표시(배당 0/NULL, 스플릿 1/NULL)일
+        때만 새 실값으로 갱신하고, 이미 있는 실값은 절대 덮지 않는다.
+        """
+        if df is None or df.empty:
+            return
+        rows = df[["code", "date", "dividend", "split"]].values.tolist()
+        self.conn.executemany(
+            "INSERT INTO corporate_actions (code, date, dividend, split) VALUES (?,?,?,?) "
+            "ON CONFLICT(code, date) DO UPDATE SET "
+            "  dividend = CASE WHEN corporate_actions.dividend IS NULL OR corporate_actions.dividend <= 0 "
+            "             THEN excluded.dividend ELSE corporate_actions.dividend END, "
+            "  split    = CASE WHEN (corporate_actions.split IS NULL OR corporate_actions.split = 1) "
+            "             THEN excluded.split ELSE corporate_actions.split END",
+            rows
+        )
+        self.conn.commit()
+
     def purge_isolated_spikes(self, days: int = 120, ratio_threshold: float = 4.0) -> int:
         """price_daily에서 고립 스파이크(오틱) 행을 영구 DELETE — 근본 클린업.
 
@@ -647,7 +669,7 @@ class PriceLoader:
                 action_df = action_df.copy()
                 action_df["code"] = code
             self._insert_ignore(price_df, "price_daily")
-            self._insert_ignore(action_df, "corporate_actions")
+            self._upsert_actions(action_df)
 
         # ── 백필링 자동 실행 (ticker당 1회) ─────────────────
         # _backfilled_codes: 성공 완료 → 재시도 불필요

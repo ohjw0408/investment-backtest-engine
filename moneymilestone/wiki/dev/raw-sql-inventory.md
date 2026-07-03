@@ -54,3 +54,22 @@
 ## 히스토리
 
 - 2026-07-03: 최초 작성 (B-2③). B-2① 쓰기 훅·B-2② 무결성 beat와 동시 배포.
+
+## B-3: INSERT OR IGNORE / REPLACE 정책 판정 (2026-07-03)
+
+기준: "실데이터가 자리표시·합성·구데이터를 이길 수 있는가?"
+
+| 지점 | 정책 | 판정 | 근거 |
+|---|---|---|---|
+| price_loader fetch → corporate_actions | ~~IGNORE~~ → **조건부 UPSERT** (`_upsert_actions`) | ✅ 수정(이번 커밋) | 페치가 전 거래일에 dividend=0/split=1 자리표시를 깔아 실값이 영구 차단(TLT 2026-04 실사례). 실값>0이 0/NULL만 갱신, 기존 실값 불변 |
+| price_loader fetch → price_daily | IGNORE | 유지 | 쓰기 훅(`_validate_price_rows`)이 오염 차단 + purge/무결성 beat가 오틱·NULL self-heal. 과거 확정 종가는 불변이 정상 |
+| backfill_engine → price_daily·corporate_actions | IGNORE | 유지(의도) | 합성/백필이 실데이터를 절대 못 덮는 보호 장치 |
+| synthetic_price_generator → price_daily_synthetic | IGNORE | 유지 | 전용 테이블, 실데이터 비접촉 |
+| app.py KR 폴백 → price_daily·corporate_actions | REPLACE | 유지 | 실데이터 갱신 경로(최근 3y). dividend>0 행만 삽입이라 자리표시 문제 없음 |
+| krx/fetch_krx_stocks·gold | REPLACE | 유지 | KRX 공식 실데이터 |
+| ECOS USD/KRW·index_daily 로더들 | IGNORE | 유지 | 확정 지표값 불변, 쓰기 훅 적용(USD/KRW) |
+| macro_observations | IGNORE | ⚠️ 잠재(문서화만) | FRED 수정치(revision)가 반영 안 됨 — 거시 표시용이라 영향 작음, 필요 시 후속 |
+| index_ohlc·price_hourly·etf_holdings_cache·ticker_stats | REPLACE | 유지 | 캐시성 — 최신값 덮어쓰기가 정상 |
+| dividend_history 갭 재페치 | 조건부 UPSERT | ✅ (295127e) | 지나간 달 갭 lazy self-heal, 보유종목 한정 |
+
+핵심 규칙: **자리표시가 생기는 테이블(corporate_actions)은 IGNORE 금지, 조건부 UPSERT.**

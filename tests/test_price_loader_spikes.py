@@ -95,3 +95,28 @@ def test_validate_price_rows_clean_data_unchanged():
 
     assert out["close"].tolist() == [100.0, 101.5, 99.8]
     assert out["date"].tolist() == df["date"].tolist()
+
+
+def test_upsert_actions_real_value_beats_placeholder():
+    # B-3: 자리표시(dividend=0) 선점 행을 실값이 이기고, 기존 실값은 보존.
+    pl = PriceLoader.__new__(PriceLoader)
+    pl.conn = sqlite3.connect(":memory:")
+    pl.conn.execute("CREATE TABLE corporate_actions (code TEXT, date TEXT, dividend REAL, split REAL, PRIMARY KEY (code, date))")
+    pl.conn.execute("INSERT INTO corporate_actions VALUES ('TLT','2026-04-01',0.0,1.0)")    # 자리표시 선점
+    pl.conn.execute("INSERT INTO corporate_actions VALUES ('TLT','2026-05-01',0.315,1.0)")  # 기존 실값
+    pl.conn.execute("INSERT INTO corporate_actions VALUES ('AAPL','2026-06-10',0.0,1.0)")   # 스플릿 자리표시
+    df = pd.DataFrame([
+        {"code": "TLT",  "date": "2026-04-01", "dividend": 0.345, "split": 1.0},  # 실값 → 갱신
+        {"code": "TLT",  "date": "2026-05-01", "dividend": 0.0,   "split": 1.0},  # 자리표시 → 기존 보존
+        {"code": "TLT",  "date": "2026-06-01", "dividend": 0.336, "split": 1.0},  # 신규 insert
+        {"code": "AAPL", "date": "2026-06-10", "dividend": 0.0,   "split": 4.0},  # 실스플릿 → 갱신
+    ])
+
+    pl._upsert_actions(df)
+
+    got = {(c, d): (div, sp) for c, d, div, sp in
+           pl.conn.execute("SELECT code, date, dividend, split FROM corporate_actions").fetchall()}
+    assert got[("TLT", "2026-04-01")] == (0.345, 1.0)
+    assert got[("TLT", "2026-05-01")] == (0.315, 1.0)
+    assert got[("TLT", "2026-06-01")] == (0.336, 1.0)
+    assert got[("AAPL", "2026-06-10")] == (0.0, 4.0)

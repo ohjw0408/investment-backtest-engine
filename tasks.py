@@ -504,28 +504,8 @@ def refresh_macro():
 # ── 데이터 무결성 상시 방어 (출시완성도 B-2②) ─────────────────────────────
 
 def _integrity_notify_owner(issues):
-    """무결성 이상을 오너 인앱 수신함 + FCM 푸시로 통지 (기존 알림 인프라 재사용)."""
-    import sqlite3
-    owner_email = os.environ.get('OWNER_EMAIL', 'ohjw0408@gmail.com')
-    try:
-        from modules.auth_manager import DB_PATH as _users_db
-        conn = sqlite3.connect(str(_users_db))
-        row = conn.execute("SELECT id FROM users WHERE email=?", (owner_email,)).fetchone()
-        conn.close()
-        if not row:
-            return
-        uid = row[0]
-        title = f"⚠️ 데이터 무결성 이상 {len(issues)}건"
-        body = " / ".join(issues)[:500]
-        from modules.alerts import alert_store
-        alert_store.add_event(uid, title, body, meta={'type': 'integrity'})
-        try:
-            from modules.alerts import push_sender
-            push_sender.send_to_user(uid, title, body, data={'type': 'integrity', 'target_url': '/alerts#inbox'})
-        except Exception:
-            pass
-    except Exception as e:
-        print(f"[data_integrity_scan] 오너 알림 실패: {e}")
+    """내부 데이터 품질 경고는 사용자 알림함/푸시로 보내지 않는다."""
+    print(f"[data_integrity_scan] 내부 운영 경고(수신함 미발송): {issues}")
 
 
 def _sentry_capture(msg):
@@ -550,7 +530,7 @@ def data_integrity_scan():
        쓰기경로 _validate_price_rows가 신규 유입을 막으므로 잔존 발견 = 우회 쓰기경로 신호)
     ② 핵심 시계열 신선도 — USD/KRW(전 환산의 기반)·KRX_GOLD·price_daily 전체 max(date)
     ③ 합성 백필 손상 스캔 — scripts/scan_backfill_corruption.scan_all 재사용 (B-1 판정 기준)
-    이상 발견 시 오너 인앱 알림+푸시, Sentry 이벤트.
+    이상 발견 시 워커 로그 + Sentry 이벤트. 사용자 수신함/푸시는 사용하지 않는다.
     """
     import sqlite3
     from datetime import datetime, timedelta

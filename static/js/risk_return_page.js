@@ -667,7 +667,7 @@ window.addEventListener('resize', () => {
 });
 
 // ── 추세 겹쳐보기 오버레이 ──
-const rrOv = { items: [], raw: {}, start: null, end: null, mode: 'norm', activeY: 5, activeEvent: null, macros: [], chart: null };
+const rrOv = { items: [], raw: {}, start: null, end: null, mode: 'norm', basis: 'tr', activeY: 5, activeEvent: null, macros: [], chart: null, exPorts: {} };
 const RR_OV_QUICK = [['SYM:SPY','S&P500'],['SYM:069500','코스피200'],['SYM:GLD','금'],['SYM:TLT','미국 장기채']];
 const RR_RANGE_EVENTS = [
   { key:'dotcom', label:'닷컴', start:'2000-01-01', end:'2002-12-31' },
@@ -691,14 +691,14 @@ async function rrOvInit(){
     await Promise.all(pre.map(async (p, i) => {
       try {
         const d = await fetch('/api/portfolio/index_series', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ portfolios: [p] }) }).then(r=>r.json());
+          body: JSON.stringify({ portfolios: [p], basis: rrOv.basis }) }).then(r=>r.json());
         results[i] = (d.series || [])[0] || null;
       } catch(e){ results[i] = null; }
       done++; rrOvProg(done, pre.length);
     }));
     rrOvProg(-1);
     rrOv.raw = {}; rrOv.items = [];
-    results.forEach((s, i) => { if (s){ const key='EX:'+i; rrOv.raw[key] = {...s, key, label: pre[i].name}; rrOv.items.push({key, label: pre[i].name}); } });
+    results.forEach((s, i) => { if (s){ const key='EX:'+i; rrOv.exPorts[key] = pre[i]; rrOv.raw[key] = {...s, key, label: pre[i].name}; rrOv.items.push({key, label: pre[i].name}); } });
     if (rrOv.items.length){
       rrOvRecolor(); rrOv.start = null; rrOvSetDefaultRange();
       rrOvRenderQuick(); rrOvRenderChips(); rrOvRenderCtrl(); rrOvDraw();
@@ -754,19 +754,33 @@ async function rrOvLoad(){
   if (!rrOv.items.length){ rrOvRenderCtrl(); rrOvDraw(); return; }
   // EX:(즉석 예시 포폴) 시계열은 macro/multi에 없음 → 보존하고 나머지만 조회
   const kept = {};
-  rrOv.items.forEach(it=>{ if(it.key.startsWith('EX:') && rrOv.raw[it.key]) kept[it.key]=rrOv.raw[it.key]; });
+  rrOv.items.forEach(it=>{ if(it.key.startsWith('EX:') && rrOv.raw[it.key] && rrOv.raw[it.key].basis === rrOv.basis) kept[it.key]=rrOv.raw[it.key]; });
   const fetchKeys = rrOv.items.map(it=>it.key).filter(k=>!k.startsWith('EX:'));
   if (fetchKeys.length){
     // 키별 병렬(동시성 4) 요청 + 진행률 — 도착하는 대로 % 채움
     let done=0; rrOvProg(0, fetchKeys.length);
     const q=[...fetchKeys];
     const worker = async () => { while(q.length){ const k=q.shift();
-      try { const d=await fetch(`/api/macro/multi?keys=${encodeURIComponent(k)}`).then(r=>r.json());
+      try { const d=await fetch(`/api/macro/multi?keys=${encodeURIComponent(k)}&basis=${encodeURIComponent(rrOv.basis)}`).then(r=>r.json());
         (d.series||[]).forEach(s=>kept[s.key]=s);
       } catch(e){}
       done++; rrOvProg(done, fetchKeys.length);
     }};
     await Promise.all([worker(),worker(),worker(),worker()]);
+    rrOvProg(-1);
+  }
+  const exKeys = rrOv.items.map(it=>it.key).filter(k=>k.startsWith('EX:') && !kept[k] && rrOv.exPorts[k]);
+  if (exKeys.length){
+    let done=0; rrOvProg(0, exKeys.length);
+    await Promise.all(exKeys.map(async k => {
+      try {
+        const d = await fetch('/api/portfolio/index_series', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ portfolios: [rrOv.exPorts[k]], basis: rrOv.basis }) }).then(r=>r.json());
+        const s = (d.series || [])[0];
+        if (s) kept[k] = {...s, key: k, label: rrOv.exPorts[k].name};
+      } catch(e){}
+      done++; rrOvProg(done, exKeys.length);
+    }));
     rrOvProg(-1);
   }
   rrOv.raw = kept;
@@ -836,11 +850,15 @@ function rrOvRenderCtrl(){
     <span class="grp">표시:
       <label><input type="radio" name="rrovm" value="norm" ${rrOv.mode==='norm'?'checked':''}>정규화(시작=100)</label>
       <label><input type="radio" name="rrovm" value="raw" ${rrOv.mode==='raw'?'checked':''}>원값(개별축)</label></span>
+    <span class="grp">수익률 기준:
+      <label><input type="radio" name="rrovbasis" value="tr" ${rrOv.basis==='tr'?'checked':''}>총수익</label>
+      <label><input type="radio" name="rrovbasis" value="price" ${rrOv.basis==='price'?'checked':''}>가격</label></span>
     <span class="rr-ov-zoomhint" style="font-size:0.72rem;color:var(--text-muted);">💡 그래프를 <b>드래그</b>하면 그 구간만 확대돼요.</span>
     ${over5?'<span class="rr-ov-warn">⚠ 5년 초과 + 정규화는 작은 차이가 과장돼 보여요</span>':''}`;
   document.getElementById('rrOvStart').addEventListener('change',e=>rrOvApplyRange(e.target.value, rrOv.end, -1, null));
   document.getElementById('rrOvEnd').addEventListener('change',e=>rrOvApplyRange(rrOv.start, e.target.value, -1, null));
   el.querySelectorAll('input[name=rrovm]').forEach(r=>r.addEventListener('change',e=>{ rrOv.mode=e.target.value; rrOvRenderCtrl(); rrOvDraw(); }));
+  el.querySelectorAll('input[name=rrovbasis]').forEach(r=>r.addEventListener('change',e=>{ rrOv.basis=e.target.value; rrOv.raw={}; rrOvLoad(); }));
   el.querySelectorAll('.qr[data-y]').forEach(b=>b.addEventListener('click',()=>rrOvSetYears(+b.dataset.y)));
   el.querySelectorAll('.ev').forEach(b=>b.addEventListener('click',()=>rrOvApplyEvent(b.dataset.ev)));
   const zr=document.getElementById('rrOvZoomReset');

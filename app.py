@@ -3031,7 +3031,7 @@ def _price_daily_conn():
 
 # ── 추세 겹쳐보기 시계열 캐시(일일) — 종목별·포폴결과 재계산 방지(공유종목 dedupe) ──
 _TS_DAY = None
-_TS_TKCACHE = {}    # (code, start) -> (close_map, syn_map)
+_TS_TKCACHE = {}    # (code, start, total_return) -> (close_map, syn_map)
 _TS_RESCACHE = {}   # signature -> downsampled points
 
 
@@ -3046,9 +3046,9 @@ def _ts_day_guard():
     return today
 
 
-def _ticker_series(conn, code, start):
+def _ticker_series(conn, code, start, total_return=True):
     """종목별 (close_map, syn_map) — 일일 캐시. 여러 포폴이 공유하는 종목(TLT·GLD 등) 1회만 계산."""
-    key = (code, start)
+    key = (code, start, bool(total_return))
     hit = _TS_TKCACHE.get(key)
     if hit is not None:
         return hit
@@ -3070,10 +3070,12 @@ def _ticker_series(conn, code, start):
             # 총수익 인덱스(배당 재투자) — 결정#6. 배당주(SCHD 등) 저평가 방지.
             # ⚠️ price_daily close·dividend는 이미 분할조정(연속)이라 split 곱하면 가짜 점프
             #    (예: SCHD 2024-10-11 3:1) → split 적용 안 함. 배당만 재투자.
-            act = conn.execute(
-                "SELECT date, dividend FROM corporate_actions WHERE code=? AND date>=?",
-                (c, start)).fetchall()
-            divm = {a[0]: (float(a[1]) if a[1] else 0.0) for a in act}
+            divm = {}
+            if total_return:
+                act = conn.execute(
+                    "SELECT date, dividend FROM corporate_actions WHERE code=? AND date>=?",
+                    (c, start)).fetchall()
+                divm = {a[0]: (float(a[1]) if a[1] else 0.0) for a in act}
             prev_close = None
             tr = None
             for r in dfx.itertuples():
@@ -3110,7 +3112,7 @@ def _downsample_points(points, target):
     return out
 
 
-def _portfolio_index_series(tickers, years=None, conn=None, downsample=1800):
+def _portfolio_index_series(tickers, years=None, conn=None, downsample=1800, total_return=True):
     """저장 포트폴리오 → 비중 고정 정규화 지수(시작=100) 일별 시계열. 오버레이 추세 비교용.
        각 포인트 = [date, value, syn] (syn=1: 그 날 합성 백필[volume=0] 섞임 → 프런트 점선).
        years=None=전체기간. downsample=프런트 전송용 최대 포인트 수(0=무제한).
@@ -3130,7 +3132,7 @@ def _portfolio_index_series(tickers, years=None, conn=None, downsample=1800):
     if not valid:
         return []
 
-    sig = (tuple(sorted((c, round(w, 6)) for c, w in valid)), start, downsample, day)
+    sig = (tuple(sorted((c, round(w, 6)) for c, w in valid)), start, downsample, bool(total_return), day)
     cached = _TS_RESCACHE.get(sig)
     if cached is not None:
         return cached
@@ -3150,7 +3152,7 @@ def _portfolio_index_series(tickers, years=None, conn=None, downsample=1800):
     series = {}
     try:
         for code, w in valid:
-            m, syn = _ticker_series(conn, code, start)
+            m, syn = _ticker_series(conn, code, start, total_return=total_return)
             if m:
                 series[code] = (w, m, syn)
     finally:
@@ -3191,20 +3193,37 @@ def api_macro_multi():
        단위가 제각각이라 프런트에서 시작=100 정규화(또는 개별 축). 원값 반환."""
     from modules import macro_loader
     keys = [k for k in request.args.get('keys', '').split(',') if k][:6]
+    basis = (request.args.get('basis') or 'tr').lower()
+    total_return = basis != 'price'
     uid = session.get('user_id')
     out = []
     for k in keys:
         if k.startswith('SYM:'):
             code = k[4:].upper()
             try:
-                d = portfolio_engine.loader.get_symbol_data(code)
-                pts = [[p['date'], p['close']] for p in d.get('prices', [])
-                       if p.get('close') is not None]
+                pts = _portfolio_index_series([{'code': code, 'weight': 100}], total_return=total_return)
+                if not pts:
+                    raise ValueError('empty symbol index series')
                 if pts:
-                    out.append({'key': k, 'label': d.get('name') or code,
-                                'unit': d.get('currency') or '', 'points': pts})
+                    try:
+                        d = portfolio_engine.loader.get_symbol_data(code)
+                        label = d.get('name') or code
+                    except Exception:
+                        label = code
+                    out.append({'key': k, 'label': label,
+                                'unit': '총수익 지수(시작=100)' if total_return else '가격 지수(시작=100)',
+                                'basis': 'tr' if total_return else 'price',
+                                'points': pts})
             except Exception:
-                pass
+                try:
+                    d = portfolio_engine.loader.get_symbol_data(code)
+                    pts = [[p['date'], p['close']] for p in d.get('prices', [])
+                           if p.get('close') is not None]
+                    if pts:
+                        out.append({'key': k, 'label': d.get('name') or code,
+                                    'unit': d.get('currency') or '', 'basis': 'price', 'points': pts})
+                except Exception:
+                    pass
         elif k.startswith('PF:'):
             if not uid:
                 continue
@@ -3213,10 +3232,12 @@ def api_macro_multi():
             except Exception:
                 pf = None
             if pf:
-                pts = _portfolio_index_series(pf.get('tickers') or [])
+                pts = _portfolio_index_series(pf.get('tickers') or [], total_return=total_return)
                 if pts:
                     out.append({'key': k, 'label': pf['name'],
-                                'unit': '지수(시작=100)', 'points': pts})
+                                'unit': '총수익 지수(시작=100)' if total_return else '가격 지수(시작=100)',
+                                'basis': 'tr' if total_return else 'price',
+                                'points': pts})
         else:
             s = macro_loader.get_series(k)
             if s:
@@ -3231,6 +3252,8 @@ def api_portfolio_index_series():
        body: {portfolios:[{name, tickers:[{code,weight}]}]}. 키=EX:<index>. 로그인 불필요."""
     body = request.get_json(silent=True) or {}
     ports = body.get('portfolios') or []
+    basis = str(body.get('basis') or 'tr').lower()
+    total_return = basis != 'price'
     out = []
     conn = _price_daily_conn()   # 1요청 1연결 — 포폴 N개가 공유(연결 반복 개폐 시 락/빈결과 회피)
     try:
@@ -3240,10 +3263,12 @@ def api_portfolio_index_series():
             tickers = [t for t in (p.get('tickers') or []) if isinstance(t, dict) and t.get('code')]
             if not tickers:
                 continue
-            pts = _portfolio_index_series(tickers, conn=conn)
+            pts = _portfolio_index_series(tickers, conn=conn, total_return=total_return)
             if pts:
                 out.append({'key': f'EX:{i}', 'label': str(p.get('name') or '포트폴리오'),
-                            'unit': '지수(시작=100)', 'points': pts})
+                            'unit': '총수익 지수(시작=100)' if total_return else '가격 지수(시작=100)',
+                            'basis': 'tr' if total_return else 'price',
+                            'points': pts})
     finally:
         conn.close()
     return jsonify({'series': out})

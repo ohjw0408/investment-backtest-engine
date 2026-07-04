@@ -4586,3 +4586,11 @@ _작성: Claude_
 - **F-5 잔여(다크 브랜드 버튼 흰 글자 3.7:1) = 오너 결정 "현행 유지"** — 종결, 재제안 금지.
 
 _작성: Claude_
+
+## 2026-07-04 (Claude) — 추세 겹쳐보기 모바일 전체화면 UX 수정
+
+- 오너 리포트: 전체화면 스크롤 끊김 + 가격 미표시. 뿌리 = 한 손가락 제스처가 팬에 잡혀 재그림 끊김 + `tooltip.enabled=!(full&&touch)`로 터치 전체화면서 툴팁 강제 OFF.
+- 수정(`risk_return_page.js` rrOvDraw): `tooltip.enabled=true`(항상), `pan.enabled = full && !touch`(팬은 데스크톱 전체화면만). 터치 전체화면 = 한 손가락 = **가격 스크럽**, 두 손가락 = 핀치줌. 안내문구(`risk_return.html`) "좌우 이동"→"가격 보기".
+- 검증: Playwright Pixel7 터치 에뮬 8 PASS(툴팁 발화·가격값 표시·팬 off·핀치 on·라이트/다크·jsErr 0).
+
+_작성: Claude_

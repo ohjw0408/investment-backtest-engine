@@ -230,3 +230,9 @@ tags: [dev, bug]
 | 버그 | 원인 | 수정 | 커밋 | 상태 |
 |---|---|---|---|---|
 | 네이티브 `alert()` 26곳 잔존 (dividend_target 12·myportfolios 9·myassets 2·base/share/risk_return 각 1) — 브랜드 모달/토스트 원칙 위반, 앱 WebView에서 OS 다이얼로그 노출 | F-1 당시 미검출(발화 조건이 검증 경로 밖) | 전부 `mmToast`로 교체(base.html 전역). 줄바꿈·URL 포함 2곳(인앱 로그인 차단·공유 폴백)은 문구 재작성 | 이번 커밋 | ✅ 실클릭: dialog 이벤트 0·토스트 발화·jsErr 0 |
+
+## 2026-07-04 세션 (Claude) — 추세 겹쳐보기 모바일 전체화면 UX
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| 모바일 전체화면에서 ① 스크롤 뚝뚝 끊김 ② 점만 찍히고 가격 안 보임 | 한 손가락 제스처가 팬(`pan.enabled=full`)에 잡혀 매 프레임 재그림→끊김. 동시에 `tooltip.enabled=!(full&&touch)`로 터치 전체화면서 툴팁 OFF→가격 미표시 | 터치 전체화면 = 한 손가락 드래그를 **가격 스크럽(툴팁)**으로. `tooltip.enabled=true`(항상), `pan.enabled=full && !touch`(팬은 데스크톱 전체화면만), 핀치줌 유지. 안내문구 "좌우 이동"→"가격 보기" | 이번 커밋 | ✅ Playwright(Pixel7 터치 에뮬) 8 PASS: 툴팁 발화·가격 115.26 표시·팬 off·핀치 on·라이트/다크·jsErr 0 |

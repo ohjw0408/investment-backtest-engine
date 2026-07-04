@@ -991,10 +991,11 @@ function rrOvDraw(){
     options:{ responsive:true, maintainAspectRatio:false, animation: full ? false : undefined,
       interaction:{mode:'index',intersect:false},
       plugins:{ legend:{labels:{color:txt,font:{size:11}}},
-        tooltip:{ enabled:!(full && touch), mode:'index', intersect:false, itemSort:(a,b)=>b.parsed.y-a.parsed.y,
+        tooltip:{ enabled:true, mode:'index', intersect:false, itemSort:(a,b)=>b.parsed.y-a.parsed.y,
           callbacks:{ label:c=> `${c.dataset.label}: ${c.parsed.y!=null ? c.parsed.y.toLocaleString(undefined,{maximumFractionDigits:2}) : '—'}` } },
         zoom: hasZoom ? {
-          pan:{ enabled:full, mode:'x', threshold:4 },
+          // 터치 전체화면: 한 손가락 드래그 = 가격 스크럽(툴팁). 팬은 데스크톱 전체화면만(마우스 드래그).
+          pan:{ enabled:full && !touch, mode:'x', threshold:4 },
           zoom:{
             wheel:{ enabled:full },
             pinch:{ enabled:full },

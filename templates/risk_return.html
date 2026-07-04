@@ -5,10 +5,11 @@
 {% block head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
-.rr-wrap { max-width: 1040px; margin: 0 auto; padding: 24px; }
+.rr-wrap { width: 100%; max-width: 1040px; min-width: 0; margin: 0 auto; padding: 24px; box-sizing: border-box; }
 .rr-title { font-size: 1.15rem; font-weight: 800; }
 .rr-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
-.rr-card { background: var(--card); border-radius: 14px; border: 1.5px solid var(--border); padding: 18px 20px; margin-top: 16px; }
+.rr-card { min-width: 0; max-width: 100%; box-sizing: border-box; background: var(--card); border-radius: 14px; border: 1.5px solid var(--border); padding: 18px 20px; margin-top: 16px; }
+.rr-card > * { min-width: 0; }
 .rr-card-title { font-size: 0.88rem; font-weight: 700; margin-bottom: 10px; }
 
 /* 포트폴리오 선택 */
@@ -95,6 +96,7 @@
 .rr-ov-ctrl label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .rr-ov-warn { color: var(--gold-deep, #B26A00); font-size: 0.74rem; }
 .rr-corr-grid { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(280px,0.95fr); gap: 14px; align-items: start; }
+.rr-corr-grid > * { min-width: 0; max-width: 100%; }
 .rr-corr-table th, .rr-corr-table td { text-align: center; }
 .rr-corr-table th:first-child, .rr-corr-table td:first-child { text-align: left; }
 .rr-corr-cell { font-weight: 800; border-radius: 6px; }
@@ -123,17 +125,24 @@
 .login-required { text-align: center; padding: 60px 20px; color: var(--text-muted); }
 @media (max-width: 768px) {
   .rr-wrap { padding: 14px 12px; }
+  .rr-card[style*="display:flex"] { flex-wrap: wrap; }
+  .rr-card-title { overflow-wrap: anywhere; }
   .rr-chart-wrap { height: 320px; }
   .rr-card { padding: 14px; }
   .rr-table th, .rr-table td { padding: 6px 7px; font-size: 0.74rem; }
-  .rr-table-wrap { -webkit-overflow-scrolling: touch; }
+  .rr-table-wrap { width: 100%; max-width: 100%; min-width: 0; -webkit-overflow-scrolling: touch; }
   .btn-primary { width: 100%; }
   .rr-search-wrap { min-width: 100%; }
+  .rr-bench-row { min-width: 0; }
+  .rr-ov-ctrl .grp { flex-wrap: wrap; }
+  .rr-ov-chip, .rr-ov-qbtn, .rr-chip, .rr-pf-chk { max-width: 100%; }
+  .rr-ov-chip, .rr-chip { overflow-wrap: anywhere; }
   .rr-opacity { margin-left: 0; flex-basis: 100%; }
   .rr-opacity input[type=range] { flex: 1; }
   .rr-pf-list { gap: 6px; }
   .rr-pf-chk { padding: 6px 10px; font-size: 0.8rem; }
   .rr-corr-grid { grid-template-columns: 1fr; }
+  .rr-corr-grid > * { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 /* 심화 비교 아코디언 (P3) */
 .rr-acc { border: 1px solid var(--border); border-radius: 12px; margin-top: 10px; overflow: hidden; background: var(--card); }

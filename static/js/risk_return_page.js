@@ -900,6 +900,13 @@ function rrOvEnterFullscreen(){
   rrOv.fullscreen = true;
   document.body.classList.add('rr-ov-fullscreen-open');
   wrap.classList.add('rr-ov-fullscreen');
+  // 컨트롤(달력·사건·기간·모드)을 전체화면 안으로 이동 — 원위치(다음 형제) 기억 후 캔버스 앞에 삽입
+  const ctrl=document.getElementById('rrOvCtrl');
+  if (ctrl && ctrl.parentElement!==wrap){
+    rrOv._ctrlHome = { parent: ctrl.parentElement, next: ctrl.nextSibling };
+    wrap.insertBefore(ctrl, document.getElementById('rrOvChart'));
+    ctrl.classList.add('rr-ov-ctrl-full');
+  }
   if (wrap.requestFullscreen) {
     try { wrap.requestFullscreen().catch(()=>{}); } catch(_) {}
   }
@@ -912,6 +919,13 @@ function rrOvExitFullscreen(exitNative=true){
   rrOv.fullscreen = false;
   document.body.classList.remove('rr-ov-fullscreen-open');
   if(wrap) wrap.classList.remove('rr-ov-fullscreen');
+  // 컨트롤 원위치 복원
+  const ctrl=document.getElementById('rrOvCtrl');
+  if (ctrl && rrOv._ctrlHome && ctrl.parentElement===wrap){
+    rrOv._ctrlHome.parent.insertBefore(ctrl, rrOv._ctrlHome.next);
+    ctrl.classList.remove('rr-ov-ctrl-full');
+    rrOv._ctrlHome = null;
+  }
   if(exitNative && document.fullscreenElement && document.exitFullscreen) {
     try { document.exitFullscreen().catch(()=>{}); } catch(_) {}
   }

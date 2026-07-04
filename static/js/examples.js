@@ -4,7 +4,7 @@
   'use strict';
 
   var RR_KEY = 'mm_rr_preload';
-  var MAX_CMP = 5;
+  var MAX_CMP = 20;
   var SEG = ['#1f6feb', '#2ea043', '#e3873c', '#8957e5', '#c9433f', '#1f9b9b', '#d4a017', '#6e7681'];
 
   function toast(msg, kind) { if (typeof mmToast === 'function') mmToast(msg, kind); }
@@ -57,16 +57,40 @@
     location.href = '/backtest';
   }
 
-  // ── ② 비교에 추가 → 누적(비중 0~100 그대로) ──
-  function compareAdd(card, btn) {
+  // 비교 버튼 표시(담김/기본) — 카드 인라인 + 모달 공용
+  function setCmpBtn(btn, added) {
+    if (!btn) return;
+    btn.classList.toggle('added', added);
+    btn.textContent = added ? '✓ 담음' : '⚖ 비교';
+  }
+  // 슬러그가 현재 비교 목록에 있는지에 맞춰 화면의 모든 해당 비교 버튼 동기화
+  function syncCmpBtns() {
+    var slugs = readCmp().map(function (p) { return p.slug; });
+    document.querySelectorAll('[data-ex-card]').forEach(function (card) {
+      var b = card.querySelector('.ex-btn[data-act="compare"]');
+      if (b) setCmpBtn(b, slugs.indexOf(card.dataset.slug) >= 0);
+    });
+  }
+
+  // ── ② 비교에 추가/취소 토글 → 누적(비중 0~100 그대로) ──
+  function compareToggle(card, btn) {
     var list = readCmp();
-    if (list.some(function (p) { return p.slug === card.dataset.slug; })) {
-      toast('이미 비교 목록에 담겨 있어요.', 'err'); return;
+    var idx = list.findIndex(function (p) { return p.slug === card.dataset.slug; });
+    if (idx >= 0) {
+      // 이미 담김 → 취소
+      list.splice(idx, 1);
+      writeCmp(list);
+      setCmpBtn(btn, false);
+      syncCmpBtns();
+      toast("'" + card.dataset.name + "' 비교 목록에서 뺐어요.", 'ok');
+      renderCmpBar();
+      return;
     }
     if (list.length >= MAX_CMP) { toast('비교는 최대 ' + MAX_CMP + '개까지예요.', 'err'); return; }
     list.push({ slug: card.dataset.slug, name: card.dataset.name, tickers: readTickers(card) });
     writeCmp(list);
-    if (btn) { btn.classList.add('added'); btn.textContent = '✓ 담음'; }
+    setCmpBtn(btn, true);
+    syncCmpBtns();
     toast("'" + card.dataset.name + "' 비교 목록에 담았어요 (" + list.length + '개).', 'ok');
     renderCmpBar();
   }
@@ -182,7 +206,9 @@
     document.querySelectorAll('#exmActs .ex-btn').forEach(function (b) {
       b.classList.remove('added'); b.disabled = false;
     });
-    document.querySelector('#exmActs [data-act="compare"]').textContent = '⚖ 비교';
+    // 비교 버튼은 이 카드의 현재 담김 여부를 반영(토글이라 모달에서도 취소 가능)
+    var inCmp = readCmp().some(function (p) { return p.slug === card.dataset.slug; });
+    setCmpBtn(document.querySelector('#exmActs [data-act="compare"]'), inCmp);
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
   }
@@ -204,7 +230,7 @@
 
   function runAct(act, card, btn) {
     if (act === 'analyze') analyze(card);
-    else if (act === 'compare') compareAdd(card, btn);
+    else if (act === 'compare') compareToggle(card, btn);
     else if (act === 'save') save(card, btn);
   }
 
@@ -235,10 +261,11 @@
     var go = document.getElementById('exCmpGo');
     var clr = document.getElementById('exCmpClear');
     if (go) go.addEventListener('click', function () { location.href = '/risk-return'; });
-    if (clr) clr.addEventListener('click', function () { sessionStorage.removeItem(RR_KEY); renderCmpBar(); });
+    if (clr) clr.addEventListener('click', function () { sessionStorage.removeItem(RR_KEY); syncCmpBtns(); renderCmpBar(); });
   }
 
   bindTabs();
   bindCards();
+  syncCmpBtns();   // 재진입 시 세션에 남은 담김 상태를 카드 버튼에 반영
   renderCmpBar();
 })();

@@ -4592,5 +4592,6 @@ _작성: Claude_
 - 오너 리포트: 전체화면 스크롤 끊김 + 가격 미표시. 뿌리 = 한 손가락 제스처가 팬에 잡혀 재그림 끊김 + `tooltip.enabled=!(full&&touch)`로 터치 전체화면서 툴팁 강제 OFF.
 - 수정(`risk_return_page.js` rrOvDraw): `tooltip.enabled=true`(항상), `pan.enabled = full && !touch`(팬은 데스크톱 전체화면만). 터치 전체화면 = 한 손가락 = **가격 스크럽**, 두 손가락 = 핀치줌. 안내문구(`risk_return.html`) "좌우 이동"→"가격 보기".
 - 검증: Playwright Pixel7 터치 에뮬 8 PASS(툴팁 발화·가격값 표시·팬 off·핀치 on·라이트/다크·jsErr 0).
+- **후속(오너 피드백 "좌우 이동 아예 안됨")**: 팬 죽인 게 과했음. 한 제스처가 팬+스크럽 동시 불가 → 팬(드래그) + 가격(탭)으로 분리. `pan.enabled=full`(터치도 복원)·`threshold 4→6`(탭/드래그 구분). 안내문구 "좌우 이동·탭하면 가격". 재검증 9 PASS(팬 실동작 x범위 이동 추가).
 
 _작성: Claude_

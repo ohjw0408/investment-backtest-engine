@@ -504,8 +504,38 @@ def refresh_macro():
 # ── 데이터 무결성 상시 방어 (출시완성도 B-2②) ─────────────────────────────
 
 def _integrity_notify_owner(issues):
-    """내부 데이터 품질 경고는 사용자 알림함/푸시로 보내지 않는다."""
-    print(f"[data_integrity_scan] 내부 운영 경고(수신함 미발송): {issues}")
+    """데이터 품질 경고를 오너 계정에만 인앱 수신함 + FCM 푸시로 통지."""
+    owner_email = os.environ.get('OWNER_EMAIL', 'ohjw0408@gmail.com')
+    try:
+        from modules import auth_manager
+        conn = auth_manager._get_conn()
+        row = conn.execute("SELECT id FROM users WHERE email=?", (owner_email,)).fetchone()
+        if not row:
+            print(f"[data_integrity_scan] 오너 계정 없음: {owner_email}")
+            return
+
+        uid = row[0]
+        title = f"데이터 무결성 이상 {len(issues)}건"
+        body = " / ".join(str(issue) for issue in issues)[:500]
+        from modules.alerts import alert_store
+        alert_store.add_event(
+            uid,
+            title,
+            body,
+            meta={'type': 'integrity', 'audience': 'owner'},
+        )
+        try:
+            from modules.alerts import push_sender
+            push_sender.send_to_user(
+                uid,
+                title,
+                body,
+                data={'type': 'integrity', 'audience': 'owner', 'target_url': '/alerts#inbox'},
+            )
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"[data_integrity_scan] 오너 알림 실패: {e}")
 
 
 def _sentry_capture(msg):
@@ -530,7 +560,7 @@ def data_integrity_scan():
        쓰기경로 _validate_price_rows가 신규 유입을 막으므로 잔존 발견 = 우회 쓰기경로 신호)
     ② 핵심 시계열 신선도 — USD/KRW(전 환산의 기반)·KRX_GOLD·price_daily 전체 max(date)
     ③ 합성 백필 손상 스캔 — scripts/scan_backfill_corruption.scan_all 재사용 (B-1 판정 기준)
-    이상 발견 시 워커 로그 + Sentry 이벤트. 사용자 수신함/푸시는 사용하지 않는다.
+    이상 발견 시 오너 계정 알림 + 워커 로그 + Sentry 이벤트.
     """
     import sqlite3
     from datetime import datetime, timedelta

@@ -84,28 +84,7 @@ def init_alerts_db():
         c.execute("ALTER TABLE alert_rules ADD COLUMN last_state TEXT")
     if "last_fired_dir" not in cols:
         c.execute("ALTER TABLE alert_rules ADD COLUMN last_fired_dir TEXT")
-    _purge_internal_events(c)
     c.commit()
-
-
-def _internal_event_where():
-    return (
-        "rule_id IS NULL AND ("
-        "title LIKE '%데이터 무결성%' OR "
-        "meta LIKE '%\"type\": \"integrity\"%' OR "
-        "meta LIKE '%\"type\":\"integrity\"%'"
-        ")"
-    )
-
-
-def _purge_internal_events(c=None):
-    """과거 운영자용 내부 경고가 사용자 수신함에 들어간 잔재를 제거."""
-    own = c is None
-    if own:
-        c = _conn()
-    c.execute(f"DELETE FROM alert_events WHERE {_internal_event_where()}")
-    if own:
-        c.commit()
 
 
 def _conn():
@@ -228,7 +207,7 @@ def _iso_localized(s):
 
 
 def get_events(user_id, unread_only=False, limit=50):
-    q = f"SELECT * FROM alert_events WHERE user_id=? AND NOT ({_internal_event_where()})"
+    q = "SELECT * FROM alert_events WHERE user_id=?"
     if unread_only:
         q += " AND read_at IS NULL"
     q += " ORDER BY id DESC LIMIT ?"
@@ -247,7 +226,7 @@ def get_events(user_id, unread_only=False, limit=50):
 
 def unread_count(user_id):
     return _conn().execute(
-        f"SELECT COUNT(*) FROM alert_events WHERE user_id=? AND read_at IS NULL AND NOT ({_internal_event_where()})",
+        "SELECT COUNT(*) FROM alert_events WHERE user_id=? AND read_at IS NULL",
         (user_id,)
     ).fetchone()[0]
 

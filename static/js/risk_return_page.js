@@ -886,6 +886,9 @@ function rrOvRenderCtrl(){
 function rrOvBindFullscreen(){
   const close=document.getElementById('rrOvFullClose');
   const reset=document.getElementById('rrOvFullReset');
+  const tools=document.getElementById('rrOvFullTools');
+  if (tools) tools.addEventListener('click',()=>{ const w=document.getElementById('rrOvChartWrap');
+    if(w){ w.classList.toggle('rr-ov-tools-open'); tools.classList.toggle('on', w.classList.contains('rr-ov-tools-open')); } });
   if (close) close.addEventListener('click',rrOvExitFullscreen);
   if (reset) reset.addEventListener('click',()=>{ if(rrOv.chart&&rrOv.chart.resetZoom) try{rrOv.chart.resetZoom();}catch(_){} });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape' && rrOv.fullscreen) rrOvExitFullscreen(); });
@@ -918,7 +921,9 @@ function rrOvExitFullscreen(exitNative=true){
   const wrap=document.getElementById('rrOvChartWrap');
   rrOv.fullscreen = false;
   document.body.classList.remove('rr-ov-fullscreen-open');
-  if(wrap) wrap.classList.remove('rr-ov-fullscreen');
+  if(wrap){ wrap.classList.remove('rr-ov-fullscreen'); wrap.classList.remove('rr-ov-tools-open'); }
+  const toolsBtn=document.getElementById('rrOvFullTools');
+  if(toolsBtn) toolsBtn.classList.remove('on');
   // 컨트롤 원위치 복원
   const ctrl=document.getElementById('rrOvCtrl');
   if (ctrl && rrOv._ctrlHome && ctrl.parentElement===wrap){

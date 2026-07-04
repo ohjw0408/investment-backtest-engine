@@ -79,19 +79,23 @@
   box-sizing: border-box;
   background: var(--card);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
   touch-action: none;
 }
-/* 전체화면 안으로 옮겨온 컨트롤(달력·사건·기간·모드) */
+/* 전체화면 안으로 옮겨온 컨트롤(달력·사건·기간·모드) — 접이식 오버레이 패널.
+   grid 공간을 먹지 않도록 absolute → 차트는 항상 full 높이. 기본 숨김, '도구' 버튼으로 토글. */
 .rr-chart-wrap.rr-ov-fullscreen .rr-ov-ctrl.rr-ov-ctrl-full {
-  margin: 0; overflow-y: auto; max-height: 30vh;
-  background: var(--bg); border-radius: 10px; padding: 8px 10px;
-  row-gap: 8px;
+  position: absolute; left: 10px; right: 10px;
+  top: calc(10px + env(safe-area-inset-top, 0px) + 44px);
+  z-index: 6; margin: 0; row-gap: 10px;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 12px 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+  max-height: 66vh; overflow-y: auto;
+  display: none;
 }
-@media (orientation: landscape) {
-  .rr-chart-wrap.rr-ov-fullscreen .rr-ov-ctrl.rr-ov-ctrl-full { max-height: 40vh; }
-}
+.rr-chart-wrap.rr-ov-fullscreen.rr-ov-tools-open .rr-ov-ctrl.rr-ov-ctrl-full { display: flex; }
 /* 세로화면 회전 안내 (가로에서는 숨김) */
 .rr-ov-rotatehint { display: none; }
 @media (orientation: portrait) and (pointer: coarse) {
@@ -123,6 +127,7 @@
   flex-shrink: 0;
 }
 .rr-ov-fullbtn:hover { border-color: var(--blue); color: var(--blue); }
+.rr-ov-fullbtn.on { border-color: var(--blue); color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, transparent); }
 .rr-chart-wrap.rr-ov-fullscreen canvas {
   width: 100% !important;
   height: 100% !important;
@@ -291,6 +296,7 @@ body.rr-ov-fullscreen-open { overflow: hidden; }
       <div class="rr-ov-fullbar">
         <div class="rr-ov-fulltitle">추세 겹쳐보기 <span class="rr-ov-fullhint">두 손가락으로 확대·축소, 한 손가락으로 좌우 이동·탭하면 가격</span></div>
         <span class="rr-ov-rotatehint">📱↻ 가로로 돌리면 더 편해요</span>
+        <button type="button" class="rr-ov-fullbtn" id="rrOvFullTools">⚙ 도구</button>
         <button type="button" class="rr-ov-fullbtn" id="rrOvFullReset">초기화</button>
         <button type="button" class="rr-ov-fullbtn" id="rrOvFullClose">닫기</button>
       </div>

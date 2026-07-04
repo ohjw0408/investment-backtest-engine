@@ -1,6 +1,11 @@
 # Log
 
-## [2026-07-02] FIX | 모바일 푸시 heads-up/소리/진동용 HIGH 알림 채널
+## [2026-07-05] FIX | 포트폴리오 예시 비교 플로팅 바가 앱 하단 탭바에 가림
+
+오너가 모바일 앱 `/examples`에서 카드 비교 담기 시 하단에 뜨는 비교 플로팅 바(`비교하기`)가 앱 하단 탭바에 가려 윗쪽 절반만 보인다고 보고.
+- 원인: `.ex-cmpbar`가 `position: fixed; bottom: 18px` (z-index 60)인데, 앱 하단 탭바 `.mm-tabbar`(z-index 1200, ~72px + safe-area)가 그 위를 덮음.
+- 수정: `templates/examples.html`에 `html.is-app .ex-cmpbar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }` 추가. 웹(비앱)은 영향 없음.
+- 검증: 로컬 서버 + Playwright(Pixel 5 뷰포트, `html.is-app` 강제, 카드 2개 담기). 비교 바 bottom edge 643px < 탭바 top 670px (겹침 없음, 27px 여유). 스샷 육안 확인 — 바 전체 노출.
 
 오너가 푸시가 폰 알림함에는 뜨지만 유튜브/인스타처럼 상단 배너, 소리, 진동, 화면 꺼짐 상태의 주의 환기가 약해 기대한 알림과 다르다고 보고.
 - 확인: 운영 FCM 테스트 푸시는 정상 도착했고 Android notification manager에도 posted 됐지만, 채널이 Google 기본 `fcm_fallback_notification_channel`(`Miscellaneous`)이고 importance가 `3 DEFAULT`라 heads-up/소리/진동이 약할 수 있었다.

@@ -79,6 +79,8 @@
 .ex-cmpbar-go { display: inline-flex; align-items: center; gap: 5px; font-weight: 800; font-size: 12.5px; cursor: pointer;
   padding: 8px 16px; border-radius: var(--r-pill, 999px); border: none; font-family: inherit; background: var(--brand); color: var(--on-brand); }
 .ex-cmpbar-clear { background: none; border: none; color: var(--ds-canvas); opacity: .7; cursor: pointer; font-size: 16px; line-height: 1; padding: 4px; }
+/* 앱: 하단 탭바(z1200, ~72px+safe-area)에 가리지 않게 비교 플로팅 바를 위로 */
+html.is-app .ex-cmpbar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 
 /* 카드 클릭 → 상세 (액션 버튼 외 영역) */
 .ex-card[data-ex-card] { cursor: pointer; }

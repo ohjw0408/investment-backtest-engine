@@ -725,7 +725,7 @@ function rrOvRenderQuick(){
 }
 function rrOvToggle(key,label){ if (rrOv.items.some(it=>it.key===key)) rrOvRemove(key); else rrOvAdd(key,label); }
 function rrOvAdd(key,label){
-  if (rrOv.items.some(it=>it.key===key) || rrOv.items.length >= 6) return;
+  if (rrOv.items.some(it=>it.key===key) || rrOv.items.length >= 20) return;
   rrOv.items.push({key,label,color:colorOf(rrOv.items.length)}); rrOvRecolor(); rrOvLoad();
 }
 function rrOvRemove(key){
@@ -1156,7 +1156,7 @@ function rrApplyPreload(){
   let pre=null; try{ pre=JSON.parse(sessionStorage.getItem('mm_rr_preload')||'null'); }catch(e){}
   if(!Array.isArray(pre)||!pre.length) return false;
   sessionStorage.removeItem('mm_rr_preload');
-  abPorts = pre.slice(0,5).map((p,i)=>({ name:p.name||`포트폴리오 ${i+1}`,
+  abPorts = pre.slice(0,20).map((p,i)=>({ name:p.name||`포트폴리오 ${i+1}`,
     items:(p.tickers||[]).filter(t=>t&&t.code).map(t=>({code:t.code,name:t.name||t.code,weight:+t.weight||0})) }));
   // 추세 겹쳐보기도 비교 대상 포폴 N개만 보이게(rrOvInit이 읽어 기본 클리어 후 주입)
   window._rrExPreload = abPorts.filter(p=>p.items.length).map(p=>({ name:p.name, tickers:p.items }));

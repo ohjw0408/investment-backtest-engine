@@ -64,6 +64,28 @@ def test_compare_defaults_benchmarks_only_when_key_missing(monkeypatch):
     ]
 
 
+def test_compare_accepts_20_adhoc_portfolios(monkeypatch):
+    captured = {}
+
+    def fake_compute(selected, _benchmarks, _loader):
+        captured["selected"] = list(selected)
+        return {"items": [], "period": None, "skipped": []}
+
+    monkeypatch.setattr(risk_return_logic, "compute_comparison", fake_compute)
+    ports = [
+        {"name": f"P{i}", "tickers": [{"code": "AAA", "weight": 100}]}
+        for i in range(25)
+    ]
+
+    res = _client(monkeypatch).post(
+        "/api/portfolio/compare",
+        json={"portfolios": ports, "benchmarks": []},
+    )
+
+    assert res.status_code == 200
+    assert [p["name"] for p in captured["selected"]] == [f"P{i}" for i in range(20)]
+
+
 def test_portfolio_index_series_can_use_price_or_total_return(monkeypatch):
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE price_daily (code TEXT, date TEXT, close REAL, volume REAL)")
@@ -87,3 +109,33 @@ def test_portfolio_index_series_can_use_price_or_total_return(monkeypatch):
 
     assert [p[1] for p in tr] == [100.0, 110.0, 121.0]
     assert [p[1] for p in price] == [100.0, 100.0, 110.0]
+
+
+def test_overlay_index_series_accepts_20_daily_precision_portfolios(monkeypatch):
+    class DummyConn:
+        def close(self):
+            pass
+
+    calls = []
+
+    def fake_series(tickers, years=None, conn=None, downsample=1800, total_return=True):
+        calls.append({"tickers": tickers, "downsample": downsample, "total_return": total_return})
+        return [["2024-01-01", 100.0, 0], ["2024-01-02", 101.0, 0]]
+
+    monkeypatch.setattr(appmod, "_price_daily_conn", lambda: DummyConn())
+    monkeypatch.setattr(appmod, "_portfolio_index_series", fake_series)
+
+    ports = [
+        {"name": f"P{i}", "tickers": [{"code": "AAA", "weight": 100}]}
+        for i in range(25)
+    ]
+    res = _client(monkeypatch).post(
+        "/api/portfolio/index_series",
+        json={"basis": "price", "portfolios": ports},
+    )
+
+    assert res.status_code == 200
+    assert len(res.get_json()["series"]) == 20
+    assert len(calls) == 20
+    assert {c["downsample"] for c in calls} == {0}
+    assert {c["total_return"] for c in calls} == {False}

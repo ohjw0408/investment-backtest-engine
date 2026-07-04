@@ -3192,7 +3192,7 @@ def api_macro_multi():
     """임의 시리즈 N개 겹쳐보기. 토큰 = 거시지표 코드 / 'SYM:<종목>' / 'PF:<저장포폴id>'.
        단위가 제각각이라 프런트에서 시작=100 정규화(또는 개별 축). 원값 반환."""
     from modules import macro_loader
-    keys = [k for k in request.args.get('keys', '').split(',') if k][:6]
+    keys = [k for k in request.args.get('keys', '').split(',') if k][:20]
     basis = (request.args.get('basis') or 'tr').lower()
     total_return = basis != 'price'
     uid = session.get('user_id')
@@ -3201,7 +3201,7 @@ def api_macro_multi():
         if k.startswith('SYM:'):
             code = k[4:].upper()
             try:
-                pts = _portfolio_index_series([{'code': code, 'weight': 100}], total_return=total_return)
+                pts = _portfolio_index_series([{'code': code, 'weight': 100}], downsample=0, total_return=total_return)
                 if not pts:
                     raise ValueError('empty symbol index series')
                 if pts:
@@ -3232,7 +3232,7 @@ def api_macro_multi():
             except Exception:
                 pf = None
             if pf:
-                pts = _portfolio_index_series(pf.get('tickers') or [], total_return=total_return)
+                pts = _portfolio_index_series(pf.get('tickers') or [], downsample=0, total_return=total_return)
                 if pts:
                     out.append({'key': k, 'label': pf['name'],
                                 'unit': '총수익 지수(시작=100)' if total_return else '가격 지수(시작=100)',
@@ -3257,13 +3257,13 @@ def api_portfolio_index_series():
     out = []
     conn = _price_daily_conn()   # 1요청 1연결 — 포폴 N개가 공유(연결 반복 개폐 시 락/빈결과 회피)
     try:
-        for i, p in enumerate(ports[:6]):
+        for i, p in enumerate(ports[:20]):
             if not isinstance(p, dict):
                 continue
             tickers = [t for t in (p.get('tickers') or []) if isinstance(t, dict) and t.get('code')]
             if not tickers:
                 continue
-            pts = _portfolio_index_series(tickers, conn=conn, total_return=total_return)
+            pts = _portfolio_index_series(tickers, conn=conn, downsample=0, total_return=total_return)
             if pts:
                 out.append({'key': f'EX:{i}', 'label': str(p.get('name') or '포트폴리오'),
                             'unit': '총수익 지수(시작=100)' if total_return else '가격 지수(시작=100)',
@@ -3310,7 +3310,7 @@ def portfolio_compare():
     adhoc = body.get('portfolios')   # 즉석 포폴(비로그인 찍먹) — 로그인 없이 허용
     if adhoc:
         selected = []
-        for p in adhoc[:5]:
+        for p in adhoc[:20]:
             if not isinstance(p, dict):
                 continue
             tickers = [t for t in (p.get('tickers') or []) if isinstance(t, dict) and t.get('code')]

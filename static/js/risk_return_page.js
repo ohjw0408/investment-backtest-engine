@@ -678,6 +678,15 @@ const RR_RANGE_EVENTS = [
 function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function rrOvRecolor(){ rrOv.items.forEach((it,i)=>it.color = colorOf(i)); }
 function rrOvIsTouchLike(){ return window.matchMedia && window.matchMedia('(pointer: coarse)').matches; }
+function rrOvEnsureZoomPlugin(){
+  if (typeof Chart === 'undefined') return false;
+  try {
+    if (Chart.registry && Chart.registry.plugins && Chart.registry.plugins.get('zoom')) return true;
+  } catch(_) {}
+  const plugin = window.ChartZoom || window.zoomPlugin;
+  if (!plugin || !Chart.register) return false;
+  try { Chart.register(plugin); return true; } catch(_) { return false; }
+}
 function rrOvResizeSoon(){
   setTimeout(()=>{ if (rrOv.chart) try { rrOv.chart.resize(); } catch(_){} }, 80);
 }
@@ -977,20 +986,22 @@ function rrOvDraw(){
   if (rrOv.chart) rrOv.chart.destroy();
   const full = !!rrOv.fullscreen;
   const touch = rrOvIsTouchLike();
+  const hasZoom = rrOvEnsureZoomPlugin();
   rrOv.chart=new Chart(canvas.getContext('2d'),{ type:'line', data:{labels,datasets},
-    options:{ responsive:true, maintainAspectRatio:false, animation: full ? false : undefined, interaction:{mode:'index',intersect:false},
+    options:{ responsive:true, maintainAspectRatio:false, animation: full ? false : undefined,
+      interaction:{mode:'index',intersect:false},
       plugins:{ legend:{labels:{color:txt,font:{size:11}}},
-        tooltip:{ mode:'index', intersect:false, itemSort:(a,b)=>b.parsed.y-a.parsed.y,
-          callbacks:{ label:c=> `${c.dataset.label}: ${c.parsed.y!=null ? c.parsed.y.toLocaleString(undefined,{maximumFractionDigits:2}) : '–'}` } },
-        zoom:{
-          pan:{ enabled:full, mode:'x' },
+        tooltip:{ enabled:!(full && touch), mode:'index', intersect:false, itemSort:(a,b)=>b.parsed.y-a.parsed.y,
+          callbacks:{ label:c=> `${c.dataset.label}: ${c.parsed.y!=null ? c.parsed.y.toLocaleString(undefined,{maximumFractionDigits:2}) : '—'}` } },
+        zoom: hasZoom ? {
+          pan:{ enabled:full, mode:'x', threshold:4 },
           zoom:{
             wheel:{ enabled:full },
             pinch:{ enabled:full },
             drag:{enabled:!full && !touch, backgroundColor:'rgba(31,111,235,0.15)', borderColor:'rgba(31,111,235,0.45)', borderWidth:1},
             mode:'x'
           }
-        } }, scales } });
+        } : undefined }, scales } });
   rrCorrRender();
 }
 

@@ -4593,5 +4593,6 @@ _작성: Claude_
 - 수정(`risk_return_page.js` rrOvDraw): `tooltip.enabled=true`(항상), `pan.enabled = full && !touch`(팬은 데스크톱 전체화면만). 터치 전체화면 = 한 손가락 = **가격 스크럽**, 두 손가락 = 핀치줌. 안내문구(`risk_return.html`) "좌우 이동"→"가격 보기".
 - 검증: Playwright Pixel7 터치 에뮬 8 PASS(툴팁 발화·가격값 표시·팬 off·핀치 on·라이트/다크·jsErr 0).
 - **후속(오너 피드백 "좌우 이동 아예 안됨")**: 팬 죽인 게 과했음. 한 제스처가 팬+스크럽 동시 불가 → 팬(드래그) + 가격(탭)으로 분리. `pan.enabled=full`(터치도 복원)·`threshold 4→6`(탭/드래그 구분). 안내문구 "좌우 이동·탭하면 가격". 재검증 9 PASS(팬 실동작 x범위 이동 추가).
+- **후속2(오너 "몇 달 단위로 뚝뚝 끊김, 연속 부드럽게 가능하냐")**: 진짜 뿌리 = x축 `type:'category'` — 카테고리축은 팬이 정수 인덱스 단위 스냅 → 라벨 하나씩(월 단위) 점프. **x축을 `type:'linear'` 타임스탬프로 전환**(date adapter 없어 linear+ms 채택). 데이터 `{x:+new Date(d), y}`, 틱/툴팁 title은 콜백으로 날짜 포맷. 이제 픽셀 단위 연속 팬. 재검증 11 PASS(미세 3px 팬도 이동=인덱스 스냅 아님·라이트/다크·jsErr 0).
 
 _작성: Claude_

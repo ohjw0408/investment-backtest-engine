@@ -949,8 +949,10 @@ function rrOvDraw(){
   const dset=new Set();
   rrOv.items.forEach(it=>{ const s=rrOv.raw[it.key]; if(s) s.points.forEach(p=>{ if(inR(p[0])) dset.add(p[0]); }); });
   const labels=[...dset].sort();
+  const tsArr=labels.map(d=>+new Date(d));   // x = 연속 타임스탬프(카테고리축 인덱스 스냅 제거 → 부드러운 팬)
+  const fmtTs=v=>{ const d=new Date(v); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0'); };
   const txt=cssVar('--text-muted')||'#888', grid=cssVar('--border')||'#e0e0e0';
-  const datasets=[]; const scales={ x:{ type:'category', ticks:{color:txt,maxTicksLimit:8,autoSkip:true}, grid:{color:grid} } };
+  const datasets=[]; const scales={ x:{ type:'linear', ticks:{color:txt,maxTicksLimit:8,autoSkip:true,maxRotation:0,callback:v=>fmtTs(v)}, grid:{color:grid} } };
   // 합성(추정) 구간 점선: 포인트의 3번째 값(syn=1)이면 그 세그먼트를 점선으로.
   const dashSeg = synArr => ({ borderDash: ctx => (synArr[ctx.p0DataIndex] || synArr[ctx.p1DataIndex]) ? [5,4] : undefined });
   if (rrOv.mode==='norm'){
@@ -971,7 +973,7 @@ function rrOvDraw(){
       normMap[x.it.key]=nm;
     });
     rrOv.items.forEach(it=>{ const x=ser.find(z=>z.it.key===it.key); if(!x)return; const nm=normMap[it.key];
-      const data=rrOvFill(labels, nm);   // 구간 내 빈 라벨 보간 → 같은 x에 전 시리즈 툴팁값
+      const data=rrOvFill(labels, nm).map((v,i)=>({x:tsArr[i],y:v}));   // 구간 내 빈 라벨 보간 → 같은 x에 전 시리즈 툴팁값
       const synArr=labels.map(d=> x.syn[d]?1:0);
       datasets.push({label:it.label,data,borderColor:it.color,backgroundColor:it.color,borderWidth:1.8,pointRadius:0,tension:0.1,spanGaps:true,segment:dashSeg(synArr)}); });
   } else {
@@ -979,7 +981,7 @@ function rrOvDraw(){
       const m={},syn={}; s.points.forEach(p=>{ if(inR(p[0])){ m[p[0]]=p[1]; syn[p[0]]=p[2]?1:0; } });
       const ax='y'+i;
       scales[ax]={ position:i%2?'right':'left', ticks:{color:it.color,font:{size:10}}, grid:{drawOnChartArea:i===0,color:grid} };
-      const data=rrOvFill(labels, m);   // 구간 내 빈 라벨 보간 → 같은 x에 전 시리즈 툴팁값
+      const data=rrOvFill(labels, m).map((v,i)=>({x:tsArr[i],y:v}));   // 구간 내 빈 라벨 보간 → 같은 x에 전 시리즈 툴팁값
       const synArr=labels.map(d=> syn[d]?1:0);
       datasets.push({label:it.label+(s.unit?` (${s.unit})`:''),data,borderColor:it.color,backgroundColor:it.color,borderWidth:1.8,pointRadius:0,tension:0.1,spanGaps:true,yAxisID:ax,segment:dashSeg(synArr)}); });
   }
@@ -992,7 +994,8 @@ function rrOvDraw(){
       interaction:{mode:'index',intersect:false},
       plugins:{ legend:{labels:{color:txt,font:{size:11}}},
         tooltip:{ enabled:true, mode:'index', intersect:false, itemSort:(a,b)=>b.parsed.y-a.parsed.y,
-          callbacks:{ label:c=> `${c.dataset.label}: ${c.parsed.y!=null ? c.parsed.y.toLocaleString(undefined,{maximumFractionDigits:2}) : '—'}` } },
+          callbacks:{ title:items=> items.length ? new Date(items[0].parsed.x).toISOString().slice(0,10) : '',
+            label:c=> `${c.dataset.label}: ${c.parsed.y!=null ? c.parsed.y.toLocaleString(undefined,{maximumFractionDigits:2}) : '—'}` } },
         zoom: hasZoom ? {
           // 전체화면: 한 손가락 드래그 = 좌우 이동(팬), 탭 = 가격(툴팁), 두 손가락 = 확대·축소.
           pan:{ enabled:full, mode:'x', threshold:6 },

@@ -68,6 +68,49 @@
 .rr-kind { font-size: 0.68rem; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
 
 .rr-chart-wrap { position: relative; height: 440px; }
+.rr-ov-fullbar { display: none; }
+.rr-chart-wrap.rr-ov-fullscreen {
+  position: fixed !important;
+  inset: 0;
+  z-index: 2200;
+  height: 100dvh !important;
+  width: 100vw;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  background: var(--card);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  touch-action: none;
+}
+.rr-chart-wrap.rr-ov-fullscreen .rr-ov-fullbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.rr-ov-fulltitle { min-width: 0; flex: 1; font-size: 0.82rem; font-weight: 800; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rr-ov-fullhint { font-size: 0.72rem; font-weight: 500; color: var(--text-muted); margin-left: 6px; }
+.rr-ov-fullbtn {
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 6px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.rr-ov-fullbtn:hover { border-color: var(--blue); color: var(--blue); }
+.rr-chart-wrap.rr-ov-fullscreen canvas {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0;
+  touch-action: none;
+}
+body.rr-ov-fullscreen-open { overflow: hidden; }
 .rr-period { font-size: 0.76rem; color: var(--text-muted); margin-top: 10px; }
 .rr-warn { font-size: 0.76rem; color: var(--gold-deep, #B26A00); background: var(--gold-pale, #FFF8E1); border-radius: 8px; padding: 7px 10px; margin-top: 8px; }
 .rr-empty { text-align: center; padding: 50px 20px; color: var(--text-muted); }
@@ -136,6 +179,9 @@
   .rr-bench-row { min-width: 0; }
   .rr-ov-ctrl .grp { flex-wrap: wrap; }
   .rr-ov-zoomhint { display: none; }
+  .rr-ov-fullhint { display: none; }
+  .rr-chart-wrap.rr-ov-fullscreen { background: #fff; }
+  [data-theme="dark"] .rr-chart-wrap.rr-ov-fullscreen { background: var(--card); }
   .rr-ov-chip, .rr-ov-qbtn, .rr-chip, .rr-pf-chk { max-width: 100%; }
   .rr-ov-chip, .rr-chip { overflow-wrap: anywhere; }
   .rr-opacity { margin-left: 0; flex-basis: 100%; }
@@ -222,7 +268,12 @@
     <div id="rrOvChips" class="rr-ov-chips"></div>
     <div id="rrOvCtrl" class="rr-ov-ctrl"></div>
     <div class="rr-ov-basishint" style="font-size:0.72rem;color:var(--text-muted);margin:-4px 0 10px;">총수익은 배당을 같은 종목에 재투자한 기준이고, 가격은 배당을 제외한 가격 변화만 봅니다.</div>
-    <div class="rr-chart-wrap" style="height:380px;position:relative;">
+    <div class="rr-chart-wrap" id="rrOvChartWrap" style="height:380px;position:relative;">
+      <div class="rr-ov-fullbar">
+        <div class="rr-ov-fulltitle">추세 겹쳐보기 <span class="rr-ov-fullhint">두 손가락으로 확대·축소, 한 손가락으로 좌우 이동</span></div>
+        <button type="button" class="rr-ov-fullbtn" id="rrOvFullReset">초기화</button>
+        <button type="button" class="rr-ov-fullbtn" id="rrOvFullClose">닫기</button>
+      </div>
       <canvas id="rrOvChart"></canvas>
       <div id="rrOvSpinner" class="rr-ov-spinner" style="display:none;">
         <span class="ds-spinner"></span>

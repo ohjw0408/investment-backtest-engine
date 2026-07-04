@@ -667,7 +667,7 @@ window.addEventListener('resize', () => {
 });
 
 // ── 추세 겹쳐보기 오버레이 ──
-const rrOv = { items: [], raw: {}, start: null, end: null, mode: 'norm', basis: 'tr', activeY: 5, activeEvent: null, macros: [], chart: null, exPorts: {} };
+const rrOv = { items: [], raw: {}, start: null, end: null, mode: 'norm', basis: 'tr', activeY: 5, activeEvent: null, macros: [], chart: null, exPorts: {}, fullscreen: false };
 const RR_OV_QUICK = [['SYM:SPY','S&P500'],['SYM:069500','코스피200'],['SYM:GLD','금'],['SYM:TLT','미국 장기채']];
 const RR_RANGE_EVENTS = [
   { key:'dotcom', label:'닷컴', start:'2000-01-01', end:'2002-12-31' },
@@ -677,12 +677,17 @@ const RR_RANGE_EVENTS = [
 ];
 function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function rrOvRecolor(){ rrOv.items.forEach((it,i)=>it.color = colorOf(i)); }
+function rrOvIsTouchLike(){ return window.matchMedia && window.matchMedia('(pointer: coarse)').matches; }
+function rrOvResizeSoon(){
+  setTimeout(()=>{ if (rrOv.chart) try { rrOv.chart.resize(); } catch(_){} }, 80);
+}
 
 async function rrOvInit(){
   fetch('/api/macro/overview').then(r=>r.json())
     .then(d=>{ rrOv.macros = []; (d.categories||[]).forEach(c=>(c.series||[]).forEach(s=>rrOv.macros.push(s))); })
     .catch(()=>{ rrOv.macros = []; });
   rrOvBindSearch();
+  rrOvBindFullscreen();
   // 포트폴리오 예시 비교 진입 → 포폴별 병렬 요청 + 진행률 바
   if (Array.isArray(window._rrExPreload) && window._rrExPreload.length){
     const pre = window._rrExPreload; window._rrExPreload = null;
@@ -853,6 +858,7 @@ function rrOvRenderCtrl(){
     <span class="grp">수익률 기준:
       <label><input type="radio" name="rrovbasis" value="tr" ${rrOv.basis==='tr'?'checked':''}>총수익</label>
       <label><input type="radio" name="rrovbasis" value="price" ${rrOv.basis==='price'?'checked':''}>가격</label></span>
+    <span class="grp"><button class="qr" id="rrOvFullscreen" title="차트 전체화면">⛶ 전체화면</button></span>
     <span class="rr-ov-zoomhint" style="font-size:0.72rem;color:var(--text-muted);">💡 그래프를 <b>드래그</b>하면 그 구간만 확대돼요.</span>
     ${over5?'<span class="rr-ov-warn">⚠ 5년 초과 + 정규화는 작은 차이가 과장돼 보여요</span>':''}`;
   document.getElementById('rrOvStart').addEventListener('change',e=>rrOvApplyRange(e.target.value, rrOv.end, -1, null));
@@ -864,6 +870,44 @@ function rrOvRenderCtrl(){
   const zr=document.getElementById('rrOvZoomReset');
   if (zr) zr.addEventListener('click',()=>{ if(rrOv.chart&&rrOv.chart.resetZoom) try{rrOv.chart.resetZoom();}catch(_){}
     rrOvSetYears(5); });
+  const fs=document.getElementById('rrOvFullscreen');
+  if (fs) fs.addEventListener('click',rrOvEnterFullscreen);
+}
+
+function rrOvBindFullscreen(){
+  const close=document.getElementById('rrOvFullClose');
+  const reset=document.getElementById('rrOvFullReset');
+  if (close) close.addEventListener('click',rrOvExitFullscreen);
+  if (reset) reset.addEventListener('click',()=>{ if(rrOv.chart&&rrOv.chart.resetZoom) try{rrOv.chart.resetZoom();}catch(_){} });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape' && rrOv.fullscreen) rrOvExitFullscreen(); });
+  document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement && rrOv.fullscreen) rrOvExitFullscreen(false); });
+  window.addEventListener('resize',()=>{ if(rrOv.fullscreen) rrOvResizeSoon(); });
+  window.addEventListener('orientationchange',()=>{ if(rrOv.fullscreen) rrOvResizeSoon(); });
+}
+
+function rrOvEnterFullscreen(){
+  const wrap=document.getElementById('rrOvChartWrap');
+  if(!wrap || !rrOv.items.length) return;
+  rrOv.fullscreen = true;
+  document.body.classList.add('rr-ov-fullscreen-open');
+  wrap.classList.add('rr-ov-fullscreen');
+  if (wrap.requestFullscreen) {
+    try { wrap.requestFullscreen().catch(()=>{}); } catch(_) {}
+  }
+  rrOvDraw();
+  rrOvResizeSoon();
+}
+
+function rrOvExitFullscreen(exitNative=true){
+  const wrap=document.getElementById('rrOvChartWrap');
+  rrOv.fullscreen = false;
+  document.body.classList.remove('rr-ov-fullscreen-open');
+  if(wrap) wrap.classList.remove('rr-ov-fullscreen');
+  if(exitNative && document.fullscreenElement && document.exitFullscreen) {
+    try { document.exitFullscreen().catch(()=>{}); } catch(_) {}
+  }
+  rrOvDraw();
+  rrOvResizeSoon();
 }
 
 function rrOvMedian(a){ const b=[...a].sort((x,y)=>x-y); const n=b.length; if(!n) return 0;
@@ -931,12 +975,22 @@ function rrOvDraw(){
       datasets.push({label:it.label+(s.unit?` (${s.unit})`:''),data,borderColor:it.color,backgroundColor:it.color,borderWidth:1.8,pointRadius:0,tension:0.1,spanGaps:true,yAxisID:ax,segment:dashSeg(synArr)}); });
   }
   if (rrOv.chart) rrOv.chart.destroy();
+  const full = !!rrOv.fullscreen;
+  const touch = rrOvIsTouchLike();
   rrOv.chart=new Chart(canvas.getContext('2d'),{ type:'line', data:{labels,datasets},
-    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    options:{ responsive:true, maintainAspectRatio:false, animation: full ? false : undefined, interaction:{mode:'index',intersect:false},
       plugins:{ legend:{labels:{color:txt,font:{size:11}}},
         tooltip:{ mode:'index', intersect:false, itemSort:(a,b)=>b.parsed.y-a.parsed.y,
           callbacks:{ label:c=> `${c.dataset.label}: ${c.parsed.y!=null ? c.parsed.y.toLocaleString(undefined,{maximumFractionDigits:2}) : '–'}` } },
-        zoom:{ zoom:{ drag:{enabled:true, backgroundColor:'rgba(31,111,235,0.15)', borderColor:'rgba(31,111,235,0.45)', borderWidth:1}, mode:'x' } } }, scales } });
+        zoom:{
+          pan:{ enabled:full, mode:'x' },
+          zoom:{
+            wheel:{ enabled:full },
+            pinch:{ enabled:full },
+            drag:{enabled:!full && !touch, backgroundColor:'rgba(31,111,235,0.15)', borderColor:'rgba(31,111,235,0.45)', borderWidth:1},
+            mode:'x'
+          }
+        } }, scales } });
   rrCorrRender();
 }
 

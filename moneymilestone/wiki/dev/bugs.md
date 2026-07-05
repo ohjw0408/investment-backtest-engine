@@ -1,5 +1,5 @@
 ---
-updated: 2026-07-02
+updated: 2026-07-05
 tags: [dev, bug]
 ---
 
@@ -13,10 +13,11 @@ tags: [dev, bug]
 
 ## 활성 버그 목록
 
-> updated: 2026-07-02
+> updated: 2026-07-05
 
 | # | 버그 | 원인 | 파일 | 상태 |
 |---|---|---|---|---|
+| BUG-RR-OVERLAY-BASIS-TOGGLE-DROPS-SERIES | 포트폴리오 비교 `추세 겹쳐보기`에서 `총수익`/`가격` 라디오를 여러 번 번갈아 누르면 비교 대상 일부 시리즈가 간헐적으로 누락되어 차트에 그려지지 않음(오너 보고 2026-07-05). 재현 조건: 여러 포트폴리오/지수를 겹쳐둔 상태에서 수익률 기준 토글을 반복 전환. | 미조사. 추정 후보: `rrOv.basis` 변경 시 `rrOv.raw={}` 초기화 후 비동기 `rrOvLoad()`가 연속 호출되며 이전 요청/후속 요청 응답 순서가 꼬이거나, EX/PF/SYM 일부 key 캐시 보존/재조회 분기에서 누락될 가능성. | `static/js/risk_return_page.js`, `app.py`(`/api/macro/multi`, `/api/portfolio/index_series`) | ✅ 수정 (2026-07-05): 원인 확정 = `rrOvLoad`가 async인데 동시성 가드 없음. basis 토글 연타 시 겹친 실행이 (a) await 사이 공유 `rrOv.basis`를 읽어 키마다 다른 basis로 fetch(혼합), (b) 각자 로컬 `kept` 만들어 끝에 `rrOv.raw=kept` — 늦게 끝난 낡은 실행이 신규를 덮어써 실패/미조회 키 누락=시리즈 드롭. 픽스 = generation 토큰(`rrOv._loadTok`): 각 실행 토큰++·basis 로컬 캡처(fetch URL·POST body 둘 다 로컬 basis 사용)·await 재개마다 `_loadTok!==myTok`면 `rrOv.raw` 커밋/그리기 없이 중단. 정상 단일 로드/토글 동작 불변. 검증 = `node --check` OK. ⚠️레이스라 결정적 Playwright 재현 어려움 — 라이브 연타 재현은 배포 후 오너 확인 권장 (Claude) |
 | BUG-MOBILE-PUSH-LOW-INTERRUPTION | 푸시가 폰 알림함에는 도착하지만 화면 꺼짐 상태에서 소리/진동/상단 heads-up 배너가 약하거나 기대만큼 뜨지 않음(오너 보고) | FCM notification은 정상 도착했지만 Android가 Google 기본 fallback 채널 `fcm_fallback_notification_channel`(`Miscellaneous`)을 사용했고 importance가 `3 DEFAULT`였다. Android 8+는 notification channel importance가 실제 heads-up/소리/진동 수준을 좌우하므로 DEFAULT 채널로는 유튜브/인스타식 알림이 제한될 수 있음 | `mobile/android/app/src/main/java/com/moneymilestone/app/MainActivity.java`, `mobile/android/app/src/main/AndroidManifest.xml`, `mobile/android/app/src/main/res/values/strings.xml`, `modules/alerts/push_sender.py`, `templates/base.html` | ✅ 수정 (2026-07-02): 신규 `money_alerts_high_v1` 채널을 native 앱 시작 시 생성(IMPORTANCE_HIGH, 기본 sound, 진동 패턴, lights ON, lockscreen public). Manifest에 FCM 기본 채널 meta-data와 `VIBRATE` 권한 추가. 서버 FCM HTTP v1 payload에 `android.priority=HIGH`, `channel_id=money_alerts_high_v1`, `notification_priority=PRIORITY_HIGH`, default sound/vibration/light, visibility PUBLIC 추가. 포그라운드 로컬 알림도 같은 channelId 사용. 검증: `py_compile`, push consent 15 PASS, Android debug build PASS, 실기기 채널 `mImportance=4`, sound/vibration enabled 확인. 단, 무음·진동·방해금지·삼성 앱별 카테고리 설정은 시스템/사용자 정책이라 앱이 강제 우회 불가. (Codex) |
 | BUG-MOBILE-PUSH-NO-OS-PERMISSION | 앱 안 `내 알림`에는 알림이 쌓이지만 Android 휴대폰 푸시가 오지 않고, 시스템 “알림 권한 허용” 팝업도 뜨지 않음(오너 보고) | Android target SDK 36 앱인데 manifest에 Android 13+ 런타임 알림 권한 `POST_NOTIFICATIONS`가 없어 OS 권한 요청이 성립하지 않았다. 또한 최초 선택 푸시 동의 화면이 서버 동의 저장 후 바로 native 권한 요청/FCM 토큰 등록까지 강하게 이어지지 않았다. 운영 Celery FCM 키(`/root/secrets/fcm.json`)와 발송 모듈은 정상 확인 | `mobile/android/app/src/main/AndroidManifest.xml`, `templates/base.html`, `templates/legal/consent.html` | ✅ 수정 (2026-07-02): AndroidManifest에 `android.permission.POST_NOTIFICATIONS` 추가. `mmInitPush(force)`가 PushNotifications/LocalNotifications 권한을 확인·요청하고, FCM registration 이벤트의 `/api/push/register` 성공을 기다려 토큰 저장 완료 여부를 반환하도록 보강. 최초 동의 화면에서 선택 푸시를 체크하면 `알림 권한 확인 중...` 상태로 native 권한 요청과 토큰 등록을 실행한 뒤 홈으로 이동. 검증: `tests/test_push_consent.py` 15 PASS, `gradlew assembleDebug` BUILD SUCCESSFUL, merged manifests에 `POST_NOTIFICATIONS` 포함. ADB 연결 기기 없음으로 실기기 설치/수신 검증은 폰 연결 후 필요. (Codex) |
 | BUG-ALERT-CALENDAR-NOT-IN-MY-ALERTS | 증시 캘린더/거시경제지표 알림이 별도 설정 카드에만 있고 `내 알림` 목록에는 표시되지 않아 실제 알림 룰로 저장됐는지 애매함(오너 보고) | 가격 알림 룰은 `/api/alerts/rules` 기반으로 `내 알림`에 렌더되지만, 증시 캘린더 알림은 별도 prefs(`/api/alerts/calendar-prefs`)라 같은 목록에 합쳐 보여주는 UI 계층이 없었음 | `templates/alerts.html` | ✅ 수정 (2026-07-01): `내 알림` 렌더러가 일반 가격 알림 룰과 캘린더 prefs를 함께 렌더하도록 확장. 저장된 캘린더/거시경제지표 알림은 `거시경제지표` pill, 08:00 KST 발화 조건, 선택 항목 요약과 함께 표시되며 행에서 바로 켜기/끄기 및 수정 위치 이동 가능. Playwright DOM 검증: 캘린더 행 1개, 수정 버튼 1개, `08:00` 표시, 켜기/끄기 prefs 저장, 콘솔 에러 0. (Codex) |

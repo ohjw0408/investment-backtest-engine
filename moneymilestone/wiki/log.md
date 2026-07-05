@@ -1,5 +1,13 @@
 # Log
 
+## [2026-07-05] BUGFIX | 포폴 비교 겹쳐보기 basis 토글 시리즈 누락 (BUG-RR-OVERLAY-BASIS-TOGGLE-DROPS-SERIES)
+
+오너 보고: 추세 겹쳐보기에서 `총수익`/`가격` 라디오를 여러 번 번갈아 누르면 비교 시리즈 일부가 간헐 누락되어 안 그려짐.
+- 원인 확정: `static/js/risk_return_page.js`의 `rrOvLoad`가 async인데 동시성 가드가 없음. basis 토글 핸들러가 `rrOv.raw={}` 후 `rrOvLoad()`를 연속 호출 → 겹친 실행이 (a) await 사이 공유 `rrOv.basis`를 매 반복 읽어 키마다 다른 basis로 fetch(혼합), (b) 각자 로컬 `kept`를 만들어 끝에 `rrOv.raw=kept`로 커밋 — 늦게 끝난 낡은 실행이 신규를 덮어써 실패/미조회 키가 빠진 상태가 남음 = 시리즈 드롭.
+- 수정: generation 토큰 도입. `rrOv._loadTok` 필드 추가, `rrOvLoad` 진입 시 `++rrOv._loadTok`로 토큰 확보 + `basis`를 로컬 캡처. macro/multi fetch URL과 index_series POST body 둘 다 로컬 `basis` 사용(중간에 바뀌어도 일관). 각 await 재개마다 `rrOv._loadTok !== myTok`면 `rrOv.raw` 커밋/렌더 없이 즉시 반환 → 낡은 실행이 신규 결과를 못 덮음.
+- 정상 단일 로드/토글은 토큰 항상 일치라 동작 불변. static_v() mtime 자동 캐시버스트.
+- 검증: `node --check static/js/risk_return_page.js` OK. ⚠️비결정 레이스라 Playwright 연타 결정적 재현 어려움 — 배포 후 라이브 연타 재현 오너 확인 권장.
+
 ## [2026-07-05] FEAT | 포트폴리오 예시 비교 담기 취소 토글 + 리밋 5→20
 
 오너 요청: `/examples` 비교 담기에서 (1) 담은 항목 개별 취소 기능, (2) 최대 5개 리밋을 20개로 확대.

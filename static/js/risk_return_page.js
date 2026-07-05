@@ -667,7 +667,7 @@ window.addEventListener('resize', () => {
 });
 
 // ── 추세 겹쳐보기 오버레이 ──
-const rrOv = { items: [], raw: {}, start: null, end: null, mode: 'norm', basis: 'tr', activeY: 5, activeEvent: null, macros: [], chart: null, exPorts: {}, fullscreen: false };
+const rrOv = { items: [], raw: {}, start: null, end: null, mode: 'norm', basis: 'tr', activeY: 5, activeEvent: null, macros: [], chart: null, exPorts: {}, fullscreen: false, _loadTok: 0 };
 const RR_OV_QUICK = [['SYM:SPY','S&P500'],['SYM:069500','코스피200'],['SYM:GLD','금'],['SYM:TLT','미국 장기채']];
 const RR_RANGE_EVENTS = [
   { key:'dotcom', label:'닷컴', start:'2000-01-01', end:'2002-12-31' },
@@ -766,21 +766,25 @@ function rrOvProg(done, total){
 async function rrOvLoad(){
   rrOvRenderQuick(); rrOvRenderChips();
   if (!rrOv.items.length){ rrOvRenderCtrl(); rrOvDraw(); return; }
+  // 겹친 실행(basis 토글 연타 등) 가드 — 이 실행의 토큰·basis를 로컬 고정.
+  // await 재개마다 최신 토큰인지 확인, 낡았으면 rrOv.raw 커밋/그리기 없이 중단(시리즈 누락 방지).
+  const myTok = ++rrOv._loadTok, basis = rrOv.basis;
   // EX:(즉석 예시 포폴) 시계열은 macro/multi에 없음 → 보존하고 나머지만 조회
   const kept = {};
-  rrOv.items.forEach(it=>{ if(it.key.startsWith('EX:') && rrOv.raw[it.key] && rrOv.raw[it.key].basis === rrOv.basis) kept[it.key]=rrOv.raw[it.key]; });
+  rrOv.items.forEach(it=>{ if(it.key.startsWith('EX:') && rrOv.raw[it.key] && rrOv.raw[it.key].basis === basis) kept[it.key]=rrOv.raw[it.key]; });
   const fetchKeys = rrOv.items.map(it=>it.key).filter(k=>!k.startsWith('EX:'));
   if (fetchKeys.length){
     // 키별 병렬(동시성 4) 요청 + 진행률 — 도착하는 대로 % 채움
     let done=0; rrOvProg(0, fetchKeys.length);
     const q=[...fetchKeys];
-    const worker = async () => { while(q.length){ const k=q.shift();
-      try { const d=await fetch(`/api/macro/multi?keys=${encodeURIComponent(k)}&basis=${encodeURIComponent(rrOv.basis)}`).then(r=>r.json());
+    const worker = async () => { while(q.length){ if (rrOv._loadTok !== myTok) return; const k=q.shift();
+      try { const d=await fetch(`/api/macro/multi?keys=${encodeURIComponent(k)}&basis=${encodeURIComponent(basis)}`).then(r=>r.json());
         (d.series||[]).forEach(s=>kept[s.key]=s);
       } catch(e){}
       done++; rrOvProg(done, fetchKeys.length);
     }};
     await Promise.all([worker(),worker(),worker(),worker()]);
+    if (rrOv._loadTok !== myTok) return;   // 낡은 실행 — 신규가 진행 중, 커밋 안 함
     rrOvProg(-1);
   }
   const exKeys = rrOv.items.map(it=>it.key).filter(k=>k.startsWith('EX:') && !kept[k] && rrOv.exPorts[k]);
@@ -789,12 +793,13 @@ async function rrOvLoad(){
     await Promise.all(exKeys.map(async k => {
       try {
         const d = await fetch('/api/portfolio/index_series', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ portfolios: [rrOv.exPorts[k]], basis: rrOv.basis }) }).then(r=>r.json());
+          body: JSON.stringify({ portfolios: [rrOv.exPorts[k]], basis: basis }) }).then(r=>r.json());
         const s = (d.series || [])[0];
         if (s) kept[k] = {...s, key: k, label: rrOv.exPorts[k].name};
       } catch(e){}
       done++; rrOvProg(done, exKeys.length);
     }));
+    if (rrOv._loadTok !== myTok) return;   // 낡은 실행 — 커밋 안 함
     rrOvProg(-1);
   }
   rrOv.raw = kept;

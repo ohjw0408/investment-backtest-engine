@@ -12,6 +12,18 @@ let rrSelectedOrder = [];       // compare order for selected portfolio ids
 let rrDragPfId = null;
 let rrBench = DEFAULT_BENCH.slice();
 let rrSearchTimer = null;
+let rrMacroBench = [];   // 벤치마크로 고를 수 있는 지수형 거시지표 (부동산·M2·물가 등)
+// 지수형(레벨)만 — 금리·%·환율·원자재·주가지수 제외. 배당·거래량 없어 레벨=가격 간주.
+fetch('/api/macro/overview').then(r => r.json()).then(d => {
+  const out = [];
+  (d.categories || []).forEach(c => {
+    if (c.category === '주가지수' || c.category === '원자재') return;
+    (c.series || []).forEach(s => {
+      if (['지수', '십억원'].includes(s.unit)) out.push({ code: s.code, name: s.name_ko, cat: c.category });
+    });
+  });
+  rrMacroBench = out;
+}).catch(() => { rrMacroBench = []; });
 let rrItems = [];               // 결과 items
 let rrLastData = null;          // 마지막 compare 응답(리사이즈 재렌더용)
 let rrTableCols = null;
@@ -30,8 +42,8 @@ async function rrLoadPortfolios(){
   try {
     rrPortfolios = await fetch('/api/portfolio/list').then(r => r.json());
   } catch(e){ rrPortfolios = []; }
-  rrSelected = new Set(rrPortfolios.map(p => p.id));   // 기본 전체 선택
-  rrSelectedOrder = rrPortfolios.map(p => p.id);
+  rrSelected = new Set();          // 기본 선택 없음 (오너 요청 2026-07-07)
+  rrSelectedOrder = [];
   rrRenderPfList();
 }
 function rrRenderPfList(){
@@ -125,17 +137,29 @@ document.getElementById('rrSearch').addEventListener('input', e => {
   clearTimeout(rrSearchTimer);
   if (!q) { dd.style.display = 'none'; return; }
   rrSearchTimer = setTimeout(async () => {
+    const ql = q.toLowerCase();
+    // 지수형 거시지표(부동산·M2·물가 등)를 종목과 함께 벤치마크 후보로 노출.
+    const macros = rrMacroBench.filter(m => (m.name || '').toLowerCase().includes(ql)).slice(0, 6);
+    const macroHtml = macros.map(m => `
+      <div class="rr-dd-item" data-code="${esc(m.code)}" data-name="${esc(m.name)}">
+        <span style="font-weight:700;">📈 ${esc(m.name)}</span>
+        <span style="color:var(--text-muted);">거시지표 · ${esc(m.cat)}</span>
+      </div>`).join('');
+    const wire = () => dd.querySelectorAll('.rr-dd-item[data-code]').forEach(el =>
+      el.addEventListener('click', () => rrAddBench(el.dataset.code, el.dataset.name)));
+    const paint = (symHtml) => {
+      if (!macroHtml && !symHtml) { dd.innerHTML = '<div class="rr-dd-item">검색 결과 없음</div>'; dd.style.display = 'block'; return; }
+      dd.innerHTML = macroHtml + symHtml; dd.style.display = 'block'; wire();
+    };
+    paint('');   // 거시지표는 즉시 표시 — 종목 검색 응답을 기다리지 않음
     try {
-      const data = await fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json());
-      if (!data.length) { dd.innerHTML = '<div class="rr-dd-item">검색 결과 없음</div>'; dd.style.display = 'block'; return; }
-      dd.innerHTML = data.slice(0,8).map(item => `
+      const syms = await fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json());
+      const symHtml = (syms || []).slice(0, 8).map(item => `
         <div class="rr-dd-item" data-code="${esc(item.code)}" data-name="${esc(item.name)}">
           <span style="font-weight:700;">${esc(item.code)}</span>
           <span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(item.name)}</span>
         </div>`).join('');
-      dd.style.display = 'block';
-      dd.querySelectorAll('.rr-dd-item[data-code]').forEach(el =>
-        el.addEventListener('click', () => rrAddBench(el.dataset.code, el.dataset.name)));
+      paint(symHtml);
     } catch(err){}
   }, 250);
 });

@@ -34,8 +34,36 @@ _DIV_MIN_ACTUAL_DAYS = 40
 _DIV_FULL_YEAR_DAYS = 200
 
 
+def _load_macro_series(code, data_end):
+    """거시지표 코드(macro_observations) → (close, div=0, actual=True). 벤치마크로 지수형 macro 허용.
+    레벨을 가격처럼 간주(배당·거래량 없음). macro 레지스트리에 없는 코드는 None."""
+    try:
+        from modules import macro_loader
+        if code not in macro_loader.SERIES_BY_CODE:
+            return None
+        d = macro_loader.get_series(code)
+        pts = (d or {}).get("points") or []
+        if len(pts) < 2:
+            return None
+        idx = pd.to_datetime([p[0] for p in pts])
+        close = pd.Series([float(p[1]) for p in pts], index=idx).sort_index()
+        close = close[np.isfinite(close) & (close > 0)]
+        if data_end:
+            close = close[close.index <= pd.to_datetime(data_end)]
+        if len(close) < 2:
+            return None
+        div = pd.Series(0.0, index=close.index)
+        actual = pd.Series(True, index=close.index)
+        return close, div, actual
+    except Exception:
+        return None
+
+
 def _load_series(loader, code, data_end):
     """code → (close, dividend) Series (date index). 실패 시 None."""
+    macro = _load_macro_series(code, data_end)
+    if macro is not None:
+        return macro
     try:
         df = loader.get_price(code, _LOAD_START, data_end)
         if df is None or len(df) == 0:

@@ -1,5 +1,14 @@
 # Log
 
+## [2026-07-07] FEAT | 포폴 정밀 비교 — 기본선택 제거 + 거시지표 벤치마크 허용
+
+오너 요청: `/risk-return` 정밀 비교에서 (1) 내 포트폴리오(즐겨찾기)가 전부 기본 선택되던 것 → 기본 선택 없게, (2) 거시지표(부동산·M2 등)를 벤치마크로 고를 수 있게.
+- **Task1**(`static/js/risk_return_page.js`): `rrLoadPortfolios`에서 `rrSelected`를 전체 id로 채우던 것 → 빈 Set(`rrSelectedOrder=[]`). 백엔드는 `portfolio_ids: []`(빈 리스트)를 이미 "선택 없음"으로 처리(None만 전체 폴백)이라 프론트 변경만으로 충분. 렌더는 "선택된 포트폴리오가 없습니다" + 전체 미체크 목록.
+- **Task2 범위(오너 결정 2026-07-07)**: 벤치마크로 넣을 거시지표 = **지수형만**(금리·%·환율·원자재·주가지수 제외). 11지표 표엔 **레벨=가격 간주, 배당 0**으로 편입.
+- **Task2 백엔드**(`risk_return_logic.py`): `_load_macro_series(code)` 추가 — `macro_loader.SERIES_BY_CODE`에 있으면 `get_series`의 points를 (close=레벨, div=0, actual=True)로 로드. `_load_series` 최상단에서 macro 우선 시도. `compute_comparison`·`compute_risk_return`(산점도) 둘 다 자동 적용. 딥지표(`_item_deep`=TR인덱스)·배당은 macro에 없어 graceful 공란. macro 코드는 프리픽스(KR_/US_/IDX_)라 종목 티커와 충돌 없음.
+- **Task2 프론트**: `rrMacroBench` = `/api/macro/overview`에서 `unit∈{지수,십억원}` && category∉{주가지수,원자재} 필터(로컬 57종). 벤치 검색 드롭다운에 종목과 함께 노출(📈 라벨). ⚠️ **초기 구현 함정**: 거시지표 렌더가 `await fetch('/api/search')` 뒤에 있어, 로컬 단일스레드 서버서 종목검색이 지연되면 거시지표도 안 떴음 → **거시지표 즉시 렌더 후 종목은 도착하면 덧붙이게** 재구성(paint 헬퍼). 프로덕션 멀티워커선 안 터졌겠지만 견고성 개선.
+- 검증: 로컬 서버 + mint_session 쿠키 + Playwright. Task1 = 저장 포폴 9개 전부 미체크(checked:0). Task2 = "서울 아파트" 검색→KR_HP_APT_SEOUL·실거래 노출, "M2"→KR_M2, "기준금리"→macro 히트 0(지수형만 확인), 칩 추가 OK, 정밀 비교 실행 시 산점도·레이더·표에 서울아파트(저변동/저수익)·M2(저변동/중수익) 통합, 배당 0. 라이트+다크 스샷 육안 OK, 콘솔에러 0. 백엔드 E2E: 서울아파트 cagr 3.2%/vol 2.8%/beta~0. `tests/test_portfolio_compare_route.py` 5 PASS.
+
 ## [2026-07-07] FEAT | 거시지표 "부동산" 카테고리 신설 + 한국 주택가격지수 32종
 
 오너 요청: 거시지표 주택가격지수에 서울/지역별 아파트·비아파트 세분 지수 추가, "부동산" 카테고리 분리(웹·모바일 공용).

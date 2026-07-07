@@ -22,7 +22,7 @@ INDEX_DB = BASE / "data" / "meta" / "index_master.db"
 FRED_KEY_FILE = BASE / "data" / "meta" / "fred_api_key.txt"
 ECOS_KEY_FILE = BASE / "data" / "meta" / "ecos_api_key.txt"
 
-CATEGORIES = ["주가지수", "원자재", "금리", "인플레이션", "고용", "통화·유동성", "신용·리스크", "경기·성장", "시장·환율"]
+CATEGORIES = ["주가지수", "원자재", "금리", "인플레이션", "고용", "통화·유동성", "신용·리스크", "경기·성장", "부동산", "시장·환율"]
 
 
 def _fred(sid, freq, cat, name, unit, country="US"):
@@ -30,11 +30,19 @@ def _fred(sid, freq, cat, name, unit, country="US"):
             "category": cat, "name_ko": name, "unit": unit, "country": country}
 
 
-def _ecos(code, stat, cyc, items, cat, name, unit):
+def _ecos(code, stat, cyc, items, cat, name, unit, desc=""):
     """items = [ITEM1] 또는 [ITEM1, ITEM2] (2차원 통계표)."""
     return {"code": f"KR_{code}", "src": "ecos", "stat": stat, "cyc": cyc,
             "items": items, "freq": cyc, "category": cat, "name_ko": name,
-            "unit": unit, "country": "KR"}
+            "unit": unit, "country": "KR", "desc": desc}
+
+
+def _ecos_splice(code, items, cat, name, unit, old_stat, new_stat, cyc="M", desc=""):
+    """같은 조사지수의 구기준(old_stat)+신기준(new_stat) 표를 체인링크(기준월만 다름).
+    유형별 주택가격지수: 901Y093(2003.11~) + 901Y113(2021.06~)로 장기 시리즈 복원."""
+    return {"code": f"KR_{code}", "src": "ecos_splice", "old_stat": old_stat,
+            "new_stat": new_stat, "cyc": cyc, "items": items, "freq": cyc,
+            "category": cat, "name_ko": name, "unit": unit, "country": "KR", "desc": desc}
 
 
 def _yf(code, yfsym, country, name):
@@ -116,9 +124,9 @@ SERIES = [
     _fred("TCU", "M", "경기·성장", "미 설비가동률", "%"),
     _fred("RSAFS", "M", "경기·성장", "미 소매판매", "백만$"),
     _fred("UMCSENT", "M", "경기·성장", "미시간대 소비자심리지수(전미)", "지수"),
-    _fred("HOUST", "M", "경기·성장", "미 주택착공", "천호"),
-    _fred("PERMIT", "M", "경기·성장", "미 건축허가", "천호"),
-    _fred("CSUSHPINSA", "M", "경기·성장", "미 Case-Shiller 주택가격", "지수"),
+    _fred("HOUST", "M", "부동산", "미 주택착공", "천호"),
+    _fred("PERMIT", "M", "부동산", "미 건축허가", "천호"),
+    _fred("CSUSHPINSA", "M", "부동산", "미 Case-Shiller 주택가격", "지수"),
     _fred("DGORDER", "M", "경기·성장", "미 내구재 주문", "백만$"),
     # 미국 시장·환율
     _fred("DCOILWTICO", "D", "시장·환율", "WTI 유가", "$/배럴"),
@@ -153,7 +161,7 @@ SERIES = [
     # 한국 시장·환율·대외
     _ecos("USDKRW", "731Y001", "D", ["0000001"], "시장·환율", "원/달러 매매기준율", "원"),
     _ecos("CURRENT_ACCT", "301Y013", "M", ["000000"], "시장·환율", "한국 경상수지", "백만$"),
-    _ecos("HOUSE_PRICE", "901Y062", "M", ["P63A"], "경기·성장", "한국 주택매매가격지수(KB)", "지수"),
+    _ecos("HOUSE_PRICE", "901Y062", "M", ["P63A"], "부동산", "한국 주택매매가격지수(KB)", "지수"),
     _ecos("HOUSEHOLD_CREDIT", "151Y001", "Q", ["1000000"], "신용·리스크", "한국 가계신용", "십억원"),
 
     # 시장 대표 지수 (yfinance)
@@ -264,6 +272,59 @@ _CURVE_NODES = [
 for _n in _CURVE_NODES:
     _n["curve_only"] = True
 SERIES.extend(_CURVE_NODES)
+SERIES_BY_CODE = {s["code"]: s for s in SERIES}
+
+
+# ── 부동산: 한국부동산원 유형별 주택가격지수 (조사) + 아파트 실거래가격지수 ──
+# 조사지수 = 901Y093(2003.11~2025.03, 구기준) + 901Y113(2021.06~, 신기준) 스플라이스.
+#   ITEM = [유형, 지역].  유형: H69A 종합·H69B 아파트·H69C 연립다세대·H69D 단독주택.
+# 실거래지수 = 901Y089(2006~, 아파트 전용, 1차원=지역).
+_RE_HP_OLD, _RE_HP_NEW = "901Y093", "901Y113"
+# (토큰, 지역item, 표시명) — 전국·수도권·지방 + 17개 시도
+_RE_REGIONS = [
+    ("NAT", "R70A", "전국"), ("CAP", "R70B", "수도권"), ("LOC", "R70C", "지방"),
+    ("SEOUL", "R70F", "서울"), ("GYEONGGI", "R70G", "경기"), ("INCHEON", "R70H", "인천"),
+    ("BUSAN", "R70I", "부산"), ("DAEGU", "R70J", "대구"), ("GWANGJU", "R70K", "광주"),
+    ("DAEJEON", "R70L", "대전"), ("ULSAN", "R70M", "울산"), ("SEJONG", "R70N", "세종"),
+    ("GANGWON", "R70O", "강원"), ("CHUNGBUK", "R70P", "충북"), ("CHUNGNAM", "R70Q", "충남"),
+    ("JEONBUK", "R70R", "전북"), ("JEONNAM", "R70S", "전남"), ("GYEONGBUK", "R70T", "경북"),
+    ("GYEONGNAM", "R70U", "경남"), ("JEJU", "R70V", "제주"),
+]
+_RE_REGION_BY_TOK = {tok: (item, disp) for tok, item, disp in _RE_REGIONS}
+
+
+def _hp(type_tok, type_item, type_disp, region_toks):
+    """유형별 주택매매가격지수 스플라이스 스펙 생성."""
+    out = []
+    for tok in region_toks:
+        item, disp = _RE_REGION_BY_TOK[tok]
+        out.append(_ecos_splice(
+            f"HP_{type_tok}_{tok}", [type_item, item], "부동산",
+            f"{disp} {type_disp}", "지수", _RE_HP_OLD, _RE_HP_NEW,
+            desc=f"{disp} {type_disp} 매매가격지수(한국부동산원 조사, 2003.11~, 2025.3=100). "
+                 f"2021년 이전은 구기준(2021.6) 지수를 연결해 복원."))
+    return out
+
+
+_ALL_TOKS = [t for t, _, _ in _RE_REGIONS]
+_RE_SERIES = []
+_RE_SERIES += _hp("APT", "H69B", "아파트", _ALL_TOKS)          # 아파트 × 20지역
+_RE_SERIES += _hp("ALL", "H69A", "주택종합", ["NAT", "SEOUL"])  # 종합 × 전국·서울
+_RE_SERIES += _hp("ROW", "H69C", "연립다세대", ["NAT", "SEOUL"])
+_RE_SERIES += _hp("DET", "H69D", "단독주택", ["NAT", "SEOUL"])
+
+# 아파트 실거래가격지수(901Y089): 서울 + 서울 5개 생활권역
+for _tok, _item, _disp in [
+    ("SEOUL", "200", "서울"), ("DOSIM", "210", "서울 도심권"), ("DONGBUK", "220", "서울 동북권"),
+    ("DONGNAM", "230", "서울 동남권"), ("SEOBUK", "240", "서울 서북권"), ("SEONAM", "250", "서울 서남권"),
+]:
+    _RE_SERIES.append(_ecos(
+        f"APTRE_{_tok}", "901Y089", "M", [_item], "부동산",
+        f"{_disp} 아파트(실거래)", "지수",
+        desc=f"{_disp} 아파트 실거래가격지수(실제 신고 거래가 기반, 2006~, 2021.6=100). "
+             f"조사지수와 방법론이 달라 변동이 큼."))
+
+SERIES.extend(_RE_SERIES)
 SERIES_BY_CODE = {s["code"]: s for s in SERIES}
 
 
@@ -618,6 +679,24 @@ def fetch_ecos(stat, cyc, items, key=None):
     return rows_out
 
 
+def fetch_ecos_splice(old_stat, new_stat, cyc, items, key=None):
+    """구기준·신기준 표를 체인링크. 첫 공통월에서 계수 맞춰 구값을 신기준으로 정렬."""
+    old = dict(fetch_ecos(old_stat, cyc, items, key))
+    new = dict(fetch_ecos(new_stat, cyc, items, key))
+    if not new:
+        return sorted(old.items())
+    if not old:
+        return sorted(new.items())
+    common = sorted(set(old) & set(new))
+    factor = 1.0
+    if common and old[common[0]]:
+        factor = new[common[0]] / old[common[0]]
+    new_start = min(new)
+    merged = {d: v * factor for d, v in old.items() if d < new_start}
+    merged.update(new)  # 겹치는 구간·이후는 신기준 원값 우선
+    return sorted(merged.items())
+
+
 # ── 한 시리즈 적재 ───────────────────────────────────────────────────────
 def _upsert(conn, spec, rows):
     if not rows:
@@ -631,14 +710,17 @@ def _upsert(conn, spec, rows):
         src = f"fred:{spec['sid']}"
     elif spec["src"] == "yf":
         src = f"yf:{spec['yf']}"
+    elif spec["src"] == "ecos_splice":
+        src = f"ecos_splice:{spec['old_stat']}+{spec['new_stat']}/{'/'.join(spec['items'])}"
     else:
         src = f"ecos:{spec['stat']}/{'/'.join(spec['items'])}"
+    desc = spec.get("desc") or DESCRIPTIONS.get(spec["code"], "")
     conn.execute(
         "INSERT OR REPLACE INTO macro_series "
         "(code,name_ko,category,country,unit,freq,source,description,last_update) "
         "VALUES (?,?,?,?,?,?,?,?,?)",
         (spec["code"], spec["name_ko"], spec["category"], spec["country"],
-         spec["unit"], spec["freq"], src, DESCRIPTIONS.get(spec["code"], ""), last),
+         spec["unit"], spec["freq"], src, desc, last),
     )
     conn.commit()
     return len(rows)
@@ -649,6 +731,15 @@ def fetch_one(spec, start=None):
         return fetch_fred(spec["sid"], start=start or "1900-01-01")
     if spec["src"] == "yf":
         return fetch_yf(spec["yf"], start=start or "1900-01-01")
+    if spec["src"] == "ecos_splice":
+        # 증분 갱신(start≥신기준 시작)이면 구기준 재조회 불필요 → 신기준표만.
+        if start and start >= "2021-06":
+            rows = fetch_ecos(spec["new_stat"], spec["cyc"], spec["items"])
+        else:
+            rows = fetch_ecos_splice(spec["old_stat"], spec["new_stat"], spec["cyc"], spec["items"])
+        if start:
+            rows = [r for r in rows if r[0] >= start]
+        return rows
     rows = fetch_ecos(spec["stat"], spec["cyc"], spec["items"])
     if start:
         rows = [r for r in rows if r[0] >= start]

@@ -1,5 +1,12 @@
 # Log
 
+## [2026-07-07] BUGFIX | 정밀 비교 "지표별 심화 비교"에 거시지표 안 나옴
+
+오너 보고: SPY+한국 아파트+M2로 정밀 비교 시 메인 표엔 다 나오는데 **"지표별 심화 비교"(연도별 박스플롯·손실확률)엔 SPY만** 나옴. 수익률·변동성·MDD는 나와야 함.
+- 원인: 심화 아코디언(`risk_return_page.js` `rrRenderAccordions` L262)이 `annual`·`annual_div`가 **둘 다 비면 항목을 제외**. 거시지표 벤치는 `_item_deep`이 `build_portfolio_tr_index`(거래종목 전용)로 만들어 실패→`annual=[]`→심화에서 탈락(메인 11지표 표는 `_metrics_full`로 나오므로 정상이었음).
+- 수정(`risk_return_logic.py`): `_is_macro(code)` + `_macro_deep(close)` 추가. 거시지표는 로드된 레벨 시계열을 **영업일(freq='B') 달력으로 ffill**해 TR points를 만들고 `_annual_from_points`로 연도별 ret/vol/mdd 산출(√252 연율화가 메인 표와 일관 — 영업일 ffill이라 월별 zero가 √252로 상쇄). rolling 손실확률도 동일 points로 생성. `compute_comparison` 벤치 루프에서 macro면 `_macro_deep`, 아니면 기존 `_item_deep`. 배당 없어 `annual_div=[]`.
+- 검증: 백엔드 — 서울아파트 annual 23년(2025 ret 9.0%/vol 3.6%/mdd 0), M2 23년, rolling 생성. Playwright — SPY+서울아파트+M2 비교 시 "수익률" 심화 아코디언 박스플롯에 서울아파트(타이트)·M2(타이트) 표시, 기간별 손실확률 표에도 컬럼 추가, 콘솔에러 0. `test_portfolio_compare_route` 5 PASS.
+
 ## [2026-07-07] FEAT | 포폴 정밀 비교 — 기본선택 제거 + 거시지표 벤치마크 허용
 
 오너 요청: `/risk-return` 정밀 비교에서 (1) 내 포트폴리오(즐겨찾기)가 전부 기본 선택되던 것 → 기본 선택 없게, (2) 거시지표(부동산·M2 등)를 벤치마크로 고를 수 있게.

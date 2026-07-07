@@ -294,6 +294,40 @@ def _item_deep(tickers):
     return annual, rr
 
 
+def _is_macro(code):
+    """벤치마크 코드가 거시지표(macro_observations)인지."""
+    try:
+        from modules import macro_loader
+        return code in macro_loader.SERIES_BY_CODE
+    except Exception:
+        return False
+
+
+def _macro_deep(close):
+    """거시지표 레벨 시계열(월별) → 심화 비교용 (annual, rolling_return).
+       영업일 달력으로 ffill해 √252 연율화가 메인 표와 일관되게 한다(배당 없음, syn 없음)."""
+    try:
+        from modules import rolling
+    except Exception:
+        rolling = None
+    c = close[np.isfinite(close) & (close > 0)].sort_index()
+    if len(c) < 2:
+        return [], None
+    idx = pd.date_range(c.index.min(), c.index.max(), freq="B")
+    daily = c.reindex(idx).ffill()
+    pts = [[d.strftime("%Y-%m-%d"), round(float(v), 4), 0]
+           for d, v in daily.items() if np.isfinite(v) and v > 0]
+    annual = _annual_from_points(pts, actual_only=True)
+    rr = None
+    if rolling is not None and len(pts) >= 13:
+        rr = {
+            "horizons": rolling.DEFAULT_HORIZONS,
+            "horizon_table": {str(h): v for h, v in rolling.horizon_table(pts, actual_only=True).items()},
+            "syn_overall": 0.0,
+        }
+    return annual, rr
+
+
 def _annual_dividends(weights, series):
     """포폴 연도별 배당: dyield(연 배당수익률) + dindex(첫해=100 정규화 배당액 흐름).
        weights={code:w}. 배당/성장률은 상장 전 백필·프록시 구간을 제외하고 실제 구간만 사용."""
@@ -458,11 +492,17 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
                           "annual": annual, "annual_div": div_y,
                           "divgrowth": _dividend_growth(div_y), "rolling_return": rr})
     for b in bench_list:
-        m = _metrics_full(rets_c[b["code"]], spy_r, yld.get(b["code"], 0.0))
+        code = b["code"]
+        m = _metrics_full(rets_c[code], spy_r, yld.get(code, 0.0))
         if m:
-            annual, rr = _item_deep([{"code": b["code"], "weight": 100.0}])
-            div_y = _annual_dividends({b["code"]: 1.0}, series)
-            items.append({"kind": "benchmark", "name": b["name"], "code": b["code"], **m,
+            if _is_macro(code):
+                # 거시지표는 TR 인덱스(거래종목)로 못 만드니 로드된 레벨 시계열로 심화지표(연도별 ret/vol/mdd) 산출.
+                annual, rr = _macro_deep(series[code][0])
+                div_y = []
+            else:
+                annual, rr = _item_deep([{"code": code, "weight": 100.0}])
+                div_y = _annual_dividends({code: 1.0}, series)
+            items.append({"kind": "benchmark", "name": b["name"], "code": code, **m,
                           "annual": annual, "annual_div": div_y,
                           "divgrowth": _dividend_growth(div_y), "rolling_return": rr})
 

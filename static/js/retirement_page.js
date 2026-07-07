@@ -168,10 +168,10 @@ function updateRetWeightUI() {
       <span class="ticker-item-code">${t.code}</span>
       <span class="ticker-item-name">${t.name ? t.name : ''}</span>
       <div class="ticker-item-weight">
-        <input class="weight-input" type="number" value="${Math.round(t.weight*100)}" min="1" max="100" step="1"
+        <input class="weight-input" type="number" value="${Math.round(t.weight*100)}" min="0" max="100" step="1"
           onchange="retUpdateWeight(${i}, this.value)"><span class="weight-pct">%</span>
       </div>
-      <input type="range" class="ticker-item-slider" value="${Math.round(t.weight*100)}" min="1" max="100" step="1"
+      <input type="range" class="ticker-item-slider" value="${Math.round(t.weight*100)}" min="0" max="100" step="1"
         oninput="retUpdateWeight(${i}, this.value)">
       <button class="ticker-remove" onclick="retRemoveTicker(${i})">✕</button>
     </div>
@@ -226,10 +226,8 @@ document.addEventListener('click', (e) => {
 
 function retAddTicker(code, name) {
   if (retTickers.find(t => t.code === code)) { retDropdown.style.display='none'; return; }
-  const n = retTickers.length + 1;
-  const w = Math.round(100 / n) / 100;
-  retTickers.forEach(t => t.weight = w);
-  retTickers.push({ code, name, weight: parseFloat((1 - w*(n-1)).toFixed(2)) });
+  // 첫 종목만 100%(1.0), 이후는 0%로 조용히 추가(기존 비중 보존). weight는 0~1 스케일.
+  retTickers.push({ code, name, weight: retTickers.length === 0 ? 1 : 0 });
   retInput.value = '';
   retDropdown.style.display = 'none';
   updateRetWeightUI();

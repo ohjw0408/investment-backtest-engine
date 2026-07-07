@@ -199,35 +199,23 @@ function badgeColor(badge) {
   return '#78909C';
 }
 
-// ── 균등 비중 재배분 ──
-function redistributeWeights() {
-  const n = tickers.length;
-  if (n === 0) return;
-  const base = Math.floor(100 / n);
-  tickers.forEach((t, i) => {
-    t.weight = (i === n - 1) ? 100 - base * (n - 1) : base;
-  });
-}
-
-// ── 종목 추가 ──
+// ── 종목 추가 ── 첫 종목만 100%, 이후는 0%로 조용히 추가(기존 비중 보존)
 function addTicker(code, name, badge) {
   if (tickers.find(t => t.code === code)) {
     mmToast(`${code}는 이미 추가되어 있어요.`, 'err');
     return;
   }
-  tickers.push({ code, name, badge, weight: 0 });
-  redistributeWeights();
+  tickers.push({ code, name, badge, weight: tickers.length === 0 ? 100 : 0 });
   document.getElementById('tickerSearchInput').value = '';
   document.getElementById('tickerDropdown').style.display = 'none';
   renderTickers();
 }
 
-// ── 종목 제거 ──
+// ── 종목 제거 ── 나머지 비중 그대로 유지
 function removeTicker(code) {
   const idx = tickers.findIndex(t => t.code === code);
   if (idx === -1) return;
   tickers.splice(idx, 1);
-  if (tickers.length > 0) redistributeWeights();
   renderTickers();
 }
 

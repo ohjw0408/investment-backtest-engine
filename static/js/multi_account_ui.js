@@ -213,21 +213,10 @@ function applyFavToAccount(idx, favId) {
   renderTaxAccounts();
 }
 
-function redistributeAccountWeights(idx) {
-  const accTickers = ensureAccountTickers(idx);
-  const n = accTickers.length;
-  if (!n) return;
-  const base = Math.floor(100 / n);
-  accTickers.forEach((t, i) => {
-    t.weight = (i === n - 1) ? 100 - base * (n - 1) : base;
-  });
-}
-
 function addAccountTicker(idx, code, name, badge) {
   const accTickers = ensureAccountTickers(idx);
   if (accTickers.find(t => t.code === code)) return;
-  accTickers.push({ code, name, badge, weight: 0 });
-  redistributeAccountWeights(idx);
+  accTickers.push({ code, name, badge, weight: accTickers.length === 0 ? 100 : 0 });
   renderTaxAccounts();
 }
 
@@ -236,7 +225,6 @@ function removeAccountTicker(idx, code) {
   const pos = accTickers.findIndex(t => t.code === code);
   if (pos === -1) return;
   accTickers.splice(pos, 1);
-  if (accTickers.length > 0) redistributeAccountWeights(idx);
   renderTaxAccounts();
 }
 

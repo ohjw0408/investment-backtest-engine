@@ -121,11 +121,8 @@ function mpRemove(i) { mpEdit.tickers.splice(i, 1); mpRenderEdit(); }
 
 function mpAdd(code, name, badge) {
   if (mpEdit.tickers.some(t => t.code === code)) return;
-  // 균등 분배 (계산기 패턴)
-  const n = mpEdit.tickers.length + 1;
-  const w = Math.floor(100 / n);
-  mpEdit.tickers.forEach(t => t.weight = w);
-  mpEdit.tickers.push({ code, name, badge, weight: 100 - w * (n - 1) });
+  // 첫 종목만 100%, 이후는 0%로 조용히 추가(기존 비중 보존)
+  mpEdit.tickers.push({ code, name, badge, weight: mpEdit.tickers.length === 0 ? 100 : 0 });
   mpRenderEdit();
   document.getElementById('mpSearch').value = '';
   document.getElementById('mpDropdown').style.display = 'none';

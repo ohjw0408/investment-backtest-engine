@@ -1,5 +1,13 @@
 # Log
 
+## [2026-07-07] BUGFIX | 종목 추가 시 기존 비중 초기화(균등재분배) — 전 입력창 뿌리뽑기
+
+오너 오래된 불만: 포트 구성 중(예 SPY 50%·QQQ 20%) 새 종목(TLT) 추가하는 순간 기존 비중이 다 날아가고 33/33/34로 균등 리셋됨. 투자계산기·은퇴·포폴 등 어디든.
+- 뿌리: 각 페이지 add 핸들러가 새 종목 push 후 균등재분배 함수 호출(`redistributeWeights`/`redistributeAccountWeights`/`rebalanceWeights`/`abEqualize`/인라인). 일부는 제거 시에도 재분배.
+- **결정(오너 2026-07-07)**: 추가=첫 종목만 100%(fraction 스케일은 1.0)·이후 0%로 조용히 추가·기존 비중 보존. 제거=그냥 빼고 나머지 유지(재분배 안 함).
+- 수정 7파일: `calculator.js`(투자계산기)·`multi_account_ui.js`(다중계좌)·`backtest_page.js`(백테, 0~1 스케일)·`retirement_page.js`(은퇴, 0~1)·`myportfolios.js`(내 포폴)·`tax_switch.js`(절세, add+remove 둘 다 rebalance했음)·`risk_return_page.js`(비교 adhoc 빌더). 균등재분배 함수는 버튼 연결 없어(템플릿 grep 0) add/remove에서만 호출 → orphan 삭제. backtest/retirement 비중 input `min="1"→"0"`(0% 깔끔 표시). tax_switch는 원래 add가 weight:0였지만 rebalance 호출로 리셋됐던 것.
+- 검증: Playwright로 6페이지 실동작 — SPY 50%·QQQ 20% 세팅 후 TLT 추가 → 전부 `[50,20,0]`(예전 33/33/34 리셋 사라짐), 콘솔에러 0. 첫 종목=100% 확인. node --check 7/7 OK, 삭제 함수 잔여 참조 0. (multi_account는 동일 한줄 패턴, 문법 검증.)
+
 ## [2026-07-07] CHANGE | 정밀 비교 심화 — 백필(합성) 데이터 사용하도록 마스크 해제
 
 오너 질문 발단: 정밀 비교 심화가 백필 데이터를 안 쓰던 것 → 오너가 막은 건지 버그인지. 이력 조사 결과: 손상 백필(SHY/IEF 등)을 06-27에 급히 compare에서 **가리고**(`actual_only`) "점검 필요" 플래그만 남겼는데, **07-02 `2eef1bd`(fix_corrupt_backfill.py: SHY/IEF/TLT/LQD 삭제→bond_model 재생성)로 소스는 실제 고쳐졌고** 07-03 상시 손상 스캔(B-2)까지 붙음. 근데 compare 마스크는 소스픽스 뒤에 안 풀려 **잉여+과잉**으로 남아 있었음(멀쩡한 백필까지 심화에서 배제).

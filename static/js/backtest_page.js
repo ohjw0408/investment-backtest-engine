@@ -156,10 +156,10 @@ function updateBtWeightUI() {
     <div class="ticker-item">
       <span class="ticker-badge">${t.code}</span>
       <span class="ticker-name">${t.name || ''}</span>
-      <input type="number" class="ticker-weight-input" value="${Math.round(t.weight*100)}" min="1" max="100"
+      <input type="number" class="ticker-weight-input" value="${Math.round(t.weight*100)}" min="0" max="100"
         oninput="btW(this, ${i})">
       <span class="ticker-weight-pct">%</span>
-      <input type="range" class="ticker-weight-slider" value="${Math.round(t.weight*100)}" min="1" max="100"
+      <input type="range" class="ticker-weight-slider" value="${Math.round(t.weight*100)}" min="0" max="100"
         oninput="btW(this, ${i})">
       <button class="ticker-remove-btn" onclick="btRemoveTicker(${i})">×</button>
     </div>
@@ -215,10 +215,8 @@ document.addEventListener('click', e => {
 
 function btAddTicker(code, name) {
   if (btTickers.find(t => t.code === code)) { btDropdown.style.display='none'; return; }
-  const n = btTickers.length + 1;
-  const w = Math.round(100 / n) / 100;
-  btTickers.forEach(t => t.weight = w);
-  btTickers.push({ code, name, weight: parseFloat((1 - w*(n-1)).toFixed(2)) });
+  // 첫 종목만 100%(1.0), 이후는 0%로 조용히 추가(기존 비중 보존). weight는 0~1 스케일.
+  btTickers.push({ code, name, weight: btTickers.length === 0 ? 1 : 0 });
   btInput.value = '';
   btDropdown.style.display = 'none';
   updateBtWeightUI();

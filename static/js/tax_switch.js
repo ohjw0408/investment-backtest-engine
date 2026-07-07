@@ -72,20 +72,14 @@
 
   function addTicker(code, name, badge) {
     if (tickers.some(t => t.code === code)) return;
-    tickers.push({ code, name, badge, weight: 0 });
-    rebalanceWeights();
+    // 첫 종목만 100%, 이후는 0%로 조용히 추가(기존 비중 보존)
+    tickers.push({ code, name, badge, weight: tickers.length === 0 ? 100 : 0 });
     renderTickers();
   }
   function removeTicker(code) {
     const i = tickers.findIndex(t => t.code === code);
     if (i >= 0) tickers.splice(i, 1);
-    rebalanceWeights();
     renderTickers();
-  }
-  function rebalanceWeights() {
-    if (tickers.length === 0) return;
-    const w = Math.floor(100 / tickers.length);
-    tickers.forEach((t, i) => { t.weight = i === 0 ? 100 - w * (tickers.length - 1) : w; });
   }
   function renderTickers() {
     const list = document.getElementById('tsTickerList');

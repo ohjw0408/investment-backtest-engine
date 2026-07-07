@@ -1223,7 +1223,6 @@ let abPorts = [{ name: '포트폴리오 1', items: [] }];
 function rrBuildPortfolios(){
   return abPorts.filter(p=>p.items.length).map(p=>({ name: p.name||'포트폴리오', tickers: p.items.map(x=>({code:x.code, weight:x.weight})) }));
 }
-function abEqualize(p){ const n=p.items.length; if(n){ const w=Math.round(100/n); p.items.forEach((it,i)=>it.weight=(i===n-1)?100-w*(n-1):w);} rrRenderBuilder(); }
 function abBindSearch(inp, dd, onPick){
   let t=null;
   inp.addEventListener('input', ()=>{ const q=inp.value.trim(); clearTimeout(t);
@@ -1260,10 +1259,10 @@ function rrRenderBuilder(){
   }).join('');
   host.querySelectorAll('.ab-name').forEach(inp=>inp.oninput=()=>{ abPorts[+inp.dataset.p].name=inp.value; });
   host.querySelectorAll('.ab-w').forEach(inp=>inp.onchange=()=>{ abPorts[+inp.dataset.p].items[+inp.dataset.i].weight=Math.max(0,+inp.value||0); rrRenderBuilder(); });
-  host.querySelectorAll('.ab-tdel').forEach(b=>b.onclick=()=>{ const p=abPorts[+b.dataset.p]; p.items.splice(+b.dataset.i,1); abEqualize(p); });
+  host.querySelectorAll('.ab-tdel').forEach(b=>b.onclick=()=>{ const p=abPorts[+b.dataset.p]; p.items.splice(+b.dataset.i,1); rrRenderBuilder(); });
   host.querySelectorAll('.ab-pdel').forEach(b=>b.onclick=()=>{ abPorts.splice(+b.dataset.p,1); rrRenderBuilder(); });
   host.querySelectorAll('.ab-psearch').forEach(inp=>{ const dd=host.querySelector(`.ab-pdd[data-p="${inp.dataset.p}"]`);
-    abBindSearch(inp, dd, (code,name)=>{ const p=abPorts[+inp.dataset.p]; if(!p.items.find(x=>x.code===code)){ p.items.push({code,name,weight:0}); abEqualize(p); } }); });
+    abBindSearch(inp, dd, (code,name)=>{ const p=abPorts[+inp.dataset.p]; if(!p.items.find(x=>x.code===code)){ p.items.push({code,name,weight: p.items.length===0?100:0}); rrRenderBuilder(); } }); });
 }
 document.addEventListener('click', e=>{ if(!e.target.closest('#rrBuilder .rr-search-wrap')) document.querySelectorAll('#rrBuilder .rr-dropdown').forEach(d=>d.style.display='none'); });
 (function(){ const a=document.getElementById('rrAddPort'); if(a) a.addEventListener('click', ()=>{ abPorts.push({name:`포트폴리오 ${abPorts.length+1}`, items:[]}); rrRenderBuilder(); }); })();

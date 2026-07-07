@@ -282,13 +282,15 @@ def _item_deep(tickers):
     except Exception:
         return [], None
     pts = _clean_deep_points(pts)
-    annual = _annual_from_points(pts, actual_only=True)
+    # 백필(합성) 연도도 심화지표에 포함 — 손상 백필은 소스에서 재생성됨(fix_corrupt_backfill, 2026-07-02)
+    # + _clean_deep_points 손상 게이트가 잔존 이상치를 걸러줌. actual_only 마스크는 잉여라 해제(오너 2026-07-07).
+    annual = _annual_from_points(pts, actual_only=False)
     rr = None
     if len(pts) >= 13:
         syn_overall = sum(1 for p in pts if len(p) > 2 and p[2]) / len(pts)
         rr = {
             "horizons": rolling.DEFAULT_HORIZONS,
-            "horizon_table": {str(h): v for h, v in rolling.horizon_table(pts, actual_only=True).items()},
+            "horizon_table": {str(h): v for h, v in rolling.horizon_table(pts, actual_only=False).items()},
             "syn_overall": round(float(syn_overall), 4),
         }
     return annual, rr

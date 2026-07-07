@@ -311,7 +311,7 @@ function _rrBoxRows(it, m){
   let rows;
   if (m.divg) rows = ((it.divgrowth&&it.divgrowth.yoy)||[]).map(p=>({ year:+p.year, v:p.growth }));
   else if (m.div) rows = (it.annual_div||[]).filter(a=>!a.partial).map(a=>({ year:+a.year, v:a.dyield }));
-  else rows = (it.annual||[]).filter(a=>!a.partial && !(a.syn_frac>0)).map(a=>({ year:+a.year, v:m.get(a) }));
+  else rows = (it.annual||[]).filter(a=>!a.partial).map(a=>({ year:+a.year, v:m.get(a) }));
   return rows
     .filter(r=>Number.isFinite(r.year) && r.v!=null && isFinite(r.v))
     .sort((a,b)=>a.year-b.year);

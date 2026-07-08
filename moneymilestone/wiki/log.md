@@ -7,6 +7,7 @@
 - 수정 3겹: ① `market_alias.py` 코스피 `KS200`→`^KS11`(시장페이지·홈위젯·알림 live_quote·index_ohlc 캔들의 정본 코드 — 캔들/준라이브 시세까지 온전) + `MARKET_CODE_META` export. ② `price_loader.get_symbol_data` 일반 구제: symbol_master에 없는 코드가 `index_daily`에 있으면 지수 취급(ACWI/EEM 같은 실ETF는 symbol_master 가드로 미영향), 표시명·KRW 통화는 MARKET_CODE_META 보완 — 코스닥·금리·환율·레거시 KS200 최근검색 칩 전부 커버. ③ `/symbol`·`/api/symbol`(+intraday) 라우트 `<path:code>`.
 - 검증: test client — `/api/search?q=코스피지수`→`^KS11`, `/api/symbol/^KS11`·`USD/KRW`·`KQ150`·`DGS10` 전부 200+시계열(코스피 last 07-07), 라우트 매칭 intraday 우선 확인. `test_symbol_api` 8 PASS, `test_alert_market_hysteresis` 24 PASS.
 - 재발 방어: 별칭 코드가 index_daily에 데이터만 있으면 상세가 자동 지원(②가 일반 규칙). 단 별칭 신규 추가 시 index_daily에 없는 코드는 여전히 404 가능 — market_alias에 코드 추가하면 상세 진입 스모크 1회 권장.
+- 배포 후 prod 실검증: 검색→`^KS11`, 상세 ^KS11(last 07-08)·USD/KRW·DGS10 전부 200. **KQ150만 prod 실패** — prod index_daily에 KQ150 시드(로컬 체인 프록시 05-27산)가 아예 없어 ② 구제도 불발. 후속: 코스닥 별칭도 `KQ150`→`^KQ11`(야후 실지수, DB 시드 불필요)로 교체해 재배포. 교훈 = index_daily 의존 구제는 로컬·prod 데이터 시드 차이에 취약, 별칭 코드는 가급적 yfinance 정본 코드 사용.
 
 ## [2026-07-07] BUGFIX | 종목 추가 시 기존 비중 초기화(균등재분배) — 전 입력창 뿌리뽑기
 

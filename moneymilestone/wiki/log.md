@@ -1,5 +1,13 @@
 # Log
 
+## [2026-07-09] BUGFIX | 검색 "코스피지수" 클릭 → 종목을 찾을 수 없습니다 (BUG-SEARCH-KOSPI-DETAIL-404)
+
+오너 보고: 검색에 코스피지수가 나오는데 클릭하면 상세가 404 문구.
+- 뿌리: 검색 시장별칭이 코스피 코드로 `KS200`(ECOS 전용, index_master 코드)을 노출 — 상세 `get_symbol_data`는 `^`접두사/선물 5종만 지수로 인정해 KS200이 yfinance 무효 티커 경로로 빠짐. 같은 계열: `KQ150`(코스닥), 금리(`DGS10`·`KTB*`·`CD91`), `USD/JPY`, `USD/KRW`(슬래시가 `<code>` 라우트에 안 잡혀 페이지 자체 404). 검색이 노출하는 코드 ↔ 상세가 아는 코드의 계약 불일치가 원인.
+- 수정 3겹: ① `market_alias.py` 코스피 `KS200`→`^KS11`(시장페이지·홈위젯·알림 live_quote·index_ohlc 캔들의 정본 코드 — 캔들/준라이브 시세까지 온전) + `MARKET_CODE_META` export. ② `price_loader.get_symbol_data` 일반 구제: symbol_master에 없는 코드가 `index_daily`에 있으면 지수 취급(ACWI/EEM 같은 실ETF는 symbol_master 가드로 미영향), 표시명·KRW 통화는 MARKET_CODE_META 보완 — 코스닥·금리·환율·레거시 KS200 최근검색 칩 전부 커버. ③ `/symbol`·`/api/symbol`(+intraday) 라우트 `<path:code>`.
+- 검증: test client — `/api/search?q=코스피지수`→`^KS11`, `/api/symbol/^KS11`·`USD/KRW`·`KQ150`·`DGS10` 전부 200+시계열(코스피 last 07-07), 라우트 매칭 intraday 우선 확인. `test_symbol_api` 8 PASS, `test_alert_market_hysteresis` 24 PASS.
+- 재발 방어: 별칭 코드가 index_daily에 데이터만 있으면 상세가 자동 지원(②가 일반 규칙). 단 별칭 신규 추가 시 index_daily에 없는 코드는 여전히 404 가능 — market_alias에 코드 추가하면 상세 진입 스모크 1회 권장.
+
 ## [2026-07-07] BUGFIX | 종목 추가 시 기존 비중 초기화(균등재분배) — 전 입력창 뿌리뽑기
 
 오너 오래된 불만: 포트 구성 중(예 SPY 50%·QQQ 20%) 새 종목(TLT) 추가하는 순간 기존 비중이 다 날아가고 33/33/34로 균등 리셋됨. 투자계산기·은퇴·포폴 등 어디든.

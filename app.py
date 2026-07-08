@@ -3370,12 +3370,13 @@ def backtest_run():
 # 종목 상세 페이지
 # -----------------------------------------------
 
-@app.route('/symbol/<code>')
+# <path:>: USD/KRW 등 슬래시 포함 시장코드(검색 별칭) 상세 진입 허용 (2026-07-09)
+@app.route('/symbol/<path:code>')
 def symbol_page(code):
     return render_template('symbol.html', code=code.upper())
 
 
-@app.route('/api/symbol/<code>')
+@app.route('/api/symbol/<path:code>')
 def symbol_api(code):
     try:
         data = portfolio_engine.loader.get_symbol_data(code.upper())
@@ -3387,7 +3388,7 @@ def symbol_api(code):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/symbol/<code>/intraday')
+@app.route('/api/symbol/<path:code>/intraday')
 def symbol_intraday_api(code):
     range_key = request.args.get('range', '1d')
     if range_key not in ('1d', '1w', 'max'):

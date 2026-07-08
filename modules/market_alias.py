@@ -26,7 +26,9 @@ MARKET_ITEMS = [
     ("TPX.F", "TOPIX 지수", "지수", "", ["토픽스", "topix"]),
     ("DJUSDIV100", "미국 배당 100 지수", "지수", "US", ["배당지수", "미국배당", "배당100", "djdiv"]),
     # ── 국내 지수 ──
-    ("KS200", "코스피 지수", "지수", "KR", ["코스피", "kospi", "코스피200", "ks200", "국내증시"]),
+    # 코스피=^KS11(야후 실지수) — 종목상세/알림/index_ohlc 캔들이 전부 ^KS11 기준.
+    # KS200(ECOS 별칭)은 /symbol 미지원 티커라 상세 클릭 시 404였다 (2026-07-09 수정).
+    ("^KS11", "코스피 지수", "지수", "KR", ["코스피", "kospi", "코스피200", "ks200", "국내증시"]),
     ("KQ150", "코스닥 150 지수", "지수", "KR", ["코스닥", "kosdaq", "코스닥150", "kq150"]),
     # ── 환율 ──
     ("USD/KRW", "원/달러 환율", "환율", "KR", ["원달러", "달러원", "환율", "달러환율", "usdkrw", "달러", "미국달러", "원화"]),
@@ -54,6 +56,12 @@ def _norm(s: str) -> str:
     """소문자 + 영숫자·한글만 남김 (띄어쓰기·/·& 등 제거)."""
     return re.sub(r"[^0-9a-z가-힣]", "", (s or "").lower())
 
+
+# code → {name, country}: /symbol 상세 페이지가 지수·금리 등 비상장 코드의 표시명·통화에 사용
+MARKET_CODE_META = {
+    code: {"name": name, "country": country}
+    for code, name, badge, country, aliases in MARKET_ITEMS
+}
 
 # 사전 계산: 각 item의 매칭 토큰
 _INDEXED = [

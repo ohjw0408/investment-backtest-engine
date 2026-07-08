@@ -9,6 +9,8 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from modules.market_alias import MARKET_CODE_META
+
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 BASE_DIR        = Path(__file__).resolve().parent.parent
@@ -1029,9 +1031,21 @@ class PriceLoader:
         is_kr = self.is_kr_etf(code)
         _INDEX_FUTURES = frozenset({'GC=F', 'SI=F', 'CL=F', 'NG=F', 'KRW=X'})
         is_index = code.startswith('^') or code in _INDEX_FUTURES
+        # 검색 시장별칭 코드(KQ150·금리·환율 등 index_master 전용 코드): 상장 종목이
+        # 아니고 index_daily에 데이터가 있으면 지수로 취급 — yfinance 무효 티커 경로로
+        # 빠져 "종목을 찾을 수 없습니다"가 되는 것을 방지 (2026-07-09).
+        if (not is_index and self.index_conn is not None
+                and not is_kr and code not in self._us_tickers):
+            try:
+                if self.index_conn.execute(
+                        "SELECT 1 FROM index_daily WHERE code=? LIMIT 1", (code,)).fetchone():
+                    is_index = True
+            except Exception:
+                pass
+        _alias_kr = MARKET_CODE_META.get(code, {}).get('country') == 'KR'
         if is_index:
-            country  = 'KR' if code == '^KS11' else 'US'
-            currency = 'KRW' if code in ('^KS11', 'KRW=X') else 'USD'
+            country  = 'KR' if (code == '^KS11' or _alias_kr) else 'US'
+            currency = 'KRW' if (code in ('^KS11', 'KRW=X') or _alias_kr) else 'USD'
         else:
             currency = "KRW" if is_kr else "USD"
             country  = "KR"  if is_kr else "US"
@@ -1047,6 +1061,10 @@ class PriceLoader:
             'GC=F':  '금 선물 (COMEX)', '^NDX':  'NASDAQ-100',
             '^DJI':  '다우존스',         '^N225': '닛케이 225',
         }
+
+        def _idx_name(c):
+            # 시장별칭(검색 노출 지수·금리·환율)의 한글명 폴백 — 코드 그대로 노출 방지
+            return _INDEX_NAMES.get(c) or MARKET_CODE_META.get(c, {}).get('name') or c
         # ── 캔들용 OHLCV: index_ohlc 보유 지수는 OHLCV로 반환(라인+캔들 공용) ──
         # index_daily는 종가만 → 캔들 불가. 시장지수 OHLCV를 index_ohlc에 둔다.
         # 배포 안전: 테이블 없으면 생성(no such table 예외로 지수 페이지 깨짐 방지).
@@ -1141,7 +1159,7 @@ class PriceLoader:
                 cutoff_1y  = (_dt.today() - _td(days=365)).strftime("%Y-%m-%d")
                 prices_1y  = [p["close"] for p in prices if p["date"] >= cutoff_1y]
                 return {
-                    "code": code, "name": _INDEX_NAMES.get(code, code),
+                    "code": code, "name": _idx_name(code),
                     "country": country, "currency": currency,
                     "current_price": cur_price, "prev_price": prev_price,
                     "last_date": last_date,
@@ -1182,7 +1200,7 @@ class PriceLoader:
                 cutoff_1y  = (_dt.today() - _td(days=365)).strftime("%Y-%m-%d")
                 prices_1y  = [p["close"] for p in prices if p["date"] >= cutoff_1y]
                 return {
-                    "code": code, "name": _INDEX_NAMES.get(code, code),
+                    "code": code, "name": _idx_name(code),
                     "country": country, "currency": currency,
                     "current_price": cur_price, "prev_price": prev_price,
                     "last_date": last_date,
@@ -1277,7 +1295,7 @@ class PriceLoader:
         # 지수(^KS11 등)는 symbol_master에 없을 수 있음 → 표시 이름·카테고리 보완.
         if is_index:
             if not name:
-                name = _INDEX_NAMES.get(code, code)
+                name = _idx_name(code)
             if not category:
                 category = "INDEX"
 

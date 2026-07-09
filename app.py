@@ -3140,7 +3140,17 @@ def _portfolio_index_series(tickers, years=None, conn=None, downsample=1800, tot
     # 전체기간 지연 백필 — 플래그 안 꽂힌 종목만 먼과거 1회 페치(공유 DB 적재). 플래그면 즉시 스킵.
     for code, _w in valid:
         try:
-            if portfolio_engine.loader.ensure_full_history(code):
+            fetched = portfolio_engine.loader.ensure_full_history(code)
+            # 트레일링(최신분) 갱신 — 백필 플래그 후 이 경로엔 앞쪽을 채우는 코드가 없어,
+            # 다른 플로우(백테스트 등)가 안 건드리는 종목(^IXIC 같은 지수)은 최초 사용일에
+            # 동결됨. get_price의 트레일링 gap-fill(P2-3, 코드별 같은 날 1회)로 보충.
+            if not fetched:
+                dbc = str(code).split('.')[0].upper()
+                db_max = portfolio_engine.loader.get_date_range_in_db(dbc)[1]
+                if db_max and db_max < day:
+                    portfolio_engine.loader.get_price(code, db_max, day, apply_fx=False)
+                    fetched = portfolio_engine.loader.get_date_range_in_db(dbc)[1] != db_max
+            if fetched:
                 for k in [k for k in _TS_TKCACHE if k[0] == code]:
                     _TS_TKCACHE.pop(k, None)
         except Exception:

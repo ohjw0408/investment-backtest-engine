@@ -1342,6 +1342,7 @@ function renderValueChart(history) {
               const x = chart.scales.x;
               const i0 = Math.max(0, Math.round(x.min));
               const i1 = Math.min(_btAttrLabels.length - 1, Math.round(x.max));
+              btZoomResetBtns(true);
               if (i1 - i0 >= 1 && btTickers.length >= 2) btAttrAnalyze(_btAttrLabels[i0], _btAttrLabels[i1]);
             }
           }
@@ -1349,10 +1350,12 @@ function renderValueChart(history) {
       },
       scales: {
         x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: _btMuted }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, color: _btMuted, callback: v => fmtKRW(v) }, grid: { color: MM_CHART_GRID } }
+        // 오너 요청(2026-07-09): 데이터 최소값 맞춤 대신 0부터 전체 스케일 표시
+        y: { beginAtZero: true, ticks: { font: { size: 10 }, color: _btMuted, callback: v => fmtKRW(v) }, grid: { color: MM_CHART_GRID } }
       }
     }
   });
+  document.getElementById('btValueChart').ondblclick = btAttrReset;   // 더블클릭 = 줌 해제
 }
 
 async function btAttrAnalyze(start, end) {
@@ -1417,9 +1420,17 @@ function btAttrRender(a) {
   document.getElementById('btAttrBody').innerHTML = html;
 }
 
+function btZoomResetBtns(show) {
+  ['btValZoomReset', 'btDdZoomReset'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.style.display = show ? '' : 'none';
+  });
+}
+
 function btAttrReset() {
   if (btCharts.value && btCharts.value.resetZoom) btCharts.value.resetZoom();
   if (btCharts.drawdown && btCharts.drawdown.resetZoom) btCharts.drawdown.resetZoom();
+  btZoomResetBtns(false);
   document.getElementById('btAttrRange').textContent = '';
   document.getElementById('btAttrBody').innerHTML = '<div style="color:var(--ds-muted);font-size:0.85rem;">위 가치 추이 또는 아래 낙폭 그래프를 가로로 드래그하거나, 날짜를 골라 구간을 정하면 종목별 상승 참여율·하락 방어율이 나와요.</div>';
 }
@@ -1597,6 +1608,7 @@ function renderDrawdownChart(history) {
             const x = chart.scales.x;
             const i0 = Math.max(0, Math.round(x.min));
             const i1 = Math.min(_btAttrLabels.length - 1, Math.round(x.max));
+            btZoomResetBtns(true);
             if (i1 - i0 >= 1) btAttrAnalyze(_btAttrLabels[i0], _btAttrLabels[i1]);
           }
         }
@@ -1607,6 +1619,7 @@ function renderDrawdownChart(history) {
       }
     }
   });
+  document.getElementById('btDrawdownChart').ondblclick = btAttrReset;   // 더블클릭 = 줌 해제
 }
 
 function btAttrManual() {

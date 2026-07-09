@@ -562,8 +562,10 @@
 
       <!-- 포트폴리오 가치 차트 -->
       <div class="bt-card">
-        <div class="bt-card-title"><span class="bt-ico">{{ nicon('trend-up') }}</span> 포트폴리오 가치 추이
+        <div class="bt-card-title" style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+          <span style="display:inline-flex;align-items:center;gap:8px;"><span class="bt-ico">{{ nicon('trend-up') }}</span> 포트폴리오 가치 추이</span>
           <span style="font-weight:400;color:var(--ds-muted);font-size:0.74rem;">· 그래프를 가로로 드래그하면 그 구간 상승 참여 · 하락 방어</span>
+          <button id="btValZoomReset" onclick="btAttrReset()" class="ds-btn ds-btn-secondary ds-btn-sm" style="display:none;margin-left:auto;">↺ 전체 기간</button>
         </div>
         <div class="bt-chart-wrap"><canvas id="btValueChart"></canvas></div>
       </div>
@@ -591,7 +593,11 @@
           <div class="bt-chart-wrap annual"><canvas id="btAnnualChart"></canvas></div>
         </div>
         <div class="bt-card">
-          <div class="bt-card-title"><span class="bt-ico">{{ nicon('trend-down') }}</span> 낙폭 (Drawdown) <span style="font-weight:400;color:var(--ds-muted);font-size:0.72rem;">· 드래그=구간 분석</span></div>
+          <div class="bt-card-title" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="display:inline-flex;align-items:center;gap:8px;"><span class="bt-ico">{{ nicon('trend-down') }}</span> 낙폭 (Drawdown)</span>
+            <span style="font-weight:400;color:var(--ds-muted);font-size:0.72rem;">· 드래그=구간 분석</span>
+            <button id="btDdZoomReset" onclick="btAttrReset()" class="ds-btn ds-btn-secondary ds-btn-sm" style="display:none;margin-left:auto;">↺ 전체 기간</button>
+          </div>
           <div class="bt-chart-wrap drawdown"><canvas id="btDrawdownChart"></canvas></div>
         </div>
       </div>

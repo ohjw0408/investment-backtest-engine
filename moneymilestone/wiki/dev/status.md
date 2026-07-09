@@ -592,3 +592,12 @@ tags: [dev]
 - 수신함 항목과 상단 알림 드롭다운 항목을 클릭하면 가능한 목적지로 바로 이동한다.
 - 새 푸시 payload에 `target_url`을 추가했다. 종목 알림은 종목 상세, 리밸런싱은 내 자산, 저장 포트폴리오 알림은 포트폴리오 상세, 캘린더 알림은 캘린더로 이동한다.
 - 검증: `python tests/test_alerts_api.py` 39 PASS, `python tests/test_alert_runner.py` 10 PASS, 렌더된 실행 JS syntax OK, `git diff --check` OK.
+
+## 2026-07-09 거시지표 물가 상승률 파생 시리즈 (YoY)
+
+- `macro_loader`에 파생 타입 `src:"yoy"` 추가 — DB의 부모 월간 지수에서 전년동월비(%)를 계산해 같은 파이프라인(macro_observations)에 적재한다. API 호출 0회, 키 불필요.
+- 신규 7종: `US_CPI_YOY`(CPIAUCSL) · `US_CORE_CPI_YOY`(CPILFESL) · `US_PCE_YOY`(PCEPI) · `US_CORE_PCE_YOY`(PCEPILFE, Fed 타깃) · `US_PPI_YOY`(PPIACO) · `KR_CPI_YOY`(KR_CPI) · `KR_PPI_YOY`(KR_PPI). 인플레이션 카테고리 카드·상세·겹쳐보기·벤치마크 피커에 자동 노출.
+- 한·미 비교쌍 2개 추가: `소비자물가 상승률`, `생산자물가 상승률` — 단위 %라 기준금리와 단일 축 원값 비교 가능(RAW_UNITS).
+- 레지스트리에서 부모가 파생보다 먼저 오도록 배치 → `refresh()`(beat)·`backfill()` 한 사이클 안에서 부모 갱신 후 파생 계산 보장. 배포 시 `--ensure`가 누락 코드를 자동 백필.
+- 값 검증: 한국 2022-07 = 6.33%(공식 6.3%), 2024-12 = 1.93%(공식 1.9%), 미 2022-06 = 8.98%(계절조정 지수 기준, 비조정 공식치 9.1%와 소폭 차이 정상).
+- 검증: 파생 7종 백필 + 증분 refresh 경로 + Playwright 15 PASS(US/KR탭 카드·상세 모달·비교쌍 차트 단일축·겹쳐보기 상승률+기준금리·라이트/다크·jsErr 0).

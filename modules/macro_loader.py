@@ -45,6 +45,12 @@ def _ecos_splice(code, items, cat, name, unit, old_stat, new_stat, cyc="M", desc
             "category": cat, "name_ko": name, "unit": unit, "country": "KR", "desc": desc}
 
 
+def _yoy(code, parent, name, country, cat="인플레이션"):
+    """파생: 부모 월간 지수의 전년동월비(%). DB에서 계산, API 호출 없음."""
+    return {"code": code, "src": "yoy", "parent": parent, "freq": "M",
+            "category": cat, "name_ko": name, "unit": "%", "country": country}
+
+
 def _yf(code, yfsym, country, name):
     """yfinance 시장 지수. country=US/KR/GL."""
     return {"code": f"IDX_{code}", "src": "yf", "yf": yfsym, "freq": "D",
@@ -90,6 +96,12 @@ SERIES = [
     _fred("PCEPILFE", "M", "인플레이션", "미 근원 PCE(Fed 타깃)", "지수"),
     _fred("PPIACO", "M", "인플레이션", "미 생산자물가 PPI", "지수"),
     _fred("CPIENGSL", "M", "인플레이션", "미 에너지 CPI", "지수"),
+    # 미국 물가 상승률 (지수에서 파생, 전년동월비)
+    _yoy("US_CPI_YOY", "US_CPIAUCSL", "미 소비자물가 상승률", "US"),
+    _yoy("US_CORE_CPI_YOY", "US_CPILFESL", "미 근원 CPI 상승률", "US"),
+    _yoy("US_PCE_YOY", "US_PCEPI", "미 PCE 물가 상승률", "US"),
+    _yoy("US_CORE_PCE_YOY", "US_PCEPILFE", "미 근원 PCE 상승률(Fed 타깃)", "US"),
+    _yoy("US_PPI_YOY", "US_PPIACO", "미 생산자물가 상승률", "US"),
     # 미국 고용
     _fred("UNRATE", "M", "고용", "미 실업률", "%"),
     _fred("U6RATE", "M", "고용", "미 U6 광의실업률", "%"),
@@ -145,6 +157,9 @@ SERIES = [
     _ecos("PPI", "404Y014", "M", ["*AA"], "인플레이션", "한국 생산자물가지수", "지수"),
     _ecos("EXPORT_PRICE", "402Y014", "M", ["*AA"], "인플레이션", "한국 수출물가지수", "지수"),
     _ecos("IMPORT_PRICE", "401Y015", "M", ["*AA"], "인플레이션", "한국 수입물가지수", "지수"),
+    # 한국 물가 상승률 (지수에서 파생, 전년동월비)
+    _yoy("KR_CPI_YOY", "KR_CPI", "한국 소비자물가 상승률", "KR"),
+    _yoy("KR_PPI_YOY", "KR_PPI", "한국 생산자물가 상승률", "KR"),
     # 한국 고용
     _ecos("UNRATE", "901Y027", "M", ["I61BC"], "고용", "한국 실업률", "%"),
     _ecos("EMPRATE", "901Y027", "M", ["I61E"], "고용", "한국 고용률", "%"),
@@ -386,6 +401,11 @@ DESCRIPTIONS = {
     "US_PCEPILFE": "근원 PCE 물가. 연준이 2% 물가목표의 기준으로 삼는 핵심 지표입니다.",
     "US_PPIACO": "생산자물가지수(PPI). 생산자가 받는 출하가격으로, 소비자물가에 선행하는 경향이 있습니다.",
     "US_CPIENGSL": "에너지 부문 소비자물가. 유가·전기·가스 가격 변동을 반영합니다.",
+    "US_CPI_YOY": "미국 CPI의 전년동월비 상승률. 뉴스에서 말하는 '미국 물가상승률'이 이 숫자로, 기준금리와 직접 비교하기 좋습니다.",
+    "US_CORE_CPI_YOY": "식품·에너지를 뺀 근원 CPI의 전년동월비. 물가의 기조적 흐름을 보여줍니다.",
+    "US_PCE_YOY": "PCE 물가지수의 전년동월비 상승률. 연준이 CPI보다 중시하는 물가 지표입니다.",
+    "US_CORE_PCE_YOY": "근원 PCE의 전년동월비. 연준 물가목표 2%의 공식 기준 지표로, 정책금리 방향을 가늠하는 핵심입니다.",
+    "US_PPI_YOY": "미국 생산자물가의 전년동월비 상승률. 소비자물가 상승률에 선행하는 경향이 있습니다.",
     # 미국 고용
     "US_UNRATE": "미국 실업률. 경제활동인구 중 실업자 비율로, 고용시장 건강과 연준 정책의 핵심 변수입니다.",
     "US_U6RATE": "광의 실업률(U6). 불완전취업·구직단념자까지 포함해 체감 실업에 가깝습니다.",
@@ -438,6 +458,8 @@ DESCRIPTIONS = {
     # 한국 인플레이션
     "KR_CPI": "한국 소비자물가지수. 가계가 사는 상품·서비스 가격으로, 한국은행 물가목표의 기준입니다.",
     "KR_PPI": "한국 생산자물가지수. 생산자 출하가격으로 소비자물가에 선행합니다.",
+    "KR_CPI_YOY": "한국 CPI의 전년동월비 상승률. 통계청이 발표하는 '물가상승률'이 이 숫자로, 한국은행 물가목표 2%·기준금리와 직접 비교할 수 있습니다.",
+    "KR_PPI_YOY": "한국 생산자물가의 전년동월비 상승률. 소비자물가 상승률에 선행하는 경향이 있습니다.",
     "KR_EXPORT_PRICE": "수출물가지수. 수출품 가격 변동으로 교역조건·기업 채산성을 봅니다.",
     "KR_IMPORT_PRICE": "수입물가지수. 원자재·에너지 등 수입가격으로 국내 물가에 영향을 줍니다.",
     # 한국 고용
@@ -697,6 +719,23 @@ def fetch_ecos_splice(old_stat, new_stat, cyc, items, key=None):
     return sorted(merged.items())
 
 
+# ── 파생: 전년동월비 (부모 월간 지수 → YoY %) ────────────────────────────
+def compute_yoy(parent_code):
+    """DB의 부모 관측치에서 (v / 12개월전 v - 1)*100. 월간 date='YYYY-MM-01' 전제."""
+    conn = sqlite3.connect(str(INDEX_DB))
+    obs = conn.execute(
+        "SELECT date, value FROM macro_observations WHERE code=? ORDER BY date",
+        (parent_code,)).fetchall()
+    conn.close()
+    by_date = dict(obs)
+    out = []
+    for d, v in obs:
+        prev = by_date.get(f"{int(d[:4]) - 1}{d[4:]}")
+        if prev:
+            out.append((d, (v / prev - 1) * 100))
+    return out
+
+
 # ── 한 시리즈 적재 ───────────────────────────────────────────────────────
 def _upsert(conn, spec, rows):
     if not rows:
@@ -712,6 +751,8 @@ def _upsert(conn, spec, rows):
         src = f"yf:{spec['yf']}"
     elif spec["src"] == "ecos_splice":
         src = f"ecos_splice:{spec['old_stat']}+{spec['new_stat']}/{'/'.join(spec['items'])}"
+    elif spec["src"] == "yoy":
+        src = f"yoy:{spec['parent']}"
     else:
         src = f"ecos:{spec['stat']}/{'/'.join(spec['items'])}"
     desc = spec.get("desc") or DESCRIPTIONS.get(spec["code"], "")
@@ -727,6 +768,12 @@ def _upsert(conn, spec, rows):
 
 
 def fetch_one(spec, start=None):
+    if spec["src"] == "yoy":
+        # 부모가 SERIES에서 먼저 갱신된 뒤 호출됨 (레지스트리 순서 보장)
+        rows = compute_yoy(spec["parent"])
+        if start:
+            rows = [r for r in rows if r[0] >= start]
+        return rows
     if spec["src"] == "fred":
         return fetch_fred(spec["sid"], start=start or "1900-01-01")
     if spec["src"] == "yf":
@@ -829,7 +876,9 @@ COMPARE_PAIRS = [
     ("국채 3년", "US_DGS3", "KR_KTB3Y"),
     ("국채 1년", "US_DGS1", "KR_KTB1Y"),
     ("소비자물가 CPI", "US_CPIAUCSL", "KR_CPI"),
+    ("소비자물가 상승률", "US_CPI_YOY", "KR_CPI_YOY"),
     ("생산자물가 PPI", "US_PPIACO", "KR_PPI"),
+    ("생산자물가 상승률", "US_PPI_YOY", "KR_PPI_YOY"),
     ("실업률", "US_UNRATE", "KR_UNRATE"),
     ("M2 통화량", "US_M2SL", "KR_M2"),
     ("실질 GDP", "US_GDPC1", "KR_GDP"),

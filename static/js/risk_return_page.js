@@ -139,7 +139,9 @@ document.getElementById('rrSearch').addEventListener('input', e => {
   rrSearchTimer = setTimeout(async () => {
     const ql = q.toLowerCase();
     // 지수형 거시지표(부동산·M2·물가 등)를 종목과 함께 벤치마크 후보로 노출.
-    const macros = rrMacroBench.filter(m => (m.name || '').toLowerCase().includes(ql)).slice(0, 6);
+    // 카테고리명("부동산" 등)으로도 매칭 — 이름("서울 아파트")만으로는 못 찾던 문제(2026-07-09).
+    const macros = rrMacroBench.filter(m =>
+      (m.name || '').toLowerCase().includes(ql) || (m.cat || '').toLowerCase().includes(ql)).slice(0, 40);
     const macroHtml = macros.map(m => `
       <div class="rr-dd-item" data-code="${esc(m.code)}" data-name="${esc(m.name)}">
         <span style="font-weight:700;">📈 ${esc(m.name)}</span>
@@ -1205,7 +1207,7 @@ async function rrOvSearch(q){
   q=q.trim(); const dd=document.getElementById('rrOvDD');
   if(!q){ dd.style.display='none'; return; }
   const ql=q.toLowerCase(); let html='';
-  const ms=(rrOv.macros||[]).filter(s=>(s.name_ko||'').toLowerCase().includes(ql)).slice(0,8);
+  const ms=(rrOv.macros||[]).filter(s=>(s.name_ko||'').toLowerCase().includes(ql)||(s.category||'').toLowerCase().includes(ql)).slice(0,40);
   if (ms.length) html+='<div style="padding:5px 12px;font-size:0.7rem;color:var(--text-muted);font-weight:700;">거시지표</div>'+
     ms.map(s=>`<div class="rr-dd-item" data-key="${esc(s.code)}" data-label="${esc(s.name_ko)}"><span>${esc(s.name_ko)}</span><span style="color:var(--text-muted);">${esc(s.unit||'')}</span></div>`).join('');
   try{

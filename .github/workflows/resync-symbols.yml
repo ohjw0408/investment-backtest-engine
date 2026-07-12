@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install deps
-        run: pip install FinanceDataReader pandas requests
+        run: pip install finance-datareader pandas requests
       - name: Resync symbols
         env:
           # 한국 주식 패스용. 미등록이면 KR_STOCK만 스킵되고 나머지는 정상 동작.

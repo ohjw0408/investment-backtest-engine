@@ -1,5 +1,12 @@
 # Log
 
+## [2026-07-12] CHANGE | 신규 상장 종목 수동 리싱크 — SK하이닉스 나스닥 ADR(SKHYV) 포함 69종 추가
+
+오너 요청: SK하이닉스 나스닥 신규 상장 반영. 월간 워크플로(`resync-symbols.yml`, 매월 1일) 대기 대신 로컬에서 `modules/symbol_resync.py` 수동 실행 → `data/meta/symbol_master.db` 갱신 커밋(=push 자동배포로 prod 운반).
+- 결과: 69종 신규 INSERT(멱등), **SKHYV | SK Hynix Inc ADR | NASDAQ** 포함. 총 15,402종목.
+- 참고: 이 파이프라인은 **미국(NASDAQ/NYSE)만** — ETF/KRX 별도 소스라 제외(모듈 docstring). 한국 신규상장 동기화는 미구축.
+- 소소한 발견: 모듈 `__main__` print의 em-dash(—)가 Windows cp949 콘솔서 `UnicodeEncodeError` — DB 커밋 후라 실해 없음. 로컬 실행 시 `PYTHONIOENCODING=utf-8` 권장.
+
 ## [2026-07-09] BUGFIX | 검색 "코스피지수" 클릭 → 종목을 찾을 수 없습니다 (BUG-SEARCH-KOSPI-DETAIL-404)
 
 오너 보고: 검색에 코스피지수가 나오는데 클릭하면 상세가 404 문구.

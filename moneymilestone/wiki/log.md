@@ -1,5 +1,16 @@
 # Log
 
+## [2026-07-12] FEATURE | 신규상장 리싱크 전 자산군 확장 — KR주식·KR ETF·US ETF 자동화
+
+오너 요청: "모든 주식과 ETF 자동으로". 기존 월간 리싱크는 미국 주식만이었음.
+- `modules/symbol_resync.py` 확장 — 소스 4종: US주식(fdr NASDAQ/NYSE, 기존) + **US ETF(fdr `ETF/US`)** + **KR ETF(fdr `ETF/KR`)** + **KR주식(KRX 공식 API stk/ksq_bydd_trd, `KRX_API_KEY` env→로컬 키파일 폴백, 키 없으면 그 패스만 스킵)**. ETF 패스를 주식 패스보다 먼저(겹치면 is_etf=1 우선). 멱등 유지.
+- KR ETF 메타 파생: naver Category 번호→라벨(1국내시장지수/2국내업종테마/3국내파생/4해외주식/5원자재/6채권/7혼합자산, 실측 검증) + 이름에서 issuer(첫 토큰)·leverage(레버리지2.0/인버스-1.0/인버스2X-2.0)·hedge((H)→hedge). **category '해외주식' 라벨이 세금분류(_classify_kr_etf_uncached 해외키워드)에 필수라 정확해야 함.**
+- ⚠️ 한계(의도된 강등): 시드 ETF의 index_name(백필 프록시·IRP 안전자산 enum)은 큐레이션이라 자동추가분엔 NULL → 그 종목은 상장 전 백필 없이 실데이터만. US ETF category(etfdb 스타일)도 NULL.
+- 첫 실행: **+1,023종**(KR ETF 82 · US ETF 935 · KR주식 6 · US주식 0). 총 16,425종목.
+- 검증: 재실행 0건(멱등) / 세금분류 스팟 3종(TIGER 미국우주테크→KR_FOREIGN, SOL AI반도체→KR_DOMESTIC, 단일종목레버리지→LEVERAGED_ETF) / 검색 스모크(신규 KR ETF·KR주식·US ETF 전부 검색됨).
+- **오너 잔여: GitHub repo secret `KRX_API_KEY` 등록** — 안 하면 월간 CI서 한국 주식 패스만 스킵(나머지 3종은 정상). 로컬 수동 실행은 키파일로 동작.
+- 워크플로: `resync-symbols.yml`에 KRX_API_KEY env + requests 명시. fdr KOSPI/KOSDAQ 상장목록 스크레이프는 현재 깨져 있어(JSONDecodeError) KRX 공식 API 채택.
+
 ## [2026-07-12] CHANGE | 신규 상장 종목 수동 리싱크 — SK하이닉스 나스닥 ADR(SKHYV) 포함 69종 추가
 
 오너 요청: SK하이닉스 나스닥 신규 상장 반영. 월간 워크플로(`resync-symbols.yml`, 매월 1일) 대기 대신 로컬에서 `modules/symbol_resync.py` 수동 실행 → `data/meta/symbol_master.db` 갱신 커밋(=push 자동배포로 prod 운반).

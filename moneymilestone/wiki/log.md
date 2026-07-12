@@ -8,7 +8,8 @@
 - ⚠️ 한계(의도된 강등): 시드 ETF의 index_name(백필 프록시·IRP 안전자산 enum)은 큐레이션이라 자동추가분엔 NULL → 그 종목은 상장 전 백필 없이 실데이터만. US ETF category(etfdb 스타일)도 NULL.
 - 첫 실행: **+1,023종**(KR ETF 82 · US ETF 935 · KR주식 6 · US주식 0). 총 16,425종목.
 - 검증: 재실행 0건(멱등) / 세금분류 스팟 3종(TIGER 미국우주테크→KR_FOREIGN, SOL AI반도체→KR_DOMESTIC, 단일종목레버리지→LEVERAGED_ETF) / 검색 스모크(신규 KR ETF·KR주식·US ETF 전부 검색됨).
-- **오너 잔여: GitHub repo secret `KRX_API_KEY` 등록** — 안 하면 월간 CI서 한국 주식 패스만 스킵(나머지 3종은 정상). 로컬 수동 실행은 키파일로 동작.
+- ~~오너 잔여: secret 등록~~ → **07-13 완료**: `KRX_API_KEY` secret을 GitHub API로 등록(git 자격증명 토큰 + libsodium sealed box). CI 검증 런 success — 4개 패스 전부 실행·skipped 없음·added 0(로컬 선반영이라 멱등 정상).
+- **부수 발견·수정(cd71f54)**: 워크플로가 생성 후 **한 번도 성공한 적 없었음** — `pip install FinanceDataReader`가 PyPI 정규화 이름 불일치("versions: none")로 Install deps서 즉사. 07-01 첫 월간 cron도 이걸로 실패했었음(아무도 몰랐음). `finance-datareader`로 교정.
 - 워크플로: `resync-symbols.yml`에 KRX_API_KEY env + requests 명시. fdr KOSPI/KOSDAQ 상장목록 스크레이프는 현재 깨져 있어(JSONDecodeError) KRX 공식 API 채택.
 
 ## [2026-07-12] CHANGE | 신규 상장 종목 수동 리싱크 — SK하이닉스 나스닥 ADR(SKHYV) 포함 69종 추가

@@ -9,7 +9,7 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from modules.market_alias import MARKET_CODE_META
+from modules.market_alias import MARKET_CODE_META, is_index_point
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
@@ -1045,7 +1045,10 @@ class PriceLoader:
         _alias_kr = MARKET_CODE_META.get(code, {}).get('country') == 'KR'
         if is_index:
             country  = 'KR' if (code == '^KS11' or _alias_kr) else 'US'
-            currency = 'KRW' if (code in ('^KS11', 'KRW=X') or _alias_kr) else 'USD'
+            if is_index_point(code):
+                currency = 'PT'   # 지수 = 포인트(통화 기호 없음)
+            else:
+                currency = 'KRW' if (code == 'KRW=X' or _alias_kr) else 'USD'
         else:
             currency = "KRW" if is_kr else "USD"
             country  = "KR"  if is_kr else "US"
@@ -1438,7 +1441,7 @@ class PriceLoader:
             prices = [p for p in prices if p["date"] in kept]
         return {
             "code": code, "range": range_key,
-            "currency": "KRW" if is_kr else "USD",
+            "currency": "PT" if is_index_point(code) else ("KRW" if is_kr else "USD"),
             "prices": prices,
         }
 

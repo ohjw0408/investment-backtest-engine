@@ -1,5 +1,13 @@
 # Log
 
+## [2026-07-13] BUGFIX | 지수 가격 표시 단위 ₩/$ → 포인트 (BUG-INDEX-UNIT-CURRENCY)
+
+오너 보고: 코스피가 검색·상세에서 "₩6,900"으로 표기 — 지수는 통화 없이 포인트여야 함(S&P·나스닥·일본·유럽·중국 전부).
+- 수정: 통화 코드 `'PT'` 신설(포인트 = 접두어 없음). `market_alias.py`에 `INDEX_POINT_CODES` + `is_index_point()` 공용 헬퍼 — `^`프리픽스 전부 + `000300.SS`·`TPX.F`·`DJUSDIV100`·`KS200`·`KQ150`. **EEM·ACWI는 배지만 '지수'고 실체가 ETF(달러 가격)라 제외($ 유지).**
+- 적용 지점: ① `app.py _search_attach_prices`(검색 카드) ② `_wl_recent_closes`/`_watchlist_quote`(홈 위젯·시장페이지·검색 🔄 — 서버 포맷 문자열) ③ `price_loader.get_symbol_data`·`get_intraday_data`(상세 헤더·52주·차트 툴팁) ④ `alert_runner._currency`+`alert_engine._fmt_price`(알림 본문). JS: `search_page.js`·`symbol_page.js` fmtPrice에 PT 분기(≥1000 정수, 미만 2자리).
+- 검증: is_index_point/_fmt_price/_currency 유닛 + `test_alert_engine`·`test_alert_market_hysteresis` exit 0 + 로컬 서버 Playwright 라이트/다크 — 검색 코스피 "7,247"(₩ 제거)·삼성전자 "₩277,500"(유지)·상세 ^KS11 "6,807"·^GSPC "7,546"($ 제거)·005930 ₩ 유지, 콘솔에러 0.
+- 미변경: KRW=X(₩)·KRX_GOLD(₩, 원/g)·GC=F 등 원자재($)·금리 별칭(기존 동작). 홈 '시장 지수' 카드(market_quote_service)는 원래 prefix 없음.
+
 ## [2026-07-12] FEATURE | 신규상장 리싱크 전 자산군 확장 — KR주식·KR ETF·US ETF 자동화
 
 오너 요청: "모든 주식과 ETF 자동으로". 기존 월간 리싱크는 미국 주식만이었음.

@@ -21,6 +21,10 @@ function badgeColor(badge) {
 }
 function fmtPrice(price, currency) {
   if (price == null) return '—';
+  if (currency === 'PT') {   // 지수 = 포인트(통화 기호 없음)
+    if (price >= 1000) return Math.round(price).toLocaleString();
+    return price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
   if (currency === 'KRW') {
     if (price >= 10000) return '₩' + (Math.round(price / 100) * 100).toLocaleString();
     return '₩' + Math.round(price).toLocaleString();

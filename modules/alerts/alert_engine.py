@@ -35,6 +35,8 @@ def cooldown_ok(rule, now):
 def _fmt_price(v, currency="USD"):
     if currency == "IDX":          # 포트폴리오 정규화 지수(시작=100) → 접두어 없이 포인트
         return f"{v:,.1f}"
+    if currency == "PT":           # 시장 지수(코스피·S&P 등) → 접두어 없이 포인트
+        return f"{v:,.0f}" if v >= 1000 else f"{v:,.2f}"
     pre = "₩" if currency == "KRW" else "$"
     if currency == "KRW" or v >= 1000:
         return f"{pre}{v:,.0f}"

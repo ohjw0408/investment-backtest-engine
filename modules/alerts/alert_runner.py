@@ -14,7 +14,7 @@ from modules.alerts import alert_store, live_quote
 from modules.alerts.alert_engine import evaluate_rule, eval_close_summary, daily_pct_zone
 from modules import auth_manager
 
-_KRW_CODES = {"^KS11", "KRW=X", "KRX_GOLD"}
+_KRW_CODES = {"KRW=X", "KRX_GOLD"}
 
 
 def rule_market(code):
@@ -34,6 +34,9 @@ def rule_market(code):
 
 
 def _currency(loader, code):
+    from modules.market_alias import is_index_point
+    if is_index_point(code):
+        return "PT"   # 지수 = 포인트(통화 기호 없음)
     if code in _KRW_CODES:
         return "KRW"
     try:

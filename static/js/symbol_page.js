@@ -4,6 +4,10 @@ const DIV_INITIAL_ROWS = 12;
 
 function fmtPrice(v, currency) {
   if (v === null || v === undefined) return '—';
+  if (currency === 'PT') {   // 지수 = 포인트(통화 기호 없음)
+    if (v >= 1000) return Math.round(v).toLocaleString();
+    return v.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
   if (currency === 'KRW') return '₩' + Math.round(v).toLocaleString();
   return '$' + v.toFixed(2);
 }
@@ -455,9 +459,7 @@ function renderLine(prices, intraday) {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: {
-        callbacks: { label: ctx => allData.currency === 'KRW'
-          ? '₩' + Math.round(ctx.parsed.y).toLocaleString()
-          : '$' + ctx.parsed.y.toFixed(2) }
+        callbacks: { label: ctx => fmtPrice(ctx.parsed.y, allData.currency) }
       }},
       scales: {
         x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: MM_AXIS }, grid: { display: false } },

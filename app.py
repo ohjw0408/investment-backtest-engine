@@ -47,7 +47,7 @@ from modules.retirement.data_preparer import DataPreparer
 from modules.dividend_simulator import DividendSimulator
 from modules.rebalance.periodic import PeriodicRebalance
 from modules.market_quote_service import MarketQuoteService
-from modules.market_alias import search_market_aliases
+from modules.market_alias import search_market_aliases, is_index_point
 
 import logging
 
@@ -655,7 +655,10 @@ def _search_attach_prices(items):
             cur = price_map.get(res['code']); prv = prev_map.get(res['code'])
             res['price'] = round(cur, 2) if cur else None
             res['change_pct'] = round((cur - prv) / prv * 100, 2) if cur and prv else None
-            res['currency'] = 'KRW' if res.get('country') == 'KR' else 'USD'
+            if is_index_point(res['code']):
+                res['currency'] = 'PT'   # 지수 = 포인트(통화 기호 없음)
+            else:
+                res['currency'] = 'KRW' if res.get('country') == 'KR' else 'USD'
     except Exception as e:
         logger.warning(f"[search price] {e}")
 
@@ -1436,7 +1439,10 @@ def _wl_recent_closes(code):
             rows = conn.execute(
                 "SELECT close FROM index_daily WHERE code=? AND close IS NOT NULL ORDER BY date DESC LIMIT 25", (db_code,)
             ).fetchall()
-        currency = "KRW" if code in ('^KS11', 'KRW=X', 'KRX_GOLD') else "USD"
+        if is_index_point(code):
+            currency = "PT"   # 지수 = 포인트(통화 기호 없음)
+        else:
+            currency = "KRW" if code in ('KRW=X', 'KRX_GOLD') else "USD"
         if rows:
             return [float(r[0]) for r in rows][::-1], currency
         # 로컬 미보유 지수(예: ^KS11은 index_daily에 KS200만 있어 없음) → yfinance 경량 fetch
@@ -1525,7 +1531,7 @@ def _watchlist_quote(code):
     prev = closes[-2] if len(closes) >= 2 else None
     change = round((cur - prev) / prev * 100, 2) if prev else 0.0
     is_krw = currency == "KRW"
-    prefix = "₩" if is_krw else "$"
+    prefix = "" if currency == "PT" else ("₩" if is_krw else "$")
     val    = f"{prefix}{cur:,.0f}" if (is_krw or cur >= 1000) else f"{prefix}{cur:,.2f}"
     quote = {
         "code":   code,

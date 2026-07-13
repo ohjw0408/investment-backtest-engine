@@ -58,6 +58,21 @@ def _norm(s: str) -> str:
     return re.sub(r"[^0-9a-z가-힣]", "", (s or "").lower())
 
 
+# 진짜 지수 = 통화 없이 '포인트' 표시 (2026-07-13 오너 지시 — 코스피 ₩6,900 표기 금지).
+# EEM·ACWI는 배지만 '지수'고 실체가 ETF(달러 가격)라 제외 — $ 유지.
+INDEX_POINT_CODES = {
+    "^GSPC", "^IXIC", "^NDX", "^SOX", "^DJI", "^RUT", "^N225", "^NSEI",
+    "^STOXX50E", "000300.SS", "^HSCE", "TPX.F", "DJUSDIV100",
+    "^KS11", "^KQ11", "KS200", "KQ150",
+}
+
+
+def is_index_point(code) -> bool:
+    """포인트 표시 대상 지수인지 (^ 프리픽스 지수 포함)."""
+    code = str(code or "").upper()
+    return code.startswith("^") or code in INDEX_POINT_CODES
+
+
 # code → {name, country}: /symbol 상세 페이지가 지수·금리 등 비상장 코드의 표시명·통화에 사용
 MARKET_CODE_META = {
     code: {"name": name, "country": country}

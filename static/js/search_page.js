@@ -25,6 +25,7 @@ function fmtPrice(price, currency) {
     if (price >= 1000) return Math.round(price).toLocaleString();
     return price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
   }
+  if (currency === 'RATE') return price.toFixed(2) + '%';   // 금리
   if (currency === 'KRW') {
     if (price >= 10000) return '₩' + (Math.round(price / 100) * 100).toLocaleString();
     return '₩' + Math.round(price).toLocaleString();
@@ -180,14 +181,18 @@ function renderResults() {
         </div>
       </a>`;
   }).join('') + '</div>';
+  // 렌더 직후 보이는 페이지(≤18종목)만 라이브 시세 자동 갱신 — price_daily 박제값 방지.
+  // 서버 Redis 15분 캐시라 부하 상한 = 15분당 distinct 코드 수(유저 수 무관).
+  refreshSearchPrices(true);
 }
 
-async function refreshSearchPrices() {
+async function refreshSearchPrices(auto) {
   if (!lastCodes.length) return;
-  const btn = document.getElementById('searchRefreshBtn');
+  const codes = lastCodes.slice();   // 응답 도착 전 재검색 대비 스냅샷
+  const btn = auto ? null : document.getElementById('searchRefreshBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
   try {
-    const qs  = await (await fetch('/api/watchlist/quotes?codes=' + encodeURIComponent(lastCodes.join(',')))).json();
+    const qs  = await (await fetch('/api/watchlist/quotes?codes=' + encodeURIComponent(codes.join(',')))).json();
     const map = Object.fromEntries(qs.map(q => [q.code, q]));
     document.querySelectorAll('.result-card[data-code]').forEach(card => {
       const q = map[String(card.dataset.code).toUpperCase()];

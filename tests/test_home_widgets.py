@@ -99,7 +99,8 @@ try:
     saved = tmp_idx.execute(
         "SELECT date, close FROM index_ohlc WHERE code='^KS11' ORDER BY date"
     ).fetchall()
-    ok("지수 fallback → closes 반환", closes == [100.0, 105.0] and currency == "KRW")
+    # 지수 통화 = 'PT'(포인트, BUG-INDEX-UNIT-CURRENCY 2026-07-13)
+    ok("지수 fallback → closes 반환", closes == [100.0, 105.0] and currency == "PT")
     ok("지수 fallback → index_ohlc upsert", saved == [("2026-06-26", 100.0), ("2026-06-29", 105.0)])
 
     # ── 4b. NULL close 봉이 있어도 위젯이 죽지 않는다 (BUG-KOSPI-NIGHT-NULL 2026-07-03) ──

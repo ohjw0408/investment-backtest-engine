@@ -30,7 +30,10 @@ def is_index_like(code: str) -> bool:
     장중에만 도는 refresh beat의 index_ohlc가 아니라 yf 직접(상시 신선)으로 간다
     (2026-07-02 자산군 커버 수정)."""
     code = str(code).upper()
-    return code.startswith("^") or code == "KRX_GOLD" or "/" in code
+    if code.startswith("^") or code == "KRX_GOLD" or "/" in code:
+        return True
+    from modules.market_alias import INDEX_POINT_CODES   # 000300.SS·TPX.F 등 비^ 지수
+    return code in INDEX_POINT_CODES
 
 
 def _yf_symbol(code: str) -> str:

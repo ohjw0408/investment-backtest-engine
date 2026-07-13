@@ -31,6 +31,8 @@ def _load():
     _state["loaded"] = True
     path = os.environ.get(_CREDS_ENV)
     if not path or not os.path.exists(path):
+        # 무음 no-op 금지 — 키 미설정으로 푸시가 전부 죽어도 흔적이 없던 문제(2026-07-13 조사)
+        print(f"[push_sender] 비활성: {_CREDS_ENV}={'미설정' if not path else path + ' (파일 없음)'}")
         return False
     try:
         from google.oauth2 import service_account
@@ -112,11 +114,15 @@ def send_to_user(user_id, title, body, data=None):
     if not _load():
         return 0
     from modules.alerts import alert_store
+    tokens = alert_store.get_device_tokens(user_id)
     sent = 0
-    for t in alert_store.get_device_tokens(user_id):
+    for t in tokens:
         res = send(t["token"], title, body, data)
         if res == "ok":
             sent += 1
         elif res == "unregistered":
             alert_store.delete_device_token(t["token"])
+            print(f"[push_sender] user={user_id} 죽은 토큰 삭제: {t['token'][:12]}…")
+    # 발화당 1줄 감사 로그 — sent=0(토큰 없음/전송 실패)이 조용히 지나가지 않게
+    print(f"[push_sender] user={user_id} tokens={len(tokens)} sent={sent} title={title[:40]!r}")
     return sent

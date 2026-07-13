@@ -23,8 +23,12 @@ ETF_HOLDINGS_TTL_HOURS = 24
 
 # 캔들(OHLCV)을 index_ohlc에 보관·갱신하는 시장지수/선물/환율 집합.
 # get_symbol_data(라인·캔들 공용)와 refresh_index_ohlc(beat 갱신)가 공유.
+# 2026-07-14 확장: 검색 별칭 지수 8종 추가(yf 7d 전부 검증됨) — 이전엔 index_daily
+# 시드(05-29 박제)뿐이라 검색/위젯/알림 live_quote가 전부 stale이었음.
 CANDLE_INDEX_CODES = frozenset({'^GSPC', '^IXIC', '^KS11', '^NDX', '^DJI', '^N225',
-                                'GC=F', 'SI=F', 'CL=F', 'NG=F', 'HG=F', 'KRW=X'})
+                                'GC=F', 'SI=F', 'CL=F', 'NG=F', 'HG=F', 'KRW=X',
+                                '^KQ11', '^SOX', '^RUT', '^STOXX50E', '^HSCE',
+                                '^NSEI', '000300.SS', 'TPX.F'})
 
 
 def _yf_dl_ticker(code) -> str:

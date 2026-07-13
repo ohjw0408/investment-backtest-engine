@@ -623,40 +623,83 @@ def _search_badge_cat(badge):
     return ''
 
 
+def _search_index_quotes(codes):
+    """지수·환율·금리 등 — 준라이브 index_ohlc(30분 beat) 우선, index_daily 폴백.
+    code -> (cur, prev). 테이블에 데이터 없는 코드는 미포함(호출측이 price_daily로)."""
+    out = {}
+    if not codes or not INDEX_DB_PATH.exists():
+        return out
+    try:
+        import sqlite3 as _sq
+        ic = _sq.connect(str(INDEX_DB_PATH))
+        for code in codes:
+            rows = []
+            try:
+                rows = ic.execute(
+                    "SELECT close FROM index_ohlc WHERE code=? AND close IS NOT NULL "
+                    "ORDER BY date DESC LIMIT 2", (code,)).fetchall()
+            except Exception:
+                rows = []
+            if len(rows) < 2:
+                db_code = 'USD/KRW' if code == 'KRW=X' else code
+                try:
+                    rows = ic.execute(
+                        "SELECT close FROM index_daily WHERE code=? AND close IS NOT NULL "
+                        "ORDER BY date DESC LIMIT 2", (db_code,)).fetchall()
+                except Exception:
+                    rows = []
+            if rows:
+                out[code] = (float(rows[0][0]),
+                             float(rows[1][0]) if len(rows) > 1 else None)
+        ic.close()
+    except Exception as e:
+        logger.warning(f"[search index quote] {e}")
+    return out
+
+
 def _search_attach_prices(items):
-    """주어진 종목 리스트에 최근 종가·등락률 부착(price_daily 배치)."""
+    """주어진 종목 리스트에 최근 종가·등락률 부착.
+    지수·환율·금리 = index_ohlc/index_daily(준라이브), 주식/ETF = price_daily 배치."""
     if not items:
         return
     try:
         import sqlite3 as _sq
-        if not PRICE_DB_PATH.exists():
-            return
-        pconn = _sq.connect(str(PRICE_DB_PATH))
-        codes = [r['code'] for r in items]
-        ph = ','.join('?' * len(codes))
-        cur_rows = pconn.execute(f"""
-            SELECT p.code, p.close FROM price_daily p
-            INNER JOIN (SELECT code, MAX(date) as mx FROM price_daily
-                WHERE code IN ({ph}) AND close IS NOT NULL GROUP BY code) m
-            ON p.code=m.code AND p.date=m.mx
-        """, codes).fetchall()
-        prev_rows = pconn.execute(f"""
-            SELECT p.code, p.close FROM price_daily p
-            INNER JOIN (SELECT p2.code, MAX(p2.date) as mx2 FROM price_daily p2
+        idx_map = _search_index_quotes([r['code'] for r in items])
+        px_codes = [r['code'] for r in items if r['code'] not in idx_map]
+        price_map, prev_map = {}, {}
+        if px_codes and PRICE_DB_PATH.exists():
+            pconn = _sq.connect(str(PRICE_DB_PATH))
+            ph = ','.join('?' * len(px_codes))
+            cur_rows = pconn.execute(f"""
+                SELECT p.code, p.close FROM price_daily p
                 INNER JOIN (SELECT code, MAX(date) as mx FROM price_daily
                     WHERE code IN ({ph}) AND close IS NOT NULL GROUP BY code) m
-                ON p2.code=m.code AND p2.date < m.mx AND p2.close IS NOT NULL
-                GROUP BY p2.code) prev ON p.code=prev.code AND p.date=prev.mx2
-        """, codes).fetchall()
-        pconn.close()
-        price_map = {r[0]: r[1] for r in cur_rows}
-        prev_map  = {r[0]: r[1] for r in prev_rows}
+                ON p.code=m.code AND p.date=m.mx
+            """, px_codes).fetchall()
+            prev_rows = pconn.execute(f"""
+                SELECT p.code, p.close FROM price_daily p
+                INNER JOIN (SELECT p2.code, MAX(p2.date) as mx2 FROM price_daily p2
+                    INNER JOIN (SELECT code, MAX(date) as mx FROM price_daily
+                        WHERE code IN ({ph}) AND close IS NOT NULL GROUP BY code) m
+                    ON p2.code=m.code AND p2.date < m.mx AND p2.close IS NOT NULL
+                    GROUP BY p2.code) prev ON p.code=prev.code AND p.date=prev.mx2
+            """, px_codes).fetchall()
+            pconn.close()
+            price_map = {r[0]: r[1] for r in cur_rows}
+            prev_map  = {r[0]: r[1] for r in prev_rows}
         for res in items:
-            cur = price_map.get(res['code']); prv = prev_map.get(res['code'])
+            if res['code'] in idx_map:
+                cur, prv = idx_map[res['code']]
+            else:
+                cur, prv = price_map.get(res['code']), prev_map.get(res['code'])
             res['price'] = round(cur, 2) if cur else None
             res['change_pct'] = round((cur - prv) / prv * 100, 2) if cur and prv else None
             if is_index_point(res['code']):
-                res['currency'] = 'PT'   # 지수 = 포인트(통화 기호 없음)
+                res['currency'] = 'PT'    # 지수 = 포인트(통화 기호 없음)
+            elif res.get('badge') == '금리':
+                res['currency'] = 'RATE'  # 금리 = % (통화 기호 오표기 방지)
+            elif res['code'] == 'USD/JPY':
+                res['currency'] = 'PT'    # 엔환율에 $/₩ 붙이면 오표기
             else:
                 res['currency'] = 'KRW' if res.get('country') == 'KR' else 'USD'
     except Exception as e:
@@ -1422,7 +1465,8 @@ def _wl_recent_closes(code):
     code   = str(code).upper()
     loader = portfolio_engine.loader
     _FUT   = {'GC=F', 'SI=F', 'CL=F', 'NG=F', 'HG=F', 'KRW=X'}
-    is_index = code.startswith('^') or code in _FUT or code == 'KRX_GOLD'
+    is_index = (code.startswith('^') or code in _FUT or code == 'KRX_GOLD'
+                or is_index_point(code))   # 000300.SS·TPX.F 등 비^ 지수도 index_ohlc 경유
 
     if is_index:
         conn = loader.index_conn
@@ -1520,13 +1564,18 @@ def _watchlist_quote(code):
     if getattr(svc, '_redis_ok', False):
         cached = svc._get(key)
         if cached:
-            return cached
+            return None if cached.get('_neg') else cached
+    def _neg_cache():
+        # 실패 negative cache 5분 — 콜드 롱테일 코드 폭주 시 yf 재타격 방지
+        if getattr(svc, '_redis_ok', False):
+            svc._set(key, {'_neg': 1}, 5 * 60)
+        return None
     try:
         closes, currency = _wl_recent_closes(code)
     except Exception:
-        return None
+        return _neg_cache()
     if not closes:
-        return None
+        return _neg_cache()
     cur  = closes[-1]
     prev = closes[-2] if len(closes) >= 2 else None
     change = round((cur - prev) / prev * 100, 2) if prev else 0.0
@@ -1756,6 +1805,7 @@ def home_add_portfolio():
 
 
 @app.route('/api/watchlist/quotes')
+@limiter.limit("60 per minute")
 def watchlist_quotes():
     codes = [c.strip() for c in request.args.get('codes', '').split(',') if c.strip()][:60]
     if not codes:

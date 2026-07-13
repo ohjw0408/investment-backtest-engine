@@ -1,5 +1,20 @@
 # Log
 
+## [2026-07-14] BUGFIX | 검색 stale 가격 + 준라이브 지수 확장 + 푸시 관측성 (BUG-SEARCH-STALE-PRICE)
+
+오너 보고 3건 잔여분 일괄 처리 (07-13 보고: ①푸시 미도착 ②검색 코스피 박제가격 ④전 종목 stale).
+
+**①푸시 — prod 전수 조사 결과 서버 무죄**: 워커 env·키·enabled()·토큰(07-13 재등록)·동의 전부 정상, 3일 로그 에러 0, prod 실전송 테스트 sent=1 → **오너 폰 도착 확인**. 07-13 미도착은 단말/타이밍 쪽(원인 특정 불가). 재발 대비 관측성 패치: `push_sender` 무음 제거 — 키 미설정 no-op 로그, 죽은 토큰 삭제 로그, **발화당 1줄 감사 로그**(`user= tokens= sent= title=`). 다음부턴 journalctl만 보면 즉시 판별.
+
+**②검색 stale**: 원인 = `_search_attach_prices`가 price_daily(종목 클릭 시만 백필되는 온디맨드 캐시)만 읽음. 수정 = 신규 `_search_index_quotes()` — **index_ohlc(30분 beat 준라이브) 우선 → index_daily 폴백 → price_daily**(주식/ETF). 부수: 금리 배지 → `RATE` 통화(3.73% 표기, $ 오표기 방지), USD/JPY → PT.
+
+**②-b 준라이브 뽕뽑기**: `CANDLE_INDEX_CODES` 12→**20종**(+^KQ11 ^SOX ^RUT ^STOXX50E ^HSCE ^NSEI 000300.SS TPX.F, yf 7d 전부 사전검증). 이전엔 이 8종이 index_daily 5/29 시드 박제. 이제 30분 beat가 커버 → 검색·홈위젯(`_wl_recent_closes` is_index 확장)·캔들차트·**알림 live_quote**(`is_index_like` 확장 — 기존엔 cur_is_today=False로 장중 등락알림 불발이었음)까지 전부 신선. beat 비용 12→20 yf콜/30분.
+
+**④전 종목 자동갱신**: 검색 렌더 직후 보이는 페이지(≤18종목)만 `/api/watchlist/quotes` 자동 호출(기존 🔄 로직 재사용, `refreshSearchPrices(true)`). 스케일 방어: per-code Redis 15분 캐시(부하 상한=15분당 distinct 코드 수, 유저 수 무관) + 엔드포인트 rate limit 60/min 신설 + **실패 negative cache 5분**(`_neg` 마커 — 콜드 롱테일 yf 재타격 방지) + 실패 시 기존 표시 유지(우아한 열화).
+
+- 검증: compile+node --check / alert hysteresis·push_consent·home_widgets(20 PASS — 지수 fallback 기대 통화 KRW→PT 테스트 동기화) / 로컬 refresh_index_ohlc 20종 전부 07-13~14 적재 / Playwright: 검색 코스피 **6,807(-8.95%)**(어제 7,246 박제 해소)·코스닥 837·항셍 8,066·KTB3Y "3.73%"·**삼성전자 카드 ₩285,000→₩254,500 자동갱신 실확인**·quotes 호출 검색당 1회·콘솔에러 0.
+- prod 후속: 배포 후 refresh_index_ohlc 1회 수동 실행(신규 8종 즉시 적재, 이후 beat 유지) + 검색 API 실검증.
+
 ## [2026-07-13] BUGFIX | 지수 가격 표시 단위 ₩/$ → 포인트 (BUG-INDEX-UNIT-CURRENCY)
 
 오너 보고: 코스피가 검색·상세에서 "₩6,900"으로 표기 — 지수는 통화 없이 포인트여야 함(S&P·나스닥·일본·유럽·중국 전부).

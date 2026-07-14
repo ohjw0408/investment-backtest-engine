@@ -7,7 +7,7 @@
 - **US 우선주 공백 티커**: `"GUT PR C"`가 yf에 그대로 던져져 TypeError. 수정 = `_yf_dl_ticker`에 `PR [A-Z]?` → `-P{letter}` 변환 + 잔여 공백 하이픈.
 - **오류율 스윕(시장별 콜드 40종목 × 6시장 = 240콜, 실패 30s 후 재시도로 일시/영구 분리)**: KOSDAQ 0%·KRX(KR ETF) 0%·US_ETF 0%·KOSPI 2.5%(1)·NASDAQ 7.5%(3)·NYSE 12.5%(5) — 전체 3.8%(9). **잔여 9건 전부 야후 자체에 데이터 없음 개별 확인**(404/empty): 상장폐지·사명변경 4(140910 에이리츠·BHAT·SKLZ·PKST) + 권리/SPAC 특수증권 5(CRAQR·TSI RT·BRW RT WI·WENC RT·CGCT). 즉 페치 경로 잔여 오류 0 — "-"가 남는 건 진짜 시세 없는 종목뿐.
 - 검증: 티커 매핑 회귀 13케이스 + `test_price_loader_spikes`·`test_priceloader_fx`·`test_missing_price` 6 passed + 475230(6,740원)·452450(3,085원)·GUT PR C($21.70) 실페치.
-- 후속 논의(오너): 검색 마스터에 rights/워런트류 특수증권 노출 필터 + 검색 가격 신선도 게이트(스켈레톤 UX).
+- **오너 결정(07-15): rights/워런트 검색 필터·신선도 게이트(스켈레톤 UX) 둘 다 보류 — 하지 않기로. 재제안 금지.** 근거: 영구 "-"는 상폐·rights 등 시세가 진짜 없는 증권뿐(페치 경로 잔여 오류 0)이라 "-"가 사실을 정확히 표현. 검색 노출분은 quotes 자동갱신(≤30분 신선)이 라이브로 덮음.
 
 ## [2026-07-14] BUGFIX | 알림 제목 티커→종목명 + 무결성 스캔 3종목 판정·수정 (BUG-ALERT-RAW-TICKER / BUG-BACKFILL-FX-CLIFF)
 

@@ -1299,23 +1299,33 @@ def _compute_portfolio_history(valid, current_prices=None):
     # 전체 날짜 합집합 정렬
     all_dates = sorted(set().union(*[set(v.keys()) for v in price_map.values()]))
 
+    # 종목별 수량 합산(복수 계좌 병합) — 종목별 시리즈 분해용
+    qty_by_code = {}
+    for code, qty in valid:
+        qty_by_code[code] = qty_by_code.get(code, 0.0) + qty
+
     labels, values = [], []
+    series = {code: [] for code in qty_by_code if code in price_map}
     last_prices = {}
     for date in all_dates:
         total = 0.0
         ok = False
-        for code, qty in valid:
-            if code not in price_map:
-                continue
+        row = {}
+        for code in series:
             px = price_map[code].get(date) or last_prices.get(code)
             if px is None:
+                row[code] = None
                 continue
             last_prices[code] = px
-            total += qty * (px if is_kr(code) else px * usdkrw)
+            v = qty_by_code[code] * (px if is_kr(code) else px * usdkrw)
+            row[code] = v
+            total += v
             ok = True
         if ok and total > 0:
             labels.append(date)
             values.append(round(total))
+            for code in series:
+                series[code].append(None if row[code] is None else round(row[code]))
 
     if not values:
         return {"empty": True, "labels": [], "values": []}
@@ -1325,17 +1335,27 @@ def _compute_portfolio_history(valid, current_prices=None):
     current_total = sum(qty * (current_prices.get(code) or 0) for code, qty in valid)
     if current_total > 0:
         today = datetime.now().strftime('%Y-%m-%d')
+        cur_row = {}
+        for code in series:
+            cv = qty_by_code[code] * (current_prices.get(code) or 0)
+            cur_row[code] = round(cv) if cv > 0 else None
         if labels and labels[-1] == today:
             values[-1] = round(current_total)
+            for code in series:
+                if cur_row[code] is not None:
+                    series[code][-1] = cur_row[code]
         else:
             labels.append(today)
             values.append(round(current_total))
+            for code in series:
+                series[code].append(cur_row[code])
 
     current = values[-1]
     change = round((values[-1] / values[0] - 1) * 100, 2) if values[0] else 0
     return {
         "labels": labels,
         "values": values,
+        "series": series,
         "current": current,
         "change": change,
     }
@@ -1352,6 +1372,8 @@ def portfolio_history():
     live_prices = _live_asset_prices(holdings)[0] if valid else None
     result = _compute_portfolio_history(valid, current_prices=live_prices)
     result["hide_amounts"] = _hide_amounts_for_user(uid)
+    if result.get("series"):
+        result["names"] = _resolve_names(list(result["series"].keys()))
     return jsonify(result)
 
 
@@ -1720,58 +1742,6 @@ def attribution_capture():
     names = _resolve_names(codes)
     res['names'] = {c: names.get(c, c) for c in codes}
     return jsonify({'ok': True, 'attribution': res})
-
-
-@app.route('/api/myassets/attribution')
-def myassets_attribution():
-    """내 자산 — 상승 견인/하락 방어 종목 요약(보유 비중 기준, 최근 6년)."""
-    uid = session.get('user_id')
-    if not uid:
-        return jsonify({'error': '로그인 필요'}), 401
-    from datetime import datetime as _dt, timedelta as _td
-    holdings = get_holdings(uid)
-    today = _dt.today().strftime('%Y-%m-%d')
-    start = (_dt.today() - _td(days=20)).strftime('%Y-%m-%d')
-    weights, total = {}, 0.0
-    for h in holdings:
-        qty = h.get('quantity') or 0
-        if qty <= 0:
-            continue
-        code = str(h.get('code', '')).upper()
-        mp = h.get('manual_price')
-        if mp is not None:
-            price = mp
-        else:
-            try:
-                df = portfolio_engine.loader.get_price(code, start, today, apply_fx=True)
-                price = float(df['close'].iloc[-1]) if df is not None and not df.empty else 0.0
-            except Exception:
-                price = 0.0
-        val = qty * (price or 0)
-        if val > 0:
-            weights[code] = weights.get(code, 0.0) + val
-            total += val
-    if total <= 0 or len(weights) < 2:
-        return jsonify({'ok': False, 'reason': 'insufficient'})
-    from modules import attribution
-    cap = attribution.analyze_capture(portfolio_engine.loader, list(weights.keys()), weights, years=6)
-    if not cap or not cap.get('assets'):
-        return jsonify({'ok': False, 'reason': 'no_data'})
-    names = _resolve_names(list(weights.keys()))
-    A = cap['assets']
-    # 견인 = 상승장 기여(비중×수익) 최대 / 방어 = 하락 포착률 최소(덜 빠짐)
-    driver_code = max(A, key=lambda c: A[c]['contrib_up'])
-    defender_code = min(A, key=lambda c: (A[c]['down_capture']
-                                          if A[c]['down_capture'] is not None else 9e9))
-    out = {
-        'period': cap['period'], 'n_up': cap['n_up'], 'n_down': cap['n_down'],
-        'up_driver': {'code': driver_code, 'name': names.get(driver_code, driver_code),
-                      'contrib': A[driver_code]['contrib_up']},
-        'down_defender': {'code': defender_code, 'name': names.get(defender_code, defender_code),
-                          'down_capture': A[defender_code]['down_capture'],
-                          'down_ret': A[defender_code]['down_ret']},
-    }
-    return jsonify({'ok': True, 'attribution': out})
 
 
 @app.route('/api/home-config/add-portfolio', methods=['POST'])

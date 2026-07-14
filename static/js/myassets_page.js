@@ -87,6 +87,7 @@ function setMetricMode(mode, btn) {
   if (btn) btn.classList.add('active');
   document.getElementById('maPeriodChips').style.display = (mode === 'period') ? 'flex' : 'none';
   updateHeroMetric();
+  renderPerStock();
 }
 
 // 보유 종목 토글 — 행 수익 표시만 (오늘± ↔ 평단 전체수익률)
@@ -113,7 +114,7 @@ function showTab(name) {
 }
 
 // ── 모바일 전용 6탭 (≤768px). 카드 단위 인라인 display 제어, 데스크톱 DOM·showTab 보존 ──
-let _attrHasData = false;
+let _psHasData = false;
 let _mReady = false;  // 차트 인스턴스 준비 후 true (숨김탭 차트는 보일 때 resize 필요)
 const _DESK2M = { overview:'overview', rebalance:'rebal', purchase:'rebal', groups:'groups' };
 function _isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
@@ -129,16 +130,16 @@ function mShowTab(name) {
     ['rebalance','purchase','groups'].forEach(t => document.getElementById('tab-'+t).style.display = 'none');
     document.getElementById('tab-overview').style.display = '';
     document.querySelectorAll('#tab-overview [data-mtab]').forEach(el => {
-      if (el.id !== 'attrCard') el.style.display = '';
+      if (el.id !== 'perStockCard') el.style.display = '';
     });
-    document.getElementById('attrCard').style.display = _attrHasData ? '' : 'none';
+    document.getElementById('perStockCard').style.display = _psHasData ? '' : 'none';
     document.querySelectorAll('.ma-tab').forEach((b,i) => b.classList.toggle('active', i === 0));
     return;
   }
   document.querySelectorAll('.ma-mtab').forEach(b => b.classList.toggle('active', b.dataset.mtab === name));
   document.querySelectorAll('[data-mtab]:not(.ma-mtab)').forEach(el => {
     const active = el.dataset.mtab === name;
-    if (el.id === 'attrCard') { el.style.display = (active && _attrHasData) ? '' : 'none'; return; }
+    if (el.id === 'perStockCard') { el.style.display = (active && _psHasData) ? '' : 'none'; return; }
     el.style.display = active ? '' : 'none';
   });
   // 숨김 상태에서 그려진 차트는 캔버스 크기가 0 → 탭이 보일 때 재렌더(재생성)
@@ -179,36 +180,58 @@ async function loadAll() {
   renderSummary();
   updateHeroMetric();
   renderGroupOptions();
-  loadAttribution();
+  renderPerStock();
 }
 
-// ── 상승 견인 · 하락 방어 요약 ──
-async function loadAttribution() {
-  const card = document.getElementById('attrCard');
-  const body = document.getElementById('attrBody');
-  if (!card) return;
-  try {
-    const j = await (await fetch('/api/myassets/attribution', { cache: 'no-store' })).json();
-    if (!j.ok || !j.attribution) { _attrHasData = false; card.style.display = 'none'; return; }
-    const a = j.attribution;
-    const up = a.up_driver, dn = a.down_defender;
-    let html = '';
-    if (up) html += `📈 상승장을 가장 많이 끌어올린 종목: <b>${maEsc(up.name)}</b> <span style="color:var(--text-muted);font-size:0.82rem;">(기여 +${up.contrib.toFixed(1)}%p)</span>`;
-    if (up && dn) html += '<br>';
-    if (dn) {
-      const dc = dn.down_capture;
-      if (dc == null)
-        html += `🛡️ 하락장에서 가장 잘 버틴 종목: <b>${maEsc(dn.name)}</b>`;
-      else if (dc < 0)
-        html += `🛡️ 하락장에서 오히려 올라 <b style="color:var(--blue)">헤지</b>가 된 종목: <b>${maEsc(dn.name)}</b>`;
-      else
-        html += `🛡️ 하락장에서 가장 잘 버틴 종목: <b>${maEsc(dn.name)}</b> <span style="color:var(--text-muted);font-size:0.82rem;">(포트폴리오가 빠질 때 <b style="color:var(--blue)">${dc.toFixed(1)}배</b>만 하락)</span>`;
-    }
-    body.innerHTML = html || '데이터가 부족해요.';
-    _attrHasData = true;
-    // 모바일선 현황 탭일 때만 노출(다른 탭이면 숨김 유지)
-    card.style.display = (_isMobile() && _mActive() !== 'overview') ? 'none' : '';
-  } catch (e) { _attrHasData = false; card.style.display = 'none'; }
+// ── 종목별 손익 (히어로 오늘/기간 토글 + 기간칩 연동) ──
+function renderPerStock() {
+  const card = document.getElementById('perStockCard');
+  const body = document.getElementById('psBody');
+  if (!card || !body) return;
+  const hide = () => { _psHasData = false; card.style.display = 'none'; };
+
+  let rows = [], label;
+  if (_metricMode === 'today') {
+    label = '오늘';
+    // 계좌 넘어 종목별 수량 합산 (renderHoldings와 동일 기준)
+    const agg = {};
+    holdings.forEach(h => {
+      if (!h.quantity || h.quantity <= 0) return;
+      const a = agg[h.code] || (agg[h.code] = { name: h.name || h.code, qty: 0, code: h.code });
+      a.qty += h.quantity;
+    });
+    Object.values(agg).forEach(a => {
+      const c = prices[a.code], p = prevClose[a.code];
+      if (manualCodes.includes(a.code) || c == null || p == null || !p) { rows.push({ name: a.name, nodata: true }); return; }
+      rows.push({ name: a.name, pct: (c - p) / p, diff: (c - p) * a.qty });
+    });
+  } else {
+    label = _maPeriodLabel;
+    const d = _historyData;
+    if (!d || d.empty || !d.series) { hide(); return; }
+    Object.entries(d.series).forEach(([code, arr]) => {
+      const name = (d.names && d.names[code]) || code;
+      const w = (_maHistoryDays > 0 && arr.length > _maHistoryDays) ? arr.slice(-_maHistoryDays) : arr;
+      const nn = w.filter(v => v != null && v > 0);
+      if (nn.length < 2) { rows.push({ name, nodata: true }); return; }
+      const first = nn[0], last = nn[nn.length - 1];
+      rows.push({ name, pct: (last - first) / first, diff: last - first });
+    });
+  }
+
+  if (!rows.some(r => !r.nodata)) { hide(); return; }
+  // 기여금액 내림차순, 데이터 없는 종목은 맨 아래
+  rows.sort((a, b) => (a.nodata ? 1 : 0) - (b.nodata ? 1 : 0) || (b.diff || 0) - (a.diff || 0));
+
+  body.innerHTML = rows.map(r => {
+    if (r.nodata) return `<div class="ps-row"><span class="ps-name">${maEsc(r.name)}</span><span class="ps-pct flat">—</span><span class="ps-amt flat">—</span></div>`;
+    const cls = r.diff >= 0 ? 'up' : 'down';
+    return `<div class="ps-row"><span class="ps-name">${maEsc(r.name)}</span><span class="ps-pct ${cls}">${fmtSignedPct(r.pct)}</span><span class="ps-amt ${cls}">${fmtSignedKRW(r.diff)}</span></div>`;
+  }).join('');
+  document.getElementById('psPeriodLbl').textContent = label + ' 기준';
+  _psHasData = true;
+  // 모바일선 현황 탭일 때만 노출(다른 탭이면 숨김 유지)
+  card.style.display = (_isMobile() && _mActive() !== 'overview') ? 'none' : '';
 }
 
 const maEsc = window.mmEsc;  // E-1 공용화: 전역 mmEsc(base.html) 단일 구현 — 로컬 복붙 제거 (2026-07-03)
@@ -265,6 +288,7 @@ async function savePrivacySetting() {
   renderHoldings();
   renderSummary();
   updateHeroMetric();
+  renderPerStock();
   if (_historyData) renderHistoryChart(_maHistoryDays);
   if (document.getElementById('tab-rebalance').style.display !== 'none') renderRebalance();
   await fetch('/api/myassets/settings', {
@@ -1147,6 +1171,7 @@ function renderHistoryChart(days) {
     document.getElementById('maHistoryEmpty').style.display = 'flex';
     _lastHistWindow = null;
     updateHeroMetric();
+    renderPerStock();
     return;
   }
   document.getElementById('maHistoryEmpty').style.display = 'none';
@@ -1158,6 +1183,7 @@ function renderHistoryChart(days) {
     values = values.slice(-days);
   }
   updateHeroMetric(values);
+  renderPerStock();
 
   const ctx = document.getElementById('maHistoryChart').getContext('2d');
   const _brand = _cssVar('--brand') || '#0052ff';

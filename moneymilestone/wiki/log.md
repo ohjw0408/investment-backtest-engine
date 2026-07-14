@@ -1,5 +1,15 @@
 # Log
 
+## [2026-07-14] FEATURE | 내자산 종목별 손익(기간 연동) + 홈 최대기여 한줄 + 상승견인/하락방어 제거
+
+오너 요청: 기간 선택 시 "무슨 종목이 몇% 올라서 얼마 올랐는지"가 안 보임. 결정(오너 확정 4건): ①웹·모바일 공통 히어로 아래 새 카드 ②상승견인/하락방어는 웹·모바일 모두 제거 ③홈은 한 줄 요약만 ④오늘 모드에서도 표시.
+
+- **서버**: `_compute_portfolio_history`에 `series`(종목별 KRW 평가액 시계열, 총액과 같은 labels 정렬·계좌합산 수량, 데이터 없는 날 null) + `/api/portfolio/history`에 `names` 추가. 종목별 diff 합 = 총액 diff 보장(현재 보유수량 고정 가정 — 차트와 동일). `/api/myassets/attribution` 엔드포인트 삭제(`modules/attribution.py`와 백테·계산기용 `/api/attribution/*`은 유지).
+- **내자산**: `attrCard` → `perStockCard`(종목별 손익). 히어로 오늘/기간 토글·기간칩과 연동 — 오늘=prices/prevClose 클라 계산, 기간=series 클라 slice(재요청 0). 기여금액 내림차순, 수동가격·이력없는 종목은 — 표시, 금액가리기 시 ₩만 마스킹(%는 노출). 모바일 6탭에선 현황 탭에서만 노출(기존 attrCard 로직 승계).
+- **홈**: 포폴 카드 차트 아래 `#pfTopMover` 한 줄(선택 기간 |기여| 최대 종목, 가림 시 % 표기) — /myassets 링크.
+- 검증: Playwright 14/14 PASS(합계=히어로 등락 ±10원 일치·기간칩 갱신·모바일 탭 노출/숨김·홈 기간 변경 반영·콘솔 0) + 라이트/다크/모바일 스샷 육안. 변경=`app.py`, `templates/myassets.html`, `templates/index.html`, `static/js/myassets_page.js`, `static/js/home_page.js`.
+- 주의: 종목별 %는 가격수익률(수량 고정)이라 기간 중 매수·매도는 미반영 — 카드 각주로 안내. `tools/play_store_capture.js`의 attribution mock route는 무해하게 잔존.
+
 ## [2026-07-14] BUGFIX | 검색 stale 가격 + 준라이브 지수 확장 + 푸시 관측성 (BUG-SEARCH-STALE-PRICE)
 
 오너 보고 3건 잔여분 일괄 처리 (07-13 보고: ①푸시 미도착 ②검색 코스피 박제가격 ④전 종목 stale).

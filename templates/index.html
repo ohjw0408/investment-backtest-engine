@@ -30,6 +30,15 @@
 .portfolio-change.up { color: var(--up); }
 .portfolio-change.down { color: var(--down); }
 
+/* 기간 최대 기여 종목 한 줄 (→ 내 자산 종목별 손익) */
+.pf-top-mover { display: flex; align-items: center; gap: 6px; margin: 0 var(--sp-lg); padding: 9px 0 2px;
+  border-top: 1px solid var(--ds-hairline); font-size: var(--fs-sm); color: var(--ds-body);
+  text-decoration: none; }
+.pf-top-mover:hover { color: var(--ds-ink); }
+.pf-top-mover .amt { font-family: var(--font-mono); font-weight: 700; }
+.pf-top-mover .amt.up { color: var(--up); }
+.pf-top-mover .amt.down { color: var(--down); }
+
 /* 기간 pill */
 .period-selector { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .period-selector::-webkit-scrollbar { display: none; }
@@ -414,6 +423,7 @@ html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
     <div class="chart-wrap">
       <canvas id="portfolioChart"></canvas>
     </div>
+    <a href="/myassets" class="pf-top-mover" id="pfTopMover" style="display:none;"></a>
     <div class="home-cta">
       <a href="/myassets" class="home-btn home-btn-primary">내 자산</a>
       <a href="/myassets" class="home-btn home-btn-ghost">자산 추가</a>

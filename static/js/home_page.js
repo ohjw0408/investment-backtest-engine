@@ -112,6 +112,30 @@ function setPortfolioChange(id, label, series) {
   el.style.display = '';
 }
 
+// 선택 기간 최대 기여 종목 한 줄 (내 자산 '종목별 손익' 요약판)
+function renderTopMover(n, label, data) {
+  const el = document.getElementById('pfTopMover');
+  if (!el) return;
+  let best = null;
+  if (data.series) {
+    for (const [code, arr] of Object.entries(data.series)) {
+      const nn = arr.slice(-n).filter(v => v != null && v > 0);
+      if (nn.length < 2) continue;
+      const diff = nn[nn.length - 1] - nn[0];
+      if (!best || Math.abs(diff) > Math.abs(best.diff)) best = { code, diff, pct: diff / nn[0] };
+    }
+  }
+  if (!best) { el.style.display = 'none'; return; }
+  const name = (data.names && data.names[best.code]) || best.code;
+  const cls = best.diff >= 0 ? 'up' : 'down';
+  const amt = _homeHideAmounts
+    ? (best.pct >= 0 ? '+' : '') + (best.pct * 100).toFixed(1) + '%'
+    : (best.diff >= 0 ? '+' : '-') + '₩' + Math.abs(Math.round(best.diff)).toLocaleString();
+  const esc = window.mmEsc || (s => s);
+  el.innerHTML = `${best.diff >= 0 ? '↑' : '↓'} 최근 ${label} 최대 기여: <b>${esc(name)}</b> <span class="amt ${cls}">${amt}</span>`;
+  el.style.display = '';
+}
+
 function fmtChartKRW(v) {
   if (!Number.isFinite(v)) return '';
   const sign = v < 0 ? '-' : '';
@@ -162,6 +186,7 @@ function renderPortfolio(period = '1m') {
   valEl.textContent = fmtMaskedKRW(data.current || values[values.length - 1] || 0);
   setPortfolioChange('portfolioDailyChange', '1일', values.slice(-2));
   setPortfolioChange('portfolioPeriodChange', periodLabels[period] || '1주', slicedValues);
+  renderTopMover(n, periodLabels[period] || '1주', data);
 
   const canvas = document.getElementById('portfolioChart');
   const ctx = canvas.getContext('2d');

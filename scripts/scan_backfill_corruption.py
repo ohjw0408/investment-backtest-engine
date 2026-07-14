@@ -46,6 +46,11 @@ def scan_code(conn: sqlite3.Connection, code: str):
         "WHERE code=? AND close IS NOT NULL ORDER BY date", conn, params=(code,))
     if df.empty:
         return None
+    # 휴장일 복제행 제외: yfinance가 KR 휴장일에 전일 종가를 vol=0으로 복제해 뱉는다.
+    # 이 행이 며칠 간격으로 산재하면 실제 주간 변동(예: 005380 2000-06 +42%)이
+    # 합성 점프로 오판됨(2026-07-14 오탐). 전일 종가와 동일한 vol=0 행은 정보 0 → 제거.
+    vol0 = (df["volume"] == 0) | (df["volume"].isna())
+    df = df[~(vol0 & (df["close"] == df["close"].shift(1)))]
     synth = df[(df["volume"] == 0) | (df["volume"].isna())].copy()
     real = df[df["volume"] > 0].copy()
     if len(synth) < MIN_SEG_ROWS or len(real) < MIN_SEG_ROWS:

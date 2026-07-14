@@ -617,6 +617,12 @@ class BackfillEngine:
 
         if fx_applied:
             usdkrw = self._load_usdkrw()
+            # FX 시계열 시작(USD/KRW=1964-05-04) 이전 구간은 환산 불가 — 과거 rate=1.0
+            # 폴백이 ×255.77 절벽을 만들었다(379780, 2026-07-14 무결성 스캔).
+            # 환산 불가 구간은 백필하지 않고 FX 시작일부터 절단한다.
+            index_series = index_series[index_series.index >= usdkrw.index.min()]
+            if index_series.empty:
+                return {"code": code, "status": "no_fx_overlap"}
             def get_rate(d):
                 if d in usdkrw.index:
                     return float(usdkrw[d])

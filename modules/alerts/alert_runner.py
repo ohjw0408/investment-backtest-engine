@@ -33,6 +33,39 @@ def rule_market(code):
     return "US"
 
 
+_name_cache = {}
+
+
+def _display_name(code):
+    """코드 → 표시 이름. 알림 제목이 '005380'·'^KS11' 같은 raw 티커로 나가는 것 방지
+    (2026-07-14 오너 지시 — 특히 KR 종목은 티커가 전부 숫자라 이름 필수).
+    지수·환율·금리 = market_alias, 주식/ETF = symbol_master.db. 실패 시 코드 그대로."""
+    code = str(code or "")
+    if code in _name_cache:
+        return _name_cache[code]
+    name = None
+    try:
+        from modules.market_alias import MARKET_CODE_META
+        meta = MARKET_CODE_META.get(code)
+        if meta and meta.get("name"):
+            name = meta["name"]
+        else:
+            import sqlite3
+            from pathlib import Path
+            db = Path(__file__).resolve().parents[2] / "data" / "meta" / "symbol_master.db"
+            if db.exists():
+                conn = sqlite3.connect(str(db))
+                row = conn.execute(
+                    "SELECT name FROM symbols WHERE code=?", (code,)).fetchone()
+                conn.close()
+                if row and row[0]:
+                    name = str(row[0])
+    except Exception:
+        name = None
+    _name_cache[code] = name or code
+    return _name_cache[code]
+
+
 def _currency(loader, code):
     from modules.market_alias import is_index_point
     if is_index_point(code):
@@ -91,7 +124,7 @@ def _build_symbol_ctx(loader, code, need_all):
     win52 = prior[-252:] if len(prior) > 252 else prior
     return {
         "cur": cur, "prev_close": prev, "change_pct": change_pct,
-        "currency": currency, "name": code, "cur_is_today": cur_is_today,
+        "currency": currency, "name": _display_name(code), "cur_is_today": cur_is_today,
         "high_all": ctx_full_high, "low_all": ctx_full_low,
         "high_52w": max(win52), "low_52w": min(win52),
     }

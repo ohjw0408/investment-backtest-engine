@@ -92,6 +92,7 @@ tags: [dev, bug]
 
 | 버그 | 수정 내용 | 날짜 | 커밋 |
 |---|---|---|---|
+| BUG-YF-TICKER-SUFFIX — KOSDAQ 영구 조회실패(검색 "-") | `_kr_yf_ticker` .KS 하드코딩 → symbol_master KOSDAQ 코드셋 기반 .KQ 선택 + `_yf_dl_ticker` 우선주 "X PR C"→X-PC 변환. 240콜 스윕 잔여실패 9건 전부 야후측 데이터부재(상폐·rights) 확인 | 2026-07-14 | (이 커밋) |
 | BUG-ALERT-RAW-TICKER — 알림 제목이 raw 티커("^KS11 ▲1.29%") | `alert_runner._display_name()` 신설 — 발화 시 market_alias→symbol_master 이름 resolve, 폴백 코드. KR 숫자 티커도 종목명으로 표기 | 2026-07-14 | (이 커밋) |
 | BUG-BACKFILL-FX-CLIFF — 379780 합성백필 1964-05-04 ×255.77 절벽 | 뿌리=USD/KRW 시계열 시작(1964-05-04) 이전 `get_rate()` 1.0 폴백. fx_applied 백필을 FX 시작일부터 절단 + prod 379780 재백필 | 2026-07-14 | (이 커밋) |
 | 무결성 스캐너 005380 오탐 (휴장일 복제행) | KR 휴장일 vol=0 전일종가 복제행 쌍을 합성 점프로 오판 → `scan_code`에서 복제행 제거 후 판정. INDV는 스캐너 문제 아닌 피드 불량 2행(2022-11-23·25 close 3.13) prod DELETE | 2026-07-14 | (이 커밋) |

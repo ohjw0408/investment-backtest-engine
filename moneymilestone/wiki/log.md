@@ -1,5 +1,14 @@
 # Log
 
+## [2026-07-14] BUGFIX | yfinance 티커 매핑 — KOSDAQ .KQ + 우선주 PR 변환 (BUG-YF-TICKER-SUFFIX)
+
+검색 "-" 원인 조사 중 발견(콜드 코드 60개 스윕 → 3건 실패 분류). 뿌리 2개:
+- **KOSDAQ .KS 하드코딩**: `price_loader._kr_yf_ticker`가 전 KR 코드에 `.KS` — 야후가 `.KQ`로만 서빙하는 KOSDAQ(특히 2023~ 신규상장 475230·452450)은 영구 조회실패 = 검색 영구 "-". 수정 = symbol_master `market='KOSDAQ'` 코드셋(모듈 lazy 캐시) → `.KQ`, 그 외 `.KS`, 명시 suffix 보존.
+- **US 우선주 공백 티커**: `"GUT PR C"`가 yf에 그대로 던져져 TypeError. 수정 = `_yf_dl_ticker`에 `PR [A-Z]?` → `-P{letter}` 변환 + 잔여 공백 하이픈.
+- **오류율 스윕(시장별 콜드 40종목 × 6시장 = 240콜, 실패 30s 후 재시도로 일시/영구 분리)**: KOSDAQ 0%·KRX(KR ETF) 0%·US_ETF 0%·KOSPI 2.5%(1)·NASDAQ 7.5%(3)·NYSE 12.5%(5) — 전체 3.8%(9). **잔여 9건 전부 야후 자체에 데이터 없음 개별 확인**(404/empty): 상장폐지·사명변경 4(140910 에이리츠·BHAT·SKLZ·PKST) + 권리/SPAC 특수증권 5(CRAQR·TSI RT·BRW RT WI·WENC RT·CGCT). 즉 페치 경로 잔여 오류 0 — "-"가 남는 건 진짜 시세 없는 종목뿐.
+- 검증: 티커 매핑 회귀 13케이스 + `test_price_loader_spikes`·`test_priceloader_fx`·`test_missing_price` 6 passed + 475230(6,740원)·452450(3,085원)·GUT PR C($21.70) 실페치.
+- 후속 논의(오너): 검색 마스터에 rights/워런트류 특수증권 노출 필터 + 검색 가격 신선도 게이트(스켈레톤 UX).
+
 ## [2026-07-14] BUGFIX | 알림 제목 티커→종목명 + 무결성 스캔 3종목 판정·수정 (BUG-ALERT-RAW-TICKER / BUG-BACKFILL-FX-CLIFF)
 
 오너 보고 2건: ①알림이 "^KS11 ▲1.29%"처럼 raw 티커로 옴(KR 종목은 티커가 전부 숫자라 치명적) ②무결성 알림이 매일 옴 — 005380·379780·INDV 실제 검사 요청.

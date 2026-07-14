@@ -1,3 +1,4 @@
+import re
 import sqlite3
 import pandas as pd
 import numpy as np
@@ -32,12 +33,14 @@ CANDLE_INDEX_CODES = frozenset({'^GSPC', '^IXIC', '^KS11', '^NDX', '^DJI', '^N22
 
 
 def _yf_dl_ticker(code) -> str:
-    """yfinance 다운로드용 티커. US 클래스주(BRK.B→BRK-B)는 점→하이픈.
+    """yfinance 다운로드용 티커. US 클래스주(BRK.B→BRK-B)는 점→하이픈,
+       우선주("GUT PR C"→GUT-PC)는 PR 표기를 야후 -P 표기로 변환.
        KR .KS/.KQ·지수(^)·선물/환율(=)은 그대로."""
     c = str(code)
     if c.endswith(".KS") or c.endswith(".KQ") or c.startswith("^") or "=" in c:
         return c
-    return c.replace(".", "-") if "." in c else c
+    c = re.sub(r"\s+PR\s*([A-Z]?)$", lambda m: "-P" + m.group(1), c)
+    return c.replace(".", "-").replace(" ", "-")
 
 
 def _drop_isolated_price_spikes(df: pd.DataFrame, ratio_threshold: float = 4.0) -> pd.DataFrame:
@@ -119,6 +122,29 @@ def _load_kr_tickers() -> set:
         except Exception:
             pass
     return tickers
+
+
+_KOSDAQ_CODES = None
+
+
+def _kosdaq_codes() -> set:
+    """KOSDAQ 상장 코드(symbol_master) — yfinance 접미사 .KQ 선택용.
+    야후는 KOSDAQ 종목(특히 신규상장)을 .KQ로만 서빙하는 경우가 있어 .KS 하드코딩이
+    영구 조회실패를 만들었다(2026-07-14, 475230·452450). 로드 실패 시 빈 set(.KS 폴백)."""
+    global _KOSDAQ_CODES
+    if _KOSDAQ_CODES is None:
+        codes = set()
+        sym_db = META_DIR / "symbol_master.db"
+        if sym_db.exists():
+            try:
+                with sqlite3.connect(str(sym_db)) as conn:
+                    rows = conn.execute(
+                        "SELECT code FROM symbols WHERE market='KOSDAQ'").fetchall()
+                codes = {str(r[0]).upper() for r in rows if r and r[0]}
+            except Exception:
+                pass
+        _KOSDAQ_CODES = codes
+    return _KOSDAQ_CODES
 
 
 def _looks_like_krx_code(code: str) -> bool:
@@ -398,7 +424,11 @@ class PriceLoader:
         return code in self._kr_tickers or _looks_like_krx_code(code)
 
     def _kr_yf_ticker(self, code: str) -> str:
-        return f"{str(code).split('.')[0].upper()}.KS"
+        c = str(code).upper()
+        if c.endswith(".KS") or c.endswith(".KQ"):
+            return c
+        base = c.split(".")[0]
+        return f"{base}.KQ" if base in _kosdaq_codes() else f"{base}.KS"
 
     def is_us_asset(self, code: str) -> bool:
         code = str(code).upper()

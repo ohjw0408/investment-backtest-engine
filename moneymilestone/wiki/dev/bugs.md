@@ -245,3 +245,12 @@ tags: [dev, bug]
 | 버그 | 원인 | 수정 | 커밋 | 상태 |
 |---|---|---|---|---|
 | 모바일 전체화면에서 ① 스크롤 뚝뚝 끊김 ② 점만 찍히고 가격 안 보임 | 한 손가락 제스처가 팬(`pan.enabled=full`)에 잡혀 매 프레임 재그림→끊김. 동시에 `tooltip.enabled=!(full&&touch)`로 터치 전체화면서 툴팁 OFF→가격 미표시 | 터치 전체화면 = 한 손가락 드래그를 **가격 스크럽(툴팁)**으로. `tooltip.enabled=true`(항상), `pan.enabled=full && !touch`(팬은 데스크톱 전체화면만), 핀치줌 유지. 안내문구 "좌우 이동"→"가격 보기" | 이번 커밋 | ✅ Playwright(Pixel7 터치 에뮬) 8 PASS: 툴팁 발화·가격 115.26 표시·팬 off·핀치 on·라이트/다크·jsErr 0 |
+
+## 2026-07-18 세션 (Claude) — 정밀비교 대가 10+ 타임아웃·조용한 제외·BRK/B
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| 정밀비교 대가 10명+ 선택 시 "산출 실패"(비교 자체 불가) | 요청 경로에서 티커별 야후 갭필이 직렬 실행(66티커×122콜=56s/총 63s) — 상장일이 `_LOAD_START`(2000)보다 늦은 종목은 prefix 페치가 0행이라 db_min 불변→**매 요청 재페치**(가드 없음), nginx `proxy_read_timeout 30s` 초과 | ① `get_price`에 `skip_gapfill` 신설 — rr/비교 경로는 DB-only(빈 코드만 콜드 전체페치), 신선도는 beat 워밍업 담당 ② prefix 페치에도 트레일링과 같은 하루 1회 가드(`_gapfill_hist_day`, 결과 불변) | 이번 커밋 | ✅ 63s→8.9s(콜드)/4.8s(웜), 대가 10/10 표시 |
+| 티커 1개만 로드 실패해도 포폴 **통째 무경고 제외**(대가 10명 중 2명 증발) | `compute_comparison`/`compute_risk_return`의 `all(c in series)` 필터 | `_apply_missing_tickers` — 결측 종목만 빼고 잔여를 원 투자비중 합으로 재정규화해 유지, `partial_portfolios`로 프런트에 "X: STKL 제외 후 잔여 비중으로 계산" 표기 | 이번 커밋 | ✅ Playwright 라이트/다크: 표기 렌더·재정규화 산술 일치(SPY100%와 동일 지표)·jsErr 0. test_risk_return 7 PASS(명세 갱신) |
+| `BRK/B` 가격 로드 실패(13F CUSIP→티커가 SEC 슬래시 표기) | `_yf_dl_ticker`가 점(BRK.B)·PR만 변환, 슬래시 미처리 → 야후 404 | 슬래시→하이픈 추가(`BRK/B`→`BRK-B`), DB code 표기는 그대로 | 이번 커밋 | ✅ 콜드 전체이력 페치 확인 |
+| (미수정·데이터 한계) `STKL` 야후 상폐로 이력 없음 | 야후측 부재 | 위 partial 표기로 표면화만 | — | 인지 |

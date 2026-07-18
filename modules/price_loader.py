@@ -33,14 +33,14 @@ CANDLE_INDEX_CODES = frozenset({'^GSPC', '^IXIC', '^KS11', '^NDX', '^DJI', '^N22
 
 
 def _yf_dl_ticker(code) -> str:
-    """yfinance 다운로드용 티커. US 클래스주(BRK.B→BRK-B)는 점→하이픈,
+    """yfinance 다운로드용 티커. US 클래스주(BRK.B/BRK/B→BRK-B)는 점·슬래시→하이픈,
        우선주("GUT PR C"→GUT-PC)는 PR 표기를 야후 -P 표기로 변환.
        KR .KS/.KQ·지수(^)·선물/환율(=)은 그대로."""
     c = str(code)
     if c.endswith(".KS") or c.endswith(".KQ") or c.startswith("^") or "=" in c:
         return c
     c = re.sub(r"\s+PR\s*([A-Z]?)$", lambda m: "-P" + m.group(1), c)
-    return c.replace(".", "-").replace(" ", "-")
+    return c.replace(".", "-").replace(" ", "-").replace("/", "-")
 
 
 def _drop_isolated_price_spikes(df: pd.DataFrame, ratio_threshold: float = 4.0) -> pd.DataFrame:
@@ -631,20 +631,24 @@ class PriceLoader:
     # 핵심 함수
     # -------------------------------------------------
 
-    def get_price(self, code, start_date, end_date, apply_fx: bool = True, allow_synthetic: bool = False):
+    def get_price(self, code, start_date, end_date, apply_fx: bool = True, allow_synthetic: bool = False,
+                  skip_gapfill: bool = False):
         """
         가격 데이터 반환
         - 한국 ETF (6자리): .KS 붙여서 다운로드 + 자동 백필링
         - 미국 ETF: 자동 백필링
         - 미국 자산: USD/KRW 환율 적용 (apply_fx=True)
         - 캐시: 동일 코드+기간 두 번째 호출부터 즉시 반환
+        - skip_gapfill=True: DB에 데이터가 있으면 yfinance 갭필(과거·최신 보충)을 건너뜀.
+          다종목 인터랙티브 경로(비교탭 등)용 — 직렬 네트워크 페치로 30s 타임아웃 방지.
+          DB가 아예 빈 코드(신규)는 그대로 전체 페치.
         """
         code = str(code).split(".")[0].upper()
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date   = datetime.strptime(end_date,   "%Y-%m-%d").date()
 
         # ── 캐시 체크 ────────────────────────────────────────
-        cache_key = f"{code}_{start_date}_{end_date}_{apply_fx}_{allow_synthetic}"
+        cache_key = f"{code}_{start_date}_{end_date}_{apply_fx}_{allow_synthetic}_{skip_gapfill}"
         if cache_key in self._price_cache:
             return self._price_cache[cache_key]
 
@@ -679,9 +683,20 @@ class PriceLoader:
         else:
             db_min = datetime.strptime(db_min, "%Y-%m-%d").date()
             db_max = datetime.strptime(db_max, "%Y-%m-%d").date()
-            if start_date < db_min:
-                api_calls.append((start_date, db_min - timedelta(days=1)))
-            if end_date > db_max:
+            if skip_gapfill:
+                pass   # DB에 데이터 있음 → 갭필 생략 (docstring 참고)
+            elif start_date < db_min:
+                # 과거(prefix) 보충도 코드별 같은 날 1회로 제한 — 상장일이 start보다 늦은
+                # 종목은 야후가 0행을 돌려줘 db_min이 영영 안 내려가고, 가드 없으면 매 호출
+                # 재페치(대가 비교 = 요청당 수십 회 직렬 네트워크). 첫 시도가 실데이터를
+                # 가져오면 db_min이 갱신되므로 같은 날 재시도는 어느 쪽이든 결과 불변.
+                if not hasattr(self, "_gapfill_hist_day"):
+                    self._gapfill_hist_day = {}
+                hist_key = (code, start_date)
+                if self._gapfill_hist_day.get(hist_key) != end_date:
+                    self._gapfill_hist_day[hist_key] = end_date
+                    api_calls.append((start_date, db_min - timedelta(days=1)))
+            if not skip_gapfill and end_date > db_max:
                 # P2-3: 트레일링(최신분) gap-fill을 코드별 같은 날 1회로 제한.
                 # DB 최종일이 직전영업일까지면 매 호출 yfinance fetch가 0행 반환(낭비) — 위젯·시세
                 # 콜드경로서 누적. 같은 end_date를 오늘 이미 시도했으면 스킵(첫 시도가 0행이어도 DB

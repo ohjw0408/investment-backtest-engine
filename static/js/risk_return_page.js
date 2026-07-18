@@ -508,9 +508,13 @@ function rrRenderTable(data){
     host.innerHTML = html;
   }
 
+  const partialNote = (data.partial_portfolios || [])
+    .map(p => `${p.name}: ${p.missing.join(', ')} ${p.dropped ? '(전 종목 데이터 없음 — 제외)' : '제외 후 잔여 비중으로 계산'}`)
+    .join(' · ');
   document.getElementById('rrPeriod').textContent = data.period
     ? `비교 기간: ${data.period.start} ~ ${data.period.end} (${data.period.years}년, 전 종목 공통 겹침 구간)`
       + (data.skipped?.length ? ` · 데이터 없음 제외: ${data.skipped.join(', ')}` : '')
+      + (partialNote ? ` · ⚠ ${partialNote}` : '')
     : '';
   document.getElementById('rrWarn').innerHTML = data.period?.warning ? `<div class="rr-warn">⚠ ${esc(data.period.warning)}</div>` : '';
 }

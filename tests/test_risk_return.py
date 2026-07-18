@@ -113,15 +113,19 @@ def test_common_period_and_warning():
     assert abs(_point(res, "긴것")["cagr"] - _point(res, "SHORT")["cagr"]) < 1e-6
 
 
-# ── 6. 데이터 없는 종목: skipped + 의존 포트폴리오 제외 ─────────
+# ── 6. 데이터 없는 종목: skipped + 결측 종목만 빼고 잔여 재정규화 유지 ─────────
 def test_missing_code_skipped():
     loader = FakeLoader({"AAA": _frame("2020-01-01", 505, daily_ret=0.001)})
     res = compute_risk_return(
-        [_pf("정상", ("AAA", 100)), _pf("깨짐", ("AAA", 50), ("NOPE", 50))],
+        [_pf("정상", ("AAA", 100)), _pf("부분", ("AAA", 50), ("NOPE", 50))],
         [{"code": "GONE", "name": "GONE"}], loader, data_end="2022-12-31")
     assert sorted(res["skipped"]) == ["GONE", "NOPE"]
     names = [p["name"] for p in res["points"]]
-    assert "정상" in names and "깨짐" not in names and "GONE" not in names
+    # 2026-07-18: 통째 무경고 제외 → 결측 종목 제외 + 잔여 재정규화 유지로 변경
+    assert "정상" in names and "부분" in names and "GONE" not in names
+    # 부분 = AAA 50%가 100%로 재정규화 → 정상(AAA 100%)과 동일 지표
+    assert abs(_point(res, "정상")["cagr"] - _point(res, "부분")["cagr"]) < 1e-9
+    assert res["partial_portfolios"] == [{"name": "부분", "missing": ["NOPE"], "dropped": False}]
 
 
 # ── 7. 변동성·샤프: 교대 수익률 손계산 ─────────────────────────

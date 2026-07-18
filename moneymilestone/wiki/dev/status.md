@@ -617,3 +617,9 @@ tags: [dev]
 - 백엔드는 이미 지수형 거시코드를 벤치마크(`_load_macro_series`·`_macro_deep`)와 겹쳐보기(`/api/macro/multi`)에서 지원했으나, 프런트 검색이 **이름만 매칭**이라 "부동산"으로는 아무것도 안 나왔다(이름들이 "서울 아파트"·"전국 주택종합" 형태).
 - `risk_return_page.js` 벤치마크 검색·겹쳐보기 검색 둘 다 **카테고리명 매칭 추가**("부동산"→한국 33종+미 Case-Shiller 전부) + 캡 6/8→40(드롭다운은 이미 스크롤). 플레이스홀더에 "부동산" 예시 추가.
 - 검증: Playwright 9 PASS — 벤치 후보 33종(KR), 검색 34개 노출, 서울 아파트 칩→비교 실행→산점도·레이더 렌더, 겹쳐보기 검색 44개·서울 아파트(실거래) 차트 로드, 라이트/다크, jsErr 0.
+
+## 2026-07-18 정밀비교 대가 10+ 수정 ✅
+
+- 타임아웃(63s→8.9s)·조용한 포폴 제외→재정규화+표기·BRK/B 슬래시 매핑. 상세=[[dev/bugs]]·[[../log]] 07-18.
+- 파일: `modules/price_loader.py`(skip_gapfill·prefix 가드·슬래시), `risk_return_logic.py`(_apply_missing_tickers·partial_portfolios), `static/js/risk_return_page.js`(부분결측 표기), `tests/test_risk_return.py`(명세 갱신).
+- 주의: rr/비교 탭 시세 신선도는 beat 워밍업(11:00 UTC) 의존으로 변경(요청 중 갭필 안 함). 다른 탭(백테·겹쳐보기)은 기존 그대로.

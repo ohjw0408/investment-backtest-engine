@@ -60,12 +60,17 @@ def _load_macro_series(code, data_end):
 
 
 def _load_series(loader, code, data_end):
-    """code → (close, dividend) Series (date index). 실패 시 None."""
+    """code → (close, dividend) Series (date index). 실패 시 None.
+    skip_gapfill: 다종목 직렬 야후 갭필로 30s 타임아웃 나던 것 차단(신선도는 beat 워밍업 담당).
+    구식 시그니처 로더(테스트 더블 등)는 kwarg 없이 재시도."""
     macro = _load_macro_series(code, data_end)
     if macro is not None:
         return macro
     try:
-        df = loader.get_price(code, _LOAD_START, data_end)
+        try:
+            df = loader.get_price(code, _LOAD_START, data_end, skip_gapfill=True)
+        except TypeError:
+            df = loader.get_price(code, _LOAD_START, data_end)
         if df is None or len(df) == 0:
             return None
         df = df.copy()
@@ -450,13 +455,13 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
         else:
             series[code] = s
 
-    port_weights = [(n, w) for n, w in port_weights if all(c in series for c in w)]
+    port_weights, partial = _apply_missing_tickers(port_weights, series)
     bench_list   = [b for b in bench_list if b["code"] in series]
     used = ({c for _, w in port_weights for c in w}
             | {b["code"] for b in bench_list} | ({"SPY"} if "SPY" in series else set()))
     series = {c: s for c, s in series.items() if c in used}
     if not series:
-        return {"items": [], "period": None, "skipped": skipped}
+        return {"items": [], "period": None, "skipped": skipped, "partial_portfolios": partial}
 
     rets, closes = _total_return_matrix(series)
 
@@ -464,7 +469,7 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
     ends   = [closes[c].last_valid_index() for c in series]
     common_start, common_end = max(starts), min(ends)
     if common_start >= common_end:
-        return {"items": [], "period": None, "skipped": skipped,
+        return {"items": [], "period": None, "skipped": skipped, "partial_portfolios": partial,
                 "error": "공통 겹침 기간이 없습니다. 데이터 기간이 겹치지 않는 종목이 섞여 있어요."}
     rets_c = rets.loc[(rets.index > common_start) & (rets.index <= common_end)]
     spy_r = rets_c["SPY"] if "SPY" in rets_c.columns else None
@@ -514,7 +519,28 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
         "warning": (f"공통 기간이 {years}년으로 짧아요({MIN_YEARS_WARN:.0f}년 미만) — 지표 신뢰도가 낮을 수 있어요."
                     if years < MIN_YEARS_WARN else None),
     }
-    return {"items": items, "period": period, "skipped": skipped}
+    return {"items": items, "period": period, "skipped": skipped,
+            "partial_portfolios": partial}
+
+
+def _apply_missing_tickers(port_weights, series):
+    """로드 실패 종목이 있는 포폴을 통째 제외(구동작, 무경고) 대신 결측 종목만 빼고
+       잔여 비중을 원래 투자비중 합으로 재정규화해 유지. 전 종목 결측이면 제외.
+       반환 (kept, partial_info) — partial_info는 프런트 안내용."""
+    kept, partial = [], []
+    for n, w in port_weights:
+        loaded = {c: v for c, v in w.items() if c in series}
+        missing = sorted(set(w) - set(loaded))
+        if not loaded:
+            partial.append({"name": n, "missing": missing, "dropped": True})
+            continue
+        if missing:
+            orig, new = sum(w.values()), sum(loaded.values())
+            if new > 0:
+                loaded = {c: v * (orig / new) for c, v in loaded.items()}
+            partial.append({"name": n, "missing": missing, "dropped": False})
+        kept.append((n, loaded))
+    return kept, partial
 
 
 def _portfolio_weights(tickers):
@@ -568,13 +594,13 @@ def compute_risk_return(portfolios, benchmarks, loader, data_end=None):
         else:
             series[code] = s
 
-    # 데이터 없는 종목을 쓰는 포트폴리오/벤치마크는 제외(부분 데이터로 왜곡 방지).
-    port_weights = [(n, w) for n, w in port_weights if all(c in series for c in w)]
+    # 데이터 없는 종목 = 그 종목만 빼고 잔여 재정규화(통째 무경고 제외는 2026-07-18 폐기).
+    port_weights, partial = _apply_missing_tickers(port_weights, series)
     bench_list = [b for b in bench_list if b["code"] in series]
     used = {c for _, w in port_weights for c in w} | {b["code"] for b in bench_list}
     series = {c: s for c, s in series.items() if c in used}
     if not series:
-        return {"points": [], "period": None, "skipped": skipped}
+        return {"points": [], "period": None, "skipped": skipped, "partial_portfolios": partial}
 
     rets, closes = _total_return_matrix(series)
 
@@ -583,7 +609,7 @@ def compute_risk_return(portfolios, benchmarks, loader, data_end=None):
     ends   = [closes[c].last_valid_index() for c in series]
     common_start, common_end = max(starts), min(ends)
     if common_start >= common_end:
-        return {"points": [], "period": None, "skipped": skipped,
+        return {"points": [], "period": None, "skipped": skipped, "partial_portfolios": partial,
                 "error": "공통 겹침 기간이 없습니다. 데이터 기간이 겹치지 않는 종목이 섞여 있어요."}
     rets = rets.loc[(rets.index > common_start) & (rets.index <= common_end)]
 
@@ -606,4 +632,5 @@ def compute_risk_return(portfolios, benchmarks, loader, data_end=None):
         "warning": (f"공통 기간이 {years}년으로 짧아요({MIN_YEARS_WARN:.0f}년 미만) — 지표 신뢰도가 낮을 수 있어요."
                     if years < MIN_YEARS_WARN else None),
     }
-    return {"points": points, "period": period, "skipped": skipped}
+    return {"points": points, "period": period, "skipped": skipped,
+            "partial_portfolios": partial}

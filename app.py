@@ -3296,6 +3296,20 @@ def api_portfolio_index_series():
         for i, p in enumerate(ports[:20]):
             if not isinstance(p, dict):
                 continue
+            # 대가(guru 슬러그) = 사전계산 시점별 NAV 곡선(배당 재투자 내장 → TR 기준일 때만).
+            # NAV 없거나 가격 기준 요청이면 기존 현재비중 혼합으로 폴백.
+            if p.get('guru') and total_return:
+                try:
+                    from modules.gurus import nav as guru_nav
+                    npts = guru_nav.load_nav(str(p['guru']).strip())
+                except Exception:
+                    npts = []
+                if len(npts) >= 2:
+                    out.append({'key': f'EX:{i}', 'label': str(p.get('name') or '포트폴리오'),
+                                'unit': '총수익 지수(시작=100)', 'basis': 'tr',
+                                'point_in_time': True,
+                                'points': [[d, v, 0] for d, v in npts]})
+                    continue
             tickers = [t for t in (p.get('tickers') or []) if isinstance(t, dict) and t.get('code')]
             if not tickers:
                 continue
@@ -3351,7 +3365,10 @@ def portfolio_compare():
                 continue
             tickers = [t for t in (p.get('tickers') or []) if isinstance(t, dict) and t.get('code')]
             if tickers:
-                selected.append({'name': str(p.get('name') or '내 포트폴리오'), 'tickers': tickers})
+                entry = {'name': str(p.get('name') or '내 포트폴리오'), 'tickers': tickers}
+                if p.get('guru'):
+                    entry['guru'] = str(p['guru']).strip()[:40]   # 시점별 NAV 사용 힌트
+                selected.append(entry)
     else:
         if not session.get('user_id'):
             return jsonify({'error': '로그인 필요'}), 401

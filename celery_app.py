@@ -90,6 +90,11 @@ celery.conf.beat_schedule = {
         'task': 'tasks.warmup_history',
         'schedule': crontab(hour=11, minute=0),
     },
+    # 대가 시점별 NAV 곡선 재빌드 — 매일 11:30 UTC(워밍업 후). 비교/겹쳐보기 대가 곡선 소스.
+    'refresh-guru-nav': {
+        'task': 'tasks.refresh_guru_nav',
+        'schedule': crontab(hour=11, minute=30),
+    },
     # 데이터 무결성 상시 스캔(B-2②) — 매일 10:30 UTC(스파이크 클린업 후, 워밍업 전).
     # NULL홀 self-heal + 핵심 시계열 신선도 + 합성 손상 스캔. 이상 시 오너 알림+Sentry.
     'data-integrity-scan': {

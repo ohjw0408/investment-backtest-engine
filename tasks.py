@@ -472,6 +472,31 @@ def warmup_history():
 
 
 @celery.task
+def refresh_guru_nav():
+    """대가 시점별 NAV 곡선 전체 재빌드 (Celery Beat, 워밍업 후 매일).
+
+    과거 분기 보유 종목 가격을 ensure_full_history로 자체 워밍업한 뒤
+    guru_nav 테이블을 통째 재계산(idempotent). 비교/겹쳐보기의 대가 곡선 소스.
+    """
+    try:
+        from modules.price_loader import PriceLoader
+        from modules.gurus import nav as guru_nav
+        pl = PriceLoader()
+
+        def _warm(code):
+            pl.ensure_full_history(code)
+
+        out = guru_nav.rebuild_all(warm=_warm)
+        total = sum(out.values())
+        print(f"[refresh_guru_nav] {len(out)}명, 총 {total}행: "
+              + ", ".join(f"{k}={v}" for k, v in out.items()))
+        return {"status": "ok", "gurus": len(out), "rows": total}
+    except Exception as e:
+        print(f"[refresh_guru_nav] 오류: {e}")
+        raise
+
+
+@celery.task
 def purge_price_spikes():
     """매일 실행(Celery Beat) — price_daily의 고립 스파이크(yfinance 오틱) 행을 영구 제거.
 

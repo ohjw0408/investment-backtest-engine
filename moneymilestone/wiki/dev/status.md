@@ -623,3 +623,9 @@ tags: [dev]
 - 타임아웃(63s→8.9s)·조용한 포폴 제외→재정규화+표기·BRK/B 슬래시 매핑. 상세=[[dev/bugs]]·[[../log]] 07-18.
 - 파일: `modules/price_loader.py`(skip_gapfill·prefix 가드·슬래시), `risk_return_logic.py`(_apply_missing_tickers·partial_portfolios), `static/js/risk_return_page.js`(부분결측 표기), `tests/test_risk_return.py`(명세 갱신).
 - 주의: rr/비교 탭 시세 신선도는 beat 워밍업(11:00 UTC) 의존으로 변경(요청 중 갭필 안 함). 다른 탭(백테·겹쳐보기)은 기존 그대로.
+
+## 2026-07-18 대가 시점별 NAV 사전계산 ✅
+
+- 13F 전체 이력(2013H2+) seed + 공시일 리밸런싱 일간 NAV(guru_nav, beat 11:30 UTC) + 비교/겹쳐보기 `guru` 슬러그 서빙. 상세=[[../log]] 07-18 둘째 절.
+- 파일: `modules/gurus/{edgar,nav,store}.py`, `scripts/build_guru_db.py`, `tasks.py`, `celery_app.py`, `risk_return_logic.py`, `app.py`(index_series·compare), `static/js/{examples,risk_return_page}.js`, `tests/test_guru_nav.py`.
+- 사전계산 주기 결정(오너 질의 답): 곡선=매일(beat)·비중=분기(13F가 분기 공시라 상한).

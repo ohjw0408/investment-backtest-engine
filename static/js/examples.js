@@ -87,7 +87,10 @@
       return;
     }
     if (list.length >= MAX_CMP) { toast('비교는 최대 ' + MAX_CMP + '개까지예요.', 'err'); return; }
-    list.push({ slug: card.dataset.slug, name: card.dataset.name, tickers: readTickers(card) });
+    var entry = { slug: card.dataset.slug, name: card.dataset.name, tickers: readTickers(card) };
+    // 투자대가 카드 = 시점별(분기 13F) NAV 곡선으로 비교(백엔드 힌트)
+    if (card.dataset.type === 'guru') entry.guru = card.dataset.slug.replace(/^guru-/, '');
+    list.push(entry);
     writeCmp(list);
     setCmpBtn(btn, true);
     syncCmpBtns();

@@ -51,14 +51,16 @@ def list_gurus(top=4):
         return []
     con = _conn()
     gurus = con.execute(
-        "SELECT g.*, f.filed FROM gurus g LEFT JOIN filings f ON g.cik=f.cik "
+        "SELECT g.*, f.filed FROM gurus g "
+        "LEFT JOIN filings f ON g.cik=f.cik AND f.period=g.latest_period "
         "WHERE g.stale=0 ORDER BY g.stance"
     ).fetchall()
     out = []
     for g in gurus:
         tops = con.execute(
             "SELECT ticker, name, weight FROM holdings "
-            "WHERE cik=? AND covered=1 ORDER BY rank LIMIT ?", (g["cik"], top)
+            "WHERE cik=? AND period=? AND covered=1 ORDER BY rank LIMIT ?",
+            (g["cik"], g["latest_period"], top)
         ).fetchall()
         out.append({
             "slug": g["slug"], "name": g["name"], "name_ko": name_ko(g["slug"], g["name"]), "fund": g["fund"],
@@ -78,7 +80,8 @@ def get_guru(slug, limit=25):
         return None
     con = _conn()
     g = con.execute(
-        "SELECT g.*, f.filed, f.accession FROM gurus g LEFT JOIN filings f ON g.cik=f.cik "
+        "SELECT g.*, f.filed, f.accession FROM gurus g "
+        "LEFT JOIN filings f ON g.cik=f.cik AND f.period=g.latest_period "
         "WHERE g.slug=?", (slug,)
     ).fetchone()
     if not g:
@@ -86,7 +89,8 @@ def get_guru(slug, limit=25):
         return None
     rows = con.execute(
         "SELECT rank, ticker, name, shares, value, weight, covered "
-        "FROM holdings WHERE cik=? ORDER BY rank", (g["cik"],)
+        "FROM holdings WHERE cik=? AND period=? ORDER BY rank",
+        (g["cik"], g["latest_period"]),
     ).fetchall()
     con.close()
     covered = [r for r in rows if r["covered"]]

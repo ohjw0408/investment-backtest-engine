@@ -4781,3 +4781,15 @@ _작성: Claude_
 - 같은 날 별건: GSC "색인 미생성" 메일 = robots 의도차단(/alerts)+신규사이트 대기열, 조치 불요 판정. 서울 아파트 실거래지수 4월 최신 = 원천(부동산원) 공표 지연 정상.
 
 _작성: Claude_
+
+## 2026-07-18 — 대가 시점별(13F 분기) 성과 + NAV 사전계산 (오너 승인 기능)
+
+- 오너: "대가 비교가 현재 비중을 과거에 소급하는 건 부정확 — 분기별 13F로 계산하라. 사전계산 방식으로."
+- **데이터**: `edgar.get_13f_filings`(전체 이력, XML 시대 2013H2+, recent 1000건 초과 페이지네이션) + `fetch_holdings_merged`(정정공시 병합 — 재진술=교체·기밀누락분=합집합, 버핏 2023Q3/Q4 1행 사고 방지). `build_guru_db.py` 전 분기 재빌드: **공시 471건·보유 9,538행·1.4MB seed**(FIGI 캐시 공유). filings PK (cik,period), store.py는 latest_period 필터.
+- **NAV**: `modules/gurus/nav.py` — 분기 비중을 **공시일 종가 리밸런싱**으로 체인한 일간 TR 지수(대가당 1줄, 시작=100, 상위 10 재정규화). price_daily.db `guru_nav` 테이블. `tasks.refresh_guru_nav` beat 매일 11:30 UTC(워밍업 후, ensure_full_history 자체 워밍업).
+- **서빙**: compare/risk-return/index_series가 포폴 dict의 `guru` 슬러그 인식 → NAV 곡선으로 수익·심화지표(배당 표기는 현재 비중 유지), 없으면 기존 혼합 폴백. 공통기간 산정서 대가 개별 티커 제외 → **공통 1.96년 → 8.92년**(10명 전원). examples.js 담기·rr 빌더 패스스루(비중 수정 시 guru 해제), 표 배지 "대가 · 13F 분기 반영".
+- 검증: test_guru_nav 3 PASS(체인 검산·라운드트립·compare 경로) + 기존 12 PASS + Playwright 라이트/다크(배지·오버레이·jsErr 0). 로컬 NAV 재빌드 4.4s/10명.
+- 같은 날: nginx `location /` proxy_read_timeout 30s→**120s**(오너 지시, prod 반영·리로드 완료).
+- ⚠️ 잔여: prod 첫 NAV는 beat(내일 20:30 KST) 전까지 없음 → 배포 직후 수동 1회 실행 예정. 분기 자동 seed 갱신(P5)은 여전히 CI 키 미등록.
+
+_작성: Claude_

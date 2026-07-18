@@ -491,7 +491,7 @@ function rrRenderTable(data){
   if (window.matchMedia('(max-width:768px)').matches) {
     // 모바일 — 항목별 카드(가로스크롤 제거)
     host.innerHTML = rrItems.map((it,i) => {
-      const kind = it.kind === 'portfolio' ? '내 포트폴리오' : '벤치';
+      const kind = it.point_in_time ? '대가 · 13F 분기 반영' : (it.kind === 'portfolio' ? '내 포트폴리오' : '벤치');
       const rows = cols.map(c => `<div class="rr-mrow"><span class="l">${c[0]}</span><span class="v">${c[1](it)}</span></div>`).join('');
       return `<div class="rr-mcard"><div class="rr-mcard-head"><span class="rr-dot" style="background:${colorOf(i)}"></span>${esc(it.name)}<span class="rr-kind">${kind}</span></div><div class="rr-mgrid">${rows}</div></div>`;
     }).join('');
@@ -500,7 +500,7 @@ function rrRenderTable(data){
     let html = '<div class="rr-table-wrap"><table class="rr-table"><thead><tr><th>대상</th>'
       + cols.map(c => `<th title="${esc(c[2])}">${c[0]} <span style="opacity:0.5;font-weight:400;">ⓘ</span></th>`).join('') + '</tr></thead><tbody>';
     rrItems.forEach((it,i) => {
-      const kind = it.kind === 'portfolio' ? '내 포트폴리오' : '벤치';
+      const kind = it.point_in_time ? '대가 · 13F 분기 반영' : (it.kind === 'portfolio' ? '내 포트폴리오' : '벤치');
       html += `<tr><td><span class="rr-dot" style="background:${colorOf(i)}"></span>${esc(it.name)}<span class="rr-kind">${kind}</span></td>`
         + cols.map(c => `<td>${c[1](it)}</td>`).join('') + '</tr>';
     });
@@ -1227,7 +1227,11 @@ async function rrOvSearch(q){
 // ── 비로그인 포트폴리오 빌더 (저장 목록 대신, 결과는 로그인과 동일 렌더 재사용) ──
 let abPorts = [{ name: '포트폴리오 1', items: [] }];
 function rrBuildPortfolios(){
-  return abPorts.filter(p=>p.items.length).map(p=>({ name: p.name||'포트폴리오', tickers: p.items.map(x=>({code:x.code, weight:x.weight})) }));
+  return abPorts.filter(p=>p.items.length).map(p=>{
+    const o = { name: p.name||'포트폴리오', tickers: p.items.map(x=>({code:x.code, weight:x.weight})) };
+    if (p.guru) o.guru = p.guru;   // 대가 = 시점별 NAV 사용(비중/종목 수정 시 해제됨)
+    return o;
+  });
 }
 function abBindSearch(inp, dd, onPick){
   let t=null;
@@ -1264,11 +1268,11 @@ function rrRenderBuilder(){
     </div>`;
   }).join('');
   host.querySelectorAll('.ab-name').forEach(inp=>inp.oninput=()=>{ abPorts[+inp.dataset.p].name=inp.value; });
-  host.querySelectorAll('.ab-w').forEach(inp=>inp.onchange=()=>{ abPorts[+inp.dataset.p].items[+inp.dataset.i].weight=Math.max(0,+inp.value||0); rrRenderBuilder(); });
-  host.querySelectorAll('.ab-tdel').forEach(b=>b.onclick=()=>{ const p=abPorts[+b.dataset.p]; p.items.splice(+b.dataset.i,1); rrRenderBuilder(); });
+  host.querySelectorAll('.ab-w').forEach(inp=>inp.onchange=()=>{ const p=abPorts[+inp.dataset.p]; p.items[+inp.dataset.i].weight=Math.max(0,+inp.value||0); p.guru=null; rrRenderBuilder(); });
+  host.querySelectorAll('.ab-tdel').forEach(b=>b.onclick=()=>{ const p=abPorts[+b.dataset.p]; p.items.splice(+b.dataset.i,1); p.guru=null; rrRenderBuilder(); });
   host.querySelectorAll('.ab-pdel').forEach(b=>b.onclick=()=>{ abPorts.splice(+b.dataset.p,1); rrRenderBuilder(); });
   host.querySelectorAll('.ab-psearch').forEach(inp=>{ const dd=host.querySelector(`.ab-pdd[data-p="${inp.dataset.p}"]`);
-    abBindSearch(inp, dd, (code,name)=>{ const p=abPorts[+inp.dataset.p]; if(!p.items.find(x=>x.code===code)){ p.items.push({code,name,weight: p.items.length===0?100:0}); rrRenderBuilder(); } }); });
+    abBindSearch(inp, dd, (code,name)=>{ const p=abPorts[+inp.dataset.p]; if(!p.items.find(x=>x.code===code)){ p.items.push({code,name,weight: p.items.length===0?100:0}); p.guru=null; rrRenderBuilder(); } }); });
 }
 document.addEventListener('click', e=>{ if(!e.target.closest('#rrBuilder .rr-search-wrap')) document.querySelectorAll('#rrBuilder .rr-dropdown').forEach(d=>d.style.display='none'); });
 (function(){ const a=document.getElementById('rrAddPort'); if(a) a.addEventListener('click', ()=>{ abPorts.push({name:`포트폴리오 ${abPorts.length+1}`, items:[]}); rrRenderBuilder(); }); })();
@@ -1278,10 +1282,10 @@ function rrApplyPreload(){
   let pre=null; try{ pre=JSON.parse(sessionStorage.getItem('mm_rr_preload')||'null'); }catch(e){}
   if(!Array.isArray(pre)||!pre.length) return false;
   sessionStorage.removeItem('mm_rr_preload');
-  abPorts = pre.slice(0,20).map((p,i)=>({ name:p.name||`포트폴리오 ${i+1}`,
+  abPorts = pre.slice(0,20).map((p,i)=>({ name:p.name||`포트폴리오 ${i+1}`, guru:p.guru||null,
     items:(p.tickers||[]).filter(t=>t&&t.code).map(t=>({code:t.code,name:t.name||t.code,weight:+t.weight||0})) }));
   // 추세 겹쳐보기도 비교 대상 포폴 N개만 보이게(rrOvInit이 읽어 기본 클리어 후 주입)
-  window._rrExPreload = abPorts.filter(p=>p.items.length).map(p=>({ name:p.name, tickers:p.items }));
+  window._rrExPreload = abPorts.filter(p=>p.items.length).map(p=>({ name:p.name, tickers:p.items, guru:p.guru||undefined }));
   rrRenderBuilder();
   const note=document.getElementById('rrPreNote');
   if(note){ note.style.display='block';

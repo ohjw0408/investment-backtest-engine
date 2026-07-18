@@ -301,6 +301,45 @@ def _item_deep(tickers):
     return annual, rr
 
 
+def _load_guru_series(slug):
+    """대가 시점별 NAV 곡선(guru_nav, beat 사전계산) → (close, div=0, actual). 없으면 None.
+       분기별 13F 비중을 공시일 리밸런싱으로 이어붙인 TR 지수 — 배당은 이미 재투자돼 있음."""
+    try:
+        from modules.gurus import nav as guru_nav
+        pts = guru_nav.load_nav(slug)
+        if len(pts) < 20:
+            return None
+        idx = pd.to_datetime([p[0] for p in pts])
+        close = pd.Series([float(p[1]) for p in pts], index=idx).sort_index()
+        close = close[np.isfinite(close) & (close > 0)]
+        if len(close) < 20:
+            return None
+        div = pd.Series(0.0, index=close.index)
+        actual = pd.Series(True, index=close.index)
+        return close, div, actual
+    except Exception:
+        return None
+
+
+def _guru_deep(slug):
+    """대가 NAV pts → (annual, rolling_return). 자가산출 곡선이라 합성 손상 게이트 불필요."""
+    try:
+        from modules.gurus import nav as guru_nav
+        from modules import rolling
+        pts = [[d, v, 0] for d, v in guru_nav.load_nav(slug)]
+    except Exception:
+        return [], None
+    if len(pts) < 13:
+        return [], None
+    annual = _annual_from_points(pts, actual_only=False)
+    rr = {
+        "horizons": rolling.DEFAULT_HORIZONS,
+        "horizon_table": {str(h): v for h, v in rolling.horizon_table(pts, actual_only=False).items()},
+        "syn_overall": 0.0,
+    }
+    return annual, rr
+
+
 def _is_macro(code):
     """벤치마크 코드가 거시지표(macro_observations)인지."""
     try:
@@ -428,11 +467,13 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
     """
     data_end = data_end or pd.Timestamp.today().strftime("%Y-%m-%d")
 
+    # (name, weights, guru_slug|None). guru = 사전계산 NAV(시점별 13F)로 수익 곡선 대체.
     port_weights = []
     for p in portfolios:
         weights = _portfolio_weights(p.get("tickers") or [])
         if weights:
-            port_weights.append((p.get("name") or "포트폴리오", weights))
+            port_weights.append((p.get("name") or "포트폴리오", weights,
+                                 (str(p["guru"]).strip() or None) if p.get("guru") else None))
 
     bench_list, seen = [], set()
     for b in benchmarks:
@@ -441,9 +482,17 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
             seen.add(code)
             bench_list.append({"code": code, "name": b.get("name") or code})
 
-    needed = ({c for _, w in port_weights for c in w}
+    # 대가 NAV 로드(있는 것만) — 있으면 그 포폴 수익은 NAV, 티커는 배당 표시용으로만.
+    guru_nav_series = {}
+    for _, _, gslug in port_weights:
+        if gslug and gslug not in guru_nav_series:
+            s = _load_guru_series(gslug)
+            if s is not None:
+                guru_nav_series[gslug] = s
+
+    needed = ({c for _, w, g in port_weights for c in w}
               | {b["code"] for b in bench_list} | {"SPY"})   # SPY = 베타 기준
-    if not needed:
+    if not needed and not guru_nav_series:
         return {"items": [], "period": None, "skipped": []}
 
     series, skipped = {}, []
@@ -455,18 +504,42 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
         else:
             series[code] = s
 
-    port_weights, partial = _apply_missing_tickers(port_weights, series)
+    kept, partial = _apply_missing_tickers([(n, w) for n, w, _ in port_weights], series)
+    # kept는 입력 순서를 보존한 부분수열 — 위치 걷기로 guru 슬러그 재부착
+    merged, ki = [], 0
+    for n, w, g in port_weights:
+        if ki < len(kept) and kept[ki][0] == n:
+            merged.append((kept[ki][0], kept[ki][1], g if g in guru_nav_series else None))
+            ki += 1
+    port_weights = merged
     bench_list   = [b for b in bench_list if b["code"] in series]
-    used = ({c for _, w in port_weights for c in w}
+    used = ({c for _, w, g in port_weights for c in w}
             | {b["code"] for b in bench_list} | ({"SPY"} if "SPY" in series else set()))
     series = {c: s for c, s in series.items() if c in used}
-    if not series:
+    if not series and not guru_nav_series:
         return {"items": [], "period": None, "skipped": skipped, "partial_portfolios": partial}
 
-    rets, closes = _total_return_matrix(series)
+    # 공통 겹침 기간 산정 대상: 벤치·SPY·비(非)대가 포폴 티커·대가 NAV 곡선.
+    # 대가 포폴의 개별 티커는 배당 표시용으로만 로드 — 최근 상장 보유주 하나가
+    # 전체 비교 기간을 깎아먹던 문제(2024 IPO → 공통 1.96년)를 NAV 사용으로 해소.
+    guru_only = set()
+    for _, w, g in port_weights:
+        if g:
+            guru_only |= set(w)
+    for _, w, g in port_weights:
+        if not g:
+            guru_only -= set(w)
+    matrix_series = dict(series)
+    for gslug, s in guru_nav_series.items():
+        if any(g == gslug for _, _, g in port_weights):
+            matrix_series[f"GURU:{gslug}"] = s
 
-    starts = [closes[c].first_valid_index() for c in series]
-    ends   = [closes[c].last_valid_index() for c in series]
+    rets, closes = _total_return_matrix(matrix_series)
+
+    window_cols = [c for c in matrix_series
+                   if c.startswith("GURU:") or c not in guru_only]
+    starts = [closes[c].first_valid_index() for c in window_cols]
+    ends   = [closes[c].last_valid_index() for c in window_cols]
     common_start, common_end = max(starts), min(ends)
     if common_start >= common_end:
         return {"items": [], "period": None, "skipped": skipped, "partial_portfolios": partial,
@@ -487,7 +560,20 @@ def compute_comparison(portfolios, benchmarks, loader, data_end=None):
         yld[code] = (d1 / last_px) if last_px > 0 else 0.0
 
     items = []
-    for name, weights in port_weights:
+    for name, weights, gslug in port_weights:
+        if gslug:
+            # 시점별 NAV 곡선 = 수익/위험/심화지표. 배당 표시는 현재 비중으로(NAV엔 배당 재투자 내장).
+            pr = rets_c[f"GURU:{gslug}"]
+            dy = sum(yld.get(c, 0.0) * w for c, w in weights.items())
+            m = _metrics_full(pr, spy_r, dy)
+            if m:
+                annual, rr = _guru_deep(gslug)
+                div_y = _annual_dividends(weights, series)
+                items.append({"kind": "portfolio", "name": name, **m,
+                              "annual": annual, "annual_div": div_y,
+                              "divgrowth": _dividend_growth(div_y), "rolling_return": rr,
+                              "point_in_time": True})
+            continue
         pr = sum(rets_c[c] * w for c, w in weights.items())
         dy = sum(yld.get(c, 0.0) * w for c, w in weights.items())
         m = _metrics_full(pr, spy_r, dy)
@@ -568,8 +654,15 @@ def compute_risk_return(portfolios, benchmarks, loader, data_end=None):
     """
     data_end = data_end or pd.Timestamp.today().strftime("%Y-%m-%d")
 
-    port_weights = []
+    # guru 슬러그 달린 포폴 = 사전계산 NAV 곡선 사용(티커 로드 불필요)
+    port_weights, guru_ports = [], []
     for p in portfolios:
+        gslug = (str(p["guru"]).strip() or None) if p.get("guru") else None
+        if gslug:
+            s = _load_guru_series(gslug)
+            if s is not None:
+                guru_ports.append((p.get("name") or "포트폴리오", gslug, s))
+                continue
         weights = _portfolio_weights(p.get("tickers") or [])
         if weights:
             port_weights.append((p.get("name") or "포트폴리오", weights))
@@ -583,7 +676,7 @@ def compute_risk_return(portfolios, benchmarks, loader, data_end=None):
             bench_list.append({"code": code, "name": b.get("name") or code})
 
     needed = {c for _, w in port_weights for c in w} | {b["code"] for b in bench_list}
-    if not needed:
+    if not needed and not guru_ports:
         return {"points": [], "period": None, "skipped": []}
 
     series, skipped = {}, []
@@ -599,6 +692,8 @@ def compute_risk_return(portfolios, benchmarks, loader, data_end=None):
     bench_list = [b for b in bench_list if b["code"] in series]
     used = {c for _, w in port_weights for c in w} | {b["code"] for b in bench_list}
     series = {c: s for c, s in series.items() if c in used}
+    for name, gslug, s in guru_ports:
+        series[f"GURU:{gslug}"] = s
     if not series:
         return {"points": [], "period": None, "skipped": skipped, "partial_portfolios": partial}
 
@@ -619,6 +714,10 @@ def compute_risk_return(portfolios, benchmarks, loader, data_end=None):
         m = _metrics(pr)
         if m:
             points.append({"kind": "portfolio", "name": name, **m})
+    for name, gslug, _s in guru_ports:
+        m = _metrics(rets[f"GURU:{gslug}"])
+        if m:
+            points.append({"kind": "portfolio", "name": name, **m, "point_in_time": True})
     for b in bench_list:
         m = _metrics(rets[b["code"]])
         if m:

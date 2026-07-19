@@ -18,11 +18,10 @@ import yfinance as yf
 
 DB = Path(__file__).resolve().parent.parent / "data" / "meta" / "index_master.db"
 
-# 캔들 가능한 시장지수 (yfinance OHLCV 존재)
-CODES = [
-    "^GSPC", "^IXIC", "^KS11", "^NDX", "^DJI", "^N225",
-    "GC=F", "SI=F", "CL=F", "NG=F", "HG=F", "KRW=X",
-]
+# 캔들 가능한 시장지수 — beat 트레일링 갱신과 동일한 단일 소스 사용
+# (리스트가 어긋나면 신규 지수는 트레일링 며칠치만 쌓이고 과거가 비는 사고 재발)
+from modules.price_loader import CANDLE_INDEX_CODES
+CODES = sorted(CANDLE_INDEX_CODES)
 
 
 def ensure_table(conn):
@@ -54,10 +53,16 @@ def backfill_one(conn, code):
     for _, r in raw.iterrows():
         d = r["Date"]
         ds = d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)[:10]
+        # NaN 종가는 sqlite NULL로 저장돼 위젯 "데이터 없음"을 만든다 (BUG-KOSPI-NIGHT-NULL)
+        if pd.isna(r["Close"]):
+            continue
         try:
+            _c = float(r["Close"])
             rows.append((code, ds,
-                         float(r["Open"]), float(r["High"]),
-                         float(r["Low"]), float(r["Close"]),
+                         float(r["Open"]) if pd.notna(r["Open"]) else _c,
+                         float(r["High"]) if pd.notna(r["High"]) else _c,
+                         float(r["Low"]) if pd.notna(r["Low"]) else _c,
+                         _c,
                          float(r["Volume"]) if pd.notna(r["Volume"]) else 0.0))
         except (ValueError, TypeError):
             continue

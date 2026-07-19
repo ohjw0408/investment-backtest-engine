@@ -454,8 +454,11 @@ class PriceLoader:
             raise RuntimeError("USD/KRW 환율 데이터가 없습니다.")
         df["date"] = pd.to_datetime(df["date"])
         series     = df.set_index("date")["close"]
-        full_idx   = pd.date_range(series.index.min(), series.index.max(), freq="D")
-        series     = series.reindex(full_idx).ffill()
+        # 첫 관측(1964-05-04, 255.77) 이전은 첫 환율로 플랫 백필: rate=1.0 폴백이
+        # 미국 자산 원화 환산에 ×255.77 절벽을 만들던 문제 방지 (2026-07-19 오너 결정).
+        start      = min(series.index.min(), pd.Timestamp("1900-01-01"))
+        full_idx   = pd.date_range(start, series.index.max(), freq="D")
+        series     = series.reindex(full_idx).ffill().bfill()
         self._usdkrw_cache = series
         return series
 

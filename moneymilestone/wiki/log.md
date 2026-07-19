@@ -1,5 +1,17 @@
 # Log
 
+## [2026-07-19] FEATURE | ETF 카테고리 검색 — 전 종목 분류 + 자연어 패싯 + 상세검색 탭
+
+오너 요청: "미국 단기채 etf" 검색 시 미국 상장 + 한국 상장 둘 다 나오게, NH증권 카테고리 검색 수준. 결정(오너 확정 3건): ①UI=기존 /search에 ETF 탭 확장 ②자연어+카테고리 UI 둘 다 ③US 전 종목 5,528 분류.
+
+- **분류 데이터**: `symbols` 테이블 8컬럼 신설 — asset_class(주식/채권/원자재/부동산/자산배분/통화/크립토/대체) · region(투자지역 14종) · bond_type(국채/회사채/하이일드/금리현금성 등 13종) · bond_dur(초단기~장기) · eq_style(배당/성장/가치/커버드콜 등) · eq_size · sector(24 슬러그) · cls_src(출처). KR 1,157 = 한글 이름규칙 + index_name 폴백(`modules/etf_classifier.py`). US 5,528 = yfinance info.category(모닝스타) → `_MS_MAP` 매핑 + 이름규칙 폴백(듀레이션·지역·스타일·섹터 보강). US 레버리지도 이름에서 산출(UltraPro Short=-3, UltraShort 단어=-2 ProShares 브랜드, "Ultra Short-Term Bond" 1배 오인 방지).
+- **수집 파이프라인**: `scripts/fetch_us_etf_categories.py` → `data/meta/us_etf_categories.csv`(git 추적, 재실행 시 ok/empty 스킵·err 재시도 = 재개형). ⚠️교훈: 3워커 병렬 12/s → yf 크럼 공유 401 대량("Invalid Crumb"/"unable to access this feature"). 순차 0.3s + 연속오류 백오프(20→300s)로 안정(~0.5/s, err률 <1%).
+- **자연어 검색**: `modules/etf_facets.py` — 별칭사전(ALIAS) + 토큰 그리디 접두어 분해("미국단기채" 붙여쓰기도 분해). "미국 단기채 etf" → region=US ∧ bond ∧ dur∈{short,ultrashort} → KR·US 상장 동시 히트, 통합검색 결과 최상단(잔여 토큰은 name LIKE AND). "미국채권"은 그리디가 "미국채"+"권" 오분해라 명시 별칭. `/api/search` 확장: `etf=1` 모드(패싯 파라미터 market/asset/region/bdur/btype/style/size/sector/lev/hedge, q 없이 브라우즈 가능), 카드 부제=한국어 패싯 문자열(`facet_subtitle`), 정렬=국내상장→1배→이름短.
+- **UI**: `/search` 모드 탭(통합검색|ETF 상세검색) + 패싯 패널 — 채권 선택 시 만기·채권종류 행, 주식 선택 시 스타일·섹터 행 노출(숨긴 그룹 선택 자동해제로 유령필터 방지), 레버리지·환헤지=단일선택, 필터 초기화. 기존 cats 칩·인기종목·최근검색은 통합 모드 전용.
+- **CI**: `resync-symbols.yml`에 수집(신규분만, continue-on-error)+분류 단계 편입, CSV도 커밋 대상.
+- 검증: `tests/test_etf_search.py` 24 PASS(파싱 9 + API 15) · `tests/test_etf_search_browser.js` Playwright 23/23(모드 전환·조건행·양시장 혼재·국내만·단일선택·초기화·페이지네이션·콘솔 0) · 라이트/다크/모바일(390px) 스샷 육안 · KR/US 대표 30종 스팟체크(JEPI covcall·SQQQ -3x·TIP tips·GLD global 등 오분류 6건 수정 확인).
+- 주의: US 분류 품질 상한 = yfinance category 커버리지(최종 5,153/5,528=93%, empty 366=야후에 진짜 없음). 미커버는 이름규칙 폴백. US issuer는 yfinance fundFamily로 백필 — 검색 랭킹(국내→1배→주요 운용사→이름短)에 사용, 안 하면 SGOV·BIL이 잡ETF에 밀림.
+
 ## [2026-07-14] BUGFIX | yfinance 티커 매핑 — KOSDAQ .KQ + 우선주 PR 변환 (BUG-YF-TICKER-SUFFIX)
 
 검색 "-" 원인 조사 중 발견(콜드 코드 60개 스윕 → 3건 실패 분류). 뿌리 2개:

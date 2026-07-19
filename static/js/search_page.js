@@ -98,6 +98,87 @@ function spClearInput() { input.value = ''; input.dispatchEvent(new Event('input
 
 function spCatsParam() { return [...spActive].join(','); }
 
+// ── ETF 상세검색 모드 ──
+let spMode = 'all';
+const ETF_GROUPS = ['market', 'asset', 'region', 'bdur', 'btype', 'style', 'size', 'sector'];
+const etfFacets = {
+  market: new Set(), asset: new Set(), region: new Set(), bdur: new Set(),
+  btype: new Set(), style: new Set(), size: new Set(), sector: new Set(),
+  lev: '', hedge: '',
+};
+
+function spSetMode(m) {
+  if (spMode === m) return;
+  spMode = m;
+  document.getElementById('spModeAll').classList.toggle('active', m === 'all');
+  document.getElementById('spModeEtf').classList.toggle('active', m === 'etf');
+  document.getElementById('spFacetPanel').style.display = m === 'etf' ? 'block' : 'none';
+  document.getElementById('spFilters').style.display = m === 'all' ? 'flex' : 'none';
+  input.placeholder = m === 'etf'
+    ? 'ETF 이름·자연어 검색 (예: 미국 단기채, 커버드콜)'
+    : '종목명, ETF, 티커 입력 (예: SPY, 삼성전자)';
+  spQuery = input.value.trim();
+  if (m === 'etf') {
+    defaultDiv.style.display = 'none';
+    spFetch(1);
+  } else if (spQuery) {
+    spFetch(1);
+  } else {
+    input.dispatchEvent(new Event('input'));   // 기본화면 복귀
+  }
+}
+
+function etfClearGroup(g) {
+  etfFacets[g].clear();
+  document.querySelectorAll(`.sp-chip[data-g="${g}"]`).forEach(c => c.classList.remove('active'));
+}
+
+function etfCondRows() {
+  const hasBond = etfFacets.asset.has('bond');
+  const hasEq   = etfFacets.asset.has('equity');
+  document.getElementById('spRowBondDur').style.display  = hasBond ? 'flex' : 'none';
+  document.getElementById('spRowBondType').style.display = hasBond ? 'flex' : 'none';
+  document.getElementById('spRowEqStyle').style.display  = hasEq ? 'flex' : 'none';
+  document.getElementById('spRowSector').style.display   = hasEq ? 'flex' : 'none';
+  // 숨긴 그룹의 잔류 선택 해제 — 안 보이는 필터가 결과를 죽이는 것 방지
+  if (!hasBond) { etfClearGroup('bdur'); etfClearGroup('btype'); }
+  if (!hasEq)   { etfClearGroup('style'); etfClearGroup('size'); etfClearGroup('sector'); }
+}
+
+function etfToggle(btn) {
+  const set = etfFacets[btn.dataset.g];
+  if (set.has(btn.dataset.v)) set.delete(btn.dataset.v); else set.add(btn.dataset.v);
+  btn.classList.toggle('active', set.has(btn.dataset.v));
+  etfCondRows();
+  spFetch(1);
+}
+
+function etfToggleSingle(btn) {   // lev·hedge = 그룹 내 단일 선택
+  const g = btn.dataset.g;
+  etfFacets[g] = etfFacets[g] === btn.dataset.v ? '' : btn.dataset.v;
+  document.querySelectorAll(`.sp-chip[data-g="${g}"]`)
+    .forEach(c => c.classList.toggle('active', etfFacets[g] === c.dataset.v));
+  spFetch(1);
+}
+
+function etfResetFacets() {
+  ETF_GROUPS.forEach(g => etfFacets[g].clear());
+  etfFacets.lev = ''; etfFacets.hedge = '';
+  document.querySelectorAll('#spFacetPanel .sp-chip').forEach(c => c.classList.remove('active'));
+  etfCondRows();
+  spFetch(1);
+}
+
+function etfParams() {
+  const p = [];
+  ETF_GROUPS.forEach(g => {
+    if (etfFacets[g].size) p.push(`${g}=${encodeURIComponent([...etfFacets[g]].join(','))}`);
+  });
+  if (etfFacets.lev) p.push('lev=' + etfFacets.lev);
+  if (etfFacets.hedge) p.push('hedge=' + etfFacets.hedge);
+  return p.join('&');
+}
+
 function spToggle(cat) {
   if (spActive.has(cat)) spActive.delete(cat); else spActive.add(cat);
   document.querySelectorAll('.sp-chip[data-cat]').forEach(c => c.classList.toggle('active', spActive.has(c.dataset.cat)));
@@ -112,15 +193,24 @@ function spResetFilter() {
 }
 
 // 서버사이드 페이지 조회(전체 결과·필터·페이지당 18)
+// ETF 모드는 검색어 없이도 브라우즈 가능(etf=1 + 패싯 파라미터)
 async function spFetch(page) {
-  if (!spQuery) return;
+  if (spMode !== 'etf' && !spQuery) return;
   spPage = page;
   const seq = ++spSeq;
   resultsDiv.innerHTML = '<div class="search-hint">검색 중...</div>';
   try {
-    const url = `/api/search?q=${encodeURIComponent(spQuery)}&page=${page}&per=${SP_PER_PAGE}&cats=${encodeURIComponent(spCatsParam())}`;
+    let url = `/api/search?q=${encodeURIComponent(spQuery)}&page=${page}&per=${SP_PER_PAGE}`;
+    if (spMode === 'etf') {
+      url += '&etf=1';
+      const fp = etfParams();
+      if (fp) url += '&' + fp;
+    } else {
+      url += `&cats=${encodeURIComponent(spCatsParam())}`;
+    }
     const r = await (await fetch(url)).json();
-    if (seq !== spSeq || input.value.trim() === '') return;   // stale/빈칸 폐기
+    if (seq !== spSeq) return;                                        // stale 폐기
+    if (spMode !== 'etf' && input.value.trim() === '') return;        // 빈칸 폐기(통합만)
     lastItems = r.items || []; spTotal = r.total || 0; spPage = r.page || page;
     renderResults();
   } catch (e) {
@@ -210,6 +300,11 @@ input.addEventListener('input', () => {
   spQuery = q;
   if (!q) {
     clearTimeout(timer); ++spSeq;   // 대기 타이머 취소 + in-flight 응답 무효화(도배 방지)
+    if (spMode === 'etf') {         // ETF 모드: 빈 검색어 = 패싯 브라우즈
+      resultsDiv.innerHTML = '';
+      timer = setTimeout(() => spFetch(1), 250);
+      return;
+    }
     resultsDiv.innerHTML = '';
     defaultDiv.style.display = 'block';
     document.getElementById('searchControls').style.display = 'none';

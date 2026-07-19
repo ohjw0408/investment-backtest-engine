@@ -28,6 +28,30 @@
 .sp-clear { background: none; border: none; cursor: pointer; color: var(--ds-muted); font-size: 1.2rem; line-height: 1; padding: 0 4px; display: none; }
 .sp-clear:hover { color: var(--ds-ink); }
 
+/* 검색 모드 탭 (통합 / ETF 상세) */
+.sp-modes { display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; }
+.sp-mode {
+  font-size: 0.86rem; font-weight: 700; padding: 9px 22px; border-radius: var(--r-pill);
+  border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body);
+  cursor: pointer; transition: all .12s;
+}
+[data-theme="dark"] .sp-mode { background: var(--ds-dark-el); }
+.sp-mode:hover { border-color: var(--brand); color: var(--brand-text); }
+.sp-mode.active { background: var(--brand); color: var(--on-brand); border-color: transparent; }
+
+/* ETF 상세검색 패싯 패널 */
+.sp-facets {
+  max-width: 900px; margin: 0 auto 22px; padding: 16px 18px; display: none;
+  background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-lg);
+}
+[data-theme="dark"] .sp-facets { background: var(--ds-dark-el); }
+.sp-facet-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 0; }
+.sp-facet-row + .sp-facet-row { border-top: 1px dashed var(--ds-hairline); }
+.sp-facet-lab { flex-shrink: 0; width: 74px; font-size: 0.76rem; font-weight: 800; color: var(--ds-muted); }
+.sp-facets .sp-chip { font-size: 0.76rem; padding: 5px 11px; }
+.sp-facet-actions { display: flex; justify-content: flex-end; padding-top: 10px; }
+@media (max-width: 520px) { .sp-facet-lab { width: 100%; } }
+
 /* 필터 칩 (다중선택) */
 .sp-filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; margin-bottom: 22px; }
 .sp-filter-label { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 700; color: var(--ds-muted); margin-right: 2px; }
@@ -102,11 +126,107 @@
 <div class="sp-page">
   {{ mm_hero('종목 검색', '국내·해외 주식, ETF, 크립토를 한 곳에서 찾아보세요') }}
 
+  <!-- 검색 모드: 통합 / ETF 상세 -->
+  <div class="sp-modes">
+    <button class="sp-mode active" id="spModeAll" onclick="spSetMode('all')">통합검색</button>
+    <button class="sp-mode" id="spModeEtf" onclick="spSetMode('etf')">ETF 상세검색</button>
+  </div>
+
   <div class="sp-searchwrap">
     <div class="sp-bar">
       <span class="sp-ico">{{ nicon('search') }}</span>
       <input type="text" id="searchInput" placeholder="종목명, ETF, 티커 입력 (예: SPY, 삼성전자)" autocomplete="off" autofocus>
       <button class="sp-clear" id="spClear" onclick="spClearInput()" title="지우기">✕</button>
+    </div>
+  </div>
+
+  <!-- ETF 상세검색 패싯 패널 -->
+  <div class="sp-facets" id="spFacetPanel">
+    <div class="sp-facet-row">
+      <span class="sp-facet-lab">상장시장</span>
+      <button class="sp-chip" data-g="market" data-v="KR" onclick="etfToggle(this)">국내 상장</button>
+      <button class="sp-chip" data-g="market" data-v="US" onclick="etfToggle(this)">미국 상장</button>
+    </div>
+    <div class="sp-facet-row">
+      <span class="sp-facet-lab">자산군</span>
+      <button class="sp-chip" data-g="asset" data-v="equity" onclick="etfToggle(this)">주식</button>
+      <button class="sp-chip" data-g="asset" data-v="bond" onclick="etfToggle(this)">채권</button>
+      <button class="sp-chip" data-g="asset" data-v="commodity" onclick="etfToggle(this)">원자재</button>
+      <button class="sp-chip" data-g="asset" data-v="real_estate" onclick="etfToggle(this)">부동산·리츠</button>
+      <button class="sp-chip" data-g="asset" data-v="multi_asset" onclick="etfToggle(this)">자산배분</button>
+      <button class="sp-chip" data-g="asset" data-v="currency" onclick="etfToggle(this)">통화</button>
+      <button class="sp-chip" data-g="asset" data-v="crypto" onclick="etfToggle(this)">크립토</button>
+    </div>
+    <div class="sp-facet-row">
+      <span class="sp-facet-lab">투자지역</span>
+      <button class="sp-chip" data-g="region" data-v="US" onclick="etfToggle(this)">미국</button>
+      <button class="sp-chip" data-g="region" data-v="KR" onclick="etfToggle(this)">한국</button>
+      <button class="sp-chip" data-g="region" data-v="global" onclick="etfToggle(this)">글로벌</button>
+      <button class="sp-chip" data-g="region" data-v="CN" onclick="etfToggle(this)">중국</button>
+      <button class="sp-chip" data-g="region" data-v="JP" onclick="etfToggle(this)">일본</button>
+      <button class="sp-chip" data-g="region" data-v="EU" onclick="etfToggle(this)">유럽</button>
+      <button class="sp-chip" data-g="region" data-v="IN" onclick="etfToggle(this)">인도</button>
+      <button class="sp-chip" data-g="region" data-v="em" onclick="etfToggle(this)">신흥국</button>
+      <button class="sp-chip" data-g="region" data-v="dm" onclick="etfToggle(this)">선진국</button>
+    </div>
+    <div class="sp-facet-row" id="spRowBondDur" style="display:none;">
+      <span class="sp-facet-lab">만기</span>
+      <button class="sp-chip" data-g="bdur" data-v="ultrashort" onclick="etfToggle(this)">초단기</button>
+      <button class="sp-chip" data-g="bdur" data-v="short" onclick="etfToggle(this)">단기</button>
+      <button class="sp-chip" data-g="bdur" data-v="mid" onclick="etfToggle(this)">중기</button>
+      <button class="sp-chip" data-g="bdur" data-v="long" onclick="etfToggle(this)">장기</button>
+    </div>
+    <div class="sp-facet-row" id="spRowBondType" style="display:none;">
+      <span class="sp-facet-lab">채권종류</span>
+      <button class="sp-chip" data-g="btype" data-v="treasury" onclick="etfToggle(this)">국채</button>
+      <button class="sp-chip" data-g="btype" data-v="corporate" onclick="etfToggle(this)">회사채</button>
+      <button class="sp-chip" data-g="btype" data-v="aggregate" onclick="etfToggle(this)">종합</button>
+      <button class="sp-chip" data-g="btype" data-v="highyield" onclick="etfToggle(this)">하이일드</button>
+      <button class="sp-chip" data-g="btype" data-v="money" onclick="etfToggle(this)">금리·현금성</button>
+      <button class="sp-chip" data-g="btype" data-v="tips" onclick="etfToggle(this)">물가연동</button>
+    </div>
+    <div class="sp-facet-row" id="spRowEqStyle" style="display:none;">
+      <span class="sp-facet-lab">스타일</span>
+      <button class="sp-chip" data-g="style" data-v="dividend" onclick="etfToggle(this)">배당</button>
+      <button class="sp-chip" data-g="style" data-v="growth" onclick="etfToggle(this)">성장</button>
+      <button class="sp-chip" data-g="style" data-v="value" onclick="etfToggle(this)">가치</button>
+      <button class="sp-chip" data-g="style" data-v="covcall" onclick="etfToggle(this)">커버드콜</button>
+      <button class="sp-chip" data-g="style" data-v="momentum" onclick="etfToggle(this)">모멘텀</button>
+      <button class="sp-chip" data-g="style" data-v="quality" onclick="etfToggle(this)">퀄리티</button>
+      <button class="sp-chip" data-g="style" data-v="lowvol" onclick="etfToggle(this)">저변동</button>
+      <button class="sp-chip" data-g="size" data-v="large" onclick="etfToggle(this)">대형</button>
+      <button class="sp-chip" data-g="size" data-v="mid" onclick="etfToggle(this)">중형</button>
+      <button class="sp-chip" data-g="size" data-v="small" onclick="etfToggle(this)">소형</button>
+    </div>
+    <div class="sp-facet-row" id="spRowSector" style="display:none;">
+      <span class="sp-facet-lab">섹터·테마</span>
+      <button class="sp-chip" data-g="sector" data-v="semi" onclick="etfToggle(this)">반도체</button>
+      <button class="sp-chip" data-g="sector" data-v="tech" onclick="etfToggle(this)">테크</button>
+      <button class="sp-chip" data-g="sector" data-v="ai" onclick="etfToggle(this)">AI</button>
+      <button class="sp-chip" data-g="sector" data-v="battery" onclick="etfToggle(this)">2차전지</button>
+      <button class="sp-chip" data-g="sector" data-v="bio" onclick="etfToggle(this)">바이오·헬스</button>
+      <button class="sp-chip" data-g="sector" data-v="finance" onclick="etfToggle(this)">금융</button>
+      <button class="sp-chip" data-g="sector" data-v="bank" onclick="etfToggle(this)">은행</button>
+      <button class="sp-chip" data-g="sector" data-v="energy" onclick="etfToggle(this)">에너지</button>
+      <button class="sp-chip" data-g="sector" data-v="defense" onclick="etfToggle(this)">방산·우주</button>
+      <button class="sp-chip" data-g="sector" data-v="nuclear" onclick="etfToggle(this)">원자력</button>
+      <button class="sp-chip" data-g="sector" data-v="green" onclick="etfToggle(this)">친환경</button>
+      <button class="sp-chip" data-g="sector" data-v="robot" onclick="etfToggle(this)">로봇</button>
+      <button class="sp-chip" data-g="sector" data-v="game" onclick="etfToggle(this)">게임</button>
+      <button class="sp-chip" data-g="sector" data-v="consumer" onclick="etfToggle(this)">소비재</button>
+      <button class="sp-chip" data-g="sector" data-v="utility" onclick="etfToggle(this)">유틸리티</button>
+    </div>
+    <div class="sp-facet-row">
+      <span class="sp-facet-lab">레버리지</span>
+      <button class="sp-chip" data-g="lev" data-v="plain" onclick="etfToggleSingle(this)">1배만</button>
+      <button class="sp-chip" data-g="lev" data-v="lev" onclick="etfToggleSingle(this)">레버리지</button>
+      <button class="sp-chip" data-g="lev" data-v="inv" onclick="etfToggleSingle(this)">인버스</button>
+      <span class="sp-facet-lab" style="width:auto;margin-left:14px;">환헤지</span>
+      <button class="sp-chip" data-g="hedge" data-v="hedge" onclick="etfToggleSingle(this)">헤지(H)</button>
+      <button class="sp-chip" data-g="hedge" data-v="unhedged" onclick="etfToggleSingle(this)">환노출</button>
+    </div>
+    <div class="sp-facet-actions">
+      <button class="sp-chip sp-chip-reset" onclick="etfResetFacets()">✕ 필터 초기화</button>
     </div>
   </div>
 

@@ -48,6 +48,8 @@ from modules.dividend_simulator import DividendSimulator
 from modules.rebalance.periodic import PeriodicRebalance
 from modules.market_quote_service import MarketQuoteService
 from modules.market_alias import search_market_aliases, is_index_point
+from modules.etf_facets import (parse_query as etf_parse_query,
+                                build_where as etf_build_where, facet_subtitle)
 
 import logging
 
@@ -623,6 +625,54 @@ def _search_badge_cat(badge):
     return ''
 
 
+_ETF_FACET_ARGS = {          # ETF 탭 쿼리파라미터 → 패싯 키
+    'market': '_market', 'asset': 'asset_class', 'region': 'region',
+    'btype': 'bond_type', 'bdur': 'bond_dur', 'style': 'eq_style',
+    'size': 'eq_size', 'sector': 'sector',
+}
+
+
+_MAJOR_US_FAMILIES = (
+    "iShares", "Vanguard", "State Street Investment Management",
+    "SPDR State Street Global Advisors", "Schwab ETFs", "Invesco",
+    "JPMorgan", "Fidelity Investments", "First Trust", "Global X Funds",
+    "VanEck", "WisdomTree", "ProShares", "Direxion Funds", "Dimensional",
+    "Pacer", "PIMCO",
+)
+
+
+def _etf_facet_rows(facets, residual_text=''):
+    """패싯 조건으로 symbol_master ETF 조회 → 검색결과 dict 리스트.
+    정렬 = 국내 상장 먼저 → 1배 상품 → 주요 운용사(US) → 이름 짧은 순."""
+    import sqlite3 as _sq
+    where, params = etf_build_where(facets)
+    where.insert(0, "is_etf=1")
+    for tok in (residual_text or '').split():
+        where.append("(name LIKE ? OR code LIKE ?)")
+        params.extend([f"%{tok}%", f"%{tok}%"])
+    fam_ph = ','.join('?' * len(_MAJOR_US_FAMILIES))
+    sql = ("SELECT code, name, country, leverage, hedge, asset_class, region, "
+           "bond_type, bond_dur, eq_style, eq_size, sector FROM symbols WHERE "
+           + " AND ".join(where) +
+           " ORDER BY country ASC, "
+           "CASE WHEN leverage IS NULL OR leverage = 1.0 THEN 0 ELSE 1 END, "
+           f"CASE WHEN country='KR' OR issuer IN ({fam_ph}) THEN 0 ELSE 1 END, "
+           "length(name)")
+    params.extend(_MAJOR_US_FAMILIES)
+    conn = _sq.connect(str(info_engine.db_path))
+    conn.row_factory = _sq.Row
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return [{
+        'code':     r['code'],
+        'name':     r['name'],
+        'badge':    'KR ETF' if r['country'] == 'KR' else 'US ETF',
+        'subtitle': facet_subtitle(dict(r)),
+        'country':  r['country'],
+        'is_etf':   True,
+    } for r in rows]
+
+
 def _search_index_quotes(codes):
     """지수·환율·금리 등 — 준라이브 index_ohlc(30분 beat) 우선, index_daily 폴백.
     code -> (cur, prev). 테이블에 데이터 없는 코드는 미포함(호출측이 price_daily로)."""
@@ -757,7 +807,8 @@ def _prev_close_krw_map(codes, usdkrw):
 def search():
     q = request.args.get('q', '').strip()
     paged = request.args.get('page') is not None
-    if not q:
+    etf_mode = request.args.get('etf') == '1'
+    if not q and not etf_mode:
         return jsonify({'items': [], 'total': 0, 'page': 1, 'per': 18}) if paged else jsonify([])
     try:
         try:
@@ -767,27 +818,54 @@ def search():
         cats = [c for c in request.args.get('cats', '').split(',') if c]
         results = []
 
-        # 지수·환율·원자재·금리 (symbol_master에 없는 시장 심볼) — 한글 별칭 검색
-        results.extend(search_market_aliases(q, limit=12))
-
-        # paged면 전체 매칭(제한 없음 — 서버서 페이지 슬라이스라 페이로드 무관), 아니면 _limit.
-        uni = 10_000_000 if paged else _limit
-        df = info_engine.search_fuzzy(q, limit=uni)
-        if not df.empty:
-            for _, row in df.iterrows():
-                if row.get('is_etf'):
-                    badge = 'KR ETF' if row.get('country') == 'KR' else 'US ETF'
+        if etf_mode:
+            # ETF 상세검색: 명시 패싯 파라미터 + 검색어의 자연어 패싯 병합
+            facets = {}
+            for arg, key in _ETF_FACET_ARGS.items():
+                vals = [v for v in request.args.get(arg, '').split(',') if v]
+                if vals:
+                    facets[key] = set(vals)
+            for arg, key in (('lev', '_lev'), ('hedge', '_hedge')):
+                v = request.args.get(arg, '')
+                if v:
+                    facets[key] = v
+            residual, nl_facets = etf_parse_query(q)
+            for k, v in nl_facets.items():
+                if k.startswith('_'):
+                    facets.setdefault(k, v)
                 else:
-                    badge = row.get('market') or row.get('country') or ''
-                subtitle = (row.get('index_name') or row.get('category') or row.get('issuer') or '')
-                results.append({
-                    'code':     row['code'],
-                    'name':     row['name'],
-                    'badge':    badge,
-                    'subtitle': '' if str(subtitle) == 'nan' else str(subtitle),
-                    'country':  row.get('country', ''),
-                    'is_etf':   bool(row.get('is_etf', 0)),
-                })
+                    facets.setdefault(k, set()).update(v)
+            results = _etf_facet_rows(facets, residual)
+        else:
+            # 자연어 패싯 ("미국 단기채 etf" → 양시장 ETF) — 매칭 시 최상단
+            residual, nl_facets = etf_parse_query(q)
+            if nl_facets:
+                results.extend(_etf_facet_rows(nl_facets, residual))
+
+            # 지수·환율·원자재·금리 (symbol_master에 없는 시장 심볼) — 한글 별칭 검색
+            results.extend(search_market_aliases(q, limit=12))
+
+            # paged면 전체 매칭(제한 없음 — 서버서 페이지 슬라이스라 페이로드 무관), 아니면 _limit.
+            uni = 10_000_000 if paged else _limit
+            df = info_engine.search_fuzzy(q, limit=uni)
+            seen = {r['code'] for r in results}
+            if not df.empty:
+                for _, row in df.iterrows():
+                    if row['code'] in seen:
+                        continue
+                    if row.get('is_etf'):
+                        badge = 'KR ETF' if row.get('country') == 'KR' else 'US ETF'
+                    else:
+                        badge = row.get('market') or row.get('country') or ''
+                    subtitle = (row.get('index_name') or row.get('category') or row.get('issuer') or '')
+                    results.append({
+                        'code':     row['code'],
+                        'name':     row['name'],
+                        'badge':    badge,
+                        'subtitle': '' if str(subtitle) == 'nan' else str(subtitle),
+                        'country':  row.get('country', ''),
+                        'is_etf':   bool(row.get('is_etf', 0)),
+                    })
 
         # 카테고리 다중필터(서버) — 페이지네이션과 일관
         if cats:

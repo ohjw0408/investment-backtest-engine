@@ -102,7 +102,7 @@
   function bounds() {
     var inp = activeInput;
     var nextY = new Date().getFullYear() + 1;
-    var minY = yearOf(inp.getAttribute('min'), 1985);
+    var minY = yearOf(inp.getAttribute('min'), 1900);
     var maxY = yearOf(inp.getAttribute('max'), nextY);
     if (maxY < minY) maxY = minY;
     return { minY: minY, maxY: maxY, min: inp.getAttribute('min') || null, max: inp.getAttribute('max') || null };

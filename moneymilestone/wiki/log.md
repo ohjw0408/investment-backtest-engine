@@ -4832,3 +4832,24 @@ _작성: Claude_
   구간이라 실환율 데이터 자체가 무의미). 달러 수익률 왜곡은 없음(상수배).
 
 _작성: Claude_
+
+## 2026-07-19 — index_ohlc 신규 지수 13종 과거 백필 누락 수정 (오너 발견: 니케이 한달치)
+
+- 증상: prod ^N225 캔들/상세가 한 달치(06-15~)뿐. index_daily·price_daily는 1965~ 정상 —
+  `index_ohlc`만 빈 것.
+- 원인: 과거 백필 = 일회성 `scripts/backfill_index_ohlc.py`인데 자체 CODES 리스트가 구버전
+  12종. 07-13 지수 20종 확장분(^RUT ^SOX ^STOXX50E ^NSEI ^HSCE TPX.F 000300.SS ^KQ11)은
+  beat `refresh_index_ohlc`(7일 트레일링)만 쌓여 과거 전무. ^N225·원자재 선물 4종도 prod에선
+  스크립트 재실행이 없어 06-15 이후만 존재.
+- 수정(74e529d): 스크립트 CODES → `modules.price_loader.CANDLE_INDEX_CODES` import(단일
+  소스, 리스트 드리프트 재발 방지) + NaN 종가 스킵·OHLC NaN→close 폴백(BUG-KOSPI-NIGHT-NULL
+  동일 가드). index_master.db는 gitignore라 prod 직접 실행 영속.
+- 실행: prod·로컬 각각 스크립트 실행 — 20종 총 168,375행. ^N225 1965-01-05~, ^RUT 1987~,
+  ^SOX 1994~, ^HSCE 1993~, TPX.F 2000~, ^KQ11 2000~, ^NSEI·^STOXX50E 2007~, 000300.SS
+  2021~(야후 원천 한계).
+- 검증(prod): 20종 전수 NULL 종가 0, >25% 일변동 스캔 — CL=F 2020-04(WTI 마이너스 유가),
+  NG=F(천연가스 실변동), SI=F 2026-01-30 -31%(실버 스퀴즈 붕괴·레벨시프트 지속=실제)뿐.
+- ⚠️ 알려진 원천 한계: TPX.F 2009년경 야후 데이터 저품질(수일 플랫 종가, 스케일 의문).
+  000300.SS는 야후에 2021-03 이전 데이터 자체가 없음.
+
+_작성: Claude_

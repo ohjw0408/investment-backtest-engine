@@ -1501,18 +1501,15 @@ function mmEncodeShare(data) {
 }
 
 async function btMakeCanvas() {
-  const layout = document.querySelector('.bt-layout');
-  const rightPanel = document.querySelector('.bt-right');
-  const rightW = rightPanel ? rightPanel.offsetWidth : 0;
+  // 결과 뷰(#btResultContent) 기준. 옛 .bt-layout은 입력↔결과 뷰 분리 때 사라짐.
+  const layout = document.getElementById('btResultContent');
+  if (!layout) throw new Error('결과 영역을 찾을 수 없습니다');
 
   const rawCanvas = await html2canvas(layout, {
     scale: 2, backgroundColor: (typeof MM_DARK !== 'undefined' && MM_DARK) ? '#0E141C' : '#F0F4F8', useCORS: true, allowTaint: true,
     onclone: function(doc, clonedLayout) {
-      // Fix flex:1 width so html2canvas renders right panel correctly
-      const cr = clonedLayout.querySelector('.bt-right');
-      if (cr) { cr.style.width = rightW + 'px'; cr.style.flex = 'none'; cr.style.minWidth = '0'; }
       // Hide elements that don't belong in a static image
-      ['#btRunBtn', '#btLoading', '#btShareUrlBox'].forEach(sel => {
+      ['#btShareBtns', '#btLoading', '#btShareUrlBox'].forEach(sel => {
         const e = clonedLayout.querySelector(sel); if (e) e.style.display = 'none';
       });
       // Copy canvas pixel data
@@ -1548,6 +1545,7 @@ async function btMakeCanvas() {
 async function btCopyLink(ev) {
   const btn = ev && ev.currentTarget;
   if (!window._btShareData) { mmToast('먼저 분석을 실행하세요', 'err'); return; }
+  if (typeof html2canvas === 'undefined') { mmToast('공유 기능을 불러오는 중입니다.', 'err'); return; }
   if (btn) btn.disabled = true;
   mmToast('공유 이미지 생성 중…');
   try {

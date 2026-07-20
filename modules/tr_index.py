@@ -116,6 +116,13 @@ def build_portfolio_tr_index(tickers, conn=None, start='1900-01-01'):
         return []
 
     closes = pd.DataFrame({c: pd.Series(m) for c, (w, m, syn) in series.items()}).sort_index()
+    # 전 구성종목이 데이터를 갖는 날부터 시작 — 선행 구간을 남기면 결측 종목이 비중에서 빠져
+    # "50/25/25 포폴인데 실제론 채권 100%" 같은 가짜 구성이 통계에 섞인다(2026-07-21).
+    # 내부 결손(NULL홀)의 비중 재정규화는 그대로 둔다 — 가짜 점프 가드가 거기 의존.
+    firsts = [closes[c].first_valid_index() for c in closes.columns]
+    firsts = [f for f in firsts if f is not None]
+    if firsts:
+        closes = closes.loc[max(firsts):]
     if len(closes.index) < 2:
         return []
     weights = pd.Series({c: w for c, (w, m, syn) in series.items()}, dtype=float)

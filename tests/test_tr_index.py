@@ -60,6 +60,18 @@ def test_null_hole_no_fake_jump():
     assert max(abs(r) for r in rets) < 0.02, f"가짜 점프 감지: {max(rets)}"
 
 
+def test_starts_when_all_constituents_have_data():
+    """상장 늦은 종목이 있으면 포폴은 그 종목 데이터가 생긴 날부터 — 선행 구간의
+    '결측 종목 빼고 재정규화'(가짜 구성) 금지."""
+    conn = _mk_conn()
+    a = [("A", f"2020-01-{d:02d}", 100.0, 1000) for d in range(1, 11)]
+    b = [("B", f"2020-01-{d:02d}", 100.0, 1000) for d in range(5, 11)]
+    conn.executemany("INSERT INTO price_daily VALUES (?,?,?,?)", a + b)
+    pts = build_portfolio_tr_index([{"code": "A", "weight": 50}, {"code": "B", "weight": 50}], conn=conn)
+    assert pts[0][0] == "2020-01-05"
+    assert abs(pts[0][1] - 100.0) < 1e-6      # 절단 후 시작=100 재정규화
+
+
 def test_empty():
     assert build_portfolio_tr_index([]) == []
     assert build_portfolio_tr_index([{"code": "", "weight": 0}]) == []

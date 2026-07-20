@@ -631,3 +631,7 @@ tags: [dev]
 - 13F 전체 이력(2013H2+) seed + 공시일 리밸런싱 일간 NAV(guru_nav, beat 11:30 UTC) + 비교/겹쳐보기 `guru` 슬러그 서빙. 상세=[[../log]] 07-18 둘째 절.
 - 파일: `modules/gurus/{edgar,nav,store}.py`, `scripts/build_guru_db.py`, `tasks.py`, `celery_app.py`, `risk_return_logic.py`, `app.py`(index_series·compare), `static/js/{examples,risk_return_page}.js`, `tests/test_guru_nav.py`.
 - 사전계산 주기 결정(오너 질의 답): 곡선=매일(beat)·비중=분기(13F가 분기 공시라 상한).
+
+## 2026-07-20 내자산 보유종목 1주당 현재가 표시 ✅
+- 카드 메타행 우측에 `1주 ₩x`(.hc-cur) 추가 + 패딩 확대. fmtPrice() 신설 — 시세는 hideAmounts 마스킹 제외(총액·평단은 유지). 펼침 상세 현재가도 fmtPrice 통일. .hc-chev margin-left:auto 제거(가격 중앙 뜸 방지).
+- 검증: Playwright 모바일/데스크톱·라이트/다크·접힘/펼침·가리기 토글 양방향, 콘솔에러 0. 상세=log.md 07-20.

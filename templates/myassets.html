@@ -172,7 +172,7 @@
 
 /* 보유 종목 = 한 줄 카드 + 탭하면 펼침 */
 .hold-list { display: flex; flex-direction: column; }
-.hold-card { border-bottom: 1px solid var(--ds-hairline); padding: 12px 4px; cursor: pointer; }
+.hold-card { border-bottom: 1px solid var(--ds-hairline); padding: 14px 6px; cursor: pointer; }
 .hold-card:last-child { border-bottom: none; }
 .hc-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .hc-name { font-weight: 700; font-size: .95rem; color: var(--ds-ink); min-width: 0;
@@ -181,11 +181,13 @@
 .hc-gdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
 .hc-val { font-family: var(--font-mono); font-weight: 700; font-size: .92rem; color: var(--ds-ink);
   white-space: nowrap; flex-shrink: 0; }
-.hc-meta { display: flex; align-items: center; gap: 7px; margin-top: 3px; font-size: .78rem; }
+.hc-meta { display: flex; align-items: center; gap: 7px; margin-top: 4px; font-size: .78rem; }
 .hc-wt { color: var(--ds-muted); font-weight: 600; }
+.hc-cur { margin-left: auto; color: var(--ds-muted); font-family: var(--font-mono); font-weight: 600;
+  font-size: .76rem; white-space: nowrap; }
 .hc-ret { font-weight: 700; }
 .hc-ret.up { color: var(--up); } .hc-ret.down { color: var(--down); } .hc-ret.flat { color: var(--ds-muted); }
-.hc-chev { margin-left: auto; color: var(--ds-muted); transition: transform .2s; display: inline-flex; }
+.hc-chev { color: var(--ds-muted); transition: transform .2s; display: inline-flex; }
 .hold-card.open .hc-chev { transform: rotate(180deg); }
 .hc-exp { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--ds-hairline); }
 .hc-detail { font-size: .76rem; color: var(--ds-body); line-height: 1.7; margin-bottom: 10px; }

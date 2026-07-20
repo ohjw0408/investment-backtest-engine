@@ -29,6 +29,11 @@ function fmtKRW(v) {
   if (!v && v !== 0) return '—';
   return (v < 0 ? '-' : '') + '₩' + Math.abs(Math.round(v)).toLocaleString();
 }
+function fmtPrice(v) {
+  // 시세(공개 정보)라 금액 숨김 대상 아님
+  if (!v && v !== 0) return '—';
+  return '₩' + Math.abs(Math.round(v)).toLocaleString();
+}
 function fmtPct(v) { return (v*100).toFixed(1)+'%'; }
 function fmtSignedPct(v) { return (v>=0?'+':'')+(v*100).toFixed(2)+'%'; }
 function fmtSignedKRW(v) {
@@ -367,10 +372,11 @@ function renderHoldings() {
         <span style="color:var(--ds-hairline);">·</span>
         ${retHtml}
         ${isManual?'<span class="hc-badge" style="color:var(--blue);">수동가</span>':''}
+        <span class="hc-cur">1주 ${cur ? fmtPrice(cur) : '—'}</span>
         <span class="hc-chev">${MAICON.chev}</span>
       </div>
       <div class="hc-exp" id="exp-${i}" hidden onclick="event.stopPropagation();">
-        <div class="hc-detail">종목 <b>${a.code}</b> · 현재가 <b>${fmtKRW(cur)}</b> · 평단 <b>${avg>0?fmtKRW(avg):'—'}</b> · 합계 <b>${a.qty.toLocaleString()}주</b>${a.rows.length>1?` · <b>${a.rows.length}계좌</b>`:''}</div>
+        <div class="hc-detail">종목 <b>${a.code}</b> · 현재가 <b>${cur ? fmtPrice(cur) : '—'}</b> · 평단 <b>${avg>0?fmtKRW(avg):'—'}</b> · 합계 <b>${a.qty.toLocaleString()}주</b>${a.rows.length>1?` · <b>${a.rows.length}계좌</b>`:''}</div>
         ${acctRows}
         <div class="hc-actions" style="margin-top:10px;">
           <button onclick="setManual(${a.rows[0].id}, ${cur})">현재가 수동</button>

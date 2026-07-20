@@ -1,5 +1,17 @@
 # Log
 
+## [2026-07-20] FEATURE | 앱 오프라인 폴백 화면 (Play 출시 준비)
+
+Play 스토어 출시용 AAB 점검 중, 원격 로드형 Capacitor 앱(`server.url` = co.kr)에 오프라인/서버오류 처리가 전혀 없어 네트워크 끊기면 크롬 기본 에러페이지가 뜨는 문제 확인. Play 정책 4.3(Minimum Functionality)에서 웹뷰 래퍼 앱의 가치 요소로 offline support를 보기도 해 함께 보강.
+
+- **구현**: `mobile/www/offline.html` 신설 + `capacitor.config.json`에 `server.errorPath: "offline.html"`. Capacitor 내장 기능(`BridgeWebViewClient.onReceivedError` / `onReceivedHttpError` → 메인 프레임이면 errorPath 로드)이라 **네이티브 Java 코드 추가 없음**.
+- **페이지**: 외부 리소스 0(오프라인이라 CDN·웹폰트·이미지 불가). 디자인 토큰(`--brand`·`--ds-*`·로고 주황 #ff6a00) 인라인 복제, `prefers-color-scheme`로 라이트/다크 대응. "다시 시도" 버튼 + `online` 이벤트 자동 재시도.
+- **⚠️ 부작용(의도된 동작)**: `onReceivedHttpError`도 errorPath로 보내므로 메인 프레임 404/500 응답 시 서버의 자체 에러페이지 대신 이 화면이 뜬다. 하위 리소스(fetch/XHR/이미지)는 메인 프레임이 아니라 영향 없음.
+- **버그 1건 자체 발견·수정**: 스크립트에서 `var status = getElementById('status')` → 전역 `var`가 내장 `window.status`(문자열 프로퍼티)와 충돌해 엘리먼트가 아닌 문자열이 됨 → `status.textContent = …`가 sloppy mode에서 **조용히 무시**(콘솔 에러도 없음) → 오프라인 상태에서 버튼 눌러도 피드백 0. `statusEl`로 리네임. **렌더 검증 없이 배선만 봤으면 절대 못 잡을 버그** (frontend-verification 규칙의 실증 사례).
+- **검증**: Playwright 390×844 — 라이트/다크 스샷 육안 확인, 콘솔에러 0, 가로 오버플로 없음, 오프라인 클릭→"오프라인 상태입니다" 표시 + 버튼 재활성 + 페이지 유지, 온라인 클릭→co.kr 이동, `online` 이벤트→자동 이동 확인.
+- **AAB**: `npx cap sync android` + `gradlew bundleRelease` 재빌드. `mobile/android/app/build/outputs/bundle/release/app-release.aab`(4.69MB, UPLOAD 키 서명, targetSdk 36, versionCode 1). 번들 안에 `base/assets/public/offline.html`·`errorPath` 설정 포함 확인.
+- 주의: 오프라인 폴백은 **앱에 번들되는 로컬 파일**이라 서버 push로 반영 불가 — 이 변경만큼은 AAB 재빌드가 필수였음.
+
 ## [2026-07-19] FEATURE | ETF 카테고리 검색 — 전 종목 분류 + 자연어 패싯 + 상세검색 탭
 
 오너 요청: "미국 단기채 etf" 검색 시 미국 상장 + 한국 상장 둘 다 나오게, NH증권 카테고리 검색 수준. 결정(오너 확정 3건): ①UI=기존 /search에 ETF 탭 확장 ②자연어+카테고리 UI 둘 다 ③US 전 종목 5,528 분류.

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Money Milestone — 연결할 수 없음</title>
+  <style>
+    :root{
+      --logo:#ff6a00;
+      --brand:#0052ff; --brand-hover:#003ecc; --on-brand:#ffffff;
+      --ds-canvas:#ffffff; --ds-soft:#ededec; --ds-hairline:#dcdcda;
+      --ds-ink:#0a0b0d; --ds-body:#5b616e; --ds-muted:#7c828a;
+      --font-sans:'Inter','Noto Sans KR',-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+      color-scheme:light dark;
+    }
+    @media (prefers-color-scheme:dark){
+      :root{
+        --brand:#4a7dff; --brand-hover:#6a96ff;
+        --ds-canvas:#16181d; --ds-soft:#0a0b0e; --ds-hairline:#2c3038;
+        --ds-ink:#f5f6f8; --ds-body:#a8acb3; --ds-muted:#8a9099;
+      }
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{
+      background:var(--ds-soft); color:var(--ds-ink); font-family:var(--font-sans);
+      display:flex; align-items:center; justify-content:center;
+      padding:24px calc(24px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
+      -webkit-user-select:none; user-select:none;
+    }
+    .card{
+      width:100%; max-width:400px; text-align:center;
+      background:var(--ds-canvas); border:1px solid var(--ds-hairline);
+      border-radius:16px; padding:40px 24px;
+    }
+    .mark{
+      width:56px; height:56px; margin:0 auto 24px; border-radius:16px;
+      background:var(--logo); color:#fff; font-size:26px; font-weight:600;
+      display:flex; align-items:center; justify-content:center;
+    }
+    h1{margin:0 0 12px; font-size:20px; font-weight:600; letter-spacing:-.01em}
+    p{margin:0; font-size:15px; line-height:1.6; color:var(--ds-body)}
+    button{
+      width:100%; margin-top:28px; padding:14px 20px;
+      background:var(--brand); color:var(--on-brand);
+      border:0; border-radius:100px; font-family:inherit;
+      font-size:16px; font-weight:600; cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    button:active{background:var(--brand-hover)}
+    button[disabled]{opacity:.6}
+    .status{margin-top:16px; font-size:13px; color:var(--ds-muted); min-height:1.4em}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="mark">M</div>
+    <h1>연결할 수 없습니다</h1>
+    <p>네트워크 연결을 확인해 주세요.<br>연결이 정상이라면 잠시 후 다시 시도해 주세요.</p>
+    <button id="retry" type="button">다시 시도</button>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+  </div>
+
+  <script>
+    var HOME = 'https://moneymilestone.co.kr/';
+    var btn = document.getElementById('retry');
+    // 'status'는 window.status(내장 문자열)와 충돌하므로 이 이름을 쓰지 말 것
+    var statusEl = document.getElementById('status');
+
+    function retry() {
+      btn.disabled = true;
+      statusEl.textContent = navigator.onLine ? '다시 연결하는 중…' : '오프라인 상태입니다';
+      if (!navigator.onLine) {
+        btn.disabled = false;
+        return;
+      }
+      location.replace(HOME);
+    }
+
+    btn.addEventListener('click', retry);
+    window.addEventListener('online', retry);
+  </script>
+</body>
+</html>

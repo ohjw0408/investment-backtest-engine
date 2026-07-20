@@ -5,6 +5,7 @@
   "server": {
     "url": "https://moneymilestone.co.kr",
     "androidScheme": "https",
+    "errorPath": "offline.html",
     "allowNavigation": [
       "moneymilestone.co.kr",
       "www.moneymilestone.co.kr",

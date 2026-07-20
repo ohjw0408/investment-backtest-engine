@@ -4880,3 +4880,81 @@ _작성: Claude_
   콘솔에러 0, 스샷 육안 OK.
 
 _작성: Claude_
+
+## 2026-07-21 — 심화 롤링 "가짜 구성 구간" + 공유(링크복사·이미지저장) 고장
+
+### 1) 심화 분석 통계가 포트폴리오를 가짜 구성으로 굴린 건 (오너 보고)
+
+- 오너 보고: `/backtest`에서 `^NDX 50 / GLD 25 / TLT 25`, 기간 1998-01-01~ 로 돌렸는데
+  심화 분석 1년 손실확률 **24.6%** — 나스닥 100%(17.4%)보다 나쁘고, 중앙수익률도 낮고,
+  최악값은 100% 몰빵과 **소수점까지 동일**. 분산 포트폴리오로선 불가능한 값.
+- prod 재현: 오너 화면 숫자 정확히 일치(24.6/10.9/9.2/0/0/0, 표본 582/558/534/474/414/354).
+- 원인: prod `price_daily` 시작일이 `^NDX` 1985-10-01 / `GLD` 2004-11-18 / `TLT` 1977-02-15.
+  `build_portfolio_tr_index`가 결측 종목을 비중에서 빼고 **남은 종목으로 100% 재정규화**해서
+  실제로는 이렇게 굴러갔다:
+  | 구간 | 실제 비중 |
+  |---|---|
+  | 1977–1985 (8.6년) | **TLT 100%** |
+  | 1985–2004 (19.1년) | ^NDX 66.7 / TLT 33.3 |
+  | 2004–2026 (21.7년) | 50/25/25 (정상) |
+  1977–85 볼커 금리인상기 장기채 폭락이 MIX에만 들어가 손실확률을 밀어올림. 최악값이 같았던 건
+  대폭락 구간이 전부 "사실상 단일자산" 구간이었기 때문.
+- 시작일만 맞추면 뒤집힘(prod 실측 1년 손실확률): 전체 17.4% vs **24.6%** / 1985 17.4% vs
+  **17.0%** / 1998 19.9% vs **17.8%** / 2004 13.7% vs **12.1%**. 3·5·10년은 어느 시작일이든
+  MIX 압승.
+- 수정(26751fe, 오너 선택지 B): `build_portfolio_tr_index`가 **전 구성종목이 데이터를 갖는 날**
+  (`max(first_valid_index)`)부터 시작하도록 선행 구간 절단. 내부 결손(NULL홀) 재정규화는
+  **그대로 유지** — 가짜 점프 가드(`test_null_hole_no_fake_jump`)가 거기 의존.
+- 검증: `tests/test_tr_index.py`(신규 `test_starts_when_all_constituents_have_data`)+
+  `test_rolling.py` 14 PASS. 로컬 실데이터 QQQ/GLD/TLT 1971-02-05→**1977-02-15**, 시작=100
+  재정규화 확인. 단일종목 포폴은 영향 없음.
+- ⚠️ **prod 검증 미완** — 배포 후 `^NDX/GLD/TLT` 심화 시작일이 2004-11-18, 1년 손실확률
+  24.6%→12.1%, 표본 582→249로 바뀌는지 확인 필요.
+- 오너 결정: 선택지 A(심화표를 **사용자가 고른 기간**에 맞춤)는 **채택 안 함**. 즉 심화표는
+  계속 전체 가용기간 기준이며 사용자의 시작일 설정을 반영하지 않는다. 화면 문구도 그대로.
+  → 항목별 기간이 여전히 서로 다를 수 있음(NDX100=1985~, MIX=2004~)은 **알려진 잔여 한계**.
+
+### 2) 공유 기능 — 링크 복사 / 이미지 저장 (오너 보고 "작동 안 함")
+
+prod 5개 페이지 Playwright 실클릭 전수 검사 결과, **원인이 서로 다른 버그 2개**였다.
+
+| 페이지 | 이미지 저장 | 링크 복사 |
+|---|---|---|
+| backtest | ❌ | ❌ |
+| calculator | ✅ | ❌ 413 |
+| dividend-target | ✅ | ✅ 200 |
+| retirement | ✅ | ❌ 413 |
+| risk-return | 로그인 필요 — **미검증** |
+
+- **원인 A — backtest 전용 죽은 셀렉터(수정·푸시 완료 5b31f09)**: `btMakeCanvas()`가
+  `.bt-layout`/`.bt-right`를 잡는데 이 요소들은 입력↔결과 뷰 분리 개편 때 사라짐(템플릿·CSS
+  어디에도 없고 JS에만 잔존). html2canvas가 `null`을 받아
+  `Invalid element provided as first argument` 던짐 → 두 버튼 모두 사망.
+  `#btResultContent` 캡처로 교체, 클론에서 `#btShareBtns`·`#btShareUrlBox` 숨김,
+  `btCopyLink`에 html2canvas 미로드 가드 추가(이미지 저장과 동일).
+- **원인 B — 링크 복사 전역: nginx 업로드 한도(미해결)**: `/etc/nginx/sites-enabled/domino`에
+  `client_max_body_size` 설정이 **아예 없어** nginx 기본 **1MB**. 공유 PNG base64가 계산기
+  기준 **1.7MB**(2200×5992)라 `/api/share/upload`가 **413**. dividend만 통과한 건 캡처가
+  1MB 미만이라서. 서버 코드는 8MB까지 허용하는데 nginx가 먼저 자름.
+  → 프런트는 이걸 통째로 `'오류가 발생했어요'` 토스트로 뭉개서 원인 파악이 안 됐다.
+- ⚠️ `sites-enabled/domino`은 **심볼릭 링크가 아니라** `sites-available/domino`와 내용이
+  갈린 별도 파일(server_name이 다름). 라이브는 sites-enabled 쪽.
+
+### 남은 일 (다음 세션)
+
+1. **[오너 실행 필요]** nginx 한도 상향 — Claude 권한으로 차단됨(classifier). 명령:
+   `ssh -i ~/.ssh/hetzner_ed25519 root@178.105.84.213 "cp /etc/nginx/sites-enabled/domino /root/domino.enabled.bak.$(date +%s) && sed -i 's/^server {/server {\n    client_max_body_size 16m;/' /etc/nginx/sites-enabled/domino && nginx -t && systemctl reload nginx && grep -n client_max_body_size /etc/nginx/sites-enabled/domino"`
+   (백업→삽입→문법검사→reload. `nginx -t` 실패 시 reload 안 됨.) 백업본은 이미
+   `/root/domino.nginx.bak.*` 1개 존재.
+2. nginx 반영 후 4개 페이지 공유 재검증 + 배포된 backtest 수정분 prod 실클릭 확인.
+   프로브 = `tests/_scratch_probe_e2e.js`(임시 파일, 커밋 안 함 — 필요하면 재작성).
+   backtest 캡처는 결과 페이지가 길어 16m도 넘을 수 있음 → 실측 후 필요하면 scale 축소 검토.
+3. **risk-return 공유 미검증** — 공유 버튼이 `{% if user %}` 뒤에 있어 비로그인 prod에선
+   렌더 자체가 안 됨. 로컬 서버 + `tests/mint_session.py` 쿠키로 확인할 것.
+4. **미착수(오너 지시)**: DB에 없는 티커가 조용히 빠지는 문제를 사용자에게 노출.
+   `modules/tr_index.py:108-113`이 `if m:`로 데이터 0행 종목을 건너뛰고 남은 비중을
+   재정규화 — 에러도 경고도 반환값 표시도 없음. 3종목 포폴인 줄 알고 2종목 결과를 보게 됨.
+   (비교탭엔 `partial_portfolios` 플래그가 이미 있으나 분석탭 rolling엔 없음.)
+5. 심화 롤링 prod 검증(위 1번 ⚠️).
+
+_작성: Claude_

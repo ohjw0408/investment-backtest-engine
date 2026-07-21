@@ -4881,6 +4881,97 @@ _작성: Claude_
 
 _작성: Claude_
 
+## 2026-07-21 (2) — QQQ가 S&P500 과거를 갖고 있던 건 (백필 프록시 오매핑)
+
+### 오너 보고
+
+`/backtest` 심화 분석에서 QQQ와 나스닥100(^NDX)의 기간별 손실확률·수익분포가 다르고,
+QQQ 쪽에 "추정" 배지가 붙으며 값이 훨씬 크다. QQQ·QQQM·^NDX가 같은 수치를 내는지 확인 요청.
+
+### prod 실측 (수정 전)
+
+| | 1y 손실확률 | 3y | 5y | 10y | 표본(1y) | 합성비중 |
+|---|---|---|---|---|---|---|
+| ^NDX | 17.4% | 12.8% | 12.3% | 7.6% | 478 | **0%** |
+| QQQ | **26.7%** | 15.6% | 10.2% | 4.9% | 1171 | **76.1%** |
+| QQQM | **29.6%** | 20.0% | 18.4% | 9.1% | 1171 | **94.2%** |
+
+### 원인 — 백필 프록시가 나스닥이 아니라 S&P500
+
+- QQQ·QQQM 합성구간 일수익률이 `^GSPC`와 **corr 1.000**, 두 종목 간 가격비 **0.8107 상수**.
+  즉 같은 S&P500 시계열을 앵커만 달리해 리스케일한 것.
+- `backfill_runs` 기록: `QQQ proxy=^GSPC 1928-01-03~2002-12-31 18,829행` /
+  `QQQM proxy=^GSPC 1928-01-03~2020-10-12 23,305행`.
+- 뿌리 3겹:
+  1. **분류** — `us_etf_list.csv`의 category가 **4,593행 중 3,540행(77%)이
+     `US Equity - Large Cap Blend`**(yfinance 원문). 이 버킷이 `US_CATEGORY_MAP`에서
+     `^GSPC`로 연결돼 나스닥·중국·섹터 ETF가 전부 S&P500 과거를 받았다.
+     맵 자체는 정상(`Large Cap Growth → ^NDX`)이었고 `symbol_master.eq_style='growth'`도
+     맞게 들어 있었으나 백필이 category만 봤다.
+  2. **하한 없음** — 프록시 시작일 제한이 없어 **1928-01-03**부터 생성. 나스닥 개장
+     1971-02-05, ^NDX 산출 1985-10-01보다 43~57년 앞선다. 대공황이 "QQQ 과거"에 포함.
+  3. **실데이터 손실** — QQQ 상장은 1999-03-10인데 `price_daily` 실거래가 2003-01-02부터.
+     QQQ가 실제로 겪은 닷컴 붕괴(−83%)가 S&P 프록시로 덮여 있었다.
+- QQQ≠QQQM인 이유는 프록시가 같고 splice 지점만 달라서(2003-01 vs 2020-10).
+- **같은 뿌리 광범위**: `^GSPC` 백필 39종 중 국제/섹터/나스닥 29종이 오염
+  (VXUS·VEA·VWO·EWY·KWEB·ARGT·EWZ·EEM·FXI·EWA·INDA·EFA·IEMG·MCHI·XLE·XLF·XLI·XLV·
+  KRE·IBB·XBI·IWM·IWN·SOXX·JEPQ·PEY·RDVY 등). SPY·IVV·VTI·RSP는 실제 S&P 추종이라 정상.
+
+### 수정 (e509451 + prod 데이터 복구)
+
+1. **`ETF_PROXY_OVERRIDE`(코드별 36종) 신설** — category 추론을 이긴다.
+   QQQ·QQQM·JEPQ→`^NDX`, IWM·IWN→`^RUT`, SOXX→`^SOX`, FXI·MCHI→`^HSCE`,
+   INDA→`^NSEI`, EWY→`KS200`, IEMG·VWO→`EEM`, VXUS→`ACWI`, SCHD·PEY·RDVY→`DJUSDIV_PROXY`,
+   SPY·IVV·VOO·VTI·RSP→`^GSPC`(유지).
+2. **맞는 지수가 없으면 `None`으로 백필 거부** — EEM·EFA·VEA·EWZ·EWA·ARGT·KWEB·
+   XLE·XLF·XLI·XLV·KRE·IBB·XBI. `Large Cap Blend` 버킷과 섹터·테마·커버드콜·팩터·
+   중형·단일국가 카테고리도 전부 `None`.
+   > **불변식: 틀린 프록시보다 백필 없음이 낫다.** ^GSPC 폴백을 남겨두면 다음에 검색되는
+   > 중국 ETF가 또 1928년 S&P 과거를 갖는다.
+3. **prod 데이터 복구** — 29종의 합성행(`price_daily_source.source_type='backfill'` 기준)과
+   합성 배당을 삭제하고 올바른 프록시로 재백필. 백업 `/root/backups/price_daily.db.bak_proxyfix_*`.
+4. **QQQ 실데이터 복원** — yfinance에서 1999-03-10~2002-12-31 **959행**을 내려받아 합성행과
+   교체(닷컴 붕괴 실측 확보). XLE·XLF도 1998-12-22~ 각 259행 복원.
+
+### 검증
+
+- **수정 후 심화통계** — 세 종목이 같은 표본(478)·같은 시작일(1985-10-01)로 수렴:
+
+  | | 1y | 3y | 5y | 10y | 합성비중 |
+  |---|---|---|---|---|---|
+  | ^NDX | 17.36% | 12.78% | 12.33% | 7.57% | 0% |
+  | QQQ | **16.74%** | 12.56% | 11.63% | 7.57% | 33.0% |
+  | QQQM | **16.95%** | 11.89% | 11.63% | 7.03% | 85.9% |
+
+  중앙수익률이 ^NDX(17.8%)보다 QQQ(18.9%)가 높은 건 정상 — TR 인덱스는 배당 재투자,
+  `^NDX`는 가격지수라서.
+- **라이브 E2E** — `POST /api/backtest/submit` → `/api/task/<id>` 결과가 ssh 프로브와 완전 일치
+  (syn_overall 0.3304, 1y n=478 loss=0.1674).
+- 1928행 전멸. 잔존 1971 이전 데이터는 전부 정당(^GSPC·SPY/IVV/VTI/RSP의 S&P 프록시,
+  BND/BSV/IEF의 DGS10 1962, KR S&P500 3종의 FX 하한 1964, ^N225 1965, 개별주 실데이터 1970).
+- 접합부 가짜점프 스캔 29종 — 임계 초과는 KWEB 39.7%(2022-03-16) 하나뿐이며 이는 중국
+  당국 부양 발표일의 **실제** 급등. 나머지 최대 |일수익률| 전부 26% 미만.
+- `tests/test_backfill_proxy.py` 신설 + test_tr_index·test_rolling **38 PASS**.
+- 서비스 재시작(domino·celery·beat) 후 홈/`/backtest` 200.
+
+### 곁가지로 처리한 잔여 항목
+
+- **BUG-DEEP-ROLLING-FAKE-MIX prod 검증 완료** (07-21(1) 세션의 ⚠️ 미완 항목):
+  `^NDX 50/GLD 25/TLT 25` 심화 시작일 **2004-11-18**, 1년 손실확률 **12.05%**, 표본 **249**
+  — 예측치(2004-11-18 / 12.1% / 249)와 일치. MIX(12.05%)가 ^NDX 100%(17.36%)보다 우수로
+  정상 역전됐다.
+
+### 남은 한계
+
+- `US Equity - Large Cap Blend`를 `None`으로 막았으므로, `ETF_PROXY_OVERRIDE`에 없는
+  S&P 추종 ETF(SPLG·SPLV 등)는 이제 백필되지 않는다. 필요해지면 override에 추가할 것.
+- 백필을 거부한 14종(중국·브라질·호주·아르헨·미국섹터 등)은 상장일부터의 실데이터만 갖는다.
+  긴 역사 통계가 필요하면 해당 국가/섹터 지수를 `index_master.db`에 먼저 확보해야 한다.
+- `symbol_master.db`의 QQQ·QQQM category는 여전히 yfinance 원문(`Large Cap Blend`).
+  백필은 override가 이기므로 무해하지만, resync가 덮어쓰는 값이라 손대지 않았다.
+
+_작성: Claude_
+
 ## 2026-07-21 — 심화 롤링 "가짜 구성 구간" + 공유(링크복사·이미지저장) 고장
 
 ### 1) 심화 분석 통계가 포트폴리오를 가짜 구성으로 굴린 건 (오너 보고)

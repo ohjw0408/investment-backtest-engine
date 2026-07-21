@@ -756,16 +756,18 @@ def _search_attach_prices(items):
         logger.warning(f"[search price] {e}")
 
 
-def _prev_close_krw_map(codes, usdkrw):
+def _prev_close_krw_map(codes, usdkrw, before=None):
     """보유 종목 → 직전 거래일 종가(KRW). 오늘± 계산용.
     price_daily(주식/ETF) + index_daily(KRX_GOLD). US는 ×usdkrw로 KRW 정규화.
-    '직전 거래일' = 오늘보다 이전 날짜의 최신 종가 → 현재가(라이브) 대비 오늘 등락 산출."""
+    '직전 거래일' = 오늘보다 이전 날짜의 최신 종가 → 현재가(라이브) 대비 오늘 등락 산출.
+    before를 넘기면 그 날짜 이전의 최신 종가 — 라이브 시세가 전멸했을 때
+    '마지막으로 아는 종가'를 뽑는 폴백에 재사용한다."""
     import sqlite3 as _sq
     from datetime import date as _date
     out = {}
     if not codes:
         return out
-    today = _date.today().isoformat()
+    today = before or _date.today().isoformat()
 
     if 'KRX_GOLD' in codes:
         try:
@@ -1447,7 +1449,11 @@ def portfolio_history():
     holdings = get_holdings(uid)
     valid = [(h['code'], float(h['quantity'])) for h in holdings if h.get('quantity') and h['quantity'] > 0]
     # '지금' 포인트 = 내자산 헤더와 동일 소스(_live_asset_prices, 수동가격 포함)
-    live_prices = _live_asset_prices(holdings)[0] if valid else None
+    try:
+        live_prices = _live_asset_prices(holdings)[0] if valid else None
+    except Exception:
+        import traceback; traceback.print_exc()
+        live_prices = None
     result = _compute_portfolio_history(valid, current_prices=live_prices)
     result["hide_amounts"] = _hide_amounts_for_user(uid)
     if result.get("series"):
@@ -2481,6 +2487,25 @@ def _live_asset_prices(holdings):
         except Exception:
             pass
 
+    # ── KRX 장애 서킷브레이커 ──
+    # KRX Open API가 응답을 안 주면 매 요청이 18초를 버리고 결국 다 실패한다.
+    # 한 번 실패하면 10분간 건너뛰고 yfinance/DB 폴백으로 바로 간다.
+    def _krx_is_down():
+        if not _r:
+            return False
+        try:
+            return bool(_r.get('krx_api:down'))
+        except Exception:
+            return False
+
+    def _krx_mark_down():
+        if not _r:
+            return
+        try:
+            _r.setex('krx_api:down', 600, '1')
+        except Exception:
+            pass
+
     # ── USD/KRW 환율 ──────────────────────────────────────────────
     idx_db = _P(__file__).parent / 'data' / 'meta' / 'index_master.db'
     usdkrw = _cache_get('USD/KRW')
@@ -2522,16 +2547,20 @@ def _live_asset_prices(holdings):
         else:
             kr_miss.append(code)
 
-    if kr_miss:
+    if kr_miss and not _krx_is_down():
         try:
-            krx   = _KRXC(debug=False)
+            # 요청 경로 예산: 시장 2개 × (connect 3s + read 6s) ≤ 18s < gunicorn timeout 30s.
+            krx   = _KRXC(debug=False, timeout=(3, 6))
             kr_px = krx.get_current_prices_kr(kr_miss)
+            if not kr_px:
+                _krx_mark_down()
             for code, px in kr_px.items():
                 if px:
                     prices[code] = px
                     _cache_set(code, px)
         except Exception:
-            pass
+            _krx_mark_down()
+    if kr_miss:
         for code in kr_miss:
             if prices.get(code, 0) == 0:
                 try:
@@ -2574,6 +2603,18 @@ def _live_asset_prices(holdings):
                 except Exception:
                     prices[code] = 0
 
+    # ── 마지막 방어선: 라이브 시세를 못 구한 종목은 DB 최신 종가(KRW) ──
+    # 외부 시세 API가 전멸해도 자산이 0원으로 보이면 안 된다. 값이 조금 낡는 편이
+    # 낫다. (2026-07-21 KRX Open API 무응답 → 내자산 0원 장애)
+    stale = [c for c in codes if not prices.get(c)]
+    if stale:
+        try:
+            for code, px in _prev_close_krw_map(stale, usdkrw, before='9999-12-31').items():
+                if px:
+                    prices[code] = px
+        except Exception:
+            pass
+
     # ── 수동 가격 override: 설정된 보유종목은 fetch 무시하고 그 값 사용(KRW) ──
     manual_codes = []
     for h in holdings:
@@ -2595,7 +2636,12 @@ def myassets_data():
     from datetime import datetime as _dt
 
     codes = list({h['code'] for h in holdings})
-    prices, usdkrw, manual_codes = _live_asset_prices(holdings)
+    # 시세 소스 장애가 보유내역 응답 자체를 500으로 만들면 안 된다.
+    try:
+        prices, usdkrw, manual_codes = _live_asset_prices(holdings)
+    except Exception:
+        import traceback; traceback.print_exc()
+        prices, usdkrw, manual_codes = {}, 1300.0, []
     _nm = _resolve_names([h['code'] for h in holdings])
     for h in holdings:
         h['name'] = _nm.get(h['code']) or h.get('name') or h['code']

@@ -12,9 +12,12 @@ KRX_KEY_PATH = META_DIR / "krx_api_key.txt"
 
 class KRXClient:
 
-    def __init__(self, debug=True):
+    def __init__(self, debug=True, timeout=30):
         self.auth_key = self._load_key()
         self.debug = debug
+        # 웹 요청 경로에서 쓸 때는 짧게 준다. KRX가 응답을 끊지 않고 물고 있으면
+        # 기본 30초 × 시장 2개 = 60초 → gunicorn worker timeout(30s)에 먼저 죽는다.
+        self.timeout = timeout
 
     def _load_key(self) -> str:
         env_key = os.environ.get("KRX_API_KEY") or os.environ.get("KRX_AUTH_KEY")
@@ -30,7 +33,7 @@ class KRXClient:
             "User-Agent": "Mozilla/5.0"
         }
 
-        r = requests.get(url, headers=headers, params=params, timeout=30)
+        r = requests.get(url, headers=headers, params=params, timeout=self.timeout)
 
         if self.debug:
             print("\n===== KRX DEBUG =====")

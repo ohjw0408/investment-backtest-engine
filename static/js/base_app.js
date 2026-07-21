@@ -260,6 +260,24 @@ async function mmInitPush(force) {
   } catch (e) { return false; }   // 푸시 실패해도 앱 정상
 }
 window.mmInitPush = mmInitPush;
+
+// OS(안드로이드) 알림 권한 상태. 서버쪽 동의와 별개 — 서버가 '동의함'이어도
+// 재설치·권한 철회로 OS 권한이 없으면 알림은 안 온다.
+// 'granted' | 'prompt' | 'denied' | 'unsupported'
+async function mmPushPermission() {
+  try {
+    const Cap = window.Capacitor;
+    if (!(Cap && Cap.isNativePlatform && Cap.isNativePlatform())) return 'unsupported';
+    const Push = Cap.Plugins && Cap.Plugins.PushNotifications;
+    if (!Push || !Push.checkPermissions) return 'unsupported';
+    const p = await Push.checkPermissions();
+    const v = p && p.receive;
+    if (v === 'granted') return 'granted';
+    if (v === 'prompt' || v === 'prompt-with-rationale') return 'prompt';
+    return 'denied';
+  } catch (e) { return 'unsupported'; }
+}
+window.mmPushPermission = mmPushPermission;
 (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { mmInitPush(); });
   else mmInitPush();

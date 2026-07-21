@@ -148,6 +148,7 @@ function fmtChartKRW(v) {
 async function loadPortfolio(period = '1m') {
   try {
     const res = await fetch('/api/portfolio/history', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     _portfolioData = await res.json();
     renderPortfolio(period);
   } catch (e) {
@@ -322,8 +323,12 @@ async function loadActions() {
   const ladder = document.getElementById('actionLadder');
   if (!window.MM_LOGGED_IN) { _renderOnboard(); return; }  // 비로그인 = 온보딩(불필요 401 회피)
   let data;
-  try { data = await (await fetch('/api/myassets/data', { cache: 'no-store' })).json(); }
-  catch (e) { ladder.innerHTML = ''; return; }
+  try {
+    // 5xx를 "보유내역 없음"으로 오해하면 자산이 있는 사용자에게 온보딩이 뜬다.
+    const res = await fetch('/api/myassets/data', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+  } catch (e) { ladder.innerHTML = ''; return; }
 
   if (data.error || !(data.holdings || []).length) { _renderOnboard(); return; }
 

@@ -164,7 +164,11 @@ async function loadAll() {
   let res, data;
   try {
     res  = await fetch('/api/myassets/data', { cache: 'no-store' });
+    // 5xx가 JSON 본문을 갖고 오는 경우가 있다. status를 안 보면 보유내역이
+    // 통째로 비어 "자산 0원"으로 렌더된다 (2026-07-21 장애).
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     data = await res.json();
+    if (data.error) throw new Error(data.error);
   } catch (e) {
     // 네트워크/서버 실패 — 빈 화면 대신 안내 (F-1 3-상태 감사 2026-07-03)
     const wrap = document.getElementById('holdingsTableWrap');

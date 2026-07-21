@@ -19,16 +19,40 @@ async function confirmDelete() {
   if (!t) return;   // 비로그인 = 토글 없음
   const hint = document.getElementById('pushHint');
   const isApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  if (hint) hint.textContent = isApp
+  const baseHint = isApp
     ? '기본값은 꺼짐입니다. 동의해야만 알림을 받을 수 있고, 언제든 다시 끌 수 있어요.'
     : '푸시 알림은 앱에서 켤 수 있어요. (웹은 화면이 열려 있을 때만 알림이 표시돼요)';
-  fetch('/api/push/status').then(r => r.json()).then(j => { t.checked = !!j.enabled; }).catch(() => {});
+  if (hint) hint.textContent = baseHint;
+
+  // 토글 = 서버 동의 AND 기기 알림 권한. 재설치하면 서버 동의는 남아 있어도
+  // OS 권한은 초기화된다 — 그때 토글이 켜진 채로 보이면 켤 방법이 없어진다.
+  // 권한이 없으면 꺼진 상태로 보여주고, 켜는 순간 OS 권한 요청을 띄운다.
+  (async () => {
+    let enabled = false;
+    try { enabled = !!(await (await fetch('/api/push/status')).json()).enabled; } catch (e) {}
+    const perm = await window.mmPushPermission();
+    if (isApp && enabled && perm !== 'granted') {
+      enabled = false;
+      if (hint) hint.textContent = perm === 'denied'
+        ? '기기에서 이 앱의 알림이 꺼져 있어요. 휴대폰 설정 › 앱 › Money Milestone › 알림에서 허용해 주세요.'
+        : '기기 알림 권한이 아직 없어요. 켜면 권한을 요청할게요.';
+    }
+    t.checked = enabled;
+  })();
+
   t.addEventListener('change', async () => {
     if (t.checked) {
       if (!isApp) { t.checked = false; mmToast('푸시 알림은 앱에서 켤 수 있어요.'); return; }
       const ok = await window.mmInitPush(true);
-      if (ok) { mmToast('알림을 켰어요.', 'ok'); }
-      else { t.checked = false; mmToast('알림 권한이 필요해요. 휴대폰 설정 › 앱 › 알림에서 허용해 주세요.', 'err'); }
+      if (ok) {
+        if (hint) hint.textContent = baseHint;
+        mmToast('알림을 켰어요.', 'ok');
+      } else {
+        t.checked = false;
+        const perm = await window.mmPushPermission();
+        if (hint && perm === 'denied') hint.textContent = '기기에서 이 앱의 알림이 꺼져 있어요. 휴대폰 설정 › 앱 › Money Milestone › 알림에서 허용해 주세요.';
+        mmToast('알림 권한이 필요해요. 휴대폰 설정 › 앱 › 알림에서 허용해 주세요.', 'err');
+      }
     } else {
       try { await fetch('/api/push/disable', { method: 'POST' }); } catch (e) {}
       mmToast('알림을 껐어요.');

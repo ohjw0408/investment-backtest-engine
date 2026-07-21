@@ -1,5 +1,19 @@
 # Log
 
+## [2026-07-21] BUGFIX | 내 자산 0원 장애 — KRX 무응답이 worker를 죽여 500 (BUG-MYASSETS-ZERO-KRX-STALL)
+
+오너 보고(긴급): 플레이스토어 정식버전 설치 후 앱에 자산이 안 뜨고, **웹에서도 보유자산이 0원**. 단 배당금은 정상.
+
+- **데이터는 무사했다.** prod `data/private/users.db` = 사용자 3명, 오너(user_id=1) 보유 8행·저장 포폴 15개 전부 존재. 재설치·OAuth 중복계정 아님(당일 신규 user 생성 0건). `users.db`는 `.gitignore`(`data/private/`) 대상이라 배포 `reset --hard`와도 무관.
+- **뿌리**: `/api/myassets/data`와 `/api/portfolio/history`가 요청 안에서 KRX Open API를 동기 호출. `krx_client._get`의 `timeout=30`이 하드코딩이고 KOSPI·KOSDAQ을 **순차 2회** 부르므로 최대 60초. gunicorn sync worker `timeout=30`이 먼저 만료 → **WORKER TIMEOUT → SIGKILL → 500**. 07-21 KRX가 실제로 무응답(prod에서 `stk_bydd_trd`·`ksq_bydd_trd` 3연속 30.2s read timeout 실측).
+- **왜 배당만 멀쩡했나**: `/api/myassets/dividends`는 KRX를 안 탄다. nginx 로그가 그대로 증언 — 같은 초에 dividends 200 / data 500.
+- **왜 0원으로 보였나**: 프런트가 `res.ok`를 검사하지 않고 500 응답을 데이터로 취급 → `holdings=[]`·`prices={}` → 0원. 홈은 같은 이유로 온보딩 카드를 띄움.
+- **왜 자가회복이 안 됐나**: Redis 20분 시세 캐시는 **성공한 fetch만** 채운다. 장애 중엔 성공이 0이라 캐시가 영원히 cold → 매 요청이 다시 60초를 시도하는 죽음의 고리.
+- **수정(76a0901)**: ①`KRXClient(timeout=)` — 요청경로 `(3s, 6s)`로 2시장 최대 18s ②서킷브레이커 `krx_api:down` Redis TTL 600s ③최후 폴백 = `price_daily`/`index_daily` 최신 종가(0원 대신 낡은 값) ④두 라우트가 시세 예외로 500을 내지 않음 ⑤프런트 `res.ok` 가드.
+- **검증(KRX가 여전히 죽어 있는 실전 조건)**: prod에서 캐시 비우고 gunicorn 경유 실 HTTP — `/api/myassets/data` cold **13.2s 200**, 총액 **95,777,660원**, 브레이커 작동 후 **0.0s 200**, `/api/portfolio/history` current 일치. 로컬은 KRX·yfinance를 둘 다 죽인 상태에서 DB 폴백 동작 확인. Playwright 라이트/다크 렌더 + 콘솔 에러 0.
+- **재발방지 관점의 교훈**: 요청 경로의 외부 API는 **worker timeout보다 반드시 짧은 예산**을 가져야 한다. 그리고 **캐시는 장애 대비책이 아니다** — 성공해야만 채워지므로 장애 중엔 없는 것과 같다. 진짜 대비책은 DB 폴백처럼 항상 존재하는 소스다.
+- 함께 수정: 설정›계정 푸시 토글이 서버 동의만 보고 기기 알림 권한을 안 봐서, 재설치 후 "켜짐"으로 보이면서 권한 요청을 다시 띄울 방법이 없던 문제. `window.mmPushPermission()` 신설, 권한 없으면 꺼짐으로 표시 + 켜는 순간 OS 권한 요청.
+
 ## [2026-07-20] FEATURE | 앱 오프라인 폴백 화면 (Play 출시 준비)
 
 Play 스토어 출시용 AAB 점검 중, 원격 로드형 Capacitor 앱(`server.url` = co.kr)에 오프라인/서버오류 처리가 전혀 없어 네트워크 끊기면 크롬 기본 에러페이지가 뜨는 문제 확인. Play 정책 4.3(Minimum Functionality)에서 웹뷰 래퍼 앱의 가치 요소로 offline support를 보기도 해 함께 보강.

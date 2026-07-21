@@ -59,19 +59,55 @@ INDEX_DB_PATH = META_DIR / "index_master.db"
 PRICE_DB_PATH = PRICE_DIR / "price_daily.db"
 KR_ETF_PATH   = META_DIR / "kr_etf_list.csv"
 
+# ── ETF 코드 → 프록시 직접 매핑 (category 추론보다 우선) ──────────
+# us_etf_list.csv의 category는 4,593행 중 3,540행이 "US Equity - Large Cap Blend"로 뭉개진
+# yfinance 원문이라 프록시 선택 근거로 쓸 수 없다. 2026-07-21 사고: QQQ·QQQM이 이 버킷에
+# 들어가 ^GSPC로 백필되면서 1928년 S&P500이 "나스닥100 과거"로 둔갑(합성비중 76%·94%,
+# 1년 손실확률 26.7%/29.6% vs 실제 ^NDX 17.4%). 중국·브라질·인도·한국 ETF 14종도 동일.
+#
+# 불변식: **틀린 프록시보다 백필 없음이 낫다.** 실제 추종지수가 index_master.db에 있는
+# 종목만 매핑하고, 맞는 지수가 없으면 None으로 백필을 명시 거부한다.
+ETF_PROXY_OVERRIDE = {
+    # S&P 500 계열 — ^GSPC가 실제로 맞음
+    "SPY": "^GSPC", "IVV": "^GSPC", "VOO": "^GSPC", "VTI": "^GSPC", "RSP": "^GSPC",
+    # 나스닥 100
+    "QQQ": "^NDX", "QQQM": "^NDX", "JEPQ": "^NDX",
+    # 러셀 2000
+    "IWM": "^RUT", "IWN": "^RUT",
+    # 반도체
+    "SOXX": "^SOX", "SMH": "^SOX",
+    # 중국(항셍 H주), 인도(니프티50), 한국(코스피200)
+    "FXI": "^HSCE", "MCHI": "^HSCE",
+    "INDA": "^NSEI", "EWY": "KS200",
+    # 신흥국 / 글로벌
+    "IEMG": "EEM", "VWO": "EEM", "VXUS": "ACWI",
+    # 배당(DJ US Dividend 100 체인)
+    "SCHD": "DJUSDIV_PROXY", "PEY": "DJUSDIV_PROXY", "RDVY": "DJUSDIV_PROXY",
+    # ── 맞는 지수가 index_master에 없음 → 백필 거부 ──
+    # 자기 자신이 프록시라 의미 없음(EEM), 프록시 시작일이 실데이터보다 늦어 소용없음(EFA·VEA),
+    # 국가/섹터 지수 자체가 없음(나머지)
+    "EEM": None, "EFA": None, "VEA": None,
+    "EWZ": None, "EWA": None, "ARGT": None, "KWEB": None,
+    "XLE": None, "XLF": None, "XLI": None, "XLV": None,
+    "KRE": None, "IBB": None, "XBI": None,
+}
+
 # ── US ETF category → index_master.db 코드 매핑 ──────────
 US_CATEGORY_MAP = {
-    "US Equity - Large Cap Blend":      "^GSPC",
+    # yfinance가 미국 주식형 대부분을 이 버킷에 밀어넣는다(3,540/4,593). 여기에 ^GSPC를
+    # 달아두면 나스닥·중국·섹터 ETF가 전부 S&P500 과거를 갖게 되므로 None으로 막고,
+    # 실제 S&P 추종 종목만 ETF_PROXY_OVERRIDE에서 명시 허용한다.
+    "US Equity - Large Cap Blend":      None,
     "US Equity - Large Cap Growth":     "^NDX",
     "US Equity - Large Cap Value":      "^GSPC",
     "US Equity - Total Market":         "^GSPC",
-    "US Equity - Mid Cap Blend":        "^GSPC",
+    "US Equity - Mid Cap Blend":        None,      # 중형 지수 없음 — ^GSPC(대형)는 다른 유니버스
     "US Equity - Small Cap Blend":      "^RUT",
     "US Equity - Small Cap Growth":     "^RUT",
     "US Equity - Small Cap Value":      "^RUT",
     "US Equity - Dividend":             "DJUSDIV_PROXY",  # SCHD<-SDY<-DVY<-^GSPC chain
     "US Equity - Dividend Growth":      "DJUSDIV_PROXY",  # SCHD<-SDY<-DVY<-^GSPC chain
-    "US Equity - Factor":               "^GSPC",
+    "US Equity - Factor":               None,      # 팩터 지수 없음
     "US Bond - Long Treasury":          "DGS30",
     "US Bond - Intermediate Treasury":  "DGS10",
     "US Bond - Short Treasury":         "DGS3MO",
@@ -89,24 +125,26 @@ US_CATEGORY_MAP = {
     "Commodity - Agriculture":          None,
     "International Equity - Developed": "ACWI",
     "International Equity - Emerging":  "EEM",
-    "International Equity - Country":   "ACWI",
+    "International Equity - Country":   None,      # 단일국가 ≠ 글로벌 지수
     "Global Equity":                    "ACWI",
     "International Bond":               "DGS10",
     "Emerging Markets Bond":            "DGS10",
+    # 섹터 ETF에 ^GSPC를 물리면 "헬스케어 1928년 과거" 같은 허구가 생긴다. 실제 섹터 지수가
+    # index_master에 있는 반도체·기술만 남기고 나머지는 백필 거부.
     "US Sector - Technology":           "^NDX",
-    "US Sector - Healthcare":           "^GSPC",
-    "US Sector - Financials":           "^GSPC",
-    "US Sector - Energy":               "CL=F",
-    "US Sector - Consumer Discretionary": "^GSPC",
-    "US Sector - Consumer Staples":     "^GSPC",
-    "US Sector - Industrials":          "^GSPC",
-    "US Sector - Materials":            "^GSPC",
-    "US Sector - Real Estate":          "^GSPC",
-    "US Sector - Utilities":            "^GSPC",
-    "US Sector - Communication":        "^GSPC",
-    "Asset Allocation":                 "^GSPC",
-    "Thematic":                         "^GSPC",
-    "Covered Call":                     "^GSPC",
+    "US Sector - Healthcare":           None,
+    "US Sector - Financials":           None,
+    "US Sector - Energy":               None,      # CL=F(원유 선물) ≠ 에너지 주식
+    "US Sector - Consumer Discretionary": None,
+    "US Sector - Consumer Staples":     None,
+    "US Sector - Industrials":          None,
+    "US Sector - Materials":            None,
+    "US Sector - Real Estate":          None,
+    "US Sector - Utilities":            None,
+    "US Sector - Communication":        None,
+    "Asset Allocation":                 None,      # 멀티에셋 ≠ 주가지수
+    "Thematic":                         None,
+    "Covered Call":                     None,      # 손익구조가 지수와 근본적으로 다름
     "Leveraged":                        None,
     "Inverse":                          None,
     "Crypto":                           None,
@@ -533,6 +571,10 @@ class BackfillEngine:
             index_code = index_nm if index_nm and index_nm != "None" else None
         else:
             index_code = INDEX_MAP.get(index_nm)
+
+        # 코드별 명시 매핑이 category 추론을 이긴다(오분류 차단). 값 None = 백필 거부.
+        if not is_bond and code in ETF_PROXY_OVERRIDE:
+            index_code = ETF_PROXY_OVERRIDE[code]
 
         # 금현물·국제금 ETF는 GC=F 대신 KRX_GOLD(KRW/g 네이티브) 프록시 사용
         if code in _GOLD_KRX_SPOT:

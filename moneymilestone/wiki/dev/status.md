@@ -1,5 +1,5 @@
 ---
-updated: 2026-07-22
+updated: 2026-07-23
 tags: [dev]
 ---
 
@@ -16,6 +16,9 @@ tags: [dev]
 > 2026-07-22 업데이트: **시스템 글자배율 대응**(BUG-FONTSCALE-CLIP). 어머니 폰에서 홈 총자산이 잘린 원인은 해상도가 아니라 삼성 글자크기 설정 → WebView `textZoom`이 CSS 폰트에 곱해진 것 + flex 자식 `min-width:auto`가 축소를 막은 것. 레이아웃이 큰 글자를 흡수하도록 수정(`min-width:0`·wrap·여백 압축) + 신규 공용 유틸 `mmFitText()`(넘칠 때만 축소, 배율은 존중). 신규 회귀 하니스 `tests/test_font_scale_responsive.js`(뷰포트 8종 × 배율 4단) **82 PASS / 0 FAIL**. APK 재빌드 불필요. ⚠️실기기 확인 미완.
 
 > 2026-07-22 업데이트 2: **레이아웃 안전성 전수 정비**. 전 22페이지 x 폭 8종(260~1280) x 글자배율 4단 x 로그인·비로그인 검사에서 실패 468 -> **0 (156/156 PASS)**. 전역 안전망(`*{min-width:0}`·`overflow-wrap:break-word`) + grid `minmax(0,1fr)` 63건 + 중앙정렬 래퍼 `width:100%` 10건 + `mmFitText` 측정 기준 수정. 신규 하니스 `tests/test_layout_safety.js`(병렬·모서리 우선). ⚠️ 실기기·세로비율·CI편입 미완.
+
+> 2026-07-23 업데이트: **금액 입력란 콤마 표시**(27칸). `type=number`는 콤마를 못 담아 `text`로 전환해야 하는데 그러면 `parseFloat("1,980,000")===1`로 **조용히 틀린다** — 읽기 지점 400곳을 안 건드리려고 해당 엘리먼트의 `value` 접근자를 오버라이드(화면=콤마, `el.value`=raw). 신규 골든 마스터 `tests/golden_number_inputs.js`로 계산 결과 보존 검증. ISA 전환 2칸은 계산 자동실행이 안 돼 검증 불가라 **의도적 제외**. 상세=[[layout-safety]]·[[money-input-format]].
+> **잔여(우선순위순)**: ①레이아웃 하니스 **CI 편입**(지금 수동 — 재발 자동차단 안 됨) ②육안 검토 시트 오너 확인 ③실기기(폴드·플립·태블릿) ④세로 비율·힌지 미검사 ⑤`--fs-*` 유동 타이포(선택) ⑥ISA 전환 콤마 ⑦[[bugs|BUG-NAVLINKS-1280]].
 
 # 현재 개발 상태
 

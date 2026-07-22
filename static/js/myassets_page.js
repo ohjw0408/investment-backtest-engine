@@ -310,8 +310,10 @@ async function savePrivacySetting() {
 // ── 보유 종목 = 종목별 한 줄 카드(계좌 합산) + 탭하면 계좌별 펼침 ──
 function renderHoldings() {
   const wrap = document.getElementById('holdingsTableWrap');
+  syncHistoryEmptyMode();
   if (!holdings.length) {
-    wrap.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">보유 종목이 없습니다. + 종목 추가를 눌러 시작하세요</div>';
+    wrap.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">'
+      + '보유 종목이 없습니다.<br><button class="btn-primary" style="margin-top:14px;" onclick="openAddHolding()">+ 첫 종목 추가</button></div>';
     return;
   }
 
@@ -1161,6 +1163,7 @@ async function loadPortfolioHistory(days) {
     _historyData = await res.json();
     renderHistoryChart(days);
   } catch(e) {
+    syncHistoryEmptyMode();
     document.getElementById('maHistoryEmpty').style.display = 'flex';
   } finally {
     document.getElementById('maHistoryLoading').style.display = 'none';
@@ -1175,9 +1178,16 @@ function setHistoryPeriod(days, btn) {
   if (_historyData) renderHistoryChart(days);
 }
 
+// 빈 차트 안내 = 보유 종목 유무로 문구 분기 (없으면 "첫 종목 추가" CTA, 있으면 이력 없음 안내)
+function syncHistoryEmptyMode() {
+  const el = document.getElementById('maHistoryEmpty');
+  if (el) el.classList.toggle('has-holdings', holdings.length > 0);
+}
+
 function renderHistoryChart(days) {
   const data = _historyData;
   if (!data || data.empty || !data.labels || !data.values || !data.labels.length) {
+    syncHistoryEmptyMode();
     document.getElementById('maHistoryEmpty').style.display = 'flex';
     _lastHistWindow = null;
     updateHeroMetric();

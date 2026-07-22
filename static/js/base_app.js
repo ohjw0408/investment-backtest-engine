@@ -507,3 +507,50 @@ function mmPrompt(title, opts) {
     grp.querySelectorAll('.mmnav-menu a').forEach(a => a.addEventListener('click', () => grp.classList.remove('mmnav-open')));
   });
 })();
+
+/* ── 글자배율 대응: 긴 텍스트를 컨테이너 폭에 맞춤 (mmFitText) ────────────────
+ *
+ * Android WebView 는 시스템 "글자 크기" 설정을 textZoom 으로 CSS 폰트에 곱한다.
+ * 배율을 크게 쓰는 사용자(주로 40~50대)의 폰에서는 CSS 미디어쿼리로는 손댈 수
+ * 없는 크기로 글자가 커진다. 줄바꿈이 불가능한 한 덩어리(금액 `₩75,808,745`,
+ * 퍼센트 `-24.18%`)는 그대로 카드 밖으로 나가 잘린다.
+ *
+ * 원칙: 배율과 싸우지 않는다. 사용자가 일부러 키운 것이므로 강제로 되돌리면
+ * 오히려 못 읽는다. 다만 "잘려서 안 보이는 것"보다는 "조금 작아도 다 보이는 것"이
+ * 낫기 때문에, 넘칠 때만 minPx 를 하한으로 축소한다. 넘치지 않으면 손대지 않는다.
+ */
+function mmFitText(el, minPx) {
+  if (!el) return;
+  const box = el.parentElement;
+  if (!box) return;
+  minPx = minPx || 14;
+
+  el.style.fontSize = '';                       // CSS 원래 크기로 되돌린 뒤 재측정
+  const base = parseFloat(getComputedStyle(el).fontSize);
+  const avail = box.clientWidth;
+  if (!base || avail <= 0) return;
+
+  /* 요소의 getBoundingClientRect().width 를 쓰면 안 된다. min-width:0 으로 박스가 이미
+     컨테이너 폭에 맞춰 줄어든 상태라 항상 "맞는다"고 나오고, 정작 줄바꿈이 안 되는
+     금액 문자열은 박스 밖으로 삐져나가 카드에 잘린다. 글자 자체의 폭을 재야 한다. */
+  const textWidth = () => {
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    return r.getBoundingClientRect().width;
+  };
+
+  let w = textWidth();
+  if (w <= avail) return;                       // 안 넘치면 개입하지 않음
+
+  // 폭은 글자크기에 거의 비례 → 비율로 한 번에 근사(리플로우 최소화)
+  let size = Math.max(minPx, Math.floor(base * avail / w));
+  el.style.fontSize = size + 'px';
+
+  // 자간·반올림 때문에 남는 오차는 1px씩 보정
+  for (let i = 0; i < 6 && size > minPx; i++) {
+    if (textWidth() <= avail) break;
+    size -= 1;
+    el.style.fontSize = size + 'px';
+  }
+}
+window.mmFitText = mmFitText;

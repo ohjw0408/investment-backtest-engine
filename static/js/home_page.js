@@ -55,6 +55,13 @@ let _homeHideAmounts = true;
 let _homePeek = false;   // 로컬 금액 보기 (개인 가림설정 임시 해제, 저장 안 함)
 let _homePortfolioPeriod = '1m';
 
+/* 총자산 금액을 카드 폭에 맞춤. 마스킹(***) ↔ 실금액 전환, 창 회전/폴드 펼침,
+   시스템 글자배율 어디서든 잘리지 않게 한다. */
+function fitPortfolioAmount() {
+  if (window.mmFitText) window.mmFitText(document.getElementById('portfolioValue'), 16);
+}
+window.addEventListener('resize', fitPortfolioAmount);
+
 function togglePeek() {
   _homePeek = !_homePeek;
   const b = document.getElementById('peekBtn');
@@ -187,6 +194,8 @@ function renderPortfolio(period = '1m') {
   valEl.textContent = fmtMaskedKRW(data.current || values[values.length - 1] || 0);
   setPortfolioChange('portfolioDailyChange', '1일', values.slice(-2));
   setPortfolioChange('portfolioPeriodChange', periodLabels[period] || '1주', slicedValues);
+  // 큰 글자배율(시스템 설정)에서 금액이 카드 밖으로 잘리지 않게 — CSS로는 못 잡는 축
+  fitPortfolioAmount();
   renderTopMover(n, periodLabels[period] || '1주', data);
 
   const canvas = document.getElementById('portfolioChart');

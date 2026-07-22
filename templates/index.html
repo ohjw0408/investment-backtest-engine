@@ -107,7 +107,14 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 .dashboard-grid.is-auth .guru-promo    { order: 4; }
 .dashboard-grid.is-auth .feat-sec      { order: 5; }
 /* md-hero(브랜드 헤더)는 order 미지정(0) → 항상 최상단 */
-.portfolio-amount { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.portfolio-amount { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-width: 0; }
+/* flex 자식의 기본 min-width:auto 는 "내용보다 작아지지 않음"이라 축소를 막는다.
+   좁은 폭(폴드 바깥화면)이나 큰 글자배율에서 금액이 카드 밖으로 나가 잘리던 원인. */
+.portfolio-header > div { min-width: 0; }
+/* 금액은 항상 한 줄. 마스킹 표기(***,***,***원)는 '원' 앞에서 줄바꿈이 가능해
+   두 줄로 깨지는데, 그러면 넘치지 않으니 mmFitText 도 개입하지 않는다.
+   nowrap 으로 고정해 "넘치면 줄인다" 한 가지 규칙만 남긴다. */
+#portfolioValue { min-width: 0; white-space: nowrap; }
 .portfolio-change { background: var(--up-tint); color: var(--up); padding: 3px 11px; border-radius: var(--r-pill); font-size: 14px; font-weight: 600; }
 .portfolio-change.down { background: var(--down-tint); color: var(--down); }
 .portfolio-change-stack { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -306,7 +313,9 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
     radial-gradient(135% 165% at 100% -25%, color-mix(in srgb, var(--brand) 32%, transparent), transparent 56%),
     linear-gradient(135deg, color-mix(in srgb, var(--brand) 20%, var(--ds-dark-el)), var(--ds-dark-el) 70%);
   border-color: color-mix(in srgb, var(--brand) 36%, transparent); }
-.guru-promo-top { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
+/* 아바타(고정폭 44px×4) + nowrap 배지가 한 줄에 안 들어가면 배지를 다음 줄로.
+   폴드 바깥화면(320px)·큰 글자배율에서 배지가 카드 밖으로 잘리던 원인. */
+.guru-promo-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; row-gap: 8px; position: relative; z-index: 1; }
 .guru-promo-avatars { display: flex; flex-shrink: 0; }
 .guru-promo-av { width: 44px; height: 44px; border-radius: var(--r-full, 50%); display: flex; align-items: center;
   justify-content: center; font-weight: 800; font-size: 14px; color: #fff; border: 2.5px solid var(--ds-canvas);

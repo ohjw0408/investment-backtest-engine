@@ -642,7 +642,12 @@ a { text-decoration: none; color: inherit; }
   display: flex;
   justify-content: center;
   padding: 0 20px;
+  /* flex 자식의 기본 min-width:auto 는 "내용보다 좁아지지 않음"이라, 시스템 글자배율을
+     크게 쓰면 검색창이 안 줄어들고 네비바 전체가 가로로 넘친다(태블릿 폭에서는
+     모바일 미디어쿼리도 안 걸린다). 검색창이 먼저 양보하게 한다. */
+  min-width: 0;
 }
+.nav-search-wrap .nav-search-box { min-width: 0; }
 
 .nav-search-box {
   position: relative;
@@ -830,6 +835,12 @@ img, canvas, svg, video { max-width: 100%; }
 /* ≤1024px: 사이드바 → 슬라이드 드로어 + 햄버거 */
 @media (max-width: 1024px) {
   .nav-hamburger { display: flex; }
+
+  /* 태블릿 폭은 모바일 미디어쿼리(≤768) 밖이라 네비바가 데스크톱 밀도 그대로다.
+     시스템 글자배율을 크게 쓰면 그 상태로 가로가 넘친다. 여기서 줄일 수 있는 건
+     장식용 여백뿐이므로(로고 우측 여백·검색창 좌우 패딩) 그것부터 양보시킨다. */
+  .logo { margin-right: 12px; }
+  .nav-search-wrap { padding: 0 8px; }
 
   .sidebar {
     position: fixed;

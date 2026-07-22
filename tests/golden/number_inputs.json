@@ -1,0 +1,242 @@
+{
+  "calculator": {
+    "readback": {
+      "initialCapital": "19800000",
+      "monthlyContrib": "19800000",
+      "feeRateInput": "7.5"
+    },
+    "posts": [
+      "/api/calculator/submit {\"tickers\":[{\"code\":\"SPY\",\"name\":\"SPDR S&P 500 ETF\",\"badge\":\"US ETF\",\"weight\":1},{\"code\":\"TLT\",\"name\":\"iShares 20+ Year Treasury\",\"badge\":\"US ETF\",\"weight\":0}],\"initial_capital\":19800000,\"monthly_contribution\":19800000,\"years\":20,\"rebal_mode\":\"monthly\",\"band_width\":0.05,\"dividend_mode\":\"reinvest\",\"tax_enabled\":false,\"account_type\":\"위탁\",\"isa_renewal\":false,\"gain_harvesting\":false,\"use_synthetic\":false,\"user_settings\":{}}"
+    ],
+    "rendered": [
+      "\n1",
+      "2",
+      " 10",
+      "30",
+      "2",
+      "2",
+      "2",
+      "2",
+      "2",
+      " 500",
+      " 20",
+      "\n100%",
+      "₩19,800,000",
+      "₩19,800,000",
+      " 20",
+      "\n1",
+      "\n10",
+      "\n20",
+      "\n30",
+      "\n40",
+      " 15",
+      " 2026"
+    ]
+  },
+  "backtest": {
+    "readback": {
+      "btSeed": "19800000",
+      "btMonthly": "19800000"
+    },
+    "posts": [
+      "/api/backtest/submit {\"tickers\":[{\"code\":\"SPY\",\"name\":\"SPDR S&P 500 ETF\",\"weight\":1},{\"code\":\"TLT\",\"name\":\"iShares 20+ Year Treasury\",\"weight\":0}],\"start_date\":\"2010-01-01\",\"end_date\":\"2026-07-22\",\"initial_capital\":19800000,\"monthly_contribution\":19800000,\"dividend_mode\":\"reinvest\",\"rebal_mode\":\"none\",\"band_width\":0.05,\"use_synthetic\":false,\"tax_enabled\":false,\"account_type\":\"위탁\",\"gain_harvesting\":false,\"isa_renewal\":false,\"user_settings\":{}}"
+    ],
+    "rendered": [
+      "\n1",
+      "2",
+      " 30",
+      "2",
+      "2",
+      "2",
+      "2",
+      "2",
+      " 500",
+      " 20",
+      "\n100%",
+      "₩19,800,000",
+      "₩19,800,000",
+      " 15",
+      " 2026"
+    ]
+  },
+  "dividend": {
+    "readback": {
+      "dtTargetDiv": "19800000",
+      "dtSeedVal": "19800000",
+      "dtMonthlyVal": "19800000",
+      "dtYearsVal": "12",
+      "feeRateInput": "7.5"
+    },
+    "posts": [
+      "/api/dividend-target/submit {\"tickers\":[{\"code\":\"SPY\",\"name\":\"SPDR S&P 500 ETF\",\"badge\":\"US ETF\",\"weight\":1},{\"code\":\"TLT\",\"name\":\"iShares 20+ Year Treasury\",\"badge\":\"US ETF\",\"weight\":0}],\"target_monthly_div\":19800000,\"probability\":0.5,\"dividend_mode\":\"reinvest\",\"rebal_mode\":\"none\",\"band_width\":0.05,\"account_type\":\"none\",\"earned_income\":50000000,\"isa_type\":\"general\",\"seed\":{\"center\":19800000,\"step\":5000000,\"n\":2,\"mode\":\"fixed\"},\"monthly\":{\"center\":19800000,\"step\":500000,\"n\":2,\"mode\":\"fixed\"},\"years\":{\"center\":12,\"step\":5,\"n\":2,\"mode\":\"fixed\"}}"
+    ],
+    "rendered": [
+      "\n1",
+      "2",
+      " 15",
+      " 2026"
+    ]
+  },
+  "retirement": {
+    "readback": {
+      "simSeed": "19800000",
+      "simMonthly": "19800000",
+      "simAccYearsInput": "12",
+      "simWithdraw": "19800000",
+      "simWdYearsInput": "12",
+      "simPensionStartAge": "58",
+      "simInflation": "7.5",
+      "retTargetProbInput": "7",
+      "feeRateInput": "7.5"
+    },
+    "posts": [
+      "/api/retirement/submit {\"tickers\":[{\"code\":\"SPY\",\"name\":\"SPDR S&P 500 ETF\",\"weight\":1},{\"code\":\"TLT\",\"name\":\"iShares 20+ Year Treasury\",\"weight\":0}],\"initial_capital\":19800000,\"monthly_contribution\":19800000,\"accumulation_years\":12,\"dividend_mode\":\"reinvest\",\"rebal_mode\":\"none\",\"band_width\":0.05,\"monthly_withdrawal\":19800000,\"withdrawal_years\":12,\"inflation\":0.075,\"pension_start_age\":58,\"target_percentile\":0.07,\"use_synthetic\":false,\"tax_enabled\":false,\"account_type\":\"위탁\",\"isa_renewal\":false,\"gain_harvesting\":false,\"user_settings\":{}}"
+    ],
+    "rendered": [
+      "\n1",
+      "2",
+      " 15",
+      " 2026"
+    ]
+  },
+  "simple": {
+    "readback": {
+      "stCpInitial": "19800000",
+      "stCpMonthly": "19800000",
+      "stCpReturn": "7.5",
+      "stCpYears": "12",
+      "stCpIncrease": "7.5",
+      "stCpInflation": "7.5"
+    },
+    "posts": [],
+    "rendered": [
+      "\n1",
+      "2",
+      " 15.4%",
+      "₩66",
+      " 1,810",
+      "₩43",
+      " 9,727",
+      "₩22",
+      " 2,082",
+      "₩27",
+      " 7,863",
+      "\n1",
+      "₩2",
+      " 5,740",
+      "₩2",
+      " 6,843",
+      "₩2",
+      " 4,970",
+      "\n2",
+      "₩5",
+      " 1,282",
+      "₩5",
+      " 5,424",
+      "₩4",
+      " 7,960",
+      "\n3",
+      "₩7",
+      " 8,739",
+      "₩8",
+      " 8,142",
+      "₩7",
+      " 950",
+      "\n4",
+      "₩10",
+      " 8,256",
+      "₩12",
+      " 5,455",
+      "₩9",
+      " 3,941",
+      "\n5",
+      "₩13",
+      " 9,987",
+      "₩16",
+      " 7,870",
+      "₩11",
+      " 6,931",
+      "\n6",
+      "₩17",
+      " 4,097",
+      "₩21",
+      " 5,941",
+      "₩13",
+      " 9,921",
+      "\n7",
+      "₩21",
+      " 766",
+      "₩27",
+      " 279",
+      "₩16",
+      " 2,912",
+      "\n8",
+      "₩25",
+      " 185",
+      "₩33",
+      " 1,552",
+      "₩18",
+      " 5,902",
+      "\n9",
+      "₩29",
+      " 2,561",
+      "₩40",
+      " 497",
+      "₩20",
+      " 8,892",
+      "\n10",
+      "₩33",
+      " 8,114",
+      "₩47",
+      " 7,918",
+      "₩23",
+      " 1,883",
+      "\n11",
+      "₩38",
+      " 7,084",
+      "₩56",
+      " 4,699",
+      "₩25",
+      " 4,873",
+      "\n12",
+      "₩43",
+      " 9,727",
+      "₩66",
+      " 1,810",
+      "₩27",
+      " 7,863",
+      " 15.4%",
+      " 15",
+      " 2026"
+    ]
+  },
+  "taxswitch": {
+    "readback": {
+      "tsCurrentValue": "19800000",
+      "tsCostBasis": "19800000",
+      "tsYears": "12"
+    },
+    "posts": [],
+    "rendered": [
+      "\n1",
+      "2",
+      "2",
+      "2",
+      "2",
+      "2",
+      "2",
+      " 500",
+      " 500",
+      " 500",
+      " 4",
+      " 2",
+      " 500",
+      " 500",
+      " 100%",
+      " 40",
+      " 1",
+      " 15",
+      " 2026"
+    ]
+  }
+}

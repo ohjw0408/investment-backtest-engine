@@ -569,3 +569,99 @@ function mmFitText(el, minPx) {
   }
 }
 window.mmFitText = mmFitText;
+
+/* ── 금액 입력란 콤마 표시 (mmMoneyInput) ────────────────────────────────────
+ *
+ * 목적: 평단가·초기투자금 같은 금액 칸에서 타이핑하는 동안 화면에 1,980,000 처럼
+ * 보이게 한다. 저장·계산에 쓰이는 값은 그대로 1980000 이어야 한다.
+ *
+ * 왜 이렇게 구현했나
+ *   `<input type="number">` 는 콤마를 담지 못한다(명세상 값이 유효한 부동소수점
+ *   문자열이어야 하고, 콤마가 들어가면 브라우저가 값을 빈 문자열로 취급한다).
+ *   그래서 `type="text"` 로 바꿀 수밖에 없는데, 그 순간 이 칸을 읽는 모든 코드가
+ *   "1,980,000" 을 받게 되고 `parseFloat` 은 **1** 을 반환한다. 예외도 안 나고
+ *   계산도 정상적으로 돌아간다 — 결과만 조용히 틀린다.
+ *
+ *   읽는 지점이 앱 전체에 400곳 가까이 흩어져 있어 하나씩 고치면 반드시 빠뜨린다.
+ *   그래서 **해당 엘리먼트에만** `value` 접근자를 덮어써서, 화면에는 콤마가 보이되
+ *   `el.value` 로 읽으면 언제나 콤마 없는 숫자가 나오도록 했다. 기존 읽기 코드는
+ *   한 줄도 바꾸지 않아도 되고, 앞으로 추가될 코드도 자동으로 안전하다.
+ *
+ * 적용 전제(확인함): 이 앱에는 `valueAsNumber`·네이티브 `<form>` 전송·`stepUp()`·
+ * `checkValidity()` 사용처가 없다. 셋 다 type=number 에 묶인 기능이라 전환 시
+ * 깨질 수 있는 지점이었다.
+ */
+function mmMoneyInput(el) {
+  if (!el || el.dataset.mmMoney) return;
+  el.dataset.mmMoney = '1';
+
+  const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  const rawOf = s => String(s == null ? '' : s).replace(/,/g, '');
+
+  function fmt(s) {
+    const v = rawOf(s);
+    if (v === '' || v === '-') return v;
+    const m = v.match(/^(-?)(\d*)(\.\d*)?$/);
+    if (!m) return v;                       // 숫자 형태가 아니면 건드리지 않는다
+    const grouped = m[2].replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return m[1] + grouped + (m[3] || '');
+  }
+
+  el.type = 'text';                          // number 는 콤마도 캐럿 제어도 불가
+  el.setAttribute('inputmode', 'numeric');
+  el.setAttribute('autocomplete', 'off');
+
+  Object.defineProperty(el, 'value', {
+    configurable: true,
+    get() { return rawOf(desc.get.call(this)); },   // 읽기 = 항상 콤마 없는 숫자
+    set(v) { desc.set.call(this, fmt(v)); },        // 쓰기 = 자동으로 콤마 표시
+  });
+
+  // 타이핑 중 재포맷 — 캐럿은 "앞에 있던 숫자 개수"를 기준으로 되돌린다
+  el.addEventListener('input', function () {
+    const before = desc.get.call(el);
+    const caret = el.selectionStart;
+    const digitsLeft = before.slice(0, caret).replace(/\D/g, '').length;
+    const after = fmt(before);
+    if (after === before) return;
+    desc.set.call(el, after);
+    let i = 0, seen = 0;
+    while (i < after.length && seen < digitsLeft) {
+      if (/\d/.test(after[i])) seen++;
+      i++;
+    }
+    try { el.setSelectionRange(i, i); } catch (e) {}
+  });
+
+  desc.set.call(el, fmt(desc.get.call(el)));   // 서버가 심어둔 초기값도 포맷
+}
+window.mmMoneyInput = mmMoneyInput;
+
+/* 콤마를 붙일 금액(원) 칸 목록. 수익률·기간·나이·수량은 대상이 아니다 —
+   "7.5%"·"30년"·"만 58세"에 콤마가 낄 일이 없다.
+   ⚠️ tsCurrentValue·tsCostBasis(ISA 전환)는 의도적으로 제외했다. 그 페이지는
+   계산을 자동으로 돌릴 수 없어 골든 마스터로 결과 보존을 검증할 수 없었다. */
+window.MM_MONEY_INPUT_IDS = [
+  'btSeed', 'btMonthly',
+  'initialCapital', 'monthlyContrib',
+  'dtTargetDiv', 'dtSeedVal', 'dtSeedStep', 'dtMonthlyVal', 'dtMonthlyStep',
+  'purchaseAmount', 'holdingAvgPrice', 'manualPriceInput',
+  'pdAmount',
+  'simSeed', 'simMonthly', 'simWithdraw', 'wdSeed', 'wdWithdraw',
+  'earnedIncome',
+  'stCpInitial', 'stCpMonthly', 'stDvInitial', 'stDvMonthly',
+  'stDgTarget', 'stInfCost', 'stRvAmount',
+];
+
+(function () {
+  function applyMoneyInputs() {
+    window.MM_MONEY_INPUT_IDS.forEach(id => mmMoneyInput(document.getElementById(id)));
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyMoneyInputs);
+  } else {
+    applyMoneyInputs();
+  }
+  // 모달 안에 나중에 그려지는 칸(내 자산 종목 추가 등)도 잡는다
+  window.mmApplyMoneyInputs = applyMoneyInputs;
+})();

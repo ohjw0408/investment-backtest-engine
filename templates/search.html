@@ -87,9 +87,9 @@
 .sp-recent-chip b { font-family: var(--font-mono); font-size: 0.78rem; color: var(--brand-text); }
 
 /* 결과·인기 카드 그리드 */
-.results-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-@media (max-width: 860px) { .results-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 520px) { .results-grid { grid-template-columns: 1fr; } }
+.results-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .results-grid { grid-template-columns: minmax(0, 1fr); } }
 
 .result-card {
   background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-lg);

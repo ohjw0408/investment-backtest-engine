@@ -5,12 +5,14 @@
 <link rel="stylesheet" href="{{ static_v('css/calculator.css') }}">
 <style>
 /* 폼 아키타입 (코인베이스 룩) — ds 토큰. 클래스·ID 보존(tax_switch.js 의존) */
-.ts-wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
+/* width:100% 필수 — margin:0 auto 만 있으면 grid 아이템이 stretch 대신 fit-content 가 되어
+   내부 min-content 를 그대로 물려받고, 좁은 화면에서 화면 밖으로 밀려난다. */
+.ts-wrap { max-width: 1080px; width: 100%; margin: 0 auto; padding: 32px 24px 80px; }
 .ts-header { margin-bottom: 24px; }
 .ts-header .calc-title { font-size:var(--fs-h1); font-weight:600; letter-spacing:-.6px; color:var(--ds-ink); }
 .ts-header .calc-sub { font-size:var(--fs-sm); color:var(--ds-body); margin-top:6px; line-height:1.6; }
 .ts-panel-box { background:var(--ds-canvas); border:1px solid var(--ds-hairline); border-radius:var(--r-xl); padding:var(--sp-lg); margin-bottom:16px; }
-.ts-input-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:18px; margin-bottom:var(--sp-base); }
+.ts-input-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap:18px; margin-bottom:var(--sp-base); }
 .ts-field label { display:block; font-size:var(--fs-sm); font-weight:600; color:var(--ds-ink); margin-bottom:6px; }
 /* 입력칸 = 폼 아키타입 */
 .ts-wrap .input-group { position:relative; display:flex; align-items:center; }
@@ -52,7 +54,7 @@
 }
 .ts-verdict .headline { font-size:1.05rem; font-weight:700; margin-bottom:4px; color:var(--ds-ink); }
 .ts-verdict .sub { font-size:var(--fs-sm); color:var(--ds-body); line-height:1.6; }
-.ts-sum-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; margin:var(--sp-md) 0; }
+.ts-sum-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(190px, 100%), 1fr)); gap:12px; margin:var(--sp-md) 0; }
 .ts-sum-card { background:var(--ds-soft); border:1px solid var(--ds-hairline); border-radius:var(--r-lg); padding:16px 18px; }
 .ts-sum-label { font-size:var(--fs-cap); font-weight:500; color:var(--ds-muted); margin-bottom:4px; }
 .ts-sum-value { font-size:1.05rem; font-weight:600; font-family:var(--font-mono); font-variant-numeric:tabular-nums; color:var(--ds-ink); }

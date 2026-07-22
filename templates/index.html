@@ -7,7 +7,7 @@
 /* ═══ HOME — 코인베이스 룩 (이 페이지 전용 오버라이드, block head=홈만 렌더) ═══ */
 /* 깊이: 배경은 한 톤 낮춤(후경), 카드는 띄움(전경) — 라이트=soft/흰카드, 다크=최암/elevated */
 .main-content { font-family: var(--font-sans); color: var(--ds-ink); background: var(--ds-soft);
-  gap: var(--sp-lg); padding: var(--sp-xl); grid-template-columns: 1fr; }
+  gap: var(--sp-lg); padding: var(--sp-xl); grid-template-columns: minmax(0, 1fr); }
 [data-theme="dark"] .main-content { background: var(--ds-soft); }
 .dashboard-grid { max-width: 960px; margin-inline: auto; width: 100%; }
 
@@ -31,7 +31,8 @@
 .portfolio-change.down { color: var(--down); }
 
 /* 기간 최대 기여 종목 한 줄 (→ 내 자산 종목별 손익) */
-.pf-top-mover { display: flex; align-items: center; gap: 6px; margin: 0 var(--sp-lg); padding: 9px 0 2px;
+/* 좁은 폭·큰 글자배율에서 '최대 기여: 종목명 -33.8%' 가 카드를 넘치던 문제 → 줄바꿈 허용 */
+.pf-top-mover { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 var(--sp-lg); padding: 9px 0 2px;
   border-top: 1px solid var(--ds-hairline); font-size: var(--fs-sm); color: var(--ds-body);
   text-decoration: none; }
 .pf-top-mover:hover { color: var(--ds-ink); }
@@ -171,7 +172,7 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 .feat-sec { margin-top: 4px; }
 .feat-sec-title { font-size: var(--fs-title); font-weight: 600; color: var(--ds-ink); margin: 0 0 2px 2px; }
 .feat-sec-sub { font-size: var(--fs-cap); color: var(--ds-muted); margin: 0 0 14px 2px; }
-.feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.feat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .feat-tile { display: flex; flex-direction: column; gap: 10px; padding: 26px 24px; background: var(--ds-canvas);
   border: 1px solid var(--ds-hairline); border-radius: var(--r-xl); text-decoration: none; color: inherit; transition: border-color .15s, box-shadow .15s; }
 .feat-tile:hover { border-color: var(--brand); box-shadow: var(--ds-shadow); }
@@ -195,7 +196,7 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 .demo-overlay .ds { font-size: var(--fs-cap); color: var(--ds-muted); }
 
 /* ── 비로그인 CTA 2카드 (각 장점 설명) ── */
-.cta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cta-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
 .cta-card { display: flex; flex-direction: column; gap: 5px; padding: 22px; border-radius: var(--r-xl); text-decoration: none; }
 .cta-card.primary { background: var(--ds-dark); color: #fff; }
 .cta-card.ghost { background: var(--ds-canvas); border: 1px solid var(--ds-hairline); color: var(--ds-ink); }
@@ -235,7 +236,9 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 
 /* 기둥1 자산관리 — 데모 포폴 느낌 유지(예시배지·모노금액·업필·스파크라인 + 자물쇠/그라데/유도문구 오버레이) */
 .md-amount-row { display: flex; align-items: center; gap: 9px; margin-top: 11px; flex-wrap: wrap; }
-.md-amount { font-family: var(--font-mono); font-size: 26px; font-weight: 500; letter-spacing: -1px; color: var(--ds-ink); }
+/* 히어로 금액과 같은 처리 — 줄바꿈 불가 토큰이라 한 줄 고정하고, 넘칠 때만 mmFitText 가 줄인다. */
+.md-amount { font-family: var(--font-mono); font-size: 26px; font-weight: 500; letter-spacing: -1px; color: var(--ds-ink);
+  min-width: 0; white-space: nowrap; }
 .md-spark-wrap { position: relative; height: 96px; margin-top: 8px; }
 .md-spark-wrap canvas { width: 100% !important; height: 96px !important; }
 .md-door .demo-overlay { padding: 0 14px 12px; gap: 3px;
@@ -257,7 +260,8 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 .md-gauge-scale { display: flex; justify-content: space-between; margin-top: 9px; font-size: 10px;
   color: var(--ds-muted); font-family: var(--font-mono); }
 .md-gauge-scale .tgt { color: var(--ds-body); font-weight: 600; }
-.md-gauge-cap { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+/* 설명문 + 칩이 한 줄에 안 들어가면 칩을 다음 줄로(좁은 폭·큰 글자배율). */
+.md-gauge-cap { display: flex; align-items: center; justify-content: space-between; gap: 10px; row-gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .md-gauge-cap-t { font-size: 12px; color: var(--ds-body); }
 .md-gauge-cap-t b { color: var(--ds-ink); font-weight: 700; font-family: var(--font-mono); }
 .md-gauge-cap-t i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px;
@@ -266,7 +270,9 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
   padding: 3px 10px; border-radius: var(--r-pill); flex-shrink: 0; }
 
 /* 기둥3 계산·시뮬 — 8개 도구 2열 그리드(아이콘+제목+한줄설명) */
-.md-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+/* minmax(0,1fr) 이어야 한다. 그냥 1fr 은 minmax(auto,1fr) 이고 auto 최소값 = min-content 라
+   grid 아이템이 내용보다 작아지지 못해, 큰 글자배율·좁은 폭에서 열이 화면 밖으로 나간다. */
+.md-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
 .md-tool { display: flex; align-items: flex-start; gap: 9px; padding: 11px 11px; border-radius: var(--r-md);
   background: var(--ds-soft); text-decoration: none; }
 .md-tool:active { background: var(--ds-hairline); }
@@ -279,7 +285,8 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 
 /* 시장지수 밑 거시 안내 + 맨밑 법무 링크 (모바일 비로그인) */
 .mobile-macro, .mobile-legal { display: none; }
-.mm-macro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* .md-tools 와 같은 이유로 minmax(0,1fr) — 1fr 은 min-content 밑으로 못 줄어든다. */
+.mm-macro-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .mm-macro-card { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: var(--r-xl);
   background: var(--ds-canvas); border: 1px solid var(--ds-hairline); box-shadow: var(--ds-shadow); text-decoration: none; }
 [data-theme="dark"] .mm-macro-card { background: var(--ds-dark-el); border-color: transparent; }
@@ -377,8 +384,8 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 html.is-app .dashboard-grid:not(.is-auth) .mobile-legal { display: block; }
 
 @media (max-width: 720px) {
-  .feat-grid { grid-template-columns: 1fr; }
-  .cta-grid { grid-template-columns: 1fr; }
+  .feat-grid { grid-template-columns: minmax(0, 1fr); }
+  .cta-grid { grid-template-columns: minmax(0, 1fr); }
 }
 /* 데스크톱 전용(비로그인 웹 홈) — 모바일 불변 */
 @media (min-width: 769px) {

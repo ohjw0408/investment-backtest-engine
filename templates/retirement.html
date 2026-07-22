@@ -53,7 +53,7 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "assets" "modes" "target" "advanced";
   }
-  .ret-mode-grid { grid-template-columns: 1fr; }
+  .ret-mode-grid { grid-template-columns: minmax(0, 1fr); }
   .bt-full { grid-column: auto; }
 }
 
@@ -644,14 +644,14 @@
           <input type="range" id="retSplitYearsSlider" min="1" max="20" value="5" style="flex:1;" oninput="retUpdateSplitPlan(this.value)">
           <span id="retSplitYearsLabel" style="font-size:0.85rem;font-weight:700;min-width:30px;color:var(--ds-ink);">5년</span>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;" id="retSplitMetrics"></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(120px, 100%),1fr));gap:8px;" id="retSplitMetrics"></div>
         <div style="font-size:0.72rem;color:var(--ds-muted);margin-top:8px;">※ 참고용. 실제 세무 처리는 세무사와 확인하세요.</div>
       </div>
 
       <!-- 히어로 — 생존 확률 -->
       <div class="bt-hero">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
-          <div style="flex:1;min-width:200px;">
+          <div style="flex:1;min-width:min(200px, 100%);">
             <div class="bt-hero-label">목표 생존 확률 달성도</div>
             <div class="bt-hero-value" id="retSurvivalPct">—</div>
             <div class="survival-bar-wrap">

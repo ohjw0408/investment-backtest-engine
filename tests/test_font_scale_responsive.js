@@ -6,11 +6,12 @@
  * 시스템 글자배율을 textZoom으로 CSS 폰트에 곱해서 생긴 넘침.
  *
  * 기존 test_responsive_dark.js가 이걸 못 잡은 이유: 카드가 overflow:hidden 이라
- * documentElement.scrollWidth 는 안 넘친다. 잘림은 요소 안에서 일어난다.
- * → 요소별 scrollWidth > clientWidth (자기 자신이 내용을 자르는 요소) 를 봐야 한다.
+ * documentElement.scrollWidth 는 안 넘친다. 잘림은 카드 *안에서* 일어난다.
  *
- * textZoom 시뮬레이션: 모든 요소의 computed font-size 를 읽어 scale 배로 인라인 고정.
- * Android textZoom 이 하는 일과 동일(단위 무관, 해석된 px에 곱).
+ * 검사 두 가지 — 문서 가로 오버플로우(가로 스크롤바) + 텍스트 잘림.
+ * 잘림 판정은 텍스트 노드의 Range 사각형 기준이다. scrollWidth 기준은 장식용
+ * 가상요소·의도된 말줄임·네이티브 select 까지 잡아 오탐이 압도적으로 많았다.
+ * 자세한 근거는 findClipped()/applyTextZoom() 주석 참고.
  *
  * 실행: node tests/test_font_scale_responsive.js [BASE_URL] [SESSION_COOKIE]
  */
@@ -158,12 +159,20 @@ function findClipped() {
     await ctx.addCookies([{ name: 'session', value: COOKIE, domain: '127.0.0.1', path: '/' }]);
   }
 
+  /* 비로그인 홈은 로그인 홈과 DOM 이 완전히 다르다(도구 타일 그리드·온보딩 카드 등).
+     로그인 상태만 돌리면 그쪽 레이아웃은 한 번도 렌더되지 않는다 — 실제로 그렇게
+     놓친 넘침이 prod 에서 잡혔다(2026-07-22 `.md-tools` grid). 쿠키 없는 컨텍스트로
+     비로그인 홈도 같은 매트릭스에 태운다. */
+  const anonCtx = await browser.newContext();
+  PAGES.push(['home-anon', '/']);
+
   for (const [pname, url] of PAGES) {
     for (const [vpName, w, h] of VIEWPORTS) {
       for (const scale of SCALES) {
-        if (pname !== 'home' && !REDUCED.some(([v, s]) => v === vpName && s === scale)) continue;
+        const fullMatrix = (pname === 'home' || pname === 'home-anon');
+        if (!fullMatrix && !REDUCED.some(([v, s]) => v === vpName && s === scale)) continue;
 
-        const page = await ctx.newPage();
+        const page = await (pname === 'home-anon' ? anonCtx : ctx).newPage();
         await page.setViewportSize({ width: w, height: h });
         try {
           await page.goto(BASE + url, { waitUntil: 'networkidle', timeout: 25000 });
@@ -196,6 +205,7 @@ function findClipped() {
   }
 
   await ctx.close();
+  await anonCtx.close();
   await browser.close();
   console.log(`\n총 ${pass} PASS / ${fail} FAIL`);
   if (failures.length) console.log(`\n실패 목록:\n- ` + failures.join('\n- '));

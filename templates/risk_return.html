@@ -36,8 +36,8 @@
 .rr-chip button:hover { background: var(--red, #C62828); color: #fff; }
 .rr-chip-empty { font-size: 0.78rem; color: var(--text-muted); padding: 4px 0; }
 /* 추가 입력 = + 아이콘으로 "추가" 명확 */
-.rr-search-wrap { position: relative; flex: 1; min-width: 200px; }
-.rr-add-wrap { position: relative; flex: 1; min-width: 200px; }
+.rr-search-wrap { position: relative; flex: 1; min-width: min(200px, 100%); }
+.rr-add-wrap { position: relative; flex: 1; min-width: min(200px, 100%); }
 .rr-add-wrap::before { content: '+'; position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--blue); font-weight: 800; font-size: 1rem; pointer-events: none; z-index: 1; }
 .rr-add-wrap .rr-input { padding-left: 28px; border-style: dashed; border-color: var(--blue); }
 .rr-add-wrap .rr-input::placeholder { color: var(--blue); opacity: 0.75; }
@@ -61,7 +61,7 @@
 /* 모바일 항목 카드 (표 대체) */
 .rr-mcard { border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
 .rr-mcard-head { font-weight: 800; font-size: 0.92rem; margin-bottom: 8px; display: flex; align-items: center; }
-.rr-mgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.rr-mgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 14px; }
 .rr-mrow { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; padding: 3px 0; border-bottom: 1px solid var(--border); }
 .rr-mrow .l { color: var(--text-muted); }
 .rr-mrow .v { font-weight: 700; }
@@ -162,7 +162,7 @@ body.rr-ov-fullscreen-open { overflow: hidden; }
 .rr-ov-ctrl .qr.on { border-color: var(--blue); color: var(--blue); font-weight: 700; }
 .rr-ov-ctrl label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .rr-ov-warn { color: var(--gold-deep, #B26A00); font-size: 0.74rem; }
-.rr-corr-grid { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(280px,0.95fr); gap: 14px; align-items: start; }
+.rr-corr-grid { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(min(280px, 100%),0.95fr); gap: 14px; align-items: start; }
 .rr-corr-grid > * { min-width: 0; max-width: 100%; }
 .rr-corr-table th, .rr-corr-table td { text-align: center; }
 .rr-corr-table th:first-child, .rr-corr-table td:first-child { text-align: left; }
@@ -212,7 +212,7 @@ body.rr-ov-fullscreen-open { overflow: hidden; }
   .rr-opacity input[type=range] { flex: 1; }
   .rr-pf-list { gap: 6px; }
   .rr-pf-chk { padding: 6px 10px; font-size: 0.8rem; }
-  .rr-corr-grid { grid-template-columns: 1fr; }
+  .rr-corr-grid { grid-template-columns: minmax(0, 1fr); }
   .rr-corr-grid > * { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 /* 심화 비교 아코디언 (P3) */
@@ -227,7 +227,7 @@ body.rr-ov-fullscreen-open { overflow: hidden; }
 .rr-acc-body { padding: 4px 16px 18px; }
 .rr-acc-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px; }
 .rr-acc-desc b { color: var(--text); }
-.rr-sample-guide { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 12px; }
+.rr-sample-guide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin: 10px 0 12px; }
 .rr-sample-guide-item { border: 1px solid var(--border); border-radius: 9px; background: var(--bg); padding: 10px 12px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.55; }
 .rr-sample-guide-item b { color: var(--text); font-size: 0.82rem; }
 .rr-sample-ctrl { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin: 0 0 12px; font-size: 0.78rem; color: var(--text-muted); }
@@ -235,8 +235,8 @@ body.rr-ov-fullscreen-open { overflow: hidden; }
 .rr-sample-ctrl .qr { padding: 4px 9px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text-muted); font-size: 0.74rem; cursor: pointer; font-family: inherit; }
 .rr-sample-ctrl .qr.on { border-color: var(--blue); color: var(--blue); font-weight: 800; background: rgba(25,118,210,0.08); }
 .rr-sample-caption { flex-basis: 100%; font-size: 0.72rem; color: var(--text-muted); line-height: 1.45; }
-.rr-acc-2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
-@media (max-width: 760px) { .rr-acc-2, .rr-sample-guide { grid-template-columns: 1fr; } }
+.rr-acc-2 { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 760px) { .rr-acc-2, .rr-sample-guide { grid-template-columns: minmax(0, 1fr); } }
 .rr-acc-chart { position: relative; height: 380px; }
 .rr-lp-panel { margin-top: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--bg); }
 .rr-lp-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
@@ -259,7 +259,7 @@ body.rr-ov-fullscreen-open { overflow: hidden; }
     <span style="font-size:1.5rem;flex-shrink:0;">🔓</span>
     <div style="flex:1;font-size:0.86rem;color:var(--text);line-height:1.5;">
       로그인 없이 바로 만들어 비교해보세요. <b>로그인하면</b> 만든 포트폴리오 저장·불러오기까지 돼요.
-      <a href="/auth/google" style="color:var(--blue);font-weight:700;white-space:nowrap;">Google로 로그인 →</a>
+      <a href="/auth/google" style="color:var(--blue);font-weight:700;">Google로 로그인 →</a>
     </div>
   </div>
   {% endif %}

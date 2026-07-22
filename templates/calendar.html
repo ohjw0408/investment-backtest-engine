@@ -9,17 +9,19 @@
 .cal-title { font-size: var(--fs-h2); font-weight: 600; letter-spacing: -0.4px; }
 .cal-sub { font-size: var(--fs-sm); color: var(--ds-muted); margin-top: 4px; }
 .cal-bar { display: flex; align-items: center; gap: 12px; margin: 20px 0 10px; flex-wrap: wrap; }
-.cal-nav { display: inline-flex; align-items: center; gap: 8px; }
+/* 좁은 화면에서 '오늘' 버튼이 밖으로 나가던 문제 → 줄바꿈 허용 */
+.cal-nav { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cal-nav button { border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-ink); border-radius: var(--r-pill); padding: 7px 14px; font-size: 0.9rem; cursor: pointer; font-family: var(--font-sans); transition: all .15s; }
 .cal-nav button:hover { border-color: var(--ds-muted); }
-.cal-nav .mlabel { font-size: var(--fs-title); font-weight: 600; min-width: 120px; text-align: center; }
+/* min-width 고정은 전역 안전망(*{min-width:0})보다 특이성이 높아 축소를 막는다 → 화면 폭 상한 */
+.cal-nav .mlabel { font-size: var(--fs-title); font-weight: 600; min-width: min(120px, 100%); text-align: center; }
 .cal-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
 .cal-filters button { border: 1px solid var(--ds-hairline); background: transparent; color: var(--ds-body); border-radius: var(--r-pill); padding: 6px 13px; font-size: 0.76rem; font-weight: 600; cursor: pointer; font-family: var(--font-sans); transition: all .15s; }
 .cal-filters button.on { border-color: var(--brand); background: var(--brand-tint); color: var(--brand-text); }
 .cal-settings-btn { display: inline-flex; align-items: center; gap: 5px; background: var(--brand); color: var(--on-brand); border-radius: var(--r-pill); padding: 8px 16px; font-size: 0.82rem; font-weight: 600; text-decoration: none; }
 .cal-settings-btn:hover { background: var(--brand-hover); }
 
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
 .cal-dow { text-align: center; font-size: 0.72rem; color: var(--ds-muted); font-weight: 600; padding: 4px 0; }
 .cal-cell { min-height: 92px; border: 1px solid var(--ds-hairline); border-radius: var(--r-md); padding: 5px 6px; background: var(--ds-canvas); display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
 .cal-cell.empty { background: transparent; border: none; }
@@ -45,7 +47,7 @@
 @keyframes cal-spin { to { transform: rotate(360deg); } }
 
 /* 배당 1주당 금액 팝오버 */
-.cal-pop { position: fixed; display: none; z-index: 2000; min-width: 200px; max-width: 280px;
+.cal-pop { position: fixed; display: none; z-index: 2000; min-width: min(200px, 100%); max-width: 280px;
   background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-lg);
   box-shadow: var(--ds-shadow-lg); padding: 12px 14px; font-size: 0.8rem; }
 .cal-pop .cp-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; }

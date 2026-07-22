@@ -29,10 +29,10 @@
 .tax-save-btn { width:100%; padding:14px; background:var(--brand); color:var(--on-brand); border:none; border-radius:var(--r-pill); font-size:var(--fs-body); font-weight:600; font-family:var(--font-sans); cursor:pointer; margin-top:4px; transition:background .15s; }
 .tax-save-btn:hover { background:var(--brand-hover); }
 /* 세금 카드 2열 고정 (폭 따라 열수 안 흔들리게 — 정렬 일관) */
-.tax-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-items: stretch; }
+.tax-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
 .tax-grid .tax-card { margin-bottom: 0; display: flex; flex-direction: column; }
 /* 선택 칩 토글 (캘린더 등 — raw 체크박스 대체, 결 통일) */
-.set-chk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.set-chk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr)); gap: 8px; }
 .set-chk { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--ds-hairline); border-radius: var(--r-md); background: var(--ds-canvas); cursor: pointer; font-size: 0.83rem; color: var(--ds-body); transition: border-color .12s, background .12s, color .12s; user-select: none; }
 [data-theme="dark"] .set-chk { background: var(--ds-dark-el); }
 .set-chk:hover { border-color: var(--brand); }
@@ -81,8 +81,8 @@
 .we-widget { margin-bottom: 0; }
 @media (max-width: 768px) {
   .settings-wrap { max-width: 760px; }
-  #weList { grid-template-columns: 1fr; }
-  .tax-grid { grid-template-columns: 1fr; }
+  #weList { grid-template-columns: minmax(0, 1fr); }
+  .tax-grid { grid-template-columns: minmax(0, 1fr); }
 }
 /* 카테고리 세그먼트 nav */
 .set-nav { display: flex; gap: 6px; background: var(--ds-soft); border: 1px solid var(--ds-hairline); border-radius: var(--r-pill); padding: 5px; margin-bottom: 20px; max-width: 460px; }

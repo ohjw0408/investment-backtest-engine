@@ -106,6 +106,27 @@ html[data-theme="dark"] {
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── 레이아웃 안전망 (2026-07-22) ────────────────────────────────────────────
+   flex/grid 자식의 `min-width` 기본값은 `auto` = "내용보다 좁아지지 않음"이다.
+   그래서 줄바꿈이 안 되는 내용(금액·긴 단어·고정폭 아이콘 묶음)이 들어가면
+   컨테이너가 화면 밖으로 밀려나며 잘린다. 좁은 화면(폴드 바깥 320px·플립 커버
+   260px)과 시스템 글자배율을 크게 쓴 기기에서 특히 심하다.
+
+   flex/grid 자식이 아닌 요소에서는 `min-width:auto`가 어차피 0으로 계산되므로
+   이 규칙은 사실상 flex/grid 자식에만 작용한다. 특이성이 0이라 개별 규칙이
+   필요하면 언제든 덮어쓸 수 있다.
+
+   ⚠️ grid 의 `1fr` 은 `minmax(auto, 1fr)` 이라 이 규칙으로도 안 잡힌다.
+   grid 열은 반드시 `minmax(0, 1fr)` 로 쓸 것. */
+*, *::before, *::after { min-width: 0; }
+
+/* 긴 URL·이메일·영문 장문 단어는 줄바꿈 지점이 없어 그대로 화면을 뚫는다
+   (약관·개인정보·계정삭제 페이지의 링크에서 실제로 +326px 넘침 발생).
+   `break-word` 는 min-content 계산을 바꾸지 않고 렌더 시 넘칠 때만 끊으므로
+   기존 레이아웃에 영향이 거의 없다. `anywhere` 는 폭 계산까지 바꿔서 쓰지 않는다.
+   끊기면 안 되는 곳(금액 등)은 각자 `white-space: nowrap` 으로 막는다. */
+body { overflow-wrap: break-word; }
+
 body {
   font-family: 'Noto Sans KR', sans-serif;
   background: var(--bg);
@@ -316,7 +337,7 @@ a { text-decoration: none; color: inherit; }
   min-width: 0;
   padding: 22px;
   display: grid;
-  grid-template-columns: 1fr 308px;
+  grid-template-columns: minmax(0, 1fr) 308px;
   grid-template-rows: auto auto;
   gap: 18px;
   align-content: start;
@@ -425,7 +446,7 @@ a { text-decoration: none; color: inherit; }
 
 .market-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
 }
 
 
@@ -815,7 +836,7 @@ a { text-decoration: none; color: inherit; }
    RESPONSIVE — 모바일/태블릿 레이아웃
    ============================================= */
 
-img, canvas, svg, video { max-width: 100%; }
+img, canvas, svg, video, table { max-width: 100%; }
 
 /* 사이드바 드로어 오버레이 (모바일) */
 .sidebar-overlay {
@@ -872,7 +893,7 @@ img, canvas, svg, video { max-width: 100%; }
   .sidebar-item { padding: 13px 20px; font-size: 0.95rem; }
 
   .main-content {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   /* 자식 min-content가 트랙을 밀어내며 가로 스크롤 만드는 것 방지 */
   .main-content > * { min-width: 0; max-width: 100%; }
@@ -902,7 +923,7 @@ img, canvas, svg, video { max-width: 100%; }
 
   .main-content { padding: 14px 12px; gap: 14px; }
 
-  .market-grid { grid-template-columns: 1fr 1fr; }
+  .market-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .market-loading { grid-column: span 2; }
   .widget-dots { display: flex; }
 
@@ -928,7 +949,7 @@ img, canvas, svg, video { max-width: 100%; }
   .nav-search-wrap { display: none; }
   .nav-right { gap: 5px; }
   .nav-auth-link { padding-inline: 9px !important; }
-  .market-grid { grid-template-columns: 1fr 1fr; }
+  .market-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   /* 로고 텍스트 숨김 — 아이콘만 (로그인 버튼과 겹침 방지) */
   .logo { font-size: 0; gap: 0; }
   .logo img { height: 30px !important; }

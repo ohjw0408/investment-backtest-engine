@@ -29,7 +29,9 @@
 /* 깊이: 배경 한 톤 낮춤(후경) + 카드 띄움(전경) — 홈과 동일 패턴 */
 .main-content { background: var(--ds-soft); }
 [data-theme="dark"] .main-content { background: var(--ds-soft); }
-.ma-wrap { max-width: 1100px; min-width: 0; margin: 0 auto; padding: 24px; }
+/* width:100% 필수 — margin:0 auto 만 있으면 grid 아이템이 stretch 대신 fit-content 가 되어
+   내부 min-content 를 그대로 물려받고, 좁은 화면에서 화면 밖으로 밀려난다. */
+.ma-wrap { max-width: 1100px; min-width: 0; width: 100%; margin: 0 auto; padding: 24px; }
 
 /* 아이콘 (duotone) */
 .ic { width: 18px; height: 18px; flex-shrink: 0; vertical-align: -3px; }
@@ -97,7 +99,7 @@
 /* 리밸런싱 */
 .rebal-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
 .rebal-row:last-child { border-bottom: none; }
-.rebal-action { font-weight: 700; padding: 3px 10px; border-radius: 6px; font-size: 0.78rem; min-width: 145px; text-align: center; flex-shrink: 0; }
+.rebal-action { font-weight: 700; padding: 3px 10px; border-radius: 6px; font-size: 0.78rem; min-width: min(145px, 100%); text-align: center; flex-shrink: 0; }
 .rebal-buy   { background:var(--green-pale); color:var(--green); }
 .rebal-sell  { background:var(--red-pale); color:var(--red); }
 .rebal-ok    { background:var(--bg); color:var(--text-muted); }
@@ -128,7 +130,7 @@
 .div-proj-badge { font-size:0.65rem; font-weight:700; color:#FB8C00; border:1px solid #FB8C00; border-radius:4px; padding:1px 5px; margin-left:6px; }
 
 /* 월별 배당 네모칸 */
-.div-month-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:12px; }
+.div-month-grid { display:grid; grid-template-columns:repeat(6,minmax(0, 1fr)); gap:8px; margin-bottom:12px; }
 .div-month-box { border:1.5px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center; cursor:pointer; background:var(--card); transition:border-color .15s, background .15s; }
 .div-month-box:hover { border-color:var(--blue); }
 .div-month-box.active { border-color:var(--blue); background:var(--blue); color:#fff; }
@@ -136,9 +138,9 @@
 .div-month-box .m-label { font-size:0.78rem; font-weight:700; }
 .div-month-box .m-amt { font-size:0.72rem; margin-top:2px; opacity:0.85; }
 .div-month-table { border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:8px; }
-@media (max-width:768px) { .div-month-grid { grid-template-columns:repeat(4,1fr); } }
+@media (max-width:768px) { .div-month-grid { grid-template-columns:repeat(4,minmax(0, 1fr)); } }
 
-.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr)); gap: 10px; margin-bottom: 16px; }
 .summary-item { padding: 12px 14px; background: var(--bg); border-radius: 10px; }
 .summary-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
 .summary-value { font-size: 1.05rem; font-weight: 800; }
@@ -148,9 +150,11 @@
 .ma-asset-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 20px 0; }
 .ma-asset-label { font-size: var(--fs-cap); font-weight: 600; color: var(--ds-muted); }
 .ma-asset-value-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 3px; }
+/* 홈 총자산과 동일 처리: 줄바꿈 불가 금액이라 한 줄로 고정하고,
+   컨테이너를 넘칠 때만 mmFitText 가 줄인다(myassets_page.js). */
 .ma-asset-value {
   font-family: var(--font-mono); font-size: 38px; font-weight: 600; color: var(--ds-ink);
-  letter-spacing: 0; line-height: 1.08; word-break: keep-all;
+  letter-spacing: 0; line-height: 1.08; word-break: keep-all; white-space: nowrap;
 }
 .ma-asset-change {
   display: none; font-size: 0.86rem; font-weight: 700; border-radius: var(--r-pill);

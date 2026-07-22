@@ -58,9 +58,13 @@ let _homePortfolioPeriod = '1m';
 /* 총자산 금액을 카드 폭에 맞춤. 마스킹(***) ↔ 실금액 전환, 창 회전/폴드 펼침,
    시스템 글자배율 어디서든 잘리지 않게 한다. */
 function fitPortfolioAmount() {
-  if (window.mmFitText) window.mmFitText(document.getElementById('portfolioValue'), 16);
+  if (!window.mmFitText) return;
+  window.mmFitText(document.getElementById('portfolioValue'), 16);
+  // 비로그인 홈의 데모 금액 — 렌더 경로가 달라 renderPortfolio 를 안 탄다
+  document.querySelectorAll('.md-amount').forEach(el => window.mmFitText(el, 14));
 }
 window.addEventListener('resize', fitPortfolioAmount);
+document.addEventListener('DOMContentLoaded', fitPortfolioAmount);
 
 function togglePeek() {
   _homePeek = !_homePeek;

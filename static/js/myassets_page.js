@@ -48,8 +48,15 @@ function _holdDays(d) {
 }
 function updateAssetHeroTotal(value) {
   const el = document.getElementById('maTotalAssetValue');
-  if (el) el.textContent = fmtKRW(value || 0);
+  if (!el) return;
+  el.textContent = fmtKRW(value || 0);
+  // 줄바꿈 불가 금액 — 좁은 화면·큰 글자배율에서 카드 밖으로 잘리지 않게
+  if (window.mmFitText) window.mmFitText(el, 16);
 }
+window.addEventListener('resize', () => {
+  const el = document.getElementById('maTotalAssetValue');
+  if (el && window.mmFitText) window.mmFitText(el, 16);
+});
 
 // 오늘± 총액(현재가 vs 직전 거래일 종가, KRW). 수동가격 종목 제외.
 function _todayChange() {

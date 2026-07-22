@@ -233,8 +233,8 @@
 [data-theme="dark"] .bt-card { background: var(--ds-dark-el); }
 @media (max-width: 860px) { .bt-card { padding: 16px 14px; } }
 .bt-card-title { font-size: var(--fs-sm); font-weight: 700; color: var(--ds-ink); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-.bt-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 720px) { .bt-grid-2 { grid-template-columns: 1fr; } }
+.bt-grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 720px) { .bt-grid-2 { grid-template-columns: minmax(0, 1fr); } }
 
 /* 결과 차트 — 고정 높이 래퍼 (Chart.js maintainAspectRatio:false) */
 .bt-chart-wrap { position: relative; height: 300px; }
@@ -247,7 +247,7 @@
 }
 
 /* 보조 지표 칩 그리드 */
-.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 10px; }
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(132px, 100%), 1fr)); gap: 10px; }
 .metric-item { padding: 12px 14px; background: var(--ds-soft); border-radius: var(--r-md); }
 [data-theme="dark"] .metric-item { background: var(--ds-strong); }
 .metric-label { font-size: var(--fs-cap); color: var(--ds-muted); margin-bottom: 4px; }
@@ -656,7 +656,7 @@
             <strong>손실확률</strong> = 그 기간 동안 굴린 모든 경우 중 원금보다 손해 본 비율. 보통 <strong>기간이 길수록 0에 가까워집니다</strong> — 장기투자의 핵심.
           </div>
           <div style="overflow-x:auto;">
-            <table id="btHorizonTable" class="bt-htable" style="width:100%;border-collapse:collapse;font-size:0.82rem;min-width:480px;"></table>
+            <table id="btHorizonTable" class="bt-htable" style="width:100%;border-collapse:collapse;font-size:0.82rem;min-width:min(480px, 100%);"></table>
           </div>
           <div class="bt-card-title" style="margin-top:22px;font-size:0.84rem;"><span class="bt-ico">{{ nicon('chart') }}</span> 연 수익률 분포 (오차막대)</div>
           <div style="font-size:0.78rem;color:var(--ds-muted);line-height:1.6;margin-bottom:10px;">

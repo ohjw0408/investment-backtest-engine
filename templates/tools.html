@@ -10,7 +10,7 @@
 .tl-sub { font-size: 0.82rem; color: var(--ds-muted); margin-top: 4px; }
 .tl-group { margin-top: 26px; }
 .tl-group-h { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ds-muted); margin-bottom: 10px; padding-left: 2px; }
-.tl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.tl-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .tl-card { display: flex; align-items: flex-start; gap: 13px; padding: 16px; border: 1px solid var(--ds-hairline);
   border-radius: var(--r-xl); background: var(--ds-canvas); text-decoration: none; color: var(--ds-ink);
   transition: border-color .14s, box-shadow .14s, transform .14s; }
@@ -22,7 +22,7 @@
 .tl-card-t { font-size: 0.92rem; font-weight: 700; display: flex; align-items: center; gap: 5px; }
 .tl-card-t .arr { color: var(--ds-muted); font-weight: 400; }
 .tl-card-d { font-size: 0.76rem; color: var(--ds-muted); margin-top: 4px; line-height: 1.45; }
-@media (max-width: 560px) { .tl-grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .tl-grid { grid-template-columns: minmax(0, 1fr); } }
 </style>
 {% endblock %}
 

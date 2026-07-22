@@ -18,7 +18,7 @@
 .mc-toggle button[data-view="CMP"]:not(.on),
 .mc-toggle button[data-view="CUSTOM"]:not(.on) { background: var(--brand-tint); color: var(--brand-text); }
 /* 분석 도구 바로가기 카드 (검색창 밑, 전면 노출) */
-.mc-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.mc-tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 12px; }
 .mc-tool { text-align: left; border: 1px solid var(--brand); background: var(--brand-tint); border-radius: var(--r-lg);
   padding: 12px 14px; cursor: pointer; font-family: var(--font-sans); display: flex; flex-direction: column; gap: 3px; transition: box-shadow .12s; }
 .mc-tool:hover { box-shadow: var(--ds-shadow-sm); }
@@ -37,7 +37,7 @@
 .mc-cat { margin-top: 22px; }
 .mc-cat-head { font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 .mc-cat-head .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--brand); }
-.mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px; }
+.mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(158px, 100%), 1fr)); gap: 12px; }
 
 /* 검색 */
 .mc-searchbar { margin-top: 14px; position: relative; }
@@ -103,7 +103,7 @@
   .mc-cat { scroll-margin-top: 104px; }  /* navbar 60 + 칩바 ~44 */
 
   /* ── B5-1: 지표 카드 → 리스트 행 (홈 위젯 D2 패턴) ── */
-  .mc-grid { grid-template-columns: 1fr; gap: 0; border: 1px solid var(--ds-hairline);
+  .mc-grid { grid-template-columns: minmax(0, 1fr); gap: 0; border: 1px solid var(--ds-hairline);
     border-radius: var(--r-lg); overflow: hidden; background: var(--ds-canvas); }
   .mc-card { border: none; border-bottom: 1px solid var(--ds-hairline); border-radius: 0;
     padding: 10px 14px; display: grid; column-gap: 12px; align-items: center;

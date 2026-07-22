@@ -173,7 +173,7 @@
 .mmnav-link:hover { background:var(--ds-strong); color:var(--ds-ink); }
 .mmnav-link.active { color:var(--ds-ink); font-weight:600; }
 .mmnav-caret { font-size:10px; opacity:.55; }
-.mmnav-menu { position:absolute; top:calc(100% + 6px); left:0; min-width:204px;
+.mmnav-menu { position:absolute; top:calc(100% + 6px); left:0; min-width:min(204px, 100%);
   background:var(--ds-canvas); border:1px solid var(--ds-hairline); border-radius:var(--r-lg);
   box-shadow:var(--ds-shadow-lg); padding:6px; display:none; flex-direction:column; z-index:300; }
 /* 트리거↔메뉴 6px 갭을 메뉴 폭 전체로 덮는 투명 브릿지 — 대각선 이동에도 hover 유지. */

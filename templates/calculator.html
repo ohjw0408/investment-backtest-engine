@@ -471,7 +471,7 @@
           <input type="range" id="calcSplitYearsSlider" min="1" max="20" value="5" style="flex:1;" oninput="calcUpdateSplitPlan(this.value)">
           <span id="calcSplitYearsLabel" style="font-size:0.85rem;font-weight:700;min-width:30px;">5년</span>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;" id="calcSplitMetrics"></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(120px, 100%),1fr));gap:8px;" id="calcSplitMetrics"></div>
         <div style="font-size:0.72rem;color:var(--ds-muted);margin-top:8px;">※ 참고용. 실제 세무 처리는 세무사와 확인하세요.</div>
       </div>
 

@@ -4,7 +4,9 @@
 
 {% block head %}
 <style>
-.ex-wrap { max-width: 960px; margin: 0 auto; padding: 22px 18px 64px; }
+/* width:100% 필수 — margin:0 auto 만 있으면 grid 아이템이 stretch 대신 fit-content 가 되어
+   내부 min-content 를 그대로 물려받고, 좁은 화면에서 화면 밖으로 밀려난다. */
+.ex-wrap { max-width: 960px; width: 100%; margin: 0 auto; padding: 22px 18px 64px; }
 
 /* 지역 탭 */
 .ex-tabs { display: flex; gap: 6px; margin: 18px 0 6px; background: var(--ds-soft); padding: 5px; border-radius: var(--r-pill, 999px); }
@@ -20,7 +22,7 @@
 .ex-sec-title { font-size: 14px; font-weight: 800; color: var(--ds-ink); margin: 24px 2px 12px; }
 
 /* 카드 그리드 */
-.ex-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ex-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .ex-card { display: flex; flex-direction: column; min-width: 0; padding: 16px 17px; border-radius: var(--r-xl, 16px);
   background: var(--ds-canvas); border: 1px solid var(--ds-hairline); box-shadow: var(--ds-shadow); }
 [data-theme="dark"] .ex-card { background: var(--ds-dark-el); border-color: transparent; }
@@ -132,7 +134,7 @@ html.is-app .ex-cmpbar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); 
 .exm-wbar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--brand-bright), var(--brand)); }
 .ex-modal-acts { margin-top: 18px; }
 
-@media (max-width: 640px) { .ex-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .ex-grid { grid-template-columns: minmax(0, 1fr); } }
 </style>
 {% endblock %}
 

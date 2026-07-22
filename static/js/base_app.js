@@ -521,14 +521,29 @@ function mmPrompt(title, opts) {
  */
 function mmFitText(el, minPx) {
   if (!el) return;
-  const box = el.parentElement;
-  if (!box) return;
+  if (!el.parentElement) return;
   minPx = minPx || 14;
 
   el.style.fontSize = '';                       // CSS 원래 크기로 되돌린 뒤 재측정
   const base = parseFloat(getComputedStyle(el).fontSize);
-  const avail = box.clientWidth;
-  if (!base || avail <= 0) return;
+  if (!base) return;
+
+  /* 가용 폭 = "잘리기 시작하는 지점까지의 거리".
+     바로 위 부모의 clientWidth 를 쓰면 안 된다. 부모 자신이 이미 카드 밖으로 밀려나
+     있으면(내 자산 히어로에서 실제로 그랬다) 부모 폭이 카드보다 넓게 나와 "맞는다"고
+     오판하고 축소가 걸리지 않는다. 실제로 내용을 자르는 조상을 찾아 거기까지의
+     남은 거리를 재야 한다. */
+  let clipper = el.parentElement;
+  for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+    if (getComputedStyle(p).overflowX !== 'visible') { clipper = p; break; }
+  }
+  const cRect = clipper.getBoundingClientRect();
+  const cStyle = getComputedStyle(clipper);
+  const rightEdge = cRect.right
+    - parseFloat(cStyle.borderRightWidth || 0)
+    - parseFloat(cStyle.paddingRight || 0);
+  const avail = rightEdge - el.getBoundingClientRect().left;
+  if (!(avail > 0)) return;
 
   /* 요소의 getBoundingClientRect().width 를 쓰면 안 된다. min-width:0 으로 박스가 이미
      컨테이너 폭에 맞춰 줄어든 상태라 항상 "맞는다"고 나오고, 정작 줄바꿈이 안 되는

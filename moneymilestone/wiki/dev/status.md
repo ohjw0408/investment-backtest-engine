@@ -15,6 +15,8 @@ tags: [dev]
 
 > 2026-07-22 업데이트: **시스템 글자배율 대응**(BUG-FONTSCALE-CLIP). 어머니 폰에서 홈 총자산이 잘린 원인은 해상도가 아니라 삼성 글자크기 설정 → WebView `textZoom`이 CSS 폰트에 곱해진 것 + flex 자식 `min-width:auto`가 축소를 막은 것. 레이아웃이 큰 글자를 흡수하도록 수정(`min-width:0`·wrap·여백 압축) + 신규 공용 유틸 `mmFitText()`(넘칠 때만 축소, 배율은 존중). 신규 회귀 하니스 `tests/test_font_scale_responsive.js`(뷰포트 8종 × 배율 4단) **82 PASS / 0 FAIL**. APK 재빌드 불필요. ⚠️실기기 확인 미완.
 
+> 2026-07-22 업데이트 2: **레이아웃 안전성 전수 정비**. 전 22페이지 x 폭 8종(260~1280) x 글자배율 4단 x 로그인·비로그인 검사에서 실패 468 -> **0 (156/156 PASS)**. 전역 안전망(`*{min-width:0}`·`overflow-wrap:break-word`) + grid `minmax(0,1fr)` 63건 + 중앙정렬 래퍼 `width:100%` 10건 + `mmFitText` 측정 기준 수정. 신규 하니스 `tests/test_layout_safety.js`(병렬·모서리 우선). ⚠️ 실기기·세로비율·CI편입 미완.
+
 # 현재 개발 상태
 
 **에이전트: 코드 작업 완료 후 이 파일 반드시 업데이트.**

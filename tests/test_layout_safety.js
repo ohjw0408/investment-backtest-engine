@@ -52,8 +52,8 @@ const PAGES = [
   ['macro',       '/macro',            'both'],
   ['calendar',    '/calendar',         'both'],
   ['examples',    '/examples',         'both'],
-  ['myportfolios','/myportfolios',     'auth'],
-  ['myassets',    '/myassets',         'auth'],
+  ['myportfolios','/myportfolios',     'both'],
+  ['myassets',    '/myassets',         'both'],
   ['taxsettings', '/tax-settings',     'auth'],
   ['settings',    '/settings',         'auth'],
   ['alerts',      '/alerts',           'auth'],
@@ -120,7 +120,15 @@ function findClipped() {
 
     const host = node.parentElement;
     if (!host) continue;
-    if (!host.offsetParent && getComputedStyle(host).position !== 'fixed') continue;
+    const hs = getComputedStyle(host);
+    if (!host.offsetParent && hs.position !== 'fixed') continue;
+
+    /* 비상호작용 장식은 잘려도 정보 손실이 없다 — 오히려 잘리라고 만든 것이다.
+       예: 내 자산 데모 카드의 "예시" 워터마크(absolute · right:-10px · opacity .05 ·
+       pointer-events:none · user-select:none · rotate). 클릭도 선택도 불가능한
+       absolute 요소는 사용자가 읽어야 할 내용이 아니다. */
+    if (hs.position === 'absolute' &&
+        (hs.pointerEvents === 'none' || hs.userSelect === 'none' || hs.webkitUserSelect === 'none')) continue;
 
     // 가로/세로 각각 "자르는 조상"을 찾는다
     for (const axis of ['x', 'y']) {

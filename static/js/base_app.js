@@ -147,6 +147,47 @@ function handleGoogleLogin(e) {
   } catch (e) {}
 })();
 
+// ── Capacitor 앱: 안드로이드 뒤로가기 ──
+// 기본 동작(webView.canGoBack()이면 goBack, 아니면 종료)만으로는 홈에 도달한 뒤에도
+// WebView 히스토리가 남아 있어 아무리 눌러도 앱이 안 닫힌다(오너 보고 2026-07-22).
+// 열린 오버레이 닫기 → 이전 페이지 → 홈에서 두 번 누르면 종료, 순으로 직접 처리한다.
+(function () {
+  try {
+    const Cap = window.Capacitor;
+    if (!(Cap && Cap.isNativePlatform && Cap.isNativePlatform())) return;
+    const App = Cap.Plugins && Cap.Plugins.App;
+    if (!App) return;
+
+    let exitArmedUntil = 0;
+
+    function closeOpenOverlay() {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar && sidebar.classList.contains('open')) {
+        sidebar.classList.remove('open');
+        const ov = document.getElementById('sidebarOverlay');
+        if (ov) ov.classList.remove('show');
+        return true;
+      }
+      const bell = document.getElementById('mmBellDd');
+      if (bell && bell.classList.contains('open')) { bell.classList.remove('open'); return true; }
+      const modal = document.querySelector('.modal-overlay.show');
+      if (modal) { modal.classList.remove('show'); return true; }
+      return false;
+    }
+
+    App.addListener('backButton', function () {
+      if (closeOpenOverlay()) return;
+      if (location.pathname !== '/') {
+        if (history.length > 1) history.back(); else location.href = '/';
+        return;
+      }
+      if (Date.now() < exitArmedUntil) { App.exitApp(); return; }
+      exitArmedUntil = Date.now() + 2000;
+      mmToast('한 번 더 누르면 종료됩니다');
+    });
+  } catch (e) {}
+})();
+
 function mmAlertTargetUrl(data) {
   data = data || {};
   const meta = data.meta && typeof data.meta === 'object' ? data.meta : data;

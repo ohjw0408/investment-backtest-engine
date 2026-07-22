@@ -5088,3 +5088,44 @@ _작성: Claude_
 실클릭 확인. 종목 추가 후 CTA가 사라지고 차트가 뜨는 것도 확인. 콘솔 에러 0.
 
 _작성: Claude_
+
+---
+
+## 2026-07-22 — 앱 뒤로가기가 홈에서 죽는 버그
+
+오너 보고: 안드로이드 앱에서 뒤로가기를 누르면 홈까지는 이동하지만, 홈에서는
+아무리 눌러도 앱이 종료되지 않는다.
+
+**원인 = 종료 코드가 아예 없었다.** `@capacitor/app`의 `AppPlugin.java:53-56`:
+
+```java
+if (!hasListeners(EVENT_BACK_BUTTON)) {
+    if (bridge.getWebView().canGoBack()) {
+        bridge.getWebView().goBack();
+    }
+}   // ← else 없음
+```
+
+JS에 `backButton` 리스너가 없으면 플러그인 기본 동작은 "뒤로 갈 수 있으면 뒤로,
+아니면 **무동작**". 홈(`/`)은 앱 시작 URL이라 `canGoBack=false` → 버튼이 죽는다.
+`Activity.finish()`를 호출하는 경로는 `App.exitApp()`뿐인데 아무도 안 부르고 있었다.
+(히스토리 오염 문제가 아니다.)
+
+**수정** = `static/js/base_app.js`에 앱 전용 `backButton` 리스너 등록. 우선순위:
+
+1. 열린 오버레이(사이드바 드로어 → 알림 벨 드롭다운 → `.modal-overlay.show`)가 있으면 닫고 소비
+2. 홈이 아니면 `history.back()` (히스토리가 없으면 `location.href='/'` — 푸시 딥링크 진입 대비)
+3. 홈이면 **두 번 눌러 종료** — 1회차 토스트 "한 번 더 누르면 종료됩니다", 2초 내 2회차에 `App.exitApp()`
+
+리스너를 등록하는 순간 위 기본 동작은 자동으로 비활성(`hasListeners` 분기)되므로 충돌 없음.
+
+⚠️ **APK 재빌드 불필요** — 앱은 `moneymilestone.co.kr`를 원격 로드하는 래퍼라 push만으로 반영된다.
+
+검증: Playwright에서 `window.Capacitor`를 스텁(`isNativePlatform`·`App.addListener`·`exitApp`
+카운터)해 실제 콜백을 발화. 7케이스 전부 PASS — ①/myassets에서 → `/`로 이동, 종료 안 함
+②홈 1회 → 토스트만, exit 0 ③2초 내 2회차 → exit 1 ④2.3초 대기 후 1회 → exit 0(armed 만료)
+⑤사이드바 열린 채 → 드로어만 닫힘, 이동·종료 없음 ⑥종목 추가 모달 열린 채 → 모달만 닫힘,
+경로 유지 ⑦일반 웹에선 `window.Capacitor` undefined = 리스너 미등록. pageerror 0.
+**실기기 확인은 미완** — 오너가 앱에서 직접 확인 필요.
+
+_작성: Claude_

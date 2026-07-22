@@ -1,5 +1,5 @@
 ---
-updated: 2026-07-21
+updated: 2026-07-22
 tags: [dev]
 ---
 
@@ -12,6 +12,8 @@ tags: [dev]
 > 2026-05-29 추가 업데이트 3: 세금 설정 프로필을 단일 입력원으로 통일. 투자계산기/백테스트/연금 탭의 나이·연간 근로소득 중복 입력칸 제거, 배당금 계산기도 서버 세금설정 API 우선 로드로 정리. 금융소득은 세금설정에서 묻지 않도록 UI 제거하고, 계산기별 자동 산출 계획을 `dev/ideas.md`에 기록. 서버 `192693c` 배포 및 주요 5개 화면 HTTP 200 확인.
 
 > 2026-05-30 업데이트: Track G G1(다중 계좌 시뮬레이션 엔진 — 자금이동 OFF) 투자계산기 탭 1차 구현 완료. `MultiAccountSimulationLoop`/`MultiAccountAnalyzer` 신규 추가, `calculator_logic.py` accounts 배열 분기 추가, 투자계산기 UI를 계좌별 독립 입력으로 변경. L0~L3 결정론적 테스트 4/4 PASS, 기존 Gate 2a/2b/2c 12/12 PASS, 브라우저 UI 스모크 확인. (Codex)
+
+> 2026-07-22 업데이트: **시스템 글자배율 대응**(BUG-FONTSCALE-CLIP). 어머니 폰에서 홈 총자산이 잘린 원인은 해상도가 아니라 삼성 글자크기 설정 → WebView `textZoom`이 CSS 폰트에 곱해진 것 + flex 자식 `min-width:auto`가 축소를 막은 것. 레이아웃이 큰 글자를 흡수하도록 수정(`min-width:0`·wrap·여백 압축) + 신규 공용 유틸 `mmFitText()`(넘칠 때만 축소, 배율은 존중). 신규 회귀 하니스 `tests/test_font_scale_responsive.js`(뷰포트 8종 × 배율 4단) **82 PASS / 0 FAIL**. APK 재빌드 불필요. ⚠️실기기 확인 미완.
 
 # 현재 개발 상태
 

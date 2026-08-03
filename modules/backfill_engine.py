@@ -168,7 +168,12 @@ INDEX_MAP = {
     "COPPER":              "HG=F",
     "OIL":                 "CL=F",
     "JAPAN_NIKKEI225":     "^N225",
-    "JAPAN_TOPIX":         "TPX.F",
+    # ⚠️ JAPAN_TOPIX 매핑 제거 (2026-08-03). index_master의 TPX.F는 값이 -7.53~29.60,
+    #    4,925행 중 2,551행(52%)이 0 이하로 **TOPIX 지수(약 2,700pt)가 아니다** —
+    #    선물 베이시스류로 보인다. 0을 넘나들어 pct_change가 -2,380%까지 튀고,
+    #    인버스 ETF(205720 ACE 일본TOPIX인버스)에 곱해져 하루 +465.3% 짜리 역사가 나왔다.
+    #    올바른 TOPIX 가격 시계열을 확보하기 전까지는 매핑하지 않는다(백필 없음 = 안전).
+    #    ^N225로 대체하는 건 다른 지수라 오너 판단 필요.
     "CHINA_HSCEI":         "^HSCE",
     "CHINA_CSI300":        "000300.SS",
     "INDIA_NIFTY50":       "^NSEI",
@@ -699,6 +704,21 @@ class BackfillEngine:
         index_series = self._load_index(index_code)
         if index_series is None:
             return {"code": code, "status": f"no_index_data ({index_code})"}
+
+        # 가격 프록시 위생 검사 — 가격은 0 이하가 될 수 없다. 0을 넘나드는 시계열은
+        # pct_change가 폭발한다(TPX.F: 4,925행 중 2,551행이 0 이하 → 하루 -2,380%,
+        # 인버스 ETF에 곱해져 +465% 생성. 2026-08-03 스윕에서 검출).
+        # 단 CL=F는 2020-04-20 WTI 마이너스 유가 1행뿐인 **실제 역사**라 죽이면 안 된다 →
+        # 비율로 구분: 소수면 그 날짜만 제외, 구조적이면 프록시 자체를 거부.
+        # (채권은 yield라 0·음수가 정상 → build_bond_price_series가 처리, 여기서 제외)
+        if not is_bond:
+            nonpos = int((index_series <= 0).sum())
+            if nonpos:
+                if nonpos > max(5, len(index_series) * 0.01):
+                    return {"code": code,
+                            "status": f"non_price_index_series ({index_code}: "
+                                      f"{nonpos}/{len(index_series)} rows <= 0)"}
+                index_series = index_series[index_series > 0]
 
         # 인덱스 충분성 체크: 100행 미만이면 프록시로 사용 거부
         # (예: DJUSDIV100 1행처럼 사실상 빈 데이터 방지)

@@ -173,3 +173,54 @@ def test_kr_listed_unmodelable_bonds_refused(name):
 def test_newly_mapped_bond_categories(cat, rate):
     cfg = bond_config("_x_", cat, name="", etf_type="KR")
     assert cfg is not None and cfg["rate"] == rate
+
+
+# ── 비가격 시계열 가드 (2026-08-03, 백필 스윕에서 검출) ──────────────────────
+# INDEX_MAP["JAPAN_TOPIX"]="TPX.F" 인데 TPX.F는 값이 -7.53~29.60 이고 4,925행 중
+# 2,551행(52%)이 0 이하다 — TOPIX 지수(약 2,700pt)가 아니라 가격 시계열 자체가 아니다.
+# 0을 넘나들면 pct_change가 폭발한다(하루 -2,380%). 인버스 ETF(205720)에 곱해져
+# **하루 +465.3%** 짜리 합성 역사가 만들어졌다. DGS10 사건과 같은 종류.
+#
+# 단 CL=F는 10,135행 중 1행만 음수 — 2020-04-20 WTI 마이너스 유가라는 **실제 역사**라
+# 죽이면 안 된다. 그래서 절대값이 아니라 **비율**로 구분한다.
+
+INDEX_DB = BASE / "data" / "meta" / "index_master.db"
+_NONPRICE_RATIO = 0.01
+_NONPRICE_FLOOR = 5
+
+
+def _nonpositive_rejects(nonpos: int, total: int) -> bool:
+    """backfill()의 비가격 판정과 동일한 임계."""
+    return nonpos > max(_NONPRICE_FLOOR, total * _NONPRICE_RATIO)
+
+
+def test_structurally_nonpositive_series_rejected():
+    """TPX.F 실측(2,551/4,925)은 거부돼야 한다."""
+    assert _nonpositive_rejects(2551, 4925) is True
+
+
+def test_single_real_negative_tick_survives():
+    """CL=F 실측(1/10,135 = 2020-04-20 마이너스 유가)은 통과해야 한다 — 실제 역사."""
+    assert _nonpositive_rejects(1, 10135) is False
+
+
+@pytest.mark.skipif(not INDEX_DB.exists(), reason="index_master.db 없음(로컬 전용 데이터)")
+def test_no_mapped_price_proxy_is_structurally_nonpositive():
+    """전수 회귀: 가격 프록시로 매핑된 지수 중 구조적으로 0 이하인 게 없어야 한다."""
+    import sqlite3
+    conn = sqlite3.connect(f"file:{INDEX_DB}?mode=ro", uri=True)
+    offenders = []
+    for proxy in sorted(set(INDEX_MAP.values())):
+        if _is_rate_series(proxy):
+            continue                                   # 금리는 0·음수가 정상
+        row = conn.execute(
+            "SELECT COUNT(*), SUM(CASE WHEN close <= 0 THEN 1 ELSE 0 END) "
+            "FROM index_daily WHERE code=? AND close IS NOT NULL", (proxy,)).fetchone()
+        total, nonpos = row[0], (row[1] or 0)
+        if total and _nonpositive_rejects(nonpos, total):
+            offenders.append((proxy, nonpos, total))
+    conn.close()
+    assert offenders == [], (
+        "가격이 아닌 시계열이 가격 프록시로 매핑돼 있다 — INDEX_MAP에서 제거하거나 "
+        f"올바른 지수로 교체할 것: {offenders}"
+    )

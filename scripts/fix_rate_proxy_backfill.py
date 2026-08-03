@@ -41,7 +41,8 @@ except Exception:                                              # noqa: BLE001
 
 PRICE_DB = BASE / "data" / "price_cache" / "price_daily.db"
 
-from modules.backfill_engine import _RATE_SERIES_CODES  # noqa: E402
+from modules.backfill_engine import (_RATE_SERIES_CODES, INDEX_MAP,  # noqa: E402
+                                     ETF_PROXY_OVERRIDE, _is_rate_series)
 
 
 def find_corrupt(conn: sqlite3.Connection) -> list[tuple]:
@@ -55,6 +56,27 @@ def find_corrupt(conn: sqlite3.Connection) -> list[tuple]:
         "GROUP BY code, source_code ORDER BY code" % ",".join("?" * len(rates))
     )
     return conn.execute(q, rates).fetchall()
+
+
+def find_stale_proxy(conn: sqlite3.Connection) -> list[tuple]:
+    """프록시가 더 이상 유효하지 않은 백필 — INDEX_MAP에서 빠졌거나 비가격 시계열.
+
+    2026-08-03: `JAPAN_TOPIX → TPX.F` 가 값 -7.53~29.60(52%가 0 이하)인 비가격
+    시계열이라 매핑을 제거했다. 이미 그 프록시로 만들어진 백필(인버스 ETF에 하루
+    +465.3%)이 남아 있으므로 함께 정리한다.
+    """
+    valid = set(INDEX_MAP.values()) | set(v for v in ETF_PROXY_OVERRIDE.values() if v)
+    valid |= {"KRX_GOLD"}
+    rows = conn.execute(
+        "SELECT code, source_code, COUNT(*), MIN(date), MAX(date) "
+        "FROM price_daily_source WHERE source_type='backfill' "
+        "GROUP BY code, source_code").fetchall()
+    out = []
+    for code, src, n, d0, d1 in rows:
+        if not src or src in valid or _is_rate_series(src):
+            continue          # 채권 모델용 금리 프록시는 INDEX_MAP에 없어도 정상
+        out.append((code, src, n, d0, d1))
+    return sorted(out)
 
 
 def purge(conn: sqlite3.Connection, code: str) -> dict:
@@ -80,13 +102,16 @@ def main() -> int:
     apply_ = "--apply" in sys.argv
     conn = sqlite3.connect(str(PRICE_DB))
     corrupt = find_corrupt(conn)
+    stale = find_stale_proxy(conn)
+    seen = {c[0] for c in corrupt}
+    corrupt += [s for s in stale if s[0] not in seen]
 
     if not corrupt:
-        print("오염 없음 — 금리 프록시를 채권모델 없이 쓴 백필이 없습니다.")
+        print("정리 대상 없음 — 무효/오용 프록시로 만들어진 백필이 없습니다.")
         conn.close()
         return 0
 
-    print(f"오염 {len(corrupt)}종 탐지:")
+    print(f"정리 대상 {len(corrupt)}종 (금리 프록시 오용 + 무효 프록시):")
     for code, src, n, d0, d1 in corrupt:
         print(f"  {code:<9} proxy={src:<9} rows={n:>7}  {d0}~{d1}")
 

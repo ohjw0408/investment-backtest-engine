@@ -734,6 +734,7 @@ class PriceLoader:
             "no_meta", "no_index_map", "no_pre_data", "empty_after_scale",
             "index_insufficient", "rate_proxy_without_bond_model",
             "currency_unsupported_skip", "name_index_mismatch",
+            "non_price_index_series",
         )
         if (
             (self.is_kr_etf(code) or code in self._us_tickers)

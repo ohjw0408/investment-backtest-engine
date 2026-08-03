@@ -728,7 +728,13 @@ class PriceLoader:
         # ── 백필링 자동 실행 (ticker당 1회) ─────────────────
         # _backfilled_codes: 성공 완료 → 재시도 불필요
         # _backfill_skip_codes: 영구 실패 (no_meta, no_index_map, no_pre_data) → 재시도 무의미
-        _PERMANENT_SKIP = {"no_meta", "no_index_map", "no_pre_data", "empty_after_scale", "index_insufficient"}
+        # ⚠️ status에는 상세가 붙는다("no_index_map (US_MIXED)", "index_insufficient (X: 3 rows...)")
+        #    → 집합 동등비교로는 안 잡혀 매 요청 재시도했다. 접두 비교로 통일(2026-08-03).
+        _PERMANENT_SKIP = (
+            "no_meta", "no_index_map", "no_pre_data", "empty_after_scale",
+            "index_insufficient", "rate_proxy_without_bond_model",
+            "currency_unsupported_skip", "name_index_mismatch",
+        )
         if (
             (self.is_kr_etf(code) or code in self._us_tickers)
             and code not in self._backfilled_codes
@@ -741,7 +747,7 @@ class PriceLoader:
                 if status == "ok":
                     print(f"[PriceLoader] 백필링 완료: {code} ({result['rows_added']:,}행 추가)")
                     self._backfilled_codes.add(code)
-                elif status in _PERMANENT_SKIP:
+                elif status.startswith(_PERMANENT_SKIP):
                     self._backfill_skip_codes.add(code)
                 # 그 외(no_index_data, scale_failed, no_etf_data): 재시도 허용 → 아무것도 추가 안 함
             except Exception:

@@ -32,6 +32,13 @@ _BOND_ETF_CONFIG: dict[str, dict] = {
     "SCHO": {"rate": "DGS3MO", "duration": 0.8,  "model": "duration"},  # 실측 0.8
     # ── US T-bill(MMF 성격) — carry 모델(가격 평평, 수익=이자). 한국 CD/MMF 검증용 ──
     "BIL":  {"rate": "DGS3MO", "duration": 0.0,  "model": "carry"},
+    # ── 한국상장 미국 단기국채/달러단기채 ──
+    # index 카테고리가 "US_TREASURY"(만기 불특정)라 카테고리 매핑으로는 듀레이션을 못 정한다.
+    # 카테고리에 넣으면 장기채까지 같은 듀레이션을 쓰게 되므로 코드별로 명시한다.
+    # (미지정 시 backfill_engine의 rate-proxy 가드가 백필을 거부 → 틀린 역사보다 없는 역사)
+    "0046A0": {"rate": "DGS3MO", "duration": 0.0, "model": "carry"},     # TIGER 미국초단기(3개월이하)국채
+    "329750": {"rate": "DGS3MO", "duration": 0.5, "model": "duration"},  # TIGER 미국달러단기채권액티브
+    "440650": {"rate": "DGS3MO", "duration": 0.5, "model": "duration"},  # ACE 미국달러단기채권액티브
 }
 
 # 카테고리(meta.index) 기반 매핑 — 한국 채권 ETF는 index 필드가 이미 세분 카테고리라 코드별 대신
@@ -48,6 +55,13 @@ _BOND_CATEGORY_CONFIG: dict[str, dict] = {
     "KR_MONEY_MARKET":  {"rate": "CD91",     "duration": 0.0,  "model": "carry"},
     # ── 한국상장 미국채 (USD 금리 + FX/헤지는 meta가 처리) ──
     "US_TREASURY_30Y":  {"rate": "DGS30",    "duration": 17.0, "model": "duration"},
+    "US_TREASURY_10Y":  {"rate": "DGS10",    "duration": 7.5,  "model": "duration"},  # IEF 실측 7.4
+    "US_BOND_AGGREGATE":{"rate": "DGS10",    "duration": 4.4,  "model": "duration"},  # AGG/BND와 동일
+    "US_MONEY_MARKET":  {"rate": "DGS3MO",   "duration": 0.0,  "model": "carry"},     # BIL과 동일
+    "KR_TREASURY_5Y":   {"rate": "KTB3Y",    "duration": 4.5,  "model": "duration"},  # KTB5Y 시계열 부재 → 3Y 금리 + 5년물 듀레이션(KR_BOND_AGGREGATE와 같은 방식)
+    # ⚠️ "US_TREASURY"(만기 불특정)는 의도적으로 넣지 않는다. 3개월물~30년물이 한 카테고리로
+    #    묶여 있어 카테고리 단위 듀레이션이 존재할 수 없다. 종목별로 _BOND_ETF_CONFIG에
+    #    등록하고, 미등록분은 backfill_engine의 rate-proxy 가드가 백필을 거부한다.
 }
 
 COUPON_FREQ_PER_YEAR = 12  # 채권 ETF는 보통 월 분배
@@ -137,6 +151,36 @@ def unsupported_currency(name: str) -> bool:
     return any(m in n for m in _FOREIGN_CCY_KW)
 
 
+# 한국 상장 미국채권 ETF 중 카테고리만으로는 듀레이션을 못 정하는 버킷 — 한글명으로 분류한다.
+# `US_CORPORATE` 8종에 투자등급·단기·장기우량뿐 아니라 **하이일드 2종·물가연동국채 1종**이
+# 섞여 있어(자동 분류 오염), 카테고리 단위로 DBAA를 물리면 신용/물가 위험이 다른 상품에
+# 회사채 역사가 붙는다. classify_us_bond_etf(영문)의 한국어판.
+_KR_US_BOND_NAME_CATEGORIES = {"US_CORPORATE"}
+
+# 모델 불가(신용스프레드·물가연동·구조화) — 안전 스킵. 틀린 역사보다 없는 역사.
+_KR_BOND_SKIP_KW = (
+    "하이일드", "하이일드", "정크", "인플레이션", "물가", "뱅크론", "시니어론",
+    "전환", "모기지", "MBS", "지방채", "신흥", "이머징", "글로벌", "아시아",
+)
+
+
+def classify_kr_listed_us_bond_etf(name: str) -> dict | None:
+    """한국 상장 미국 채권 ETF 한글명 → {rate, duration, model}. 모델 불가/미지면 None."""
+    if not name:
+        return None
+    if any(k in name for k in _KR_BOND_SKIP_KW):
+        return None
+    if "회사채" in name or "크레딧" in name or "투자등급" in name:
+        if "단기" in name:
+            dur = 2.7
+        elif "장기" in name:
+            dur = 13.0
+        else:
+            dur = 7.0
+        return {"rate": "DBAA", "duration": dur, "model": "duration"}
+    return None
+
+
 def bond_config(code: str, index_category: str | None = None,
                 name: str | None = None, etf_type: str = "KR",
                 us_category: str | None = None) -> dict | None:
@@ -153,6 +197,8 @@ def bond_config(code: str, index_category: str | None = None,
         return _BOND_CATEGORY_CONFIG[index_category]
     if etf_type == "US" and name and us_category == "US Fixed Income":
         return classify_us_bond_etf(name)
+    if etf_type == "KR" and name and index_category in _KR_US_BOND_NAME_CATEGORIES:
+        return classify_kr_listed_us_bond_etf(name)
     return None
 
 

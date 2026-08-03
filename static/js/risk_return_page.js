@@ -10,6 +10,9 @@ let rrPortfolios = [];          // /api/portfolio/list
 let rrSelected = new Set();     // 선택된 포폴 id
 let rrSelectedOrder = [];       // compare order for selected portfolio ids
 let rrDragPfId = null;
+// 비교 항목(개별종목·ETF·지수·거시지표) 상한. 서버(app.py portfolio_compare benchmarks)와 동일값 유지.
+// 20개 혼합 실측 9.0s (nginx 120s 여유) — 2026-08-03 12→20 완화.
+const RR_MAX_BENCH = 20;
 let rrBench = DEFAULT_BENCH.slice();
 let rrSearchTimer = null;
 let rrMacroBench = [];   // 벤치마크로 고를 수 있는 지수형 거시지표 (부동산·M2·물가 등)
@@ -125,7 +128,12 @@ function rrRenderChips(){
 }
 function rrRemoveBench(i){ rrBench.splice(i,1); rrRenderChips(); }
 function rrAddBench(code, name){
-  if (rrBench.some(b => b.code === code) || rrBench.length >= 12) return;
+  if (rrBench.some(b => b.code === code)) return;
+  // 상한 초과는 조용히 무시하지 않는다 — 이전엔 무음 return 이라 "버튼이 안 먹는다"로 보였다.
+  if (rrBench.length >= RR_MAX_BENCH) {
+    if (typeof mmToast === 'function') mmToast('비교 항목은 최대 ' + RR_MAX_BENCH + '개까지예요.', 'err');
+    return;
+  }
   rrBench.push({code, name});
   rrRenderChips();
   document.getElementById('rrSearch').value = '';

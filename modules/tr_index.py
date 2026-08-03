@@ -1,8 +1,11 @@
 """포트폴리오 총수익(배당 재투자) 인덱스 빌더 — Flask-free 공용 모듈.
 
 app.py `_ticker_series`/`_portfolio_index_series`의 검증된 코어를 워커(celery)·분석탭
-롤링에서 재사용하기 위해 추출. 캐시/다운샘플/ensure_full_history 같은 웹 전용 래퍼는 빼고
+롤링에서 재사용하기 위해 추출. 캐시/다운샘플 같은 웹 전용 래퍼는 빼고
 순수 DB+pandas 산출만 담는다(결과는 app.py 오버레이와 동일 규격: 시작=100, [date,val,syn]).
+
+단, `ensure_full_history`(지연 백필)는 2026-08-03에 다시 넣었다 — 이걸 빼둔 탓에
+미백필 종목이 조용히 빈 결과를 내고 화면엔 "데이터가 없습니다"로 떴다(`_ensure_history` 주석 참고).
 
 ⚠️ 불변식(깨면 가짜 점프 버그 재발):
   - `pct_change(fill_method=None)` — 기본 'pad'는 price_daily 내부 NULL홀을 forward-fill →
@@ -85,6 +88,41 @@ def _drop_corrupt_generated_tail(df):
     return df
 
 
+_LOADER = None
+_ENSURED: set = set()
+
+
+def _ensure_history(codes):
+    """읽기 전에 종목별 전체기간을 1회 보장(지연 백필 트리거). 전부 best-effort.
+
+    이 모듈은 price_daily를 raw SQL로만 읽는다. 그래서 **한 번도 요청된 적 없는 종목**은
+    행이 0이라 조용히 []를 반환했고, 화면엔 "데이터가 없습니다"로 떴다.
+    prod 실측(2026-08-03): kr_etf_list 1,075종 중 백필된 건 27종(2.5%)뿐이라
+    KODEX 미국S&P500(H)·KODEX 미국나스닥100 같은 정상 ETF가 전부 여기 걸렸다.
+    (환헤지 여부와 무관 — 헤지/비헤지 양쪽에서 동일하게 발생)
+
+    ensure_full_history는 코드당 1회 깊은 페치 + 백필(실측 1~2초)이고 DB 플래그로
+    멱등하므로, 읽기 직전에 부르면 이 경로가 자기치유된다.
+    """
+    global _LOADER
+    todo = [c for c in codes if c and c not in _ENSURED]
+    if not todo:
+        return
+    try:
+        if _LOADER is None:
+            from modules.price_loader import PriceLoader
+            _LOADER = PriceLoader()
+    except Exception:
+        return
+    for code in todo:
+        try:
+            _LOADER.ensure_full_history(code)
+        except Exception:
+            pass
+        # 실패해도 재시도 폭주를 막으려 프로세스 캐시엔 넣는다(다음 배포/재시작에 재시도).
+        _ENSURED.add(code)
+
+
 def build_portfolio_tr_index(tickers, conn=None, start='1900-01-01'):
     """포트폴리오(비중 고정) 총수익 정규화 지수(시작=100) 일별 시계열.
        반환 = [[date, value, syn], ...]. start=가용 전체기간(기본).
@@ -99,6 +137,8 @@ def build_portfolio_tr_index(tickers, conn=None, start='1900-01-01'):
             valid.append((code, w))
     if not valid:
         return []
+
+    _ensure_history(c for c, _w in valid)
 
     own = conn is None
     if own:

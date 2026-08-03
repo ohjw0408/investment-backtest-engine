@@ -177,7 +177,86 @@ INDEX_MAP = {
     "DOW":                 "^DJI",
     "RUSSELL2000":         "^RUT",
     "EUROPE":              "^STOXX50E",
+    # 미국달러선물 ETF(11종) — 기초자산이 곧 원/달러 환율이라 USD/KRW 시계열이 그대로 프록시.
+    # market="CURRENCY"라 fx_applied=False → 환율 이중적용 없음. 레버리지/인버스는 meta가 처리.
+    # (2026-08-03 추가: 1964년부터 17,478행이 있는데 11종이 못 쓰고 있었다)
+    "USD":                 "USD/KRW",
 }
+
+# 금리(yield, 단위 %) 시계열 코드 — index_daily에 들어있지만 **가격이 아니다**.
+# 채권 모델(build_bond_price_series)을 통과해야만 가격 시계열이 되며, 그냥 프록시로 쓰면
+# 금리 곡선 자체가 가격으로 둔갑한다(예: DGS10 1981년 15.84% → 2020년 0.52%를 가격으로
+# 스케일 → 초단기채 ETF에 하루 +42% 같은 가짜 역사. 0046A0, 2026-08-03 무결성 알림).
+# is_bond=False 인데 index_code가 여기 있으면 백필을 거부한다 — 틀린 역사보다 없는 역사.
+_RATE_SERIES_CODES: set[str] = {
+    "DGS30", "DGS10", "DGS5", "DGS3MO", "DGS2", "DGS1", "DGS20", "DGS7",
+    "DBAA", "DAAA",
+    "KTB3Y", "KTB10Y", "KTB30Y", "KTB5Y", "CORPAA3Y", "CD91", "KOFR",
+}
+
+
+def _is_rate_series(index_code: str) -> bool:
+    """금리(%) 시계열이면 True. 명시 집합 + DGS/KTB 접두 규칙(신규 금리 추가 자동 커버)."""
+    if not index_code:
+        return False
+    c = str(index_code).upper()
+    return c in _RATE_SERIES_CODES or c.startswith("DGS") or c.startswith("KTB")
+
+
+# ── 분류-이름 불일치 가드 (2026-08-03) ────────────────────────────────────────
+# kr_etf_list.csv의 index 컬럼은 **자동 분류**라 같은 버킷에 성격이 다른 상품이 섞인다.
+# 실측: KOSPI200 110종에 `TIGER 200 헬스케어`(섹터)·`TIGER 200커버드콜`(수익구조)·
+# `KODEX 성장주`(팩터)·`ACE 미국WideMoat동일가중`(**미국 ETF**)이 함께 들어 있었고,
+# SP500 40종엔 `KODEX 미국서학개미`·`TIGER 미국S&P500동일가중`이 섞여 있었다.
+# 그대로 백필하면 KOSPI200 역사가 헬스케어 ETF의 과거로, S&P500 역사가 서학개미 ETF의
+# 과거로 둔갑한다 — 2026-07-21 QQQ=^GSPC 사고와 같은 종류다.
+# 카테고리 매핑을 신뢰하지 말고 **종목명으로 한 번 더 거른다.**
+
+# ① 수익구조·가중이 달라 어떤 지수도 그대로 추종하지 않는 이름 (채권 포함 전 카테고리 적용)
+_STRUCT_MISMATCH_TOKENS = (
+    "커버드콜", "커버드 콜", "위클리", "데일리", "프리미엄", "콜옵션", "풋",
+    "동일가중", "exTOP", "중소형", "혼합", "롱", "숏", "우선주", "블루칩",
+    "성장주", "가치주", "모멘텀", "퀄리티", "멀티팩터", "로우볼", "최소변동성",
+    "저변동", "밸류", "&GOLD", "&금",
+    # 소수 종목 집중 바스켓은 광의지수든 섹터지수든 추종이 아니다
+    # (`ACE 글로벌반도체TOP4 Plus`가 ^SOX(30종) 역사를 갖는 걸 막는다)
+    "TOP10", "TOP7", "TOP5", "TOP4", "TOP3", "Top10", "Top5", "Top4", "탑10",
+)
+
+# ② 광의 시장지수 카테고리 — 여기서 섹터·테마·집중 이름이 나오면 다른 지수다
+_BROAD_MARKET_CATEGORIES = {
+    "KOSPI200", "KOSPI", "KOSDAQ150", "KRX300", "SP500", "NASDAQ100",
+    "MSCI_WORLD", "MSCI_EM", "DOW", "RUSSELL2000", "EUROPE",
+    "JAPAN_NIKKEI225", "JAPAN_TOPIX", "CHINA_HSCEI", "CHINA_CSI300", "INDIA_NIFTY50",
+}
+_NARROW_TOKENS = (
+    "IT", "중공업", "건설", "금융", "헬스케어", "에너지화학", "경기소비재", "생활소비재",
+    "철강소재", "산업재", "커뮤니케이션", "반도체", "바이오", "소비트렌드", "캐시카우",
+    "서학개미", "동학개미", "베스트셀러", "빌리어네어", "버크셔", "수급상위", "KTOP",
+    "코스피100", "ESG", "배당", "우량", "펀더멘탈", "퀀트", "Moat", "WideMoat",
+    "대장장이", "일레븐", "셀렉트밸류", "고배당",
+)
+
+# ③ 시장 불일치 — 한국 광의지수 카테고리인데 이름이 해외 자산 (분류기 오배정)
+_KR_BROAD_CATEGORIES = {"KOSPI200", "KOSPI", "KOSDAQ150", "KRX300"}
+_FOREIGN_TOKENS = ("미국", "글로벌", "차이나", "중국", "일본", "인도", "유럽", "베트남",
+                   "선진", "신흥")
+
+
+def _name_mismatches_index(name: str, index_nm: str) -> list[str]:
+    """종목명이 카테고리 지수를 추종하지 않음을 시사하는 토큰 목록. 비면 정상.
+
+    레버리지/인버스(`KODEX 레버리지`, `TIGER 200선물인버스2X`)는 meta.leverage로 처리되므로
+    여기서 거르지 않는다. TR·선물·(H)도 정상 추종이라 통과시킨다.
+    """
+    if not name:
+        return []
+    hits = [t for t in _STRUCT_MISMATCH_TOKENS if t in name]
+    if index_nm in _BROAD_MARKET_CATEGORIES:
+        hits += [t for t in _NARROW_TOKENS if t in name]
+    if index_nm in _KR_BROAD_CATEGORIES:
+        hits += [t for t in _FOREIGN_TOKENS if t in name]
+    return sorted(set(hits))
 
 
 def inject_quarterly_dividends(
@@ -582,6 +661,21 @@ class BackfillEngine:
 
         if not index_code or index_code == "None":
             return {"code": code, "status": f"no_index_map ({index_nm})"}
+
+        # 금리 시계열 오용 가드 — 채권 모델을 안 태운 금리(%)는 절대 가격 프록시가 될 수 없다.
+        # is_bond=False 로 여기 도달했다 = bond_config에 매핑이 없다는 뜻이므로 듀레이션을
+        # 알 수 없다. 추정해서 만들면 틀린 역사가 되므로 거부한다(재발방지: 0046A0 사례).
+        if not is_bond and _is_rate_series(index_code):
+            return {"code": code,
+                    "status": f"rate_proxy_without_bond_model ({index_nm} → {index_code})"}
+
+        # 분류-이름 불일치 가드 — 자동 분류가 섹터/팩터/커버드콜/타 시장을 같은 버킷에 넣는다.
+        # 코드별 명시 override(ETF_PROXY_OVERRIDE)는 사람이 정한 것이라 신뢰하고 건너뛴다.
+        if code not in ETF_PROXY_OVERRIDE:
+            mismatch = _name_mismatches_index(name, index_nm)
+            if mismatch:
+                return {"code": code,
+                        "status": f"name_index_mismatch ({index_nm}: {','.join(mismatch)})"}
 
         # ETF 기존 데이터 확인
         etf_min, etf_max = self._get_etf_range(code)

@@ -3455,7 +3455,7 @@ def risk_return():
     from risk_return_logic import compute_risk_return, DEFAULT_BENCHMARKS
     body = request.get_json(silent=True) or {}
     extra = []
-    for b in (body.get('benchmarks') or [])[:10]:
+    for b in (body.get('benchmarks') or [])[:20]:   # portfolio_compare와 동일 상한(2026-08-03, 10→20)
         if isinstance(b, dict) and b.get('code'):
             extra.append({'code': str(b['code']), 'name': str(b.get('name') or b['code'])})
     portfolios = get_portfolios(session['user_id'])
@@ -3516,7 +3516,9 @@ def portfolio_compare():
 
     benchmarks = []
     benchmark_input = body.get('benchmarks') if 'benchmarks' in body else DEFAULT_BENCHMARKS
-    for b in (benchmark_input or [])[:15]:
+    # 상한 20 — 프런트 RR_MAX_BENCH와 동일값 유지(둘이 어긋나면 프런트가 보낸 항목이
+    # 조용히 잘려 "일부만 나온다"가 된다). 20개 혼합 실측 9.0s (2026-08-03, 15→20).
+    for b in (benchmark_input or [])[:20]:
         if isinstance(b, dict) and b.get('code'):
             benchmarks.append({'code': str(b['code']), 'name': str(b.get('name') or b['code'])})
     try:

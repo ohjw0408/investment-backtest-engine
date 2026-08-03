@@ -48,11 +48,192 @@ function validHoldings(holdings) {
 function dividendRowsHtml(dividends, currency, expanded) {
   const list = expanded ? (dividends || []) : (dividends || []).slice(0, DIV_INITIAL_ROWS);
   return list.map(d => `
-    <tr>
-      <td>${escHtml(d.date)}</td>
+    <tr${d.est ? ' class="div-est"' : ''}>
+      <td>${escHtml(d.date)}${d.est ? ' <span class="div-est-tag" title="상장 이전 구간이라 실제 지급 내역이 아니라 기초지수로 추정한 값입니다">추정</span>' : ''}</td>
       <td>${fmtDiv(d.dividend, currency)}</td>
     </tr>
   `).join('');
+}
+
+// ── 배당 그래프 ──────────────────────────────────────────
+// 가격 차트와 겹치지 않고 별도로 그린다. 주가(예: 11,000원)와 분기배당(예: 150원)은
+// 자릿수가 달라 한 축에 두면 배당이 0에 붙은 직선이 되고, 이중축으로 억지로 맞추면
+// 두 선의 관계가 축 스케일이 만든 착시가 된다. 또 라인차트의 기간 선택(1개월~전체)과도
+// 안 맞는다 — 배당은 분기 이벤트라 1개월 뷰에선 막대가 0~1개다.
+//
+// 막대(주당 배당금)와 선(배당수익률)은 같은 축에 둘 근거가 있다: 수익률 = 배당/주가라
+// 정의상 관계가 실재한다. "배당은 늘었는데 주가가 더 올라 수익률은 떨어졌다"가 보인다.
+let divChart   = null;
+let divMode    = 'year';   // 'year' | 'quarter'
+let divShowEst = false;    // 상장 전 추정 구간 포함 여부 (기본 끔)
+
+function divBuckets(dividends, prices, mode, includeEst) {
+  let divs = (dividends || []).filter(d => d && d.date && Number(d.dividend) > 0);
+  // 기본은 실측만. 백필은 상장 전 60년치를 만들어 두기도 해서(458730은 273건 중 237건),
+  // 다 그리면 추정 구간이 화면을 지배하고 수익률 선은 오른쪽 끝 몇 점으로 뭉개진다.
+  // 가격 차트도 volume=0 행을 빼므로 기본값을 맞춘다 — 보고 싶으면 켤 수 있다.
+  if (!includeEst) divs = divs.filter(d => !d.est);
+  if (!divs.length) return [];
+  // 버킷별 마지막 종가 — 배당수익률 분모. prices는 실데이터만(상장 후)이라
+  // 상장 이전 버킷은 자연히 분모가 없어 수익률 선이 끊긴다(정확한 동작).
+  const lastClose = {};
+  (prices || []).forEach(p => {
+    const k = mode === 'year' ? p.date.slice(0, 4) : bucketOf(p.date);
+    lastClose[k] = p.close;
+  });
+  const map = new Map();
+  divs.forEach(d => {
+    const k = mode === 'year' ? d.date.slice(0, 4) : bucketOf(d.date);
+    if (!map.has(k)) map.set(k, { key: k, sum: 0, n: 0, nEst: 0 });
+    const b = map.get(k);
+    b.sum += Number(d.dividend);
+    b.n += 1;
+    if (d.est) b.nEst += 1;
+  });
+  const nowKey = mode === 'year'
+    ? String(new Date().getFullYear())
+    : bucketOf(new Date().toISOString().slice(0, 10));
+  // 상장 연도(또는 분기)도 반쪽이다 — 458730은 2023-06 상장이라 2023 막대가 반년치뿐인데,
+  // 실선으로 그리면 "2023년엔 배당이 적었다"로 읽힌다. 진행중과 같은 종류의 착시.
+  const realStart = (prices || []).length ? prices[0].date : null;
+  const startKey  = realStart
+    ? (mode === 'year' ? realStart.slice(0, 4) : bucketOf(realStart))
+    : null;
+  const startsMidBucket = realStart && (mode === 'year'
+    ? realStart.slice(5) !== '01-01'
+    : !['01-01', '04-01', '07-01', '10-01'].includes(realStart.slice(5)));
+  return [...map.values()]
+    .sort((a, b) => (a.key < b.key ? -1 : 1))
+    .map(b => ({
+      ...b,
+      // 미완결 구간 — 아직 배당이 다 안 나와 막대가 낮다. 구분 안 하면 "배당 삭감"으로 읽힌다.
+      ongoing: b.key === nowKey,
+      partial: !!(startsMidBucket && b.key === startKey),
+      // 상장 이전 = 기초지수로 추정한 값. 하나라도 섞이면 표시한다(과소 표기보다 과다 표기).
+      est: b.nEst > 0,
+      yield: lastClose[b.key] ? (b.sum / lastClose[b.key]) * 100 : null,
+    }));
+}
+
+function bucketOf(dateStr) {
+  const q = Math.floor((Number(dateStr.slice(5, 7)) - 1) / 3) + 1;
+  return `${dateStr.slice(0, 4)} Q${q}`;
+}
+
+function dividendChartHtml(dividends) {
+  const divs = (dividends || []).filter(d => Number(d.dividend) > 0);
+  if (divs.length < 2) return '';   // 1건 이하면 추세랄 게 없다
+  const hasEst = divs.some(d => d.est);
+  return `
+    <div class="div-chart-head">
+      <div class="div-mode-switch" role="group" aria-label="배당 집계 단위">
+        <button type="button" class="div-mode-btn active" data-divmode="year" onclick="setDivMode('year')">연간</button>
+        <button type="button" class="div-mode-btn" data-divmode="quarter" onclick="setDivMode('quarter')">분기</button>
+      </div>
+      ${hasEst ? `
+      <label class="div-est-toggle">
+        <input type="checkbox" id="divEstToggle" onchange="setDivShowEst(this.checked)">
+        <span>상장 전 추정 포함</span>
+      </label>` : ''}
+    </div>
+    <div class="div-chart-wrap"><canvas id="dividendChart"></canvas></div>
+    <div class="div-legend">
+      <span class="div-lg"><i class="sw-solid"></i>주당 배당금</span>
+      <span class="div-lg"><i class="sw-line"></i>배당수익률</span>
+      <span class="div-lg"><i class="sw-ongoing"></i>진행중·부분 구간</span>
+      <span class="div-lg div-lg-est" hidden><i class="sw-est"></i>상장 전 추정</span>
+    </div>
+    ${hasEst ? '<div class="div-est-note">이 종목은 상장 전 구간이 기초지수로 <b>추정</b>된 값입니다. 기본 그래프는 실제 지급분만 보여줍니다 — 위 체크박스로 추정 구간까지 볼 수 있고, 백테스트는 추정값도 함께 씁니다.</div>' : ''}
+  `;
+}
+
+function setDivShowEst(on) {
+  divShowEst = !!on;
+  const lg = document.querySelector('.div-lg-est');
+  if (lg) lg.hidden = !divShowEst;
+  renderDividendChart();
+}
+
+function setDivMode(mode) {
+  if (divMode === mode) return;
+  divMode = mode;
+  document.querySelectorAll('.div-mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.divmode === mode));
+  renderDividendChart();
+}
+
+function renderDividendChart() {
+  const canvas = document.getElementById('dividendChart');
+  if (!canvas || !allData) return;
+  if (divChart) { divChart.destroy(); divChart = null; }
+  const buckets = divBuckets(allData.dividends, allData.prices, divMode, divShowEst);
+  if (!buckets.length) return;
+
+  const BAR = '#2E7D32', LINE = '#E65100';
+  const soft = b => b.est || b.ongoing || b.partial;   // 반투명 + 점선으로 '그대로 비교하면 안 되는 막대' 표시
+  const barColor = b => (soft(b) ? 'rgba(46,125,50,0.32)' : BAR);
+  const hasYield = buckets.some(b => b.yield !== null);
+  const curr = allData.currency;
+
+  divChart = new Chart(canvas.getContext('2d'), {
+    data: {
+      labels: buckets.map(b => b.key),
+      datasets: [
+        {
+          type: 'bar', label: '주당 배당금', order: 2,
+          data: buckets.map(b => b.sum),
+          backgroundColor: buckets.map(barColor),
+          // 막대가 많으면(추정 포함 시 60개 넘음) 1.5px 테두리가 4px 막대를 덮어
+          // 오히려 실측처럼 진해 보인다 → 그럴 땐 투명도로만 구분한다.
+          borderColor: buckets.map(b => (soft(b) && buckets.length <= 30 ? BAR : 'transparent')),
+          borderWidth: buckets.map(b => (soft(b) && buckets.length <= 30 ? 1.5 : 0)),
+          borderDash: [4, 3], borderSkipped: false, yAxisID: 'y',
+        },
+        ...(hasYield ? [{
+          type: 'line', label: '배당수익률', order: 1,
+          data: buckets.map(b => b.yield),
+          borderColor: LINE, backgroundColor: LINE, borderWidth: 2,
+          pointRadius: 2.5, tension: 0.25, spanGaps: false, yAxisID: 'y1',
+        }] : []),
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            afterTitle: ctx => {
+              const b = buckets[ctx[0].dataIndex];
+              if (b.ongoing) return '진행중 — 아직 다 지급되지 않았습니다';
+              if (b.partial) return '상장 첫 구간 — 일부 기간만 반영됐습니다';
+              if (b.est) return b.nEst === b.n ? '상장 전 추정' : `일부 추정 (${b.nEst}/${b.n}건)`;
+              return '';
+            },
+            label: ctx => (ctx.dataset.yAxisID === 'y1'
+              ? `배당수익률 ${ctx.parsed.y.toFixed(2)}%`
+              : `주당 배당금 ${fmtDiv(ctx.parsed.y, curr)} (${buckets[ctx.dataIndex].n}회)`),
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: MM_AXIS }, grid: { display: false } },
+        y: {
+          position: 'left', beginAtZero: true,
+          ticks: { font: { size: 10 }, color: MM_AXIS, callback: v => fmtDiv(v, curr) },
+          grid: { color: MM_CHART_GRID },
+        },
+        ...(hasYield ? {
+          y1: {
+            position: 'right', beginAtZero: true,
+            ticks: { font: { size: 10 }, color: LINE, callback: v => v.toFixed(1) + '%' },
+            grid: { display: false },
+          },
+        } : {}),
+      },
+    },
+  });
 }
 
 function dividendTableHtml(dividends, currency) {
@@ -225,6 +406,7 @@ function renderPage(data) {
         ${(isStock || isETF) ? `
         <div class="symbol-card">
           <div class="symbol-card-title">💰 배당 내역</div>
+          ${dividendChartHtml(data.dividends)}
           ${dividendTableHtml(data.dividends, curr)}
         </div>` : ''}
       </div>
@@ -233,6 +415,7 @@ function renderPage(data) {
 
   renderTabs();
   renderHoldingsPie(data);
+  renderDividendChart();
   renderActive();
 }
 

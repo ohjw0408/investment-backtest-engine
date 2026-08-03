@@ -128,6 +128,47 @@
 .stat-label { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; }
 .stat-value { font-size: 0.95rem; font-weight: 700; color: var(--text); }
 
+/* 배당 그래프 */
+.div-chart-head {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 8px; margin-bottom: 8px;
+}
+.div-est-toggle {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: 0.74rem; color: var(--text-muted); font-weight: 600;
+  min-width: 0;   /* 글자배율 확대 시 헤더가 카드를 밀지 않게 */
+}
+.div-est-toggle input { width: 15px; height: 15px; flex: 0 0 auto; cursor: pointer; accent-color: var(--blue); }
+.div-mode-switch { display: inline-flex; gap: 2px; padding: 2px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 9px; }
+.div-mode-btn {
+  padding: 5px 12px; border: none; background: transparent; cursor: pointer;
+  color: var(--text-muted); font-size: 0.76rem; font-weight: 700; border-radius: 7px;
+  min-width: 44px;   /* 터치 타깃 + 글자배율 확대 시 눌림 방지 */
+}
+.div-mode-btn.active { background: var(--card); color: var(--blue); }
+.div-chart-wrap { position: relative; height: 190px; margin-bottom: 8px; }
+.div-legend {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  font-size: 0.72rem; color: var(--text-muted); margin-bottom: 6px;
+}
+.div-lg { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.div-lg i { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
+.div-lg .sw-solid   { background: #2E7D32; }
+.div-lg .sw-line    { background: #E65100; height: 3px; border-radius: 2px; }
+.div-lg .sw-ongoing,
+.div-lg .sw-est     { background: rgba(46,125,50,0.32); border: 1.5px dashed #2E7D32; }
+.div-est-note {
+  font-size: 0.72rem; color: var(--text-muted); line-height: 1.45;
+  padding: 7px 9px; background: var(--bg); border-radius: 8px; margin-bottom: 10px;
+}
+.div-table tr.div-est td { color: var(--text-muted); }
+.div-est-tag {
+  display: inline-block; padding: 1px 5px; margin-left: 4px;
+  font-size: 0.66rem; font-weight: 700; border-radius: 5px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* 배당 테이블 */
 .div-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .div-table th {

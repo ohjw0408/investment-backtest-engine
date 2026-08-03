@@ -1332,7 +1332,14 @@ class PriceLoader:
                 "WHERE code=? AND dividend > 0 ORDER BY date DESC",
                 (code,)
             ).fetchall()
-            dividends   = [{"date": r[0], "dividend": round(float(r[1]), 6)} for r in divs_raw]
+            # est=상장 이전 = BackfillEngine이 프록시 지수로 주입한 **추정** 배당.
+            # 가격 차트는 volume=0(합성) 행을 이미 빼는데 배당 표는 그대로 보여주고 있어,
+            # 2022년 상장 ETF가 1928년부터 배당을 준 것처럼 보였다(449180: 393건 중 380건).
+            # 백필은 상장일 이전 구간에만 주입하므로 첫 실거래일 기준으로 판정하면 정확하다.
+            _real_start = prices[0]["date"] if prices else None
+            dividends   = [{"date": r[0], "dividend": round(float(r[1]), 6),
+                            "est": bool(_real_start and r[0] < _real_start)}
+                           for r in divs_raw]
             recent_divs = [d["dividend"] for d in dividends if d["date"] >= cutoff_1y]
             div_yield   = (sum(recent_divs) / cur_price * 100) if cur_price and recent_divs else None
 

@@ -631,6 +631,7 @@ class BackfillEngine:
         from modules.bond_model import (
             bond_config, build_bond_price_series, COUPON_FREQ_PER_YEAR,
             COUPON_BOOK_FACTOR, STRIP_DURATION_MULT, unsupported_currency,
+            is_target_maturity,
         )
         etf_type = str(meta.get("etf_type", "KR"))
         us_category = str(meta.get("category", "")) if etf_type == "US" else None
@@ -641,6 +642,11 @@ class BackfillEngine:
         # 백필하면 환율 틀림 → 거부(안전스킵). 라벨이 'US Treasury'로 맞아도 차단.
         if is_bond and unsupported_currency(name):
             return {"code": code, "status": "currency_unsupported_skip"}
+        # 만기매칭형 가드: 상장 전 과거가 정의되지 않는 상품(만기에 청산·만기마다 갈아탐).
+        # 채권 판정(is_bond)과 무관하게 이름만으로 거른다 — 분류가 equity로 오배정된
+        # `BNK 26-06 특수채` 같은 종목도 같은 이유로 백필하면 안 된다.
+        if is_target_maturity(name, etf_type):
+            return {"code": code, "status": "target_maturity_skip"}
         # 스트립(무이표)은 듀레이션 ≈ 만기로 길다 → 이름 감지해 가산.
         # 레버리지/인버스는 meta.leverage로 아래 _apply_leverage가 기존 로직으로 처리.
         if is_bond and ("스트립" in name or "strip" in name.lower()):

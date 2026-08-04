@@ -11,6 +11,8 @@ US 국채부터. 한국 국채/회사채/MMF는 _BOND_ETF_CONFIG에 rate 시계�
 행 추가로 확장한다 (코드 수정 없이 매핑 추가).
 """
 
+import re
+
 import pandas as pd
 
 # ETF별 명시 매핑 (etf_proxy_map 씨앗).
@@ -149,6 +151,30 @@ def unsupported_currency(name: str) -> bool:
     """채권 ETF 이름에 비USD/KRW 통화 마커가 있으면 True(USD 백필 거부 대상)."""
     n = name.lower()
     return any(m in n for m in _FOREIGN_CCY_KW)
+
+
+# ── 만기매칭(타겟만기)형 가드 ───────────────────────────────
+# 정해진 만기에 청산되거나(`TIGER 26-04 회사채`) 만기마다 갈아타는(`ACE 2월만기자동연장`)
+# 상품은 상장 전 "과거"가 정의되지 않는다. 2026-04에 만기가 오는 펀드의 1995년은 존재할 수
+# 없고, 듀레이션도 만기까지 남은 기간에 따라 매일 줄어 고정값 모델 자체가 성립하지 않는다.
+# 실측(prod 20종): 실데이터 std 0.0003~0.0014 = 함의 듀레이션 0.2~0.9인데 모델은 2.0을 써서
+# 합성 역사가 실제 펀드보다 3~5배 요동쳤다. 틀린 역사보다 없는 역사 → 백필 거부(오너 결정 2026-08-04).
+_TARGET_MATURITY_KW = (
+    "만기매칭", "만기자동연장", "자동연장", "존속기한",
+    "bulletshares", "ibonds", "target maturity",   # 미국 타겟만기(Invesco·iShares)
+)
+# 한국 ETF 작명의 만기 표기 `YY-MM` (26-04·32-10·53-09). 영문명엔 `Collar 95-110` 같은
+# 오탐이 있어 KR에만 적용한다.
+_TARGET_MATURITY_RE = re.compile(r"(?<!\d)\d{2}-\d{2}(?!\d)")
+
+
+def is_target_maturity(name: str, etf_type: str = "KR") -> bool:
+    """만기매칭/만기자동연장형이면 True — 백필 거부 대상."""
+    if not name:
+        return False
+    if any(k in name.lower() for k in _TARGET_MATURITY_KW):
+        return True
+    return etf_type == "KR" and bool(_TARGET_MATURITY_RE.search(name))
 
 
 # 한국 상장 미국채권 ETF 중 카테고리만으로는 듀레이션을 못 정하는 버킷 — 한글명으로 분류한다.

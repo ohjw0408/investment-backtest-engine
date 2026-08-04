@@ -14,7 +14,8 @@ import pytest
 
 from modules.backfill_engine import (INDEX_MAP, ETF_PROXY_OVERRIDE, _is_rate_series,
                                      _name_mismatches_index)
-from modules.bond_model import bond_config, classify_kr_listed_us_bond_etf
+from modules.bond_model import (bond_config, classify_kr_listed_us_bond_etf,
+                                is_target_maturity)
 
 BASE = Path(__file__).resolve().parents[1]
 KR_ETF_CSV = BASE / "data" / "meta" / "kr_etf_list.csv"
@@ -224,3 +225,46 @@ def test_no_mapped_price_proxy_is_structurally_nonpositive():
         "가격이 아닌 시계열이 가격 프록시로 매핑돼 있다 — INDEX_MAP에서 제거하거나 "
         f"올바른 지수로 교체할 것: {offenders}"
     )
+
+
+# ── 만기매칭(타겟만기)형 가드 (2026-08-04, 오너 결정) ─────────────────────────
+# `TIGER 26-04 회사채`처럼 만기에 청산되거나 `ACE 2월만기자동연장`처럼 만기마다 갈아타는
+# 상품은 상장 전 과거가 정의되지 않는다. 듀레이션도 만기까지 남은 기간에 따라 매일 줄어
+# 고정값 모델이 성립하지 않는다(실측 함의 0.2~0.9 vs 모델 2.0 → 합성이 3~5배 요동).
+
+@pytest.mark.parametrize("name,etf_type", [
+    ("TIGER 26-04 회사채(A+이상)액티브", "KR"),
+    ("KODEX 27-12 회사채(AA-이상)액티브", "KR"),
+    ("HANARO 32-10 국고채액티브", "KR"),
+    ("KODEX 53-09 국고채액티브", "KR"),
+    ("BNK 26-06 특수채(AAA이상)액티브", "KR"),          # 분류가 equity로 오배정된 종목
+    ("ACE 2월만기자동연장회사채AA-이상액티브", "KR"),
+    ("TIGER 12월자동연장금융채(AA-이상)액티브", "KR"),   # `만기` 없이 `자동연장`만
+    ("Invesco BulletShares 2026 Corporate Bond ETF", "US"),
+    ("iShares iBonds Dec 2027 Term Corporate ETF", "US"),
+])
+def test_target_maturity_refused(name, etf_type):
+    assert is_target_maturity(name, etf_type) is True, f"{name} 은 백필하면 안 된다"
+
+
+@pytest.mark.parametrize("name,etf_type", [
+    ("KODEX 종합채권(AA-이상)액티브", "KR"),
+    ("TIGER 우량회사채액티브", "KR"),
+    ("RISE 중기우량회사채", "KR"),                       # 만기 없는 상시형 — 백필 대상
+    ("PLUS 우량회사채50", "KR"),
+    ("ACE 국고채10년", "KR"),
+    ("KODEX 미국30년국채액티브(H)", "KR"),
+    ("Global X NASDAQ 100 Collar 95-110 ETF", "US"),     # 숫자쌍 오탐(영문은 YY-MM 규칙 아님)
+    ("iShares 10-20 Year Treasury Bond ETF", "US"),
+])
+def test_non_target_maturity_passes(name, etf_type):
+    assert is_target_maturity(name, etf_type) is False, f"{name} 은 정상 백필 대상인데 차단됐다"
+
+
+def test_target_maturity_guard_does_not_hit_equity_etfs():
+    """전수 회귀: 만기 규칙(YY-MM)이 주식형 ETF 이름을 잘못 잡지 않아야 한다."""
+    equity_cats = {"KOSPI200", "KOSPI", "KOSDAQ150", "KRX300", "SP500", "NASDAQ100",
+                   "DOW30", "US_SEMICONDUCTOR", "JAPAN_TOPIX"}
+    hits = [(r["code"], r["name"], r["index"]) for r in _kr_etf_rows()
+            if is_target_maturity(r.get("name", ""), "KR") and r["index"] in equity_cats]
+    assert hits == [], f"주식형 ETF가 만기매칭으로 오판됐다: {hits}"

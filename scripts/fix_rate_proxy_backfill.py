@@ -30,6 +30,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import pandas as pd
+
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
@@ -79,6 +81,33 @@ def find_stale_proxy(conn: sqlite3.Connection) -> list[tuple]:
     return sorted(out)
 
 
+def find_target_maturity(conn: sqlite3.Connection) -> list[tuple]:
+    """만기매칭(타겟만기)형인데 이미 백필된 종목 — 상장 전 과거가 정의되지 않는 상품.
+
+    2026-08-04(오너 결정): `TIGER 26-04 회사채`·`ACE 2월만기자동연장` 류는 만기에 청산되거나
+    만기마다 갈아타므로 1995년 역사가 존재할 수 없고, 듀레이션도 만기까지 남은 기간에 따라
+    매일 줄어 고정값(2.0) 모델이 성립하지 않는다. backfill()이 이제 거부하므로
+    삭제 후 재생성하면 `target_maturity_skip`으로 무데이터가 된다.
+    """
+    from modules.backfill_engine import BackfillEngine
+    from modules.bond_model import is_target_maturity
+    meta = BackfillEngine(verbose=False)._etf_meta
+    rows = conn.execute(
+        "SELECT code, source_code, COUNT(*), MIN(date), MAX(date) "
+        "FROM price_daily_source WHERE source_type='backfill' "
+        "GROUP BY code, source_code").fetchall()
+    out = []
+    for code, src, n, d0, d1 in rows:
+        if code not in meta.index:
+            continue
+        m = meta.loc[code]
+        if isinstance(m, pd.DataFrame):
+            m = m.iloc[0]
+        if is_target_maturity(str(m.get("name", "")), str(m.get("etf_type", "KR"))):
+            out.append((code, src, n, d0, d1))
+    return sorted(out)
+
+
 def purge(conn: sqlite3.Connection, code: str) -> dict:
     """오염 백필행·상장전 분배금·provenance 삭제. 실데이터(volume>0)는 건드리지 않는다."""
     real_start = conn.execute(
@@ -102,16 +131,16 @@ def main() -> int:
     apply_ = "--apply" in sys.argv
     conn = sqlite3.connect(str(PRICE_DB))
     corrupt = find_corrupt(conn)
-    stale = find_stale_proxy(conn)
-    seen = {c[0] for c in corrupt}
-    corrupt += [s for s in stale if s[0] not in seen]
+    for extra in (find_stale_proxy(conn), find_target_maturity(conn)):
+        seen = {c[0] for c in corrupt}
+        corrupt += [s for s in extra if s[0] not in seen]
 
     if not corrupt:
         print("정리 대상 없음 — 무효/오용 프록시로 만들어진 백필이 없습니다.")
         conn.close()
         return 0
 
-    print(f"정리 대상 {len(corrupt)}종 (금리 프록시 오용 + 무효 프록시):")
+    print(f"정리 대상 {len(corrupt)}종 (금리 프록시 오용 + 무효 프록시 + 만기매칭형):")
     for code, src, n, d0, d1 in corrupt:
         print(f"  {code:<9} proxy={src:<9} rows={n:>7}  {d0}~{d1}")
 

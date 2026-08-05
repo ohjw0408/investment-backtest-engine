@@ -48,7 +48,14 @@
 - 육안: `tests/shots_direction_visual/`(홈·내자산·시장·종목 라인/캔들·거시·캘린더·검색·설정)
   + `tests/shots_direction_interact/`(내자산 3탭·성공/실패 토스트·비중초과·설정 위험영역·백테 입력)
   라이트·다크 각각. **콘솔 에러 0**
+- 신규 `tests/probe_result_view_colors.js` — 결과 뷰(백테·계산기·배당)는 celery 워커가
+  없으면 로컬에서 렌더가 안 돼서, 결과 뷰가 쓰는 셀렉터를 페이지에 직접 심어 CSS 계약을
+  검사한다. **28 PASS / 0 FAIL**. 이 과정에서 페이지마다 상승/하락 클래스명이 다르다는 걸
+  확인(백테=`.up`/`.down`, 계산기·배당=`.opt`/`.pess`, 은퇴는 등락 표기 자체가 없음)
 - 회귀: `tests/test_layout_safety.js` **164/164 PASS**
+
+**정리**: `myassets.html`의 `.rebal-buy`/`.rebal-sell` 삭제 — repo 전체에서 참조 0인
+죽은 CSS인데 `.rb-act.buy/.sell`(살아있는 쪽)과 색이 어긋나 있었다.
 
 ⚠️ 하락 파랑(`#1565d8`)과 기본 브랜드 블루(`#0052ff`)가 다소 가깝다. 아직 문제된 화면은
 없지만 액센트를 blue로 쓰는 사용자에게는 구분이 약할 수 있음.

@@ -858,22 +858,35 @@ class PriceLoader:
         '^STOXX50E': 'Europe/Berlin', '^NSEI': 'Asia/Kolkata',
     }
 
-    # 최장 연휴(설·추석·연말연시)도 거래일 공백 8일 → 10일 넘는 공백 = 데이터 결손.
-    INTRADAY_MAX_HOLE_DAYS = 10
+    # 야후가 특정 거래일의 시간봉만 빠뜨리는 경우가 있어, 이만큼까지는 결손으로 안 본다
+    # (아니면 채워지지 않는 하루 때문에 방문마다 730일 재조회가 돈다).
+    INTRADAY_HOLE_TOLERANCE_DAYS = 2
+    # 백스톱 임계. 관측된 최장 실제 휴장은 8일(2025 추석+개천절+한글날, 10/02→10/10)이라
+    # 9일부터는 실제 휴장으로 설명되지 않는다.
+    INTRADAY_MAX_CLOSURE_DAYS = 8
 
     def _has_intraday_hole(self, code: str) -> bool:
-        """price_hourly 730일 창에 휴장으로 설명 안 되는 공백(마지막 봉 이후 포함)이 있는지."""
+        """시간봉이 놓친 거래일이 있는지. 두 신호를 OR로 본다.
+
+        ①일봉(price_daily)에 있는 거래일이 시간봉에 없음 — 정확하다. 연휴·반휴장을
+          임계로 추측할 필요가 없다. 단 일봉이 stale하면 아무것도 못 잡는다.
+        ②연속 시간봉 날짜 간격이 실제 최장 휴장(8일)을 넘음 — ①이 눈 먼 구간의 백스톱.
+        시간봉 날짜는 UTC지만 KRX·NYSE·TSE 모두 정규장이 UTC 자정을 넘지 않아 일봉과 같은 날짜다.
+        """
         from datetime import datetime as _dt, timedelta as _td
-        start = (_dt.utcnow() - _td(days=730)).strftime("%Y-%m-%d")
-        days = [r[0] for r in self.conn.execute(
-            "SELECT DISTINCT substr(datetime,1,10) FROM price_hourly "
-            "WHERE code=? AND datetime >= ? ORDER BY 1", (code, start)
-        )]
-        if not days:
+        start = (_dt.utcnow() - _td(days=725)).strftime("%Y-%m-%d")   # 730일 경계 여유 5일
+        hourly = sorted({r[0] for r in self.conn.execute(
+            "SELECT DISTINCT substr(datetime,1,10) FROM price_hourly WHERE code=? AND datetime >= ?",
+            (code, start))})
+        if not hourly:
             return True
-        bounds = days + [_dt.utcnow().strftime("%Y-%m-%d")]
+        daily = {r[0] for r in self.conn.execute(
+            "SELECT date FROM price_daily WHERE code=? AND date >= ?", (code, start))}
+        if len(daily - set(hourly)) > self.INTRADAY_HOLE_TOLERANCE_DAYS:
+            return True
+        bounds = hourly + [_dt.utcnow().strftime("%Y-%m-%d")]   # 꼬리 공백도 같은 기준
         return any((_dt.strptime(b, "%Y-%m-%d") - _dt.strptime(a, "%Y-%m-%d")).days
-                   > self.INTRADAY_MAX_HOLE_DAYS
+                   > self.INTRADAY_MAX_CLOSURE_DAYS
                    for a, b in zip(bounds, bounds[1:]))
 
     def _intraday_tz(self, code: str, is_kr: bool) -> str:

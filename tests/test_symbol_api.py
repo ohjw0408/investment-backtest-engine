@@ -118,19 +118,40 @@ def test_intraday_hole_detection():
     code = "ZZTESTHOLE"
     from datetime import datetime, timedelta
     now = datetime.utcnow()
+    days = [(now - timedelta(days=n)).strftime("%Y-%m-%d") for n in range(60)]
+
+    def _seed_daily(ds):
+        L.conn.execute("DELETE FROM price_daily WHERE code=?", (code,))
+        L.conn.executemany(
+            "INSERT OR REPLACE INTO price_daily "
+            "(code,date,open,high,low,close,volume) VALUES (?,?,?,?,?,?,?)",
+            [(code, d, 100.0, 101.0, 99.0, 100.5, 1000) for d in ds])
+        L.conn.commit()
+
     try:
-        # 연속(휴장 수준 공백만) → 결손 아님
-        _seed_hourly(code, [(now - timedelta(days=n)).strftime("%Y-%m-%d 12:00")
-                            for n in range(0, 40, 3)])
+        _seed_daily(days)
+        # 거래일 전부 시간봉 보유 → 결손 아님
+        _seed_hourly(code, [d + " 12:00" for d in days])
         assert L._has_intraday_hole(code) is False
-        # 중간 30일 공백 → 결손
-        _seed_hourly(code, [(now - timedelta(days=n)).strftime("%Y-%m-%d 12:00")
-                            for n in list(range(0, 10, 3)) + list(range(40, 60, 3))])
+        # 야후가 하루치만 빠뜨림 → 허용치 안(무한 재조회 방지)
+        _seed_hourly(code, [d + " 12:00" for d in days if d != days[10]])
+        assert L._has_intraday_hole(code) is False
+        # 중간 20거래일 결손 → 복구 대상
+        _seed_hourly(code, [d + " 12:00" for d in days[:10] + days[30:]])
         assert L._has_intraday_hole(code) is True
-        # 마지막 봉이 30일 전 → 결손(꼬리 공백)
-        _seed_hourly(code, [(now - timedelta(days=n)).strftime("%Y-%m-%d 12:00")
-                            for n in range(30, 60, 3)])
+        # 꼬리 결손(최근 20일치 시간봉 없음) → 복구 대상
+        _seed_hourly(code, [d + " 12:00" for d in days[20:]])
+        assert L._has_intraday_hole(code) is True
+        # 실제 최장 휴장(2025 추석 10/02→10/10, 간격 8일)은 일봉도 없다 → 결손 아님
+        holiday = days[10:17]   # 7일 결장 = 앞뒤 거래일 간격 8일
+        _seed_daily([d for d in days if d not in holiday])
+        _seed_hourly(code, [d + " 12:00" for d in days if d not in holiday])
+        assert L._has_intraday_hole(code) is False
+        # 일봉이 stale해 ①이 눈먼 경우에도 9일 이상 공백은 백스톱(②)이 잡는다
+        _seed_daily(days[30:])
+        _seed_hourly(code, [d + " 12:00" for d in days[:10] + days[20:]])
         assert L._has_intraday_hole(code) is True
     finally:
         L.conn.execute("DELETE FROM price_hourly WHERE code=?", (code,))
+        L.conn.execute("DELETE FROM price_daily WHERE code=?", (code,))
         L.conn.commit()

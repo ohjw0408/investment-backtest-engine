@@ -668,8 +668,10 @@ function renderCandle(prices, intraday, interval) {
     upColor: '#e0342c', downColor: '#1565d8', borderVisible: false,
     wickUpColor: '#e0342c', wickDownColor: '#1565d8',
   });
+  // 시간봉 date = 거래소 현지 벽시계. Lightweight Charts는 UTCTimestamp를 UTC로 렌더하므로
+  // 'Z'를 붙여(=브라우저 로컬 해석 금지) 벽시계 숫자가 그대로 축에 찍히게 한다.
   const toTime = p => intraday
-    ? Math.floor(new Date(p.date.replace(' ', 'T')).getTime() / 1000)
+    ? Math.floor(Date.parse(p.date.replace(' ', 'T') + 'Z') / 1000)
     : p.date;
   candleSeries.setData(prices.map(p => ({
     time: toTime(p), open: p.open, high: p.high, low: p.low, close: p.close,

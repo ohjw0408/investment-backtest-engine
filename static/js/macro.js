@@ -544,7 +544,8 @@
       rightPriceScale: { borderColor: grid, scaleMargins: { top: 0.08, bottom: 0.26 } },
       crosshair: { mode: 0 },
     });
-    const toTime = p => intraday ? Math.floor(new Date(p.date.replace(' ', 'T')).getTime() / 1000) : p.date;
+    // 시간봉 date = 거래소 현지 벽시계 → 'Z'로 UTC 고정해야 LWC 축에 그 숫자가 그대로 찍힌다.
+    const toTime = p => intraday ? Math.floor(Date.parse(p.date.replace(' ', 'T') + 'Z') / 1000) : p.date;
     const s = candleChart.addCandlestickSeries({ upColor: '#e0342c', downColor: '#1565d8', borderVisible: false, wickUpColor: '#e0342c', wickDownColor: '#1565d8' });
     s.setData(prices.map(p => ({ time: toTime(p), open: p.open, high: p.high, low: p.low, close: p.close })));
     const vol = candleChart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } });

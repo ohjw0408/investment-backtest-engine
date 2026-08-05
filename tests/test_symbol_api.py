@@ -63,3 +63,74 @@ def test_intraday_reads_cache_without_fetch():
     finally:
         L.conn.execute("DELETE FROM price_hourly WHERE code=?", (code,))
         L.conn.commit()
+
+
+# --- 시간봉 타임존 회귀 (2026-08-06 BUG-INTRADAY-TZ) -------------------------
+# price_hourly는 UTC 저장, API는 거래소 현지 벽시계로 반환한다.
+# 이 계약이 깨지면 코스피 09:00 봉이 전날 15:00으로 찍힌다(날짜가 하루씩 밀림).
+
+def _seed_hourly(code, dts):
+    L.conn.execute("DELETE FROM price_hourly WHERE code=?", (code,))
+    L.conn.executemany(
+        "INSERT OR REPLACE INTO price_hourly "
+        "(code,datetime,open,high,low,close,volume) VALUES (?,?,?,?,?,?,?)",
+        [(code, d, 100.0, 101.0, 99.0, 100.5, 1000) for d in dts],
+    )
+    L.conn.commit()
+
+
+@pytest.mark.parametrize("code,utc_dt,expect_local", [
+    ("^KS11", "2026-07-13 00:00", "2026-07-13 09:00"),   # KST = UTC+9 (DST 없음)
+    ("^KS11", "2026-07-13 05:00", "2026-07-13 14:00"),
+    ("SPY",   "2026-07-13 13:30", "2026-07-13 09:30"),   # EDT = UTC-4
+    ("SPY",   "2026-01-05 14:30", "2026-01-05 09:30"),   # EST = UTC-5 (DST 전환 반영)
+])
+def test_intraday_returns_exchange_local_time(code, utc_dt, expect_local):
+    saved = L.conn.execute(
+        "SELECT datetime,open,high,low,close,volume FROM price_hourly WHERE code=?", (code,)
+    ).fetchall()
+    from datetime import datetime, timedelta
+    # 30일 이전 앵커 = has_deep 성립 → 730d 네트워크 페치 회피
+    anchor = (datetime.utcnow() - timedelta(days=200)).strftime("%Y-%m-%d 12:00")
+    try:
+        _seed_hourly(code, [anchor, utc_dt])
+        # 네트워크 재조회(최근·결손복구) 전부 차단 → 시드만으로 결정론 검증
+        L._intraday_fetch_ts = {code: 9e18, code + ":deep": 9e18}
+        out = L.get_intraday_data(code, "max")
+        assert out["tz"] == ("Asia/Seoul" if code == "^KS11" else "America/New_York")
+        assert expect_local in [p["date"] for p in out["prices"]]
+        assert len(out["prices"]) == 2
+    finally:
+        L.conn.execute("DELETE FROM price_hourly WHERE code=?", (code,))
+        if saved:
+            L.conn.executemany(
+                "INSERT OR REPLACE INTO price_hourly "
+                "(code,datetime,open,high,low,close,volume) VALUES (?,?,?,?,?,?,?)",
+                [(code,) + r for r in saved])
+        L.conn.commit()
+        L._intraday_fetch_ts = {}
+
+
+# --- 시간봉 결손 감지 회귀 (2026-08-06) --------------------------------------
+# has_deep만 보고 7d만 갱신하면 방문 공백기 구간이 영구히 비어 "7/13 다음 7/27"이 된다.
+
+def test_intraday_hole_detection():
+    code = "ZZTESTHOLE"
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+    try:
+        # 연속(휴장 수준 공백만) → 결손 아님
+        _seed_hourly(code, [(now - timedelta(days=n)).strftime("%Y-%m-%d 12:00")
+                            for n in range(0, 40, 3)])
+        assert L._has_intraday_hole(code) is False
+        # 중간 30일 공백 → 결손
+        _seed_hourly(code, [(now - timedelta(days=n)).strftime("%Y-%m-%d 12:00")
+                            for n in list(range(0, 10, 3)) + list(range(40, 60, 3))])
+        assert L._has_intraday_hole(code) is True
+        # 마지막 봉이 30일 전 → 결손(꼬리 공백)
+        _seed_hourly(code, [(now - timedelta(days=n)).strftime("%Y-%m-%d 12:00")
+                            for n in range(30, 60, 3)])
+        assert L._has_intraday_hole(code) is True
+    finally:
+        L.conn.execute("DELETE FROM price_hourly WHERE code=?", (code,))
+        L.conn.commit()

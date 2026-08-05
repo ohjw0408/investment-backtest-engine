@@ -650,7 +650,12 @@ _INTRADAY_CACHE = {}
 
 
 def fetch_yf_intraday(yfsym, range_key="max"):
-    """yfinance 1시간봉. range_key: 1d/1w/max(=730d). (date='YYYY-MM-DD HH:MM')."""
+    """yfinance 1시간봉. range_key: 1d/1w/max(=730d). (date='YYYY-MM-DD HH:MM').
+
+    Ticker.history 인덱스는 tz-aware 거래소 현지시각 → strftime 결과가 곧 현지 벽시계다.
+    (price_loader의 yf.download는 UTC라 거기서 변환해 내보낸다. 두 경로의 계약은 동일:
+     API가 내보내는 date = 거래소 현지 벽시계.)
+    """
     import yfinance as yf
     period = {"1d": "5d", "1w": "1mo", "max": "730d"}.get(range_key, "730d")
     h = yf.Ticker(yfsym).history(period=period, interval="60m", auto_adjust=False)

@@ -849,6 +849,43 @@ class PriceLoader:
         self._intraday_fetch_ts[code] = now
         return True
 
+    # price_hourly는 항상 UTC 벽시계로 저장(_fetch_intraday가 보장)하고, 화면에는
+    # 거래소 현지 시각으로 변환해 내보낸다. 코드→거래소 타임존 (2026-08-06 BUG-INTRADAY-TZ).
+    _INTRADAY_TZ = {
+        '^KS11': 'Asia/Seoul', '^KQ11': 'Asia/Seoul', 'KRW=X': 'Asia/Seoul',
+        '^N225': 'Asia/Tokyo', 'TPX.F': 'Asia/Tokyo',
+        '000300.SS': 'Asia/Shanghai', '^HSCE': 'Asia/Hong_Kong',
+        '^STOXX50E': 'Europe/Berlin', '^NSEI': 'Asia/Kolkata',
+    }
+
+    # 최장 연휴(설·추석·연말연시)도 거래일 공백 8일 → 10일 넘는 공백 = 데이터 결손.
+    INTRADAY_MAX_HOLE_DAYS = 10
+
+    def _has_intraday_hole(self, code: str) -> bool:
+        """price_hourly 730일 창에 휴장으로 설명 안 되는 공백(마지막 봉 이후 포함)이 있는지."""
+        from datetime import datetime as _dt, timedelta as _td
+        start = (_dt.utcnow() - _td(days=730)).strftime("%Y-%m-%d")
+        days = [r[0] for r in self.conn.execute(
+            "SELECT DISTINCT substr(datetime,1,10) FROM price_hourly "
+            "WHERE code=? AND datetime >= ? ORDER BY 1", (code, start)
+        )]
+        if not days:
+            return True
+        bounds = days + [_dt.utcnow().strftime("%Y-%m-%d")]
+        return any((_dt.strptime(b, "%Y-%m-%d") - _dt.strptime(a, "%Y-%m-%d")).days
+                   > self.INTRADAY_MAX_HOLE_DAYS
+                   for a, b in zip(bounds, bounds[1:]))
+
+    def _intraday_tz(self, code: str, is_kr: bool) -> str:
+        code = str(code).upper()
+        if code in self._INTRADAY_TZ:
+            return self._INTRADAY_TZ[code]
+        if is_kr:
+            return 'Asia/Seoul'
+        if code.endswith('-USD'):      # 크립토 = 24시간 거래, 거래소 현지 개념 없음
+            return 'UTC'
+        return 'America/New_York'
+
     def refresh_index_ohlc(self, codes=None) -> int:
         """시장지수 index_ohlc에 최근 며칠치 OHLCV를 upsert. Celery beat(장중 주기 갱신)용.
 
@@ -1463,25 +1500,31 @@ class PriceLoader:
         - range 'max': 캔들차트 1시간봉(yfinance 1h 상한 730일치 fetch).
         장중 신선도: 코드별 20분 TTL(_intraday_fetch_ok)로 최근 시간봉을 재조회 →
         라인(1d/1w)·캔들(1h/max) 모두 당일 최신 반영. 온디맨드(방문 시)라 부하 작음.
+        저장은 UTC, 반환 date는 거래소 현지 벽시계("YYYY-MM-DD HH:MM") + tz 필드.
         """
         from datetime import datetime as _dt, timedelta as _td
         code  = str(code).split(".")[0].upper()
         is_kr = self.is_kr_etf(code)
 
-        today = _dt.today().strftime("%Y-%m-%d")
+        # price_hourly.datetime은 UTC라 조회 경계도 UTC 기준이어야 한다.
+        today = _dt.utcnow().strftime("%Y-%m-%d")
         recent_ok = self._intraday_fetch_ok(code)   # 20분 경과 시 최신 재조회 허용
         if range_key == "max":
             # 730일치 보유 여부 = 30일 이전 row 존재로 판정. 없으면 730일 fetch.
-            old_cutoff = (_dt.now() - _td(days=30)).strftime("%Y-%m-%d")
+            old_cutoff = (_dt.utcnow() - _td(days=30)).strftime("%Y-%m-%d")
             has_deep = self.conn.execute(
                 "SELECT COUNT(*) FROM price_hourly WHERE code=? AND datetime < ?",
                 (code, old_cutoff)
             ).fetchone()[0]
             if not has_deep:
                 self._fetch_intraday(code, is_kr, period="730d")
+            elif self._has_intraday_hole(code) and self._intraday_fetch_ok(code + ":deep", 21600):
+                # 방문 공백기 결손 복구. has_deep만 보면 7d 갱신만 돌아 그 사이 구간이
+                # 영구히 비고, 차트가 "7/13 다음 7/27"로 건너뛴다 (2026-08-06).
+                self._fetch_intraday(code, is_kr, period="730d")
             elif recent_ok:
                 self._fetch_intraday(code, is_kr, period="7d")   # 최근 시간봉만 갱신
-            cutoff = (_dt.now() - _td(days=730)).strftime("%Y-%m-%d")
+            cutoff = (_dt.utcnow() - _td(days=730)).strftime("%Y-%m-%d")
         else:
             have_today = self.conn.execute(
                 "SELECT COUNT(*) FROM price_hourly WHERE code=? AND datetime >= ?",
@@ -1490,23 +1533,30 @@ class PriceLoader:
             if not have_today or recent_ok:
                 self._fetch_intraday(code, is_kr, period="7d")
             days   = 7 if range_key == "1w" else 2  # 1d는 직전 거래일 포함 위해 2일치 조회
-            cutoff = (_dt.now() - _td(days=days)).strftime("%Y-%m-%d")
+            cutoff = (_dt.utcnow() - _td(days=days)).strftime("%Y-%m-%d")
         rows = self.conn.execute(
             "SELECT datetime, open, high, low, close, volume FROM price_hourly "
             "WHERE code=? AND datetime >= ? ORDER BY datetime",
             (code, cutoff)
         ).fetchall()
-        prices = [{"date": r[0],
+        # UTC 저장값 → 거래소 현지 벽시계. DST가 있는 시장 때문에 봉마다 개별 변환해야 한다.
+        tzname = self._intraday_tz(code, is_kr)
+        if rows and tzname != "UTC":
+            local = pd.to_datetime([r[0] for r in rows], utc=True) \
+                      .tz_convert(tzname).strftime("%Y-%m-%d %H:%M")
+        else:
+            local = [r[0] for r in rows]
+        prices = [{"date": local[i],
                    "open":  round(float(r[1]), 4), "high": round(float(r[2]), 4),
                    "low":   round(float(r[3]), 4), "close": round(float(r[4]), 4),
                    "volume": float(r[5]) if r[5] is not None else 0}
-                  for r in rows]
+                  for i, r in enumerate(rows)]
         # 시간봉 오틱(bad tick) 제거 — 일봉과 동일 isolated-revert 필터(read-time, self-heal).
         if len(prices) >= 3:
             kept = set(_drop_isolated_price_spikes(pd.DataFrame(prices))["date"])
             prices = [p for p in prices if p["date"] in kept]
         return {
-            "code": code, "range": range_key,
+            "code": code, "range": range_key, "tz": tzname,
             "currency": "PT" if is_index_point(code) else ("KRW" if is_kr else "USD"),
             "prices": prices,
         }
@@ -1524,6 +1574,14 @@ class PriceLoader:
             raw.columns = raw.columns.get_level_values(0)
         raw   = raw.reset_index()
         dtcol = raw.columns[0]  # 'Datetime' (intraday) 또는 'index'
+        # yf.download 인덱스는 tz-aware UTC지만 버전/경로에 따라 거래소 현지로 오기도 한다.
+        # 저장 포맷은 tz를 못 담으므로(strftime) UTC로 못박아야 읽는 쪽이 변환할 수 있다.
+        try:
+            ts_col = pd.to_datetime(raw[dtcol], errors="coerce")
+            raw[dtcol] = (ts_col.dt.tz_localize("UTC") if ts_col.dt.tz is None
+                          else ts_col.dt.tz_convert("UTC"))
+        except Exception:
+            pass
         rows  = []
         for _, r in raw.iterrows():
             ts  = r[dtcol]

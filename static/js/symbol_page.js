@@ -629,8 +629,8 @@ function renderLine(prices, intraday) {
   const labels = prices.map(p => p.date);
   const vals   = prices.map(p => p.close);
   const isUp   = vals.length > 1 && vals[vals.length - 1] >= vals[0];
-  const color  = isUp ? '#2E7D32' : '#C62828';
-  const fill   = isUp ? 'rgba(46,125,50,0.08)' : 'rgba(198,40,40,0.08)';
+  const color  = isUp ? '#e0342c' : '#1565d8';
+  const fill   = isUp ? 'rgba(224,52,44,0.08)' : 'rgba(21,101,216,0.08)';
 
   const ctx = document.getElementById('priceChart').getContext('2d');
   chartInst = new Chart(ctx, {
@@ -665,8 +665,8 @@ function renderCandle(prices, intraday, interval) {
     crosshair: { mode: 0 },
   });
   candleSeries = candleChart.addCandlestickSeries({
-    upColor: '#2E7D32', downColor: '#C62828', borderVisible: false,
-    wickUpColor: '#2E7D32', wickDownColor: '#C62828',
+    upColor: '#e0342c', downColor: '#1565d8', borderVisible: false,
+    wickUpColor: '#e0342c', wickDownColor: '#1565d8',
   });
   const toTime = p => intraday
     ? Math.floor(new Date(p.date.replace(' ', 'T')).getTime() / 1000)
@@ -675,14 +675,14 @@ function renderCandle(prices, intraday, interval) {
     time: toTime(p), open: p.open, high: p.high, low: p.low, close: p.close,
   })));
 
-  // 거래량 히스토그램 — 하단 26% 영역, 봉 색과 동일(상승=초록/하락=빨강)
+  // 거래량 히스토그램 — 하단 26% 영역, 봉 색과 동일(상승=적/하락=청)
   const volSeries = candleChart.addHistogramSeries({
     priceScaleId: 'vol', priceFormat: { type: 'volume' },
   });
   candleChart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
   volSeries.setData(prices.map(p => ({
     time: toTime(p), value: p.volume || 0,
-    color: (p.close >= p.open) ? 'rgba(46,125,50,0.45)' : 'rgba(198,40,40,0.45)',
+    color: (p.close >= p.open) ? 'rgba(224,52,44,0.45)' : 'rgba(21,101,216,0.45)',
   })));
 
   // 간격별 기본 배율 — 전체 데이터 유지, 초기 보이는 창만 제한

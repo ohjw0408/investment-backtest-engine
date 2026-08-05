@@ -138,8 +138,8 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 .action-row { display: flex; align-items: center; gap: 14px; padding: 16px var(--sp-lg); border-top: 1px solid var(--ds-hairline); cursor: pointer; text-decoration: none; color: inherit; transition: background .12s; }
 .action-row:hover { background: var(--ds-soft); }
 .action-ic { width: 40px; height: 40px; border-radius: var(--r-full); background: var(--brand-tint); color: var(--brand-text); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-.action-ic.warn { background: var(--down-tint); color: var(--down); }
-.action-ic.ok { background: var(--up-tint); color: var(--up); }
+.action-ic.warn { background: var(--danger-tint); color: var(--danger); }
+.action-ic.ok { background: var(--ok-tint); color: var(--ok); }
 .action-main { flex: 1; min-width: 0; }
 .action-t { font-size: var(--fs-sm); font-weight: 600; color: var(--ds-ink); }
 .action-s { font-size: var(--fs-cap); color: var(--ds-muted); margin-top: 2px; }
@@ -251,11 +251,11 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 .md-gauge { margin-top: 15px; }
 .md-gauge-track { position: relative; height: 10px; border-radius: var(--r-pill); background: var(--ds-soft); }
 .md-gauge-safe { position: absolute; top: 0; bottom: 0; border-radius: 3px;
-  background: color-mix(in srgb, var(--up) 26%, transparent); }
+  background: color-mix(in srgb, var(--ok) 26%, transparent); }
 .md-gauge-target { position: absolute; top: -5px; bottom: -5px; width: 0;
   border-left: 2px dashed var(--ds-ink); opacity: .5; }
 .md-gauge-cur { position: absolute; top: 50%; width: 15px; height: 15px; border-radius: var(--r-full);
-  background: var(--down); border: 3px solid var(--ds-canvas); transform: translate(-50%, -50%); box-shadow: var(--ds-shadow); }
+  background: var(--danger); border: 3px solid var(--ds-canvas); transform: translate(-50%, -50%); box-shadow: var(--ds-shadow); }
 [data-theme="dark"] .md-gauge-cur { border-color: var(--ds-dark-el); }
 .md-gauge-scale { display: flex; justify-content: space-between; margin-top: 9px; font-size: 10px;
   color: var(--ds-muted); font-family: var(--font-mono); }
@@ -265,8 +265,8 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 .md-gauge-cap-t { font-size: 12px; color: var(--ds-body); }
 .md-gauge-cap-t b { color: var(--ds-ink); font-weight: 700; font-family: var(--font-mono); }
 .md-gauge-cap-t i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px;
-  vertical-align: -1px; background: color-mix(in srgb, var(--up) 50%, transparent); }
-.md-rebal-chip { background: var(--down-tint); color: var(--down); font-weight: 700; font-size: 11px;
+  vertical-align: -1px; background: color-mix(in srgb, var(--ok) 50%, transparent); }
+.md-rebal-chip { background: var(--danger-tint); color: var(--danger); font-weight: 700; font-size: 11px;
   padding: 3px 10px; border-radius: var(--r-pill); flex-shrink: 0; }
 
 /* 기둥3 계산·시뮬 — 8개 도구 2열 그리드(아이콘+제목+한줄설명) */
@@ -357,17 +357,17 @@ html[data-theme="dark"] .market-row { border-bottom-color: #3a3f49; }
 .hc-btn:hover { background: var(--ds-soft); }
 [data-theme="dark"] .hc-btn { background: var(--ds-dark-el); }
 .examples-promo-card { background:
-    radial-gradient(135% 165% at 100% -25%, color-mix(in srgb, var(--up) 24%, transparent), transparent 56%),
-    linear-gradient(135deg, color-mix(in srgb, var(--up) 11%, var(--ds-canvas)), var(--ds-canvas) 70%);
-  border: 1px solid color-mix(in srgb, var(--up) 26%, var(--ds-hairline)); }
-.examples-promo-card::after { background: radial-gradient(circle, color-mix(in srgb, var(--up) 24%, transparent), transparent 70%); }
+    radial-gradient(135% 165% at 100% -25%, color-mix(in srgb, var(--ok) 24%, transparent), transparent 56%),
+    linear-gradient(135deg, color-mix(in srgb, var(--ok) 11%, var(--ds-canvas)), var(--ds-canvas) 70%);
+  border: 1px solid color-mix(in srgb, var(--ok) 26%, var(--ds-hairline)); }
+.examples-promo-card::after { background: radial-gradient(circle, color-mix(in srgb, var(--ok) 24%, transparent), transparent 70%); }
 [data-theme="dark"] .examples-promo-card { background:
-    radial-gradient(135% 165% at 100% -25%, color-mix(in srgb, var(--up) 30%, transparent), transparent 56%),
-    linear-gradient(135deg, color-mix(in srgb, var(--up) 18%, var(--ds-dark-el)), var(--ds-dark-el) 70%);
-  border-color: color-mix(in srgb, var(--up) 34%, transparent); }
-.examples-promo-card .guru-promo-cta { background: var(--up); }
+    radial-gradient(135% 165% at 100% -25%, color-mix(in srgb, var(--ok) 30%, transparent), transparent 56%),
+    linear-gradient(135deg, color-mix(in srgb, var(--ok) 18%, var(--ds-dark-el)), var(--ds-dark-el) 70%);
+  border-color: color-mix(in srgb, var(--ok) 34%, transparent); }
+.examples-promo-card .guru-promo-cta { background: var(--ok); }
 .examples-promo-card:hover .guru-promo-cta { filter: brightness(1.06); }
-.examples-promo-card .guru-promo-badge { color: var(--up); background: color-mix(in srgb, var(--up) 14%, var(--ds-canvas)); border-color: color-mix(in srgb, var(--up) 32%, transparent); }
+.examples-promo-card .guru-promo-badge { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, var(--ds-canvas)); border-color: color-mix(in srgb, var(--ok) 32%, transparent); }
 .mobile-legal { padding: 18px 4px 6px; text-align: center; }
 .mobile-legal a { font-size: 12px; color: var(--ds-muted); text-decoration: none; }
 .mobile-legal .sep { color: var(--ds-hairline); margin: 0 8px; }

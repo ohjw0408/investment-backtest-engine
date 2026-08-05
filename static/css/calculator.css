@@ -215,7 +215,7 @@
   flex-shrink: 0;
 }
 
-.ticker-remove:hover { background: var(--down-tint); color: var(--down); }
+.ticker-remove:hover { background: var(--danger-tint); color: var(--danger); }
 
 /* ── 비중 합계 ── */
 .weight-summary { margin-top: 4px; }
@@ -230,8 +230,8 @@
 }
 
 .weight-total-num { font-family: var(--font-mono); font-weight: 600; }
-.weight-total-num.ok   { color: var(--up); }
-.weight-total-num.over { color: var(--down); }
+.weight-total-num.ok   { color: var(--ok); }
+.weight-total-num.over { color: var(--danger); }
 
 .weight-track {
   height: 6px;
@@ -250,7 +250,7 @@
 
 .weight-warn {
   font-size: var(--fs-cap);
-  color: var(--down);
+  color: var(--danger);
   margin-top: 4px;
   min-height: 16px;
 }
@@ -478,7 +478,7 @@
 
 .metric-label { font-size: var(--fs-cap); color: var(--ds-muted); font-weight: 500; margin-bottom: 8px; }
 .metric-value { font-size: var(--fs-title); font-weight: 600; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--brand-text); }
-.metric-value.red { color: var(--down); }
+.metric-value.red { color: var(--danger); }
 
 /* ── 히스토그램 섹션 ── */
 .hist-section-title {

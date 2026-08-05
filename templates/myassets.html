@@ -201,7 +201,7 @@
 .hc-actions button, .hc-actions a { font-size: .8rem; font-weight: 600; padding: 7px 14px; border-radius: var(--r-pill);
   border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body); cursor: pointer;
   font-family: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-.hc-actions button.danger { color: var(--down); border-color: color-mix(in srgb, var(--down) 40%, transparent); }
+.hc-actions button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
 .hc-actions .grp-sel { padding: 6px 10px; border: 1px solid var(--ds-hairline); border-radius: var(--r-pill);
   background: var(--ds-canvas); color: var(--ds-body); font-size: .78rem; font-family: inherit; cursor: pointer; }
 .hc-badge { font-size: .68rem; font-weight: 700; color: var(--ds-body); background: var(--ds-soft);
@@ -213,7 +213,7 @@
 .hc-acct-act { display: flex; gap: 6px; flex-shrink: 0; }
 .hc-acct-act button { font-size: .74rem; font-weight: 600; padding: 4px 11px; border-radius: var(--r-pill);
   border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-body); cursor: pointer; font-family: inherit; }
-.hc-acct-act button.danger { color: var(--down); border-color: color-mix(in srgb, var(--down) 40%, transparent); }
+.hc-acct-act button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
 
 /* 그룹 안내 (그룹 미설정 사용자) */
 .grp-hint { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; background: var(--brand-tint);
@@ -329,8 +329,8 @@
 .rb-track { position: relative; height: 10px; border-radius: 100px; background: var(--ds-strong); margin: 14px 0 10px; }
 /* 허용 구간(목표±밴드) — 슬라이더 연동, left/width 라이브 변동 */
 .rb-band-zone { position: absolute; top: -3px; height: 16px; border-radius: 5px;
-  background: color-mix(in srgb, var(--up) 13%, transparent);
-  border: 1px dashed color-mix(in srgb, var(--up) 55%, transparent);
+  background: color-mix(in srgb, var(--ok) 13%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--ok) 55%, transparent);
   transition: left .25s ease, width .25s ease; pointer-events: none; }
 .rb-card.warn .rb-band-zone { background: color-mix(in srgb, var(--gold-acc) 14%, transparent);
   border-color: color-mix(in srgb, var(--gold-acc) 60%, transparent); }
@@ -355,7 +355,7 @@
 
 /* ── 그룹 관리 카드 ── */
 .grp-sum { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; border-radius: var(--r-md); margin-bottom: 14px; font-size: 0.85rem; font-weight: 600; }
-.grp-sum.ok { background: var(--up-tint); color: var(--up); }
+.grp-sum.ok { background: var(--ok-tint); color: var(--ok); }
 .grp-sum.warn { background: color-mix(in srgb, var(--gold-acc) 14%, transparent); color: var(--gold-deep); }
 .grp-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); margin-bottom: 10px; }
 .grp-emblem { width: 38px; height: 38px; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 800; color: #fff; font-size: 0.85rem; }
@@ -372,12 +372,12 @@
 /* ── 확인 다이얼로그 ── */
 .confirm-box { width: 360px; max-width: 90vw; text-align: center; }
 .confirm-ic { width: 48px; height: 48px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
-.confirm-ic.danger { background: var(--down-tint); color: var(--down); }
+.confirm-ic.danger { background: var(--danger-tint); color: var(--danger); }
 .confirm-ic.warn { background: var(--brand-tint); color: var(--brand-text); }
 .confirm-ic svg { width: 26px; height: 26px; }
 .confirm-msg { font-size: 0.95rem; font-weight: 700; color: var(--ds-ink); }
 .confirm-sub { font-size: 0.82rem; color: var(--ds-muted); margin-top: 6px; line-height: 1.5; }
-.btn-danger { padding: 9px 20px; background: var(--down); color: #fff; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+.btn-danger { padding: 9px 20px; background: var(--danger); color: #fff; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
 
 @media (max-width: 768px) {
   .ma-wrap { padding: 14px 12px; max-width: 100%; }

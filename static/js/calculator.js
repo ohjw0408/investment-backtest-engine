@@ -268,11 +268,11 @@ function updateWeightBar() {
   fill.style.width  = Math.min(total, 100) + '%';
 
   if (total === 100) {
-    fill.style.background = 'var(--up)';
+    fill.style.background = 'var(--ok)';
     label.className = 'weight-total-num ok';
     warn.textContent = '';
   } else if (total > 100) {
-    fill.style.background = 'var(--down)';
+    fill.style.background = 'var(--danger)';
     label.className = 'weight-total-num over';
     warn.textContent = '⚠ 비중 합계가 100%를 초과했어요';
   } else {
@@ -684,7 +684,7 @@ function showProgressUI() {
         <span id="progressEta"></span>
       </div>
       <div style="text-align:center;margin-top:10px;">
-        <button onclick="cancelCalcTask()" class="ds-btn ds-btn-sm" style="border:1.5px solid var(--down);background:transparent;color:var(--down);">취소</button>
+        <button onclick="cancelCalcTask()" class="ds-btn ds-btn-sm" style="border:1.5px solid var(--danger);background:transparent;color:var(--danger);">취소</button>
       </div>
     </div>`;
   document.getElementById('resultContent').style.display = 'none';
@@ -1443,8 +1443,8 @@ function _ccRgba(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 function ccBrand() { return _ccCss('--brand', '#0052ff'); }
-function ccUp()    { return _ccCss('--up', '#05b169'); }
-function ccDown()  { return _ccCss('--down', '#cf202f'); }
+function ccUp()    { return _ccCss('--up', '#e0342c'); }
+function ccDown()  { return _ccCss('--down', '#1565d8'); }
 // ═══════════════════════════════════════════════════════════
 // 세금 토글 + 계좌 설정
 // ═══════════════════════════════════════════════════════════

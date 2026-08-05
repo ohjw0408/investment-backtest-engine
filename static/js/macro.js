@@ -36,7 +36,7 @@
     if (!arr || arr.length < 2) return '';
     const w = 150, h = 30, pad = 2, mn = Math.min(...arr), mx = Math.max(...arr), rng = (mx - mn) || 1;
     const pts = arr.map((v, i) => `${(pad + (i / (arr.length - 1)) * (w - 2 * pad)).toFixed(1)},${(h - pad - ((v - mn) / rng) * (h - 2 * pad)).toFixed(1)}`).join(' ');
-    const col = arr[arr.length - 1] >= arr[0] ? '#2E7D32' : '#C62828';
+    const col = arr[arr.length - 1] >= arr[0] ? '#e0342c' : '#1565d8';
     return `<svg class="mc-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" style="stroke:${col}"></polyline></svg>`;
   }
 
@@ -545,11 +545,11 @@
       crosshair: { mode: 0 },
     });
     const toTime = p => intraday ? Math.floor(new Date(p.date.replace(' ', 'T')).getTime() / 1000) : p.date;
-    const s = candleChart.addCandlestickSeries({ upColor: '#2E7D32', downColor: '#C62828', borderVisible: false, wickUpColor: '#2E7D32', wickDownColor: '#C62828' });
+    const s = candleChart.addCandlestickSeries({ upColor: '#e0342c', downColor: '#1565d8', borderVisible: false, wickUpColor: '#e0342c', wickDownColor: '#1565d8' });
     s.setData(prices.map(p => ({ time: toTime(p), open: p.open, high: p.high, low: p.low, close: p.close })));
     const vol = candleChart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } });
     candleChart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
-    vol.setData(prices.map(p => ({ time: toTime(p), value: p.volume || 0, color: (p.close >= p.open) ? 'rgba(46,125,50,0.45)' : 'rgba(198,40,40,0.45)' })));
+    vol.setData(prices.map(p => ({ time: toTime(p), value: p.volume || 0, color: (p.close >= p.open) ? 'rgba(224,52,44,0.45)' : 'rgba(21,101,216,0.45)' })));
     // 간격별 기본 줌
     const days = CANDLE_DEFAULT_DAYS[interval] || 0, ts = candleChart.timeScale();
     if (days > 0 && prices.length > 1) {

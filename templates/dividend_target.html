@@ -168,7 +168,7 @@
 }
 [data-theme="dark"] .var-radio-label { background:var(--ds-dark-el); }
 .var-radio:checked + .var-radio-label { border-color:var(--brand); background:var(--brand-tint); color:var(--brand-text); }
-.var-radio.auto:checked + .var-radio-label { border-color:var(--up); background:var(--green-pale); color:var(--up); }
+.var-radio.auto:checked + .var-radio-label { border-color:var(--ok); background:var(--ok-tint); color:var(--ok); }
 .var-body { display:flex; gap:8px; align-items:center; }
 .var-range-extra { margin-top:6px; display:none; }
 .var-range-extra.show { display:flex; gap:8px; align-items:center; }
@@ -236,7 +236,7 @@
     <section class="bt-fcard dt-cond-card">
       <h2 class="bt-fcard-title">투자 조건</h2>
       <div style="font-size:11px;color:var(--ds-muted);line-height:1.7;margin:6px 0 16px;">
-        <b style="color:var(--brand-text);">단일</b> 값 하나로 계산 · <b style="color:var(--brand-text);">다중</b> 여러 값을 펼쳐 비교 · <b style="color:var(--up);">역산</b> 목표 달성에 필요한 최소값 자동 계산
+        <b style="color:var(--brand-text);">단일</b> 값 하나로 계산 · <b style="color:var(--brand-text);">다중</b> 여러 값을 펼쳐 비교 · <b style="color:var(--ok);">역산</b> 목표 달성에 필요한 최소값 자동 계산
       </div>
 
       <!-- 시드 -->
@@ -338,7 +338,7 @@
         <div class="var-hint" id="dtYearsHint">20년 (고정)</div>
       </div>
 
-      <div id="dtScenarioWarn" style="display:none;color:var(--down);font-size:0.78rem;margin-top:4px;"></div>
+      <div id="dtScenarioWarn" style="display:none;color:var(--danger);font-size:0.78rem;margin-top:4px;"></div>
     </section>
 
     <!-- 투자 방식 (배당 처리 · 리밸런싱) -->
@@ -484,7 +484,7 @@
         <span id="dtProgressEta"></span>
       </div>
       <div style="text-align:center;margin-top:10px;">
-        <button onclick="dtCancelTask()" style="padding:4px 16px;border:1.5px solid var(--down);border-radius:8px;background:var(--ds-canvas);color:var(--down);font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
+        <button onclick="dtCancelTask()" style="padding:4px 16px;border:1.5px solid var(--danger);border-radius:8px;background:var(--ds-canvas);color:var(--danger);font-size:12px;font-weight:700;cursor:pointer;">✕ 취소</button>
       </div>
     </div>
     <div class="result-empty" id="dtResultEmpty">

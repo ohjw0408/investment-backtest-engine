@@ -71,12 +71,12 @@ function _btRgba(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 // 차트 색 — 렌더 직전 토큰값으로 갱신(액센트/다크 반영)
-let _btMuted = '#90A4AE', _btBrand = '#0052ff', _btUp = '#05b169', _btDown = '#cf202f';
+let _btMuted = '#90A4AE', _btBrand = '#0052ff', _btUp = '#e0342c', _btDown = '#1565d8';
 function _btRefreshChartColors() {
   _btMuted = _btCss('--ds-muted', '#90A4AE');
   _btBrand = _btCss('--brand', '#0052ff');
-  _btUp    = _btCss('--up', '#05b169');
-  _btDown  = _btCss('--down', '#cf202f');
+  _btUp    = _btCss('--up', '#e0342c');
+  _btDown  = _btCss('--down', '#1565d8');
 }
 
 // ── 입력 ↔ 결과 뷰 전환 ──
@@ -130,11 +130,11 @@ function btRefreshWeightBar() {
   label.textContent = pct + '%';
   fill.style.width  = Math.min(pct, 100) + '%';
   if (pct === 100) {
-    fill.style.background = 'var(--up)';
+    fill.style.background = 'var(--ok)';
     label.className = 'weight-total-num ok';
     if (warn) warn.textContent = '';
   } else if (pct > 100) {
-    fill.style.background = 'var(--down)';
+    fill.style.background = 'var(--danger)';
     label.className = 'weight-total-num over';
     if (warn) warn.textContent = '⚠ 비중 합계가 100%를 초과했어요';
   } else {
@@ -1000,7 +1000,7 @@ function renderHorizonTable() {
     // 표본 적을 때(<10)만 회색. 합성 의존은 가독성 유지 + "추정" 배지로 표기.
     const dim = (r.n < 10) ? ' class="is-dim"' : '';
     const lp = r.loss_prob;
-    const lpColor = lp == null ? '' : (lp <= 0.001 ? 'color:var(--up);font-weight:800;' : (lp >= 0.3 ? 'color:var(--down);font-weight:700;' : 'font-weight:700;'));
+    const lpColor = lp == null ? '' : (lp <= 0.001 ? 'color:var(--ok);font-weight:800;' : (lp >= 0.3 ? 'color:var(--danger);font-weight:700;' : 'font-weight:700;'));
     const pcts = r.pcts || {};
     const worst = btDeflate(pcts['0']), best = btDeflate(pcts['100']);
     const synBadge = _btSynLevel(r.syn_frac) ? ` <span class="bt-est" title="이 기간 윈도우의 ${(r.syn_frac*100).toFixed(0)}%가 추정(합성) 데이터에 의존">추정</span>` : '';
@@ -1385,7 +1385,7 @@ function btAttrRender(a) {
       '<div style="color:var(--ds-muted);font-size:0.85rem;padding:10px;">이 구간 데이터가 부족해요.</div>';
     return;
   }
-  const grn = 'var(--up)', red = 'var(--down)', mut = 'var(--ds-muted)';
+  const grn = 'var(--ok)', red = 'var(--danger)', mut = 'var(--ds-muted)';
   // 하락 방어 잘하는 순(down_capture 작을수록 위)
   codes.sort((x, y) => (A[x].down_capture ?? 9) - (A[y].down_capture ?? 9));
 

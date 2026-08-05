@@ -153,7 +153,7 @@ function updateRetWeightUI() {
   totalEl.className = 'weight-total-num' + (pct === 100 ? ' ok' : pct > 100 ? ' over' : '');
   const bar = document.getElementById('retWeightBar');
   bar.style.width = Math.min(pct, 100) + '%';
-  bar.style.background = pct === 100 ? 'var(--up)' : pct > 100 ? 'var(--down)' : 'var(--brand)';
+  bar.style.background = pct === 100 ? 'var(--ok)' : pct > 100 ? 'var(--danger)' : 'var(--brand)';
   const warn = document.getElementById('retWeightWarn');
   if (warn) warn.textContent = pct > 100 ? '⚠ 비중 합계가 100%를 초과했어요'
     : (pct > 0 && pct < 100 ? `나머지 ${100 - pct}%는 현금으로 유지됩니다` : '');
@@ -1054,15 +1054,15 @@ function renderWdInsights(data, body) {
   const cov    = ins.withdrawal_coverage_p50 || 0;
 
   const pct = v => (v * 100).toFixed(1) + '%';
-  const ratioTag = r => r <= 1 ? '<span style="color:var(--up);">보수적</span>'
+  const ratioTag = r => r <= 1 ? '<span style="color:var(--ok);">보수적</span>'
                       : r <= 1.2 ? '<span style="color:var(--gold-deep);">적정</span>'
-                      : '<span style="color:var(--down);">공격적</span>';
+                      : '<span style="color:var(--danger);">공격적</span>';
 
   const depP10 = ins.depletion_p10, depP50 = ins.depletion_p50;
   const depleted10 = depP10 && depP10 < wdYears;
   const depleted50 = depP50 && depP50 < wdYears;
   const depletionTxt   = depleted10 ? `하위10% <span style="white-space:nowrap">${depP10}년차</span>` : depleted50 ? `중앙값 <span style="white-space:nowrap">${depP50}년차</span>` : `${wdYears}년 유지`;
-  const depletionColor = depleted10 ? 'var(--down)' : depleted50 ? 'var(--gold-deep)' : 'var(--up)';
+  const depletionColor = depleted10 ? 'var(--danger)' : depleted50 ? 'var(--gold-deep)' : 'var(--ok)';
 
   const cards = [
     { l: '은퇴 시작 자산',       v: fmtKRW(startAsset) },

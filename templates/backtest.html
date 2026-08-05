@@ -280,7 +280,7 @@
   background: none; border: none; cursor: pointer;
   color: var(--ds-muted); font-size: 1.15rem; line-height: 1; padding: 0 2px; flex-shrink: 0;
 }
-.ticker-remove-btn:hover { color: var(--down); }
+.ticker-remove-btn:hover { color: var(--danger); }
 
 .share-pill { display: inline-flex; align-items: center; gap: 6px; }
 .share-pill .bt-ico, .share-pill .bt-ico svg { width: 15px; height: 15px; }
@@ -516,7 +516,7 @@
           <span id="btProgressEta"></span>
         </div>
         <div style="text-align:center;margin-top:12px;">
-          <button onclick="btCancelTask()" class="ds-btn ds-btn-sm" style="border:1.5px solid var(--down);background:transparent;color:var(--down);">취소</button>
+          <button onclick="btCancelTask()" class="ds-btn ds-btn-sm" style="border:1.5px solid var(--danger);background:transparent;color:var(--danger);">취소</button>
         </div>
       </div>
     </div>
@@ -692,7 +692,7 @@
 
       <!-- 종합과세 경고 + 분할매도 절세 패널 (Phase 2e) -->
       <div id="btSplitSalePanel" style="display:none;" class="bt-card">
-        <div class="bt-card-title" style="color:var(--down);"><span class="bt-ico" style="color:var(--down);">{{ nicon('warn') }}</span> 금융소득 종합과세 주의</div>
+        <div class="bt-card-title" style="color:var(--danger);"><span class="bt-ico" style="color:var(--danger);">{{ nicon('warn') }}</span> 금융소득 종합과세 주의</div>
         <div style="font-size:0.83rem;color:var(--ds-body);margin-bottom:12px;">
           시뮬레이션 종료 시점 KR_FOREIGN(국내상장 해외 ETF) 미실현 이익이 2천만원을 초과합니다.
           <strong>최종 자산은 일괄 청산 기준으로 그 해 배당과 합산한 금융소득 종합과세를 이미 반영합니다.</strong>

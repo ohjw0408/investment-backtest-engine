@@ -62,8 +62,8 @@
 .acct-btn { padding: 11px 20px; border-radius: var(--r-pill); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; font-family: var(--font-sans); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 .acct-btn.ghost { border: 1px solid var(--ds-hairline); background: var(--ds-canvas); color: var(--ds-ink); }
 .acct-btn.ghost:hover { border-color: var(--ds-muted); }
-.acct-btn.danger { border: 1px solid var(--down); background: transparent; color: var(--down); }
-.acct-btn.danger:hover { background: var(--down-tint); }
+.acct-btn.danger { border: 1px solid var(--danger); background: transparent; color: var(--danger); }
+.acct-btn.danger:hover { background: var(--danger-tint); }
 /* 선택 동의(알림 권한) 토글 */
 .acct-notif { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--ds-hairline); border-radius: var(--r-lg); margin-bottom: 16px; }
 .acct-notif-main { flex: 1; min-width: 0; }
@@ -116,7 +116,7 @@
 .we-iconbtn { background: var(--ds-canvas); border: 1px solid var(--ds-hairline); border-radius: var(--r-sm); width: 30px; height: 30px; cursor: pointer; font-size: 0.85rem; color: var(--ds-muted); flex-shrink: 0; }
 .we-iconbtn:hover:not(:disabled) { background: var(--brand-tint); color: var(--brand-text); }
 .we-iconbtn:disabled { opacity: 0.3; cursor: default; }
-.we-del { color: var(--down); }
+.we-del { color: var(--danger); }
 /* 종목 목록(내 자산 보유종목처럼 행 단위로 줄맞춤) */
 .we-items { border: 1px solid var(--ds-hairline); border-radius: var(--r-md); background: var(--ds-canvas); overflow: hidden; }
 .we-item-row { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-top: 1px solid var(--ds-hairline); }
@@ -124,7 +124,7 @@
 .we-item-name { flex: 1; min-width: 0; font-size: var(--fs-sm); font-weight: 600; color: var(--ds-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .we-item-code { font-family: var(--font-mono); font-size: var(--fs-cap); color: var(--ds-muted); flex-shrink: 0; }
 .we-item-x { background: none; border: none; cursor: pointer; color: var(--ds-muted); font-size: 0.9rem; line-height: 1; padding: 4px 6px; flex-shrink: 0; border-radius: var(--r-sm); }
-.we-item-x:hover { color: var(--down); background: var(--ds-soft); }
+.we-item-x:hover { color: var(--danger); background: var(--ds-soft); }
 .we-item-empty { padding: 14px; font-size: var(--fs-cap); color: var(--ds-muted); text-align: center; }
 .we-add-item { margin-top: 10px; font-size: var(--fs-cap); font-weight: 600; color: var(--brand-text); background: var(--brand-tint); border: none; border-radius: var(--r-sm); padding: 6px 12px; cursor: pointer; }
 .we-add-widget { width: 100%; padding: 11px; border: 1px dashed var(--ds-hairline); border-radius: var(--r-md); background: transparent; color: var(--ds-muted); font-weight: 600; cursor: pointer; font-family: var(--font-sans); }
@@ -134,8 +134,8 @@
 .we-save:hover:not(:disabled) { background: var(--brand-hover); }
 .we-save:disabled { opacity: 0.5; cursor: default; }
 .we-status { font-size: var(--fs-sm); }
-.we-status.ok { color: var(--up); }
-.we-status.err { color: var(--down); }
+.we-status.ok { color: var(--ok); }
+.we-status.err { color: var(--danger); }
 .login-gate { text-align: center; padding: 30px 16px; color: var(--ds-muted); line-height: 1.7; }
 .login-gate a { color: var(--brand-text); font-weight: 600; }
 .we-modal-bg { display: none; position: fixed; inset: 0; background: rgba(10,11,13,0.5); z-index: 2000; align-items: flex-start; justify-content: center; }
@@ -341,7 +341,7 @@
 <div class="we-modal-bg" id="deleteModal" style="display:none;">
   <div class="we-modal" style="max-width:380px;">
     <div style="padding:24px 22px;">
-      <div style="font-size:1.05rem;font-weight:800;color:var(--down);margin-bottom:8px;">회원 탈퇴</div>
+      <div style="font-size:1.05rem;font-weight:800;color:var(--danger);margin-bottom:8px;">회원 탈퇴</div>
       <div style="font-size:0.88rem;color:var(--text);line-height:1.6;margin-bottom:18px;">
         정말 탈퇴하시겠어요?<br>보유종목·포트폴리오·설정·알림 등 <b>모든 데이터가 영구 삭제</b>되며
         복구할 수 없어요.</div>
@@ -349,7 +349,7 @@
         <button onclick="closeDeleteModal()" style="padding:9px 16px;border:1.5px solid var(--border);
           background:transparent;border-radius:8px;color:var(--text);font-size:0.86rem;cursor:pointer;">취소</button>
         <button id="deleteConfirmBtn" onclick="confirmDelete()" style="padding:9px 16px;border:none;
-          background:var(--down);border-radius:8px;color:#fff;font-size:0.86rem;font-weight:700;cursor:pointer;">탈퇴하기</button>
+          background:var(--danger);border-radius:8px;color:#fff;font-size:0.86rem;font-weight:700;cursor:pointer;">탈퇴하기</button>
       </div>
     </div>
   </div>

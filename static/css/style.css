@@ -14,12 +14,14 @@
   --blue-bright: var(--brand);
   --blue-pale:   var(--brand-tint);
   --blue-soft:   var(--brand-tint);
-  --green:       var(--up);
-  --green-light: var(--up);
-  --green-pale:  var(--up-tint);
-  --red:         var(--down);
-  --red-light:   var(--down);
-  --red-pale:    var(--down-tint);
+  /* 레거시 green/red = 상태색(성공/위험) 별칭. 등락 방향은 --up/--down 이 담당한다.
+     (2026-08-05 한국식 등락색 전환: 상승=적, 하락=청 → 방향색과 상태색을 분리) */
+  --green:       var(--ok);
+  --green-light: var(--ok);
+  --green-pale:  var(--ok-tint);
+  --red:         var(--danger);
+  --red-light:   var(--danger);
+  --red-pale:    var(--danger-tint);
   --gold:        #F9A825;
   --gold-pale:   #FFF8E1;
   --gold-deep:   #E65100;
@@ -57,8 +59,11 @@ html[data-theme="dark"] {
   --ds-canvas:#ffffff; --ds-soft:#ededec; --ds-strong:#e4e4e2; --ds-hairline:#dcdcda;
   --ds-ink:#0a0b0d; --ds-body:#5b616e; --ds-muted:#7c828a;
   --ds-dark:#0a0b0d; --ds-dark-el:#1c1f25;
-  /* semantics */
-  --up:#05b169; --up-tint:#e6f7ef; --down:#cf202f; --down-tint:#fdeaec; --gold-acc:#f4b000;
+  /* semantics — 등락 방향(한국식: 상승=적, 하락=청). 상태색(--ok/--danger)과 분리해서 쓸 것.
+     · 가격/수익률/지수 등 "오르내림" → --up / --down
+     · 성공·완료·절세 이득 → --ok  /  에러·삭제·취소·한도초과 → --danger */
+  --up:#e0342c; --up-tint:#fdecea; --down:#1565d8; --down-tint:#e8f1fd;
+  --ok:#05b169; --ok-tint:#e6f7ef; --danger:#cf202f; --danger-tint:#fdeaec; --gold-acc:#f4b000;
   /* elevation */
   --ds-shadow:0 4px 12px rgba(0,0,0,.04); --ds-shadow-lg:0 8px 32px rgba(0,0,0,.08);
   /* type */
@@ -77,7 +82,8 @@ html[data-theme="dark"] {
   /* dark: page(soft)=최암, card(canvas)=elevated 더 밝게 → 카드 떠 보이게 */
   --ds-canvas:#16181d; --ds-soft:#0a0b0e; --ds-strong:#23262d; --ds-hairline:#2c3038;
   --ds-ink:#f5f6f8; --ds-body:#a8acb3; --ds-muted:#8a9099; /* 4.25→4.9:1 (F-5) */
-  --up:#27c281; --up-tint:#0f2a20; --down:#ff5a5f; --down-tint:#2e1518; --gold-acc:#ffc94d;
+  --up:#ff6b6b; --up-tint:#33191a; --down:#4d9bff; --down-tint:#12233d;
+  --ok:#27c281; --ok-tint:#0f2a20; --danger:#ff5a5f; --danger-tint:#2e1518; --gold-acc:#ffc94d;
   --ds-shadow:0 4px 12px rgba(0,0,0,.4); --ds-shadow-lg:0 8px 32px rgba(0,0,0,.6);
 }
 
@@ -391,8 +397,8 @@ a { text-decoration: none; color: inherit; }
   margin-left: 8px;
 }
 
-.portfolio-change.up   { color: var(--green-light); }
-.portfolio-change.down { color: var(--red-light); }
+.portfolio-change.up   { color: var(--up); }
+.portfolio-change.down { color: var(--down); }
 
 .period-selector {
   display: flex;
@@ -491,8 +497,8 @@ a { text-decoration: none; color: inherit; }
   margin: 3px 0;
 }
 .market-change { font-size: 0.82rem; font-weight: 700; }
-.market-change.up   { color: var(--green-light); }
-.market-change.down { color: var(--red-light); }
+.market-change.up   { color: var(--up); }
+.market-change.down { color: var(--down); }
 
 .sparkline { display: block; margin-top: 6px; }
 
@@ -582,8 +588,8 @@ a { text-decoration: none; color: inherit; }
 
 .asset-name { font-size: 0.86rem; font-weight: 700; }
 .asset-info .asset-change { font-size: 0.78rem; font-weight: 600; margin-top: 2px; }
-.asset-info .asset-change.up   { color: var(--green-light); }
-.asset-info .asset-change.down { color: var(--red-light); }
+.asset-info .asset-change.up   { color: var(--up); }
+.asset-info .asset-change.down { color: var(--down); }
 
 .asset-bar-wrap {
   padding: 12px 18px 16px;

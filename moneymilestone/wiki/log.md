@@ -1,5 +1,60 @@
 # Log
 
+## [2026-08-05] DESIGN | 등락색 한국식 전환 (상승=적 / 하락=청) + 방향색↔상태색 분리
+
+오너 지시: "상승 초록·하락 빨강이 국장 감각과 반대라 헷갈린다. 상승=빨강, 하락=파랑으로 통일."
+
+**색조**(오너 선택 = 토스·네이버증권 톤):
+
+| | light | dark |
+|---|---|---|
+| `--up` 상승 | `#e0342c` | `#ff6b6b` |
+| `--down` 하락 | `#1565d8` | `#4d9bff` |
+| `--up-tint` | `#fdecea` | `#33191a` |
+| `--down-tint` | `#e8f1fd` | `#12233d` |
+
+**핵심은 색 두 개를 뒤집는 게 아니었다.** `--up`/`--down`이 등락 방향과
+**상태(성공/위험)** 양쪽에 섞여 쓰이고 있었다 — 에러 메시지·삭제 버튼·취소 버튼·한도초과
+배너가 전부 `var(--down)`, 성공 토스트·절세액·`examples-promo-card` 그라디언트가
+`var(--up)`. 그대로 뒤집었으면 **에러가 파란색, 성공 토스트가 빨간색**이 된다.
+
+그래서 토큰을 갈랐다:
+
+```css
+/* 등락 방향 */
+--up / --up-tint / --down / --down-tint
+/* 상태 — 방향과 무관 */
+--ok / --ok-tint / --danger / --danger-tint
+```
+
+레거시 별칭 `--green*`/`--red*`는 이제 `--up`/`--down`이 아니라 **`--ok`/`--danger`를
+가리킨다**(기존 사용처 절대다수가 성공/위험 의미였음). 대신 실제로 방향 의미였던
+`.portfolio-change.up/.down`·`.market-change`·`.asset-change`·`.symbol-change`는
+`--up`/`--down`으로 옮겼다.
+
+**하드코딩 잔재도 전수 교체**: 캔들 차트 upColor/downColor(`symbol_page.js`·`macro.js`),
+거래량 히스토그램 rgba, 스파크라인(`charts.js`·`macro.js`), 차트 폴백 상수
+(`backtest_page.js`·`calculator.js`·`tax_switch.js`), 공유 카드(`share.html`).
+초록으로 **남긴 것**들: 배당 막대(`symbol_page.js` `BAR`), 시장 배지 팔레트,
+리스크 점수 그라디언트, 생존율 바 — 등락이 아니라 분류·양호도라서.
+
+리밸런싱은 자연히 한국식이 됐다 — `.rb-act.buy`가 `--up`(적), `.sell`이 `--down`(청).
+
+**검증**
+- 신규 `tests/test_direction_colors.js` — 17페이지 × 라이트/다크 토큰 프로브 + 렌더된
+  `.up/.down` 실색상. **204 PASS / 0 FAIL**
+- 신규 `tests/probe_direction_dom.js` — 실제 렌더된 `+/-/▲/▼` 표기 **42건 전수 색 대조,
+  불일치 0**
+- 육안: `tests/shots_direction_visual/`(홈·내자산·시장·종목 라인/캔들·거시·캘린더·검색·설정)
+  + `tests/shots_direction_interact/`(내자산 3탭·성공/실패 토스트·비중초과·설정 위험영역·백테 입력)
+  라이트·다크 각각. **콘솔 에러 0**
+- 회귀: `tests/test_layout_safety.js` **164/164 PASS**
+
+⚠️ 하락 파랑(`#1565d8`)과 기본 브랜드 블루(`#0052ff`)가 다소 가깝다. 아직 문제된 화면은
+없지만 액센트를 blue로 쓰는 사용자에게는 구분이 약할 수 있음.
+
+_작성: Claude_
+
 ## [2026-08-04] BUGFIX | 매일 오는 "합성 백필 손상 검출 20종" — 스캐너 분모가 0에 가까웠다
 
 오너 제보: 무결성 알림이 20종을 손상으로 계속 검출한다.

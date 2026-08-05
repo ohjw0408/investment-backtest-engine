@@ -425,7 +425,7 @@ loadEvents();
     try {
       const res = await fetch('/api/alerts/calendar-prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       st.textContent = res.ok ? '저장됐어요. 알림 내역은 다음 08:00 KST 실행 때 오늘 일정이 있으면 생성됩니다.' : '저장 실패';
-      st.style.color = res.ok ? 'var(--up)' : 'var(--down)';
+      st.style.color = res.ok ? 'var(--ok)' : 'var(--danger)';
       if (res.ok) {
         renderSummary('저장됨');
         refreshCalendarRuleView(true);

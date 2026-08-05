@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 from typing import Callable, List, Optional
 
 from modules.seed_util import stable_seed
+from modules.perf_metrics import twr_index, max_drawdown, monthly_flows, mwr as compute_mwr
 
 
 class AccumulationAnalyzer:
@@ -597,17 +598,12 @@ class AccumulationAnalyzer:
         end_value   = pv.iloc[-1]
         start_value = pv.iloc[0]
 
-        # MDD
-        mdd = float(((pv - pv.cummax()) / pv.cummax()).min())
-
-        # 일간 수익률 (납입일 제거)
-        daily_returns = pv.pct_change().dropna()
-        if "cash_flow" in history.columns:
-            contrib_dates = set(
-                pd.to_datetime(history.loc[history["cash_flow"] > 0, "date"]).dt.normalize().tolist()
-            )
-            date_idx = pd.to_datetime(history.loc[daily_returns.index, "date"]).dt.normalize()
-            daily_returns = daily_returns[(~date_idx.isin(contrib_dates)).values]
+        # MDD·일간수익률 = TWR 기준. 잔고로 재면 적립금이 고점을 밀어올려 낙폭이 희석되고
+        # 납입일 점프가 그대로 (+)수익으로 섞인다 (2026-08-05).
+        cash_flow = history["cash_flow"] if "cash_flow" in history.columns else None
+        twr_idx, _daily = twr_index(pv, cash_flow)
+        mdd = max_drawdown(twr_idx)
+        daily_returns = pd.Series(_daily)
 
         # Sharpe / Sortino
         std = daily_returns.std()
@@ -618,28 +614,8 @@ class AccumulationAnalyzer:
         # MWR (IRR) - 월납 타이밍을 정확히 반영한 수익률
         # 초기 일시금만 있는 경우에는 IRR을 월수익률처럼 연율화하면 왜곡된다.
         mwr = 0.0
-        if self.monthly_contribution > 0 and "cash_flow" in history.columns:
-            cf = history.loc[history["cash_flow"] != 0, ["date", "cash_flow"]].copy()
-            cf = pd.concat([cf, pd.DataFrame([{"date": history["date"].iloc[-1], "cash_flow": float(pv.iloc[-1])}])],
-                           ignore_index=True)
-            cf["date"] = pd.to_datetime(cf["date"])
-            cf = cf.sort_values("date").reset_index(drop=True)
-            cfs = [-c for c in cf["cash_flow"].iloc[:-1].tolist()] + [float(cf["cash_flow"].iloc[-1])]
-            if len(cfs) >= 2 and any(c < 0 for c in cfs) and any(c > 0 for c in cfs):
-                try:
-                    rate = 0.01
-                    for _ in range(200):
-                        npv  = sum(c / (1 + rate) ** i for i, c in enumerate(cfs))
-                        dnpv = sum(-i * c / (1 + rate) ** (i + 1) for i, c in enumerate(cfs))
-                        if abs(dnpv) < 1e-12: break
-                        nr = rate - npv / dnpv
-                        if abs(nr - rate) < 1e-8:
-                            rate = nr; break
-                        rate = nr
-                    if -0.9 < rate < 10.0:
-                        mwr = (1 + rate) ** 12 - 1
-                except Exception:
-                    mwr = 0.0
+        if self.monthly_contribution > 0 and cash_flow is not None:
+            mwr = compute_mwr(monthly_flows(history["date"], cash_flow), float(pv.iloc[-1])) or 0.0
 
         # CAGR = MWR (IRR) 사용 - 월납 타이밍 정확히 반영
         # 단, cash_flow 없거나 MWR 계산 실패 시 단순 CAGR 사용

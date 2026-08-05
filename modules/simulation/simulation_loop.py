@@ -124,8 +124,10 @@ class SimulationLoop:
             )
 
             dividend_total = sum(dividend_by_ticker.values())
+            dividend_withdrawn = 0.0
             if config.dividend_mode == "withdraw" and dividend_total > 0:
                 portfolio.cash -= dividend_total
+                dividend_withdrawn = dividend_total
 
             # ── contribution ─────────────────────────
             _effective_monthly = (
@@ -199,6 +201,10 @@ class SimulationLoop:
                     self._initial_capital_cf = 0.0
             else:
                 cash_flow = 0.0
+
+            # 배당 인출은 월중 아무 날에나 생기는 유출 — 빠뜨리면 TWR이 배당수익률만큼
+            # 낮게 잡힌다(수익이 아니라 유출인데 잔고만 줄어드므로). 2026-08-05
+            cash_flow -= dividend_withdrawn
 
             # 🔥 3️⃣ recorder 옵션화
             if record_history:

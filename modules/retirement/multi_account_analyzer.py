@@ -15,6 +15,7 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 
 from modules.seed_util import stable_seed
+from modules.perf_metrics import twr_index, max_drawdown, monthly_flows, mwr as compute_mwr
 
 
 # use_synthetic=True 시 롤링 케이스를 이 개수까지 윈도우별 독립 합성으로 보충한다.
@@ -35,49 +36,21 @@ def calc_metrics_from_history(
     end_value = float(pv.iloc[-1])
     start_value = float(pv.iloc[0])
 
-    mdd = float(((pv - pv.cummax()) / pv.cummax()).min())
-
-    daily_returns = pv.pct_change().dropna()
-    # 초기 일시금만 있는 경우에는 IRR을 월수익률처럼 연율화하면 왜곡된다.
-    if monthly_contribution > 0 and "cash_flow" in history.columns:
-        contrib_dates = set(
-            pd.to_datetime(history.loc[history["cash_flow"] > 0, "date"]).dt.normalize().tolist()
-        )
-        date_idx = pd.to_datetime(history.loc[daily_returns.index, "date"]).dt.normalize()
-        daily_returns = daily_returns[(~date_idx.isin(contrib_dates)).values]
+    # MDD·일간수익률 = TWR 기준(잔고로 재면 적립금이 고점을 밀어 낙폭 희석) — 2026-08-05
+    cash_flow = history["cash_flow"] if "cash_flow" in history.columns else None
+    twr_idx, _daily = twr_index(pv, cash_flow)
+    mdd = max_drawdown(twr_idx)
+    daily_returns = pd.Series(_daily)
 
     std = daily_returns.std()
     sharpe = (daily_returns.mean() / std * np.sqrt(252)) if std > 0 else 0.0
     dstd = daily_returns[daily_returns < 0].std()
     sortino = (daily_returns.mean() / dstd * np.sqrt(252)) if (dstd and dstd > 0) else 0.0
 
+    # 초기 일시금만 있는 경우에는 IRR을 월수익률처럼 연율화하면 왜곡된다.
     mwr = 0.0
-    if monthly_contribution > 0 and "cash_flow" in history.columns:
-        cf = history.loc[history["cash_flow"] != 0, ["date", "cash_flow"]].copy()
-        cf = pd.concat(
-            [cf, pd.DataFrame([{"date": history["date"].iloc[-1], "cash_flow": end_value}])],
-            ignore_index=True,
-        )
-        cf["date"] = pd.to_datetime(cf["date"])
-        cf = cf.sort_values("date").reset_index(drop=True)
-        cfs = [-c for c in cf["cash_flow"].iloc[:-1].tolist()] + [float(cf["cash_flow"].iloc[-1])]
-        if len(cfs) >= 2 and any(c < 0 for c in cfs) and any(c > 0 for c in cfs):
-            try:
-                rate = 0.01
-                for _ in range(200):
-                    npv = sum(c / (1 + rate) ** i for i, c in enumerate(cfs))
-                    dnpv = sum(-i * c / (1 + rate) ** (i + 1) for i, c in enumerate(cfs))
-                    if abs(dnpv) < 1e-12:
-                        break
-                    nr = rate - npv / dnpv
-                    if abs(nr - rate) < 1e-8:
-                        rate = nr
-                        break
-                    rate = nr
-                if -0.9 < rate < 10.0:
-                    mwr = (1 + rate) ** 12 - 1
-            except Exception:
-                mwr = 0.0
+    if monthly_contribution > 0 and cash_flow is not None:
+        mwr = compute_mwr(monthly_flows(history["date"], cash_flow), end_value) or 0.0
 
     if not np.isfinite(mwr):
         mwr = 0.0   # IRR 발산(내부이동만 받은 계좌 등) → 0 처리(JSON Infinity 방지)

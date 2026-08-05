@@ -696,3 +696,10 @@ tags: [dev]
 > `tests/probe_direction_dom.js` 실렌더 42건 불일치 0, 라이트/다크 육안 스샷(콘솔 에러 0),
 > `test_layout_safety.js` 164/164. 상세 = `log.md` 2026-08-05.
 > **신규 코드 원칙**: 오르내림은 `--up`/`--down`, 성공·위험은 `--ok`/`--danger`. 섞지 말 것.
+
+## 2026-08-05 (2) 적립기 MDD·배당 인출 TWR 정리 ✅
+
+- 투자계산기·은퇴 적립기 MDD/Sharpe/Sortino도 TWR 기준으로(백테스트와 동일 뿌리 버그).
+- 배당 인출을 음수 `cash_flow`로 기록 → 배당이 손실로 잡히던 것 수정.
+- `modules/perf_metrics.py` 신설로 TWR·MWR 공용화(3곳 중복 제거).
+- 상세 = `dev/bugs.md` 2026-08-05 세션 2.

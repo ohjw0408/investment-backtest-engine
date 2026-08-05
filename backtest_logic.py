@@ -8,26 +8,6 @@ import numpy as np
 _portfolio_engine = None
 
 
-def _twr(pv, cash_flow):
-    """납입·인출이 섞인 계좌잔고에서 순수 수익만 뽑은 시간가중(TWR) 지수.
-
-    적립식은 portfolio_value가 납입 때문에 오르므로, 잔고를 그대로 쓰면
-    연간수익률·MDD·Sharpe가 "수익"이 아니라 "납입금 증가"를 재게 된다.
-    납입금은 그날 종가로 매수되어 당일 수익에는 기여하지 않으므로
-        r_t = (PV_t - CF_t) / PV_(t-1) - 1
-    반환: (지수 ndarray[첫날=1.0], 일간 TWR 수익률 ndarray[len-1])
-    """
-    v = np.asarray(pv, dtype=float)
-    if len(v) < 2:
-        return np.ones(len(v)), np.zeros(0)
-    c = np.zeros(len(v)) if cash_flow is None else np.asarray(cash_flow, dtype=float)
-    prev = v[:-1]
-    ok    = prev > 0
-    ratio = np.where(ok, (v[1:] - c[1:]) / np.where(ok, prev, 1.0), 1.0)
-    ratio = np.clip(ratio, 0.0, None)   # 잔고 소진 등 비정상 구간 방어
-    return np.concatenate(([1.0], np.cumprod(ratio))), ratio - 1.0
-
-
 def _annual_returns_from_index(years_arr, idx):
     """TWR 지수 기준 연도별 수익률 = 그 해 마지막날 / 전년 마지막날 - 1."""
     out = []
@@ -37,29 +17,6 @@ def _annual_returns_from_index(years_arr, idx):
         if base > 0:
             out.append({'year': int(yr), 'return': round(float(idx[pos[-1]] / base - 1), 4)})
     return out
-
-
-def _mwr(cash_flows, end_value):
-    """금액가중 연수익률(월 단위 IRR → 연환산). cash_flows = 월별 순납입액(양수=납입).
-       적립식에서 "내 납입금이 연 몇 %로 굴러갔나"에 해당. 실패 시 None."""
-    cfs = [-float(c) for c in cash_flows] + [float(end_value)]
-    if len(cfs) < 2 or not any(c < 0 for c in cfs) or not any(c > 0 for c in cfs):
-        return None
-    rate = 0.01
-    for _ in range(200):
-        npv  = sum(c / (1 + rate) ** i for i, c in enumerate(cfs))
-        dnpv = sum(-i * c / (1 + rate) ** (i + 1) for i, c in enumerate(cfs))
-        if abs(dnpv) < 1e-12:
-            break
-        nr = rate - npv / dnpv
-        if abs(nr - rate) < 1e-8:
-            rate = nr
-            break
-        rate = nr
-    if not (-0.9 < rate < 10.0):
-        return None
-    annual = (1 + rate) ** 12 - 1
-    return annual if np.isfinite(annual) else None
 
 
 def compute_rolling_analysis(tickers, infl=0.02):
@@ -90,6 +47,7 @@ def _perf_block(hist, end_value, initial, monthly):
     CAGR은 적립식이면 금액가중(MWR) — "내 납입금이 연 몇 %로 굴러갔나".
     """
     import pandas as _pd
+    from modules.perf_metrics import twr_index, max_drawdown, monthly_flows, mwr
 
     pv    = hist['portfolio_value']
     years = len(hist) / 252
@@ -103,21 +61,15 @@ def _perf_block(hist, end_value, initial, monthly):
     )
     total_return = (end_value / total_invested - 1) if total_invested > 0 else 0
 
-    idx, tw_ret = _twr(pv, cf)
-    mdd    = float((idx / np.maximum.accumulate(idx) - 1.0).min()) if len(idx) else 0.0
+    idx, tw_ret = twr_index(pv, cf)
+    mdd    = max_drawdown(idx)
     sharpe = (
         float(tw_ret.mean() / tw_ret.std() * np.sqrt(252))
         if len(tw_ret) and tw_ret.std() > 0 else 0.0
     )
 
     # CAGR — 월별 순납입 시계열로 IRR. 실패(데이터 부족 등) 시 단순 연환산 폴백.
-    cagr = None
-    if cf is not None:
-        mpos    = ((dates.dt.year - dates.dt.year.iloc[0]) * 12
-                   + (dates.dt.month - dates.dt.month.iloc[0])).to_numpy()
-        flows   = np.zeros(int(mpos[-1]) + 1)
-        np.add.at(flows, mpos, cf.to_numpy(dtype=float))
-        cagr = _mwr(flows.tolist(), end_value)
+    cagr = mwr(monthly_flows(dates, cf), end_value) if cf is not None else None
     if cagr is None:
         cagr = ((end_value / total_invested) ** (1 / years) - 1
                 if years > 0 and total_invested > 0 else 0)

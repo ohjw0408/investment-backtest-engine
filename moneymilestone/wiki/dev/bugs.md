@@ -283,3 +283,16 @@ tags: [dev, bug]
 
 - 적용 범위: 단일계좌·멀티계좌(세금 ON) 두 경로 공통(`_perf_block`로 통합, 두 경로가 같은 버그를 각자 갖고 있었음).
 - ⚠️ 미수정(별건): `dividend_mode='withdraw'`는 배당 유출이 `cash_flow`에 기록되지 않아 TWR이 배당수익률만큼 낮게 잡힌다(수정 전에도 동일). 은퇴탭 `calc_metrics_from_history`의 MDD도 여전히 잔고 기준.
+
+## 2026-08-05 세션 2 (Claude) — 같은 뿌리 잔여 2건 (적립기 MDD · 배당 인출)
+
+| 버그 | 원인 | 수정 | 커밋 | 상태 |
+|---|---|---|---|---|
+| **투자계산기·은퇴 적립기 MDD가 실제보다 얕음** (백테스트와 같은 뿌리) | `AccumulationAnalyzer._calc_metrics` / `calc_metrics_from_history`가 MDD를 잔고 `pv.cummax()`로 계산 → 매달 납입금이 고점을 밀어올려 낙폭 희석. Sharpe는 "납입일 제외"로 반쯤만 막아뒀음 | 둘 다 TWR 지수 기준으로 전환(`modules/perf_metrics.py` 공용). Sharpe·Sortino도 TWR 일간수익률 | 이번 커밋 | ✅ 계산기 10년 SPY 롤링 210케이스 MDD **중앙 -29.6%→-34.2%, 최악 -43.2%→-46.5%**. 적립/거치 MDD·Sharpe·Sortino 일치 확인 |
+| **배당 인출(`dividend_mode='withdraw'`)이 손실로 잡힘** | 배당 유출이 `cash_flow`에 기록되지 않음 → 잔고만 줄어드는 걸 TWR이 "수익률 하락"으로 읽음. 수익률이 배당수익률만큼 통째로 깎였다 | `simulation_loop` / `multi_account_loop`에서 인출한 배당을 음수 `cash_flow`로 기록 | 이번 커밋 | ✅ 평탄가+분기배당 결정론 케이스: 인출 모드 연 +2.0%(수정 전 0.0%), 재투자 모드와 TWR 일치, MDD 0 |
+| (예방) 배당 인출로 **월중 현금흐름**이 생기면 은퇴탭 MWR이 깨질 뻔 | 기존 IRR이 `cash_flow != 0` 행을 그대로 `enumerate` → "행 하나 = 한 달" 가정 | `monthly_flows()`로 월 버킷팅 후 IRR (백테스트는 처음부터 이 방식) | 이번 커밋 | ✅ 월중 유출 30건 주입해도 MWR 불변 |
+
+- 공용화: `modules/perf_metrics.py` 신설(`twr_index`·`max_drawdown`·`monthly_flows`·`mwr`).
+  backtest_logic·accumulation_analyzer·multi_account_analyzer 3곳이 같은 IRR 코드를 각자 복사해 갖고 있던 것도 정리.
+- 인출기(`withdrawal_analyzer`) MDD는 **의도적으로 잔고 기준 유지** — 은퇴 인출은 "내 잔고가 얼마나 줄었나"가 관심사라 TWR로 바꾸면 의미가 달라진다.
+- `modules/legacy/engine_rolling_analyzer.py`의 같은 IRR 패턴은 테스트에서만 쓰여 미수정.

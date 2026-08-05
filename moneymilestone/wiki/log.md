@@ -57,6 +57,10 @@
 **정리**: `myassets.html`의 `.rebal-buy`/`.rebal-sell` 삭제 — repo 전체에서 참조 0인
 죽은 CSS인데 `.rb-act.buy/.sell`(살아있는 쪽)과 색이 어긋나 있었다.
 
+**배포·prod 검증 완료**: `883970c` 푸시 → 배포 확인 후 라이브에서 재실행 —
+`test_direction_colors.js` **208 PASS / 0 FAIL**, `probe_direction_dom.js` 실렌더
+**22건 불일치 0**(비로그인 상태라 로컬보다 표기 수가 적음).
+
 ⚠️ 하락 파랑(`#1565d8`)과 기본 브랜드 블루(`#0052ff`)가 다소 가깝다. 아직 문제된 화면은
 없지만 액센트를 blue로 쓰는 사용자에게는 구분이 약할 수 있음.
 

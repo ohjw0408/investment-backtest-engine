@@ -296,3 +296,10 @@ tags: [dev, bug]
   backtest_logic·accumulation_analyzer·multi_account_analyzer 3곳이 같은 IRR 코드를 각자 복사해 갖고 있던 것도 정리.
 - 인출기(`withdrawal_analyzer`) MDD는 **의도적으로 잔고 기준 유지** — 은퇴 인출은 "내 잔고가 얼마나 줄었나"가 관심사라 TWR로 바꾸면 의미가 달라진다.
 - `modules/legacy/engine_rolling_analyzer.py`의 같은 IRR 패턴은 테스트에서만 쓰여 미수정.
+
+> ⚠️ 배포 걸림돌(2026-08-05): 위 적립기 MDD 수정이 CI 테스트 게이트
+> (`scripts/perf_golden.py check` — "엔진 결과 불변")에 걸려 첫 push의 배포가 막혔다.
+> 의도된 출력 변경이므로 `perf_golden.py save`로 스냅샷 갱신. 변한 키는
+> `accum_single`의 mdd·sharpe·sortino·calmar뿐이고 **end_value·cagr은 불변**임을 확인
+> (즉 시뮬 자체는 그대로, 위험지표 정의만 바뀜). **교훈: 엔진 지표를 바꾸면 push 전에
+> `perf_golden.py check`를 먼저 돌릴 것.**

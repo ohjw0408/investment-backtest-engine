@@ -8,6 +8,60 @@ import numpy as np
 _portfolio_engine = None
 
 
+def _twr(pv, cash_flow):
+    """납입·인출이 섞인 계좌잔고에서 순수 수익만 뽑은 시간가중(TWR) 지수.
+
+    적립식은 portfolio_value가 납입 때문에 오르므로, 잔고를 그대로 쓰면
+    연간수익률·MDD·Sharpe가 "수익"이 아니라 "납입금 증가"를 재게 된다.
+    납입금은 그날 종가로 매수되어 당일 수익에는 기여하지 않으므로
+        r_t = (PV_t - CF_t) / PV_(t-1) - 1
+    반환: (지수 ndarray[첫날=1.0], 일간 TWR 수익률 ndarray[len-1])
+    """
+    v = np.asarray(pv, dtype=float)
+    if len(v) < 2:
+        return np.ones(len(v)), np.zeros(0)
+    c = np.zeros(len(v)) if cash_flow is None else np.asarray(cash_flow, dtype=float)
+    prev = v[:-1]
+    ok    = prev > 0
+    ratio = np.where(ok, (v[1:] - c[1:]) / np.where(ok, prev, 1.0), 1.0)
+    ratio = np.clip(ratio, 0.0, None)   # 잔고 소진 등 비정상 구간 방어
+    return np.concatenate(([1.0], np.cumprod(ratio))), ratio - 1.0
+
+
+def _annual_returns_from_index(years_arr, idx):
+    """TWR 지수 기준 연도별 수익률 = 그 해 마지막날 / 전년 마지막날 - 1."""
+    out = []
+    for yr in dict.fromkeys(np.asarray(years_arr).tolist()):
+        pos  = np.flatnonzero(years_arr == yr)
+        base = idx[pos[0] - 1] if pos[0] > 0 else idx[pos[0]]
+        if base > 0:
+            out.append({'year': int(yr), 'return': round(float(idx[pos[-1]] / base - 1), 4)})
+    return out
+
+
+def _mwr(cash_flows, end_value):
+    """금액가중 연수익률(월 단위 IRR → 연환산). cash_flows = 월별 순납입액(양수=납입).
+       적립식에서 "내 납입금이 연 몇 %로 굴러갔나"에 해당. 실패 시 None."""
+    cfs = [-float(c) for c in cash_flows] + [float(end_value)]
+    if len(cfs) < 2 or not any(c < 0 for c in cfs) or not any(c > 0 for c in cfs):
+        return None
+    rate = 0.01
+    for _ in range(200):
+        npv  = sum(c / (1 + rate) ** i for i, c in enumerate(cfs))
+        dnpv = sum(-i * c / (1 + rate) ** (i + 1) for i, c in enumerate(cfs))
+        if abs(dnpv) < 1e-12:
+            break
+        nr = rate - npv / dnpv
+        if abs(nr - rate) < 1e-8:
+            rate = nr
+            break
+        rate = nr
+    if not (-0.9 < rate < 10.0):
+        return None
+    annual = (1 + rate) ** 12 - 1
+    return annual if np.isfinite(annual) else None
+
+
 def compute_rolling_analysis(tickers, infl=0.02):
     """분석탭 심화(P2) — 전체기간·거치식·배당재투자 TR 인덱스 기반 롤링/분포/낙폭.
        결정#7: 사용자의 적립·세금·리밸·선택구간과 무관한 통계 관점("언제 시작했든").
@@ -28,6 +82,86 @@ def compute_rolling_analysis(tickers, infl=0.02):
     }
 
 
+def _perf_block(hist, end_value, initial, monthly):
+    """metrics·history·annual_* 공통 산출 — 단일계좌/멀티계좌 동일 규칙.
+
+    수익률성 지표(연간수익률·MDD·낙폭·Sharpe)는 전부 TWR 지수 기준.
+    잔고(portfolio_value) 기준으로 재면 적립금이 수익으로 잡힌다.
+    CAGR은 적립식이면 금액가중(MWR) — "내 납입금이 연 몇 %로 굴러갔나".
+    """
+    import pandas as _pd
+
+    pv    = hist['portfolio_value']
+    years = len(hist) / 252
+    cf    = hist['cash_flow'] if 'cash_flow' in hist.columns else None
+    dates = _pd.to_datetime(hist['date'])
+
+    # 총 납입금 = 실제 기록된 납입 합계(근사식 initial + monthly*years*12 대체)
+    total_invested = (
+        float(cf[cf > 0].sum()) if cf is not None
+        else initial + monthly * years * 12
+    )
+    total_return = (end_value / total_invested - 1) if total_invested > 0 else 0
+
+    idx, tw_ret = _twr(pv, cf)
+    mdd    = float((idx / np.maximum.accumulate(idx) - 1.0).min()) if len(idx) else 0.0
+    sharpe = (
+        float(tw_ret.mean() / tw_ret.std() * np.sqrt(252))
+        if len(tw_ret) and tw_ret.std() > 0 else 0.0
+    )
+
+    # CAGR — 월별 순납입 시계열로 IRR. 실패(데이터 부족 등) 시 단순 연환산 폴백.
+    cagr = None
+    if cf is not None:
+        mpos    = ((dates.dt.year - dates.dt.year.iloc[0]) * 12
+                   + (dates.dt.month - dates.dt.month.iloc[0])).to_numpy()
+        flows   = np.zeros(int(mpos[-1]) + 1)
+        np.add.at(flows, mpos, cf.to_numpy(dtype=float))
+        cagr = _mwr(flows.tolist(), end_value)
+    if cagr is None:
+        cagr = ((end_value / total_invested) ** (1 / years) - 1
+                if years > 0 and total_invested > 0 else 0)
+
+    total_div = float(hist['dividend_income'].sum()) if 'dividend_income' in hist.columns else 0
+
+    h = hist.copy()
+    h['drawdown']       = idx / np.maximum.accumulate(idx) - 1.0
+    h['total_invested'] = (cf.clip(lower=0).cumsum() if cf is not None
+                           else initial + monthly * np.arange(len(h)) / 21)
+    h_sampled = h.iloc[::max(1, len(h) // 500)]
+    history_out = [
+        {
+            'date':            str(row['date'])[:10],
+            'portfolio_value': round(float(row['portfolio_value'])),
+            'total_invested':  round(float(row['total_invested'])),
+            'drawdown':        round(float(row['drawdown']), 4),
+        }
+        for _, row in h_sampled.iterrows()
+    ]
+
+    annual_returns   = _annual_returns_from_index(dates.dt.year.to_numpy(), idx)
+    annual_dividends = []
+    if 'dividend_income' in hist.columns:
+        for yr, grp in hist.groupby(dates.dt.year):
+            annual_dividends.append({'year': int(yr), 'dividend': round(float(grp['dividend_income'].sum()))})
+
+    return {
+        'metrics': {
+            'end_value':      round(end_value),
+            'total_invested': round(total_invested),
+            'total_return':   round(total_return, 4),
+            'cagr':           round(cagr, 4),
+            'mdd':            round(mdd, 4),
+            'sharpe':         round(sharpe, 2),
+            'total_dividend': round(total_div),
+            'years':          round(years, 1),
+        },
+        'history':          history_out,
+        'annual_returns':   annual_returns,
+        'annual_dividends': annual_dividends,
+    }
+
+
 def _get_portfolio_engine():
     global _portfolio_engine
     if _portfolio_engine is None:
@@ -43,7 +177,6 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
     투자계산기 멀티계좌(_run_multi_account_calculator_logic)와 입력 스키마·세금 정책 동일,
     차이는 롤링 분포 대신 단일 윈도우 시계열.
     """
-    import pandas as _pd
     from modules.simulation.multi_account_loop import MultiAccountSimulationLoop
     from modules.tax.account_tax import DistributionPolicy
     from modules.multi_account_common import (
@@ -126,43 +259,7 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
     total_initial = sum(float(a.get('initial_capital', 0.0)) for a in accounts)
     total_monthly = sum(float(a.get('monthly_contribution', 0.0)) for a in accounts)
     end_value     = float(result.combined_end_value)
-    pv            = hist['portfolio_value']
-    years         = len(hist) / 252
-    total_invested = total_initial + total_monthly * years * 12
-    total_return  = (end_value / total_invested - 1) if total_invested > 0 else 0
-    cagr          = (end_value / total_invested) ** (1 / years) - 1 if years > 0 and total_invested > 0 else 0
-    cummax        = pv.cummax()
-    mdd           = float(((pv - cummax) / cummax).min())
-    daily_ret     = pv.pct_change().dropna()
-    sharpe        = float(daily_ret.mean() / daily_ret.std() * np.sqrt(252)) if daily_ret.std() > 0 else 0
-    total_div     = float(hist['dividend_income'].sum()) if 'dividend_income' in hist.columns else 0
-
-    h = hist.copy()
-    h['drawdown']       = (pv - cummax) / cummax
-    h['total_invested'] = total_initial + total_monthly * np.arange(len(h)) / 21
-    h_sampled = h.iloc[::max(1, len(h) // 500)]
-    history_out = [
-        {
-            'date':            str(row['date'])[:10],
-            'portfolio_value': round(float(row['portfolio_value'])),
-            'total_invested':  round(float(row['total_invested'])),
-            'drawdown':        round(float(row['drawdown']), 4),
-        }
-        for _, row in h_sampled.iterrows()
-    ]
-
-    h2 = hist.copy()
-    h2['year'] = _pd.to_datetime(h2['date']).dt.year
-    annual_returns = []
-    annual_dividends = []
-    _has_div = 'dividend_income' in h2.columns
-    for yr, grp in h2.groupby('year'):
-        s = float(grp['portfolio_value'].iloc[0])
-        e = float(grp['portfolio_value'].iloc[-1])
-        if s > 0:
-            annual_returns.append({'year': int(yr), 'return': round((e / s - 1), 4)})
-        if _has_div:
-            annual_dividends.append({'year': int(yr), 'dividend': round(float(grp['dividend_income'].sum()))})
+    perf          = _perf_block(hist, end_value, total_initial, total_monthly)
 
     # 계좌별 분해
     accounts_out = [
@@ -214,19 +311,10 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
         'limit_warnings': limit_warnings or None,
         'total_fees':     (float(getattr(result, 'total_fees', 0.0)) if body.get('fee_enabled') else None),  # D4
         'tax_enabled':    tax_enabled,
-        'metrics': {
-            'end_value':      round(end_value),
-            'total_invested': round(total_invested),
-            'total_return':   round(total_return, 4),
-            'cagr':           round(cagr, 4),
-            'mdd':            round(mdd, 4),
-            'sharpe':         round(sharpe, 2),
-            'total_dividend': round(total_div),
-            'years':          round(years, 1),
-        },
-        'history':        history_out,
-        'annual_returns': annual_returns,
-        'annual_dividends': annual_dividends,
+        'metrics':        perf['metrics'],
+        'history':        perf['history'],
+        'annual_returns': perf['annual_returns'],
+        'annual_dividends': perf['annual_dividends'],
         'rolling':         compute_rolling_analysis(_roll_tickers),
         'accounts':       accounts_out,
         'savings':        savings,
@@ -247,7 +335,6 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
     if body.get('accounts'):
         return _run_multi_account_backtest_logic(body, progress_callback)
 
-    import pandas as _pd
     from modules.sim.fee_engine import build_stock_tickers
     from modules.simulation.taxable_runner  import TaxableSimulationRunner
     from modules.config.simulation_config   import SimulationConfig
@@ -363,44 +450,7 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
             other_financial_income = recurring_financial_income(financial_income_by_year),
         )
 
-    pv             = history_df['portfolio_value']
-    years          = len(history_df) / 252
-    total_invested = initial + monthly * years * 12
-    total_return   = (end_value / total_invested - 1) if total_invested > 0 else 0
-    cagr           = (end_value / total_invested) ** (1 / years) - 1 if years > 0 and total_invested > 0 else 0
-    cummax         = pv.cummax()
-    mdd            = float(((pv - cummax) / cummax).min())
-    daily_ret      = pv.pct_change().dropna()
-    sharpe         = float(daily_ret.mean() / daily_ret.std() * np.sqrt(252)) if daily_ret.std() > 0 else 0
-    total_div      = float(history_df['dividend_income'].sum()) if 'dividend_income' in history_df.columns else 0
-
-    h = history_df.copy()
-    h['drawdown']       = (pv - cummax) / cummax
-    h['total_invested'] = initial + monthly * np.arange(len(h)) / 21
-    h_sampled = h.iloc[::max(1, len(h) // 500)]
-
-    history_out = [
-        {
-            'date':            str(row['date'])[:10],
-            'portfolio_value': round(float(row['portfolio_value'])),
-            'total_invested':  round(float(row['total_invested'])),
-            'drawdown':        round(float(row['drawdown']), 4),
-        }
-        for _, row in h_sampled.iterrows()
-    ]
-
-    h2 = history_df.copy()
-    h2['year'] = _pd.to_datetime(h2['date']).dt.year
-    annual_returns = []
-    annual_dividends = []
-    _has_div = 'dividend_income' in h2.columns
-    for yr, grp in h2.groupby('year'):
-        s = float(grp['portfolio_value'].iloc[0])
-        e = float(grp['portfolio_value'].iloc[-1])
-        if s > 0:
-            annual_returns.append({'year': int(yr), 'return': round((e / s - 1), 4)})
-        if _has_div:
-            annual_dividends.append({'year': int(yr), 'dividend': round(float(grp['dividend_income'].sum()))})
+    perf = _perf_block(history_df, end_value, initial, monthly)
 
     return {
         'tax_enabled':    tax_enabled,
@@ -416,18 +466,9 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
         'split_sale_plan': split_sale_plan,
         'comprehensive_years': comprehensive_years,
         'financial_income_by_year': {int(y): round(v) for y, v in financial_income_by_year.items()},
-        'metrics': {
-            'end_value':      round(end_value),
-            'total_invested': round(total_invested),
-            'total_return':   round(total_return, 4),
-            'cagr':           round(cagr, 4),
-            'mdd':            round(mdd, 4),
-            'sharpe':         round(sharpe, 2),
-            'total_dividend': round(total_div),
-            'years':          round(years, 1),
-        },
-        'history':        history_out,
-        'annual_returns': annual_returns,
-        'annual_dividends': annual_dividends,
+        'metrics':        perf['metrics'],
+        'history':        perf['history'],
+        'annual_returns': perf['annual_returns'],
+        'annual_dividends': perf['annual_dividends'],
         'rolling':         compute_rolling_analysis(body['tickers']),
     }

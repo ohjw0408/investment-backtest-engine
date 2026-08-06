@@ -36,7 +36,7 @@
     if (!arr || arr.length < 2) return '';
     const w = 150, h = 30, pad = 2, mn = Math.min(...arr), mx = Math.max(...arr), rng = (mx - mn) || 1;
     const pts = arr.map((v, i) => `${(pad + (i / (arr.length - 1)) * (w - 2 * pad)).toFixed(1)},${(h - pad - ((v - mn) / rng) * (h - 2 * pad)).toFixed(1)}`).join(' ');
-    const col = arr[arr.length - 1] >= arr[0] ? '#e0342c' : '#1565d8';
+    const col = arr[arr.length - 1] >= arr[0] ? '#2E7D32' : '#C62828';
     return `<svg class="mc-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" style="stroke:${col}"></polyline></svg>`;
   }
 
@@ -546,6 +546,7 @@
     });
     // 시간봉 date = 거래소 현지 벽시계 → 'Z'로 UTC 고정해야 LWC 축에 그 숫자가 그대로 찍힌다.
     const toTime = p => intraday ? Math.floor(Date.parse(p.date.replace(' ', 'T') + 'Z') / 1000) : p.date;
+    // 캔들만 한국식(상승=적/하락=청) — 의도적 예외. 나머지 등락 표기는 --up/--down(녹/적).
     const s = candleChart.addCandlestickSeries({ upColor: '#e0342c', downColor: '#1565d8', borderVisible: false, wickUpColor: '#e0342c', wickDownColor: '#1565d8' });
     s.setData(prices.map(p => ({ time: toTime(p), open: p.open, high: p.high, low: p.low, close: p.close })));
     const vol = candleChart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } });

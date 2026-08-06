@@ -59,10 +59,11 @@ html[data-theme="dark"] {
   --ds-canvas:#ffffff; --ds-soft:#ededec; --ds-strong:#e4e4e2; --ds-hairline:#dcdcda;
   --ds-ink:#0a0b0d; --ds-body:#5b616e; --ds-muted:#7c828a;
   --ds-dark:#0a0b0d; --ds-dark-el:#1c1f25;
-  /* semantics — 등락 방향(한국식: 상승=적, 하락=청). 상태색(--ok/--danger)과 분리해서 쓸 것.
+  /* semantics — 등락 방향(상승=녹, 하락=적). 상태색(--ok/--danger)과 분리해서 쓸 것.
      · 가격/수익률/지수 등 "오르내림" → --up / --down
-     · 성공·완료·절세 이득 → --ok  /  에러·삭제·취소·한도초과 → --danger */
-  --up:#e0342c; --up-tint:#fdecea; --down:#1565d8; --down-tint:#e8f1fd;
+     · 성공·완료·절세 이득 → --ok  /  에러·삭제·취소·한도초과 → --danger
+     ※ 한국식(상승=적/하락=청)은 캔들차트에만 적용 — JS 상수(symbol_page.js·macro.js) */
+  --up:#05b169; --up-tint:#e6f7ef; --down:#cf202f; --down-tint:#fdeaec;
   --ok:#05b169; --ok-tint:#e6f7ef; --danger:#cf202f; --danger-tint:#fdeaec; --gold-acc:#f4b000;
   /* elevation */
   --ds-shadow:0 4px 12px rgba(0,0,0,.04); --ds-shadow-lg:0 8px 32px rgba(0,0,0,.08);
@@ -82,7 +83,7 @@ html[data-theme="dark"] {
   /* dark: page(soft)=최암, card(canvas)=elevated 더 밝게 → 카드 떠 보이게 */
   --ds-canvas:#16181d; --ds-soft:#0a0b0e; --ds-strong:#23262d; --ds-hairline:#2c3038;
   --ds-ink:#f5f6f8; --ds-body:#a8acb3; --ds-muted:#8a9099; /* 4.25→4.9:1 (F-5) */
-  --up:#ff6b6b; --up-tint:#33191a; --down:#4d9bff; --down-tint:#12233d;
+  --up:#27c281; --up-tint:#0f2a20; --down:#ff5a5f; --down-tint:#2e1518;
   --ok:#27c281; --ok-tint:#0f2a20; --danger:#ff5a5f; --danger-tint:#2e1518; --gold-acc:#ffc94d;
   --ds-shadow:0 4px 12px rgba(0,0,0,.4); --ds-shadow-lg:0 8px 32px rgba(0,0,0,.6);
 }

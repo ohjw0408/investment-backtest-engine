@@ -1,5 +1,6 @@
 /**
- * 등락색 한국식 전환 검증 — 상승=적, 하락=청 / 상태색(성공=녹, 위험=적)은 분리 유지.
+ * 등락색 검증 — 상승=녹, 하락=적 / 상태색(성공=녹, 위험=적)은 토큰만 분리 유지.
+ * (한국식 상승=적/하락=청은 캔들차트 전용 예외 — 이 스위트 밖, JS 상수로 하드코딩)
  * 실행: node tests/test_direction_colors.js [BASE_URL] [SHOT_DIR]
  * 기본: http://127.0.0.1:5000, tests/shots_direction
  *
@@ -37,8 +38,8 @@ const PAGES = [
 
 // 기대 색 (light / dark)
 const EXPECT = {
-  light: { up: 'rgb(224, 52, 44)', down: 'rgb(21, 101, 216)', ok: 'rgb(5, 177, 105)', danger: 'rgb(207, 32, 47)' },
-  dark:  { up: 'rgb(255, 107, 107)', down: 'rgb(77, 155, 255)', ok: 'rgb(39, 194, 129)', danger: 'rgb(255, 90, 95)' },
+  light: { up: 'rgb(5, 177, 105)', down: 'rgb(207, 32, 47)', ok: 'rgb(5, 177, 105)', danger: 'rgb(207, 32, 47)' },
+  dark:  { up: 'rgb(39, 194, 129)', down: 'rgb(255, 90, 95)', ok: 'rgb(39, 194, 129)', danger: 'rgb(255, 90, 95)' },
 };
 
 let pass = 0, fail = 0;

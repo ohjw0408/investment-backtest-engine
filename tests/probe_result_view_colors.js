@@ -1,7 +1,7 @@
 /**
  * 결과 뷰(백테·계산기·은퇴·배당) 등락색 프로브.
  * 결과 화면은 celery 워커가 있어야 렌더돼서 로컬에서 실행할 수 없다 → 결과 뷰가 쓰는
- * 셀렉터를 페이지에 직접 심어 CSS 계약(.up=적 / .down=청)이 성립하는지 확인한다.
+ * 셀렉터를 페이지에 직접 심어 CSS 계약(.up=녹 / .down=적)이 성립하는지 확인한다.
  * (JS 쪽은 클래스명만 붙이므로 — fmtPctClass 등 — 색은 전적으로 이 CSS가 결정한다.)
  *
  * 실행: node tests/probe_result_view_colors.js [BASE_URL]
@@ -12,8 +12,8 @@ const { execFileSync } = require('child_process');
 
 const BASE = process.argv[2] || 'http://127.0.0.1:5000';
 const EXP = {
-  light: { up: 'rgb(224, 52, 44)', down: 'rgb(21, 101, 216)' },
-  dark:  { up: 'rgb(255, 107, 107)', down: 'rgb(77, 155, 255)' },
+  light: { up: 'rgb(5, 177, 105)', down: 'rgb(207, 32, 47)' },
+  dark:  { up: 'rgb(39, 194, 129)', down: 'rgb(255, 90, 95)' },
 };
 
 // [페이지, 부모 마크업, 검사할 자식 클래스, 상승 클래스, 하락 클래스]

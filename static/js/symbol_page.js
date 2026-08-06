@@ -629,8 +629,8 @@ function renderLine(prices, intraday) {
   const labels = prices.map(p => p.date);
   const vals   = prices.map(p => p.close);
   const isUp   = vals.length > 1 && vals[vals.length - 1] >= vals[0];
-  const color  = isUp ? '#e0342c' : '#1565d8';
-  const fill   = isUp ? 'rgba(224,52,44,0.08)' : 'rgba(21,101,216,0.08)';
+  const color  = isUp ? '#2E7D32' : '#C62828';
+  const fill   = isUp ? 'rgba(46,125,50,0.08)' : 'rgba(198,40,40,0.08)';
 
   const ctx = document.getElementById('priceChart').getContext('2d');
   chartInst = new Chart(ctx, {
@@ -664,6 +664,7 @@ function renderCandle(prices, intraday, interval) {
     rightPriceScale: { borderColor: MM_CHART_GRID, scaleMargins: { top: 0.08, bottom: 0.26 } },
     crosshair: { mode: 0 },
   });
+  // 캔들만 한국식(상승=적/하락=청) — 의도적 예외. 나머지 등락 표기는 --up/--down(녹/적).
   candleSeries = candleChart.addCandlestickSeries({
     upColor: '#e0342c', downColor: '#1565d8', borderVisible: false,
     wickUpColor: '#e0342c', wickDownColor: '#1565d8',

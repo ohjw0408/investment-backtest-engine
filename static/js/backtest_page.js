@@ -71,12 +71,12 @@ function _btRgba(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 // 차트 색 — 렌더 직전 토큰값으로 갱신(액센트/다크 반영)
-let _btMuted = '#90A4AE', _btBrand = '#0052ff', _btUp = '#e0342c', _btDown = '#1565d8';
+let _btMuted = '#90A4AE', _btBrand = '#0052ff', _btUp = '#05b169', _btDown = '#cf202f';
 function _btRefreshChartColors() {
   _btMuted = _btCss('--ds-muted', '#90A4AE');
   _btBrand = _btCss('--brand', '#0052ff');
-  _btUp    = _btCss('--up', '#e0342c');
-  _btDown  = _btCss('--down', '#1565d8');
+  _btUp    = _btCss('--up', '#05b169');
+  _btDown  = _btCss('--down', '#cf202f');
 }
 
 // ── 입력 ↔ 결과 뷰 전환 ──

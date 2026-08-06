@@ -1,15 +1,16 @@
 /**
  * 실제 렌더된 등락 표기 엘리먼트의 computed color 전수 프로브.
  * 실행: node tests/probe_direction_dom.js [BASE_URL]
- * "+숫자%" 는 적, "-숫자%" 는 청 이어야 한다(상태 뱃지·중립 제외).
+ * "+숫자%" 는 녹, "-숫자%" 는 적 이어야 한다(상태 뱃지·중립 제외).
+ * 캔들차트는 한국식(적/청) 예외 — canvas 라 여기서 안 잡힌다.
  */
 const { chromium } = require('playwright');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
 const BASE = process.argv[2] || 'http://127.0.0.1:5000';
-const UP = 'rgb(224, 52, 44)', DOWN = 'rgb(21, 101, 216)';
-const UP_D = 'rgb(255, 107, 107)', DOWN_D = 'rgb(77, 155, 255)';
+const UP = 'rgb(5, 177, 105)', DOWN = 'rgb(207, 32, 47)';
+const UP_D = 'rgb(39, 194, 129)', DOWN_D = 'rgb(255, 90, 95)';
 
 const PAGES = ['/', '/myassets', '/market', '/symbol/005930', '/macro', '/search?q=삼성'];
 

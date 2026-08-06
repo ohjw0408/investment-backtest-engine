@@ -51,7 +51,7 @@ function drawSparkline(canvasId, data, isUp) {
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
 
-  ctx.strokeStyle = isUp ? '#e0342c' : '#1565d8';
+  ctx.strokeStyle = isUp ? '#43A047' : '#EF5350';
   ctx.lineWidth = 1.8;
   ctx.lineJoin = 'round';
   ctx.stroke();
@@ -61,6 +61,6 @@ function drawSparkline(canvasId, data, isUp) {
   const lastY = h - ((data[data.length - 1] - min) / range) * (h - 6) - 3;
   ctx.beginPath();
   ctx.arc(lastX, lastY, 3, 0, Math.PI * 2);
-  ctx.fillStyle = isUp ? '#e0342c' : '#1565d8';
+  ctx.fillStyle = isUp ? '#43A047' : '#EF5350';
   ctx.fill();
 }

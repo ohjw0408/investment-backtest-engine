@@ -55,8 +55,8 @@
     .share-metric { background: #F8FAFC; border-radius: 12px; padding: 14px 16px; }
     .share-metric-label { font-size: 0.75rem; color: #78909C; margin-bottom: 4px; }
     .share-metric-value { font-size: 1.2rem; font-weight: 800; font-family: 'DM Mono', monospace; }
-    .up { color: #e0342c; }
-    .down { color: #1565d8; }
+    .up { color: #2E7D32; }
+    .down { color: #C62828; }
     .neutral { color: #1A2332; }
     .share-chart-section { margin-top: 20px; }
     .share-chart-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; color: #1A2332; }
@@ -302,7 +302,7 @@ function fmtMw(v) {
 {% if data.get('annual') %}
 (function() {
   const annual = {{ data.get('annual', []) | tojson }};
-  const colors = annual.map(a => a.r >= 0 ? 'rgba(224,52,44,0.8)' : 'rgba(21,101,216,0.8)');
+  const colors = annual.map(a => a.r >= 0 ? 'rgba(46,125,50,0.8)' : 'rgba(198,40,40,0.8)');
   new Chart(document.getElementById('annualChart').getContext('2d'), {
     type: 'bar',
     data: { labels: annual.map(a => a.y + '년'), datasets: [{ data: annual.map(a => a.r), backgroundColor: colors, borderRadius: 4 }] },

@@ -1443,8 +1443,8 @@ function _ccRgba(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 function ccBrand() { return _ccCss('--brand', '#0052ff'); }
-function ccUp()    { return _ccCss('--up', '#e0342c'); }
-function ccDown()  { return _ccCss('--down', '#1565d8'); }
+function ccUp()    { return _ccCss('--up', '#05b169'); }
+function ccDown()  { return _ccCss('--down', '#cf202f'); }
 // ═══════════════════════════════════════════════════════════
 // 세금 토글 + 계좌 설정
 // ═══════════════════════════════════════════════════════════

@@ -514,6 +514,23 @@ def purge_price_spikes():
 
 
 @celery.task
+def refresh_stale_prices():
+    """매일 실행(Celery Beat) — 갱신이 멈춘 종목의 price_daily를 다시 당겨온다.
+
+    가격은 전부 지연 적재라 야후가 한 번 실패한 종목은 아무도 안 고친다(SPCX는 상장 5일치에
+    두 달간 멈춰 있었다). 이 태스크가 유일한 능동 복구 경로.
+    """
+    try:
+        from modules.price_loader import PriceLoader
+        st = PriceLoader().refresh_stale_prices()
+        print(f"[refresh_stale_prices] {st}")
+        return {"status": "ok", **st}
+    except Exception as e:
+        print(f"[refresh_stale_prices] 오류: {e}")
+        raise
+
+
+@celery.task
 def refresh_macro():
     """거시경제 지표 증분 갱신 (Celery Beat 자동 실행). FRED·ECOS·yfinance 시장지수."""
     try:
@@ -624,6 +641,18 @@ def data_integrity_scan():
         d = _staleness(pc, "SELECT MAX(date) FROM price_daily")
         if d is None or d > 6:
             issues.append(f"price_daily 전체 갱신 정지 의심 (last {d}일 전)")
+
+        # ②-b 종목별 신선도 — 전체 MAX(date)는 인기 종목 하나만 살아 있어도 통과라
+        # 개별 종목이 몇 달씩 멈춘 걸 못 잡았다(SPCX 2026-06~08). 정지 비율로 판정.
+        cutoff = (today - timedelta(days=6)).strftime('%Y-%m-%d')
+        codes = pc.execute("SELECT COUNT(*) FROM (SELECT code FROM price_daily GROUP BY code)").fetchone()[0]
+        stale_codes = pc.execute(
+            "SELECT COUNT(*) FROM (SELECT code FROM price_daily GROUP BY code HAVING MAX(date) < ?)",
+            (cutoff,)
+        ).fetchone()[0]
+        if codes and stale_codes / codes > 0.3:
+            issues.append(
+                f"종목별 가격 갱신 정지 {stale_codes}/{codes}종 (6일 초과) — refresh_stale_prices 확인")
 
         # ③ 합성 백필 손상 스캔 (B-1 스크립트 재사용)
         sys.path.insert(0, os.path.join(base, 'scripts'))

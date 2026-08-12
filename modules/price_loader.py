@@ -1,5 +1,6 @@
 import re
 import sqlite3
+import time
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -367,6 +368,16 @@ class PriceLoader:
                 sanity_at TEXT
             )
         """)
+        # 트레일링(최신분) 갱신 상태 — refresh_stale_prices 주기 복구용.
+        # fail_n = 연속 실패 횟수(상장폐지 종목이 매일 야후를 때리는 것 방지).
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS price_refresh_state (
+                code TEXT PRIMARY KEY,
+                fail_n INTEGER DEFAULT 0,
+                last_try TEXT,
+                last_ok TEXT
+            )
+        """)
         self.conn.commit()
 
     # -------------------------------------------------
@@ -631,6 +642,119 @@ class PriceLoader:
         return len(to_del)
 
     # -------------------------------------------------
+    # 정지한 종목 트레일링 복구 (주기 태스크)
+    # -------------------------------------------------
+
+    def _mark_refresh(self, code: str, ok: bool) -> None:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if ok:
+            self.conn.execute(
+                "INSERT INTO price_refresh_state (code, fail_n, last_try, last_ok) VALUES (?,0,?,?) "
+                "ON CONFLICT(code) DO UPDATE SET fail_n=0, last_try=excluded.last_try, last_ok=excluded.last_ok",
+                (code, now, now))
+        else:
+            self.conn.execute(
+                "INSERT INTO price_refresh_state (code, fail_n, last_try, last_ok) VALUES (?,1,?,NULL) "
+                "ON CONFLICT(code) DO UPDATE SET fail_n=price_refresh_state.fail_n+1, last_try=excluded.last_try",
+                (code, now))
+        self.conn.commit()
+
+    def refresh_stale_prices(self, max_age_days: int = 4, limit: int = 500,
+                             sleep_sec: float = 0.3, budget_sec: float = 420.0,
+                             fail_limit: int = 3, fail_cooldown_days: int = 7) -> dict:
+        """price_daily가 멈춘 종목을 찾아 최신분을 다시 당겨온다 (self-heal).
+
+        가격 적재는 전부 지연(lazy) 경로다 — 누가 그 종목을 볼 때만 갱신된다. 그래서 야후가
+        한 번 실패한 종목은 아무도 안 고쳐 몇 달씩 상장 직후 며칠에 멈춰 있었다(SPCX). 이
+        태스크가 유일한 능동 복구 경로다.
+
+        - max_age_days: 최종일이 이보다 오래면 정지로 판정(주말+연휴 여유 포함).
+        - fail_limit/fail_cooldown_days: 상폐·티커 소멸 종목이 매일 야후를 때리지 않게
+          연속 실패 N회면 쿨다운. (그래도 영구 포기는 안 한다 — 쿨다운 후 재시도.)
+        - limit/budget_sec: celery task_time_limit(600s) 안에 끝나도록 이중 상한.
+        반환: 처리 통계."""
+        today  = datetime.now().date()
+        cutoff = (today - timedelta(days=max_age_days)).strftime("%Y-%m-%d")
+        rows = self.conn.execute(
+            "SELECT code, MAX(date) FROM price_daily GROUP BY code "
+            "HAVING MAX(date) < ? ORDER BY MAX(date)", (cutoff,)
+        ).fetchall()
+        state = {r[0]: (r[1] or 0, r[2]) for r in self.conn.execute(
+            "SELECT code, fail_n, last_try FROM price_refresh_state")}
+        started  = time.time()
+        stats = {"stale": len(rows), "checked": 0, "repaired": 0, "failed": 0,
+                 "skipped": 0, "rows_added": 0}
+        for code, last in rows:
+            if stats["checked"] >= limit or (time.time() - started) > budget_sec:
+                break
+            fail_n, last_try = state.get(code, (0, None))
+            if fail_n >= fail_limit and last_try:
+                try:
+                    age = (datetime.now() - datetime.strptime(last_try[:10], "%Y-%m-%d")).days
+                except ValueError:
+                    age = fail_cooldown_days
+                if age < fail_cooldown_days:
+                    stats["skipped"] += 1
+                    continue
+            stats["checked"] += 1
+            start = (datetime.strptime(last, "%Y-%m-%d").date() + timedelta(days=1))
+            yf_code = self._kr_yf_ticker(code) if self.is_kr_etf(code) else _yf_dl_ticker(code)
+            price_df = action_df = None
+            try:
+                price_df, action_df = self.fetch_from_api(
+                    yf_code, start.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d"))
+            except Exception as exc:
+                print(f"[refresh_stale_prices] {code} 페치 실패: {type(exc).__name__}: {exc}")
+            got = price_df is not None and not price_df.empty
+            if got:
+                price_df = price_df.copy()
+                price_df["code"] = code
+                if action_df is not None and not action_df.empty:
+                    action_df = action_df.copy()
+                    action_df["code"] = code
+                self._insert_ignore(price_df, "price_daily")
+                self._upsert_actions(action_df)
+                stats["repaired"]   += 1
+                stats["rows_added"] += len(price_df)
+            else:
+                stats["failed"] += 1
+            self._mark_refresh(code, got)
+            if sleep_sec:
+                time.sleep(sleep_sec)
+        return stats
+
+    # -------------------------------------------------
+    # 트레일링 gap-fill 시도 가드 (성패 인지형)
+    # -------------------------------------------------
+
+    TRAIL_RETRY_SEC       = 600   # 결론 못 낸 시도의 재시도 백오프(초)
+    TRAIL_FRESH_GAP_DAYS  = 5     # DB 최종일이 이 안쪽이면 "빈 결과=새 거래일 없음"으로 인정
+
+    def _trail_should_try(self, code: str, end_date) -> bool:
+        """오늘분 트레일링 페치를 시도할지. 결론이 난 시도만 그날을 잠근다.
+
+        예전엔 '시도했음'만 기록해 야후 레이트리밋 한 번이 그 프로세스에서 하루 종일
+        재시도를 막았다(SPCX가 상장 5일치에서 두 달간 멈춘 원인). 실패는 백오프 후 재시도.
+        """
+        state = getattr(self, "_gapfill_trail_state", None)
+        if state is None:
+            state = self._gapfill_trail_state = {}
+        rec = state.get(code)
+        if not rec:
+            return True
+        day, done, ts = rec
+        if day != end_date:
+            return True
+        if done:
+            return False
+        return (time.time() - ts) >= self.TRAIL_RETRY_SEC
+
+    def _trail_mark(self, code: str, end_date, *, done: bool) -> None:
+        if not hasattr(self, "_gapfill_trail_state"):
+            self._gapfill_trail_state = {}
+        self._gapfill_trail_state[code] = (end_date, bool(done), time.time())
+
+    # -------------------------------------------------
     # 핵심 함수
     # -------------------------------------------------
 
@@ -680,7 +804,8 @@ class PriceLoader:
             except Exception:
                 pass
 
-        api_calls = []
+        api_calls  = []
+        trail_call = None      # 트레일링 구간(성패를 판정해 재시도 여부를 정한다)
         if db_min is None:
             api_calls.append((start_date, end_date))
         else:
@@ -699,24 +824,37 @@ class PriceLoader:
                 if self._gapfill_hist_day.get(hist_key) != end_date:
                     self._gapfill_hist_day[hist_key] = end_date
                     api_calls.append((start_date, db_min - timedelta(days=1)))
-            if not skip_gapfill and end_date > db_max:
+            if not skip_gapfill and end_date > db_max and self._trail_should_try(code, end_date):
                 # P2-3: 트레일링(최신분) gap-fill을 코드별 같은 날 1회로 제한.
                 # DB 최종일이 직전영업일까지면 매 호출 yfinance fetch가 0행 반환(낭비) — 위젯·시세
-                # 콜드경로서 누적. 같은 end_date를 오늘 이미 시도했으면 스킵(첫 시도가 0행이어도 DB
-                # 최종일 불변이므로 재시도해도 동일 결과 → 결과 불변). historical 보충(위)은 그대로 수행.
-                if not hasattr(self, "_gapfill_trail_day"):
-                    self._gapfill_trail_day = {}
-                if self._gapfill_trail_day.get(code) != end_date:
-                    self._gapfill_trail_day[code] = end_date
-                    api_calls.append((db_max + timedelta(days=1), end_date))
+                # 콜드경로서 누적. 단, "시도했다"가 아니라 "결론이 났다"일 때만 하루를 잠근다
+                # (_trail_should_try / _trail_mark). historical 보충(위)은 그대로 수행.
+                trail_call = (db_max + timedelta(days=1), end_date)
+                api_calls.append(trail_call)
 
         # ── API 호출 ──────────────────────────────────────────
         yf_code = self._kr_yf_ticker(code) if self.is_kr_etf(code) else code
         for s, e in api_calls:
-            price_df, action_df = self.fetch_from_api(
-                yf_code, s.strftime("%Y-%m-%d"), e.strftime("%Y-%m-%d")
-            )
-            if price_df is not None and not price_df.empty:
+            is_trail = trail_call is not None and (s, e) == trail_call
+            try:
+                price_df, action_df = self.fetch_from_api(
+                    yf_code, s.strftime("%Y-%m-%d"), e.strftime("%Y-%m-%d")
+                )
+            except Exception as exc:
+                # 페치 실패가 요청 전체를 죽이면 안 된다 — DB 보유분으로 계속 서빙.
+                # (실패를 삼키기만 하면 원인이 안 보이므로 로그는 남긴다.)
+                print(f"[PriceLoader] {code} 페치 실패({s}~{e}): {type(exc).__name__}: {exc}")
+                if is_trail:
+                    self._trail_mark(code, end_date, done=False)
+                continue
+            got = price_df is not None and not price_df.empty
+            if is_trail:
+                # 빈 결과의 의미가 둘이다: ①새 거래일이 아직 없다(정상) ②야후 실패·레이트리밋.
+                # DB 최종일이 최근이면 ①로 보고 하루 잠그고, 몇 주씩 벌어져 있으면 ②로 보고
+                # 잠그지 않는다(백오프 후 재시도). 안 그러면 한 번의 실패가 그날 내내 고착된다.
+                near = (end_date - db_max).days <= self.TRAIL_FRESH_GAP_DAYS
+                self._trail_mark(code, end_date, done=bool(got or near))
+            if got:
                 price_df = price_df.copy()
                 price_df["code"] = code
             if action_df is not None and not action_df.empty:

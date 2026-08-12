@@ -339,6 +339,39 @@ def upsert_holding(user_id, code, quantity, avg_price, account_type='일반', gr
     c.commit()
 
 
+def assign_holdings_to_group(user_id, group_id, codes, clear_codes=None):
+    """보유 종목을 **코드 단위**로 그룹에 담는다 / 뺀다.
+
+    같은 종목이 일반·ISA·연금저축에 나뉘어 있으면 holdings 행도 계좌 수만큼이라
+    그룹 지정을 행마다 해야 했다(종목 탭 → 수정 → 그룹 선택 × N). 코드로 한 번에 처리한다.
+    - codes:       group_id로 지정할 코드들 (group_id=None이면 미분류로)
+    - clear_codes: 이 그룹에서 빼는 코드들 (다른 그룹 소속은 건드리지 않음)
+    반환: 변경된 holdings 행 수.
+    """
+    c = _get_conn()
+    if group_id is not None:
+        if not c.execute("SELECT 1 FROM asset_groups WHERE id=? AND user_id=?",
+                         (group_id, user_id)).fetchone():
+            raise ValueError('그룹을 찾을 수 없습니다.')
+    now    = datetime.now().isoformat()
+    codes  = [str(x).upper() for x in (codes or []) if str(x).strip()]
+    clear  = [str(x).upper() for x in (clear_codes or []) if str(x).strip()]
+    n = 0
+    if codes:
+        ph = ",".join("?" * len(codes))
+        n += c.execute(
+            f"UPDATE holdings SET group_id=?, updated_at=? WHERE user_id=? AND UPPER(code) IN ({ph})",
+            [group_id, now, user_id, *codes]).rowcount
+    if clear and group_id is not None:
+        ph = ",".join("?" * len(clear))
+        n += c.execute(
+            f"UPDATE holdings SET group_id=NULL, updated_at=? "
+            f"WHERE user_id=? AND group_id=? AND UPPER(code) IN ({ph})",
+            [now, user_id, group_id, *clear]).rowcount
+    c.commit()
+    return n
+
+
 def delete_holding(user_id, holding_id):
     c = _get_conn()
     c.execute("DELETE FROM holdings WHERE id=? AND user_id=?", (holding_id, user_id))

@@ -696,22 +696,47 @@ function calcPurchase() {
 }
 
 // ── 그룹 관리 ──
+// 보유 종목을 코드 단위로 묶는다 — 같은 종목이 일반·ISA·연금저축에 나뉘어 있어도
+// 그룹 지정은 한 번에 한다(계좌 수만큼 반복하던 게 이 화면의 가장 큰 불편이었다).
+function _holdingsByCode() {
+  const m = new Map();
+  holdings.forEach(h => {
+    const code = String(h.code);
+    let e = m.get(code);
+    if (!e) { e = { code, name: h.name || code, accounts: [], qty: 0, val: 0, gids: new Set() }; m.set(code, e); }
+    e.accounts.push({ acct: h.account_type || '일반', qty: h.quantity || 0 });
+    e.qty += h.quantity || 0;
+    e.val += (prices[code] || 0) * (h.quantity || 0);
+    e.gids.add(h.group_id || null);
+  });
+  return [...m.values()].sort((a, b) => b.val - a.val);
+}
+function _acctLabel(e) {
+  const agg = {};
+  e.accounts.forEach(a => { agg[a.acct] = (agg[a.acct] || 0) + a.qty; });
+  return Object.keys(agg).map(k => `${k} ${(+agg[k].toFixed(4)).toLocaleString()}주`).join(' · ');
+}
+function _groupById(id) { return groups.find(g => g.id === id); }
+
 function renderGroups() {
   const wrap  = document.getElementById('groupsWrap');
   const sumEl = document.getElementById('groupsSum');
+  renderUnassigned();
   if (!groups.length) {
     if (sumEl) sumEl.innerHTML = '';
     wrap.innerHTML = `<div class="ma-empty"><div class="em-ic">${MAICON.layers}</div><div class="em-t">아직 그룹이 없어요</div><div class="em-d">자산을 국내주식·미국주식·채권·금 등으로 묶고<br>목표 비중을 정해 리밸런싱·추가매수에 활용하세요.</div><button class="btn-primary" style="margin-top:16px;" onclick="openAddGroup()">+ 첫 그룹 만들기</button></div>`;
     return;
   }
 
-  // 그룹별 종목 수·평가액
+  // 그룹별 종목 수·평가액 — 종목 수는 **코드 기준**(칩 개수와 일치. 계좌별 행을 세면
+  // "7개 종목"인데 칩은 5개인 불일치가 난다)
   const gStat = {};
   holdings.forEach(h => {
     if (!h.group_id) return;
     const v = (prices[h.code] || 0) * h.quantity;
-    if (!gStat[h.group_id]) gStat[h.group_id] = { n: 0, val: 0 };
-    gStat[h.group_id].n++; gStat[h.group_id].val += v;
+    if (!gStat[h.group_id]) gStat[h.group_id] = { codes: new Set(), val: 0 };
+    gStat[h.group_id].codes.add(String(h.code));
+    gStat[h.group_id].val += v;
   });
 
   const sumTargets = groups.reduce((s, g) => s + (g.target_pct || 0), 0);
@@ -723,27 +748,160 @@ function renderGroups() {
     </div>`;
 
   const maxTgt = Math.max(...groups.map(g => g.target_pct || 0), 1);
+  const byCode = _holdingsByCode();
   wrap.innerHTML = groups.map(g => {
-    const st = gStat[g.id] || { n: 0, val: 0 };
+    const st = gStat[g.id] || { codes: new Set(), val: 0 };
     const initial = (g.name || '?').trim().charAt(0);
+    const members = byCode.filter(e => e.gids.has(g.id));
+    const tags = members.map(e => `
+      <span class="gm-tag">${maEsc(e.code)}<small>${maEsc(_acctLabel(e))}</small>
+        <button onclick="removeFromGroup(${g.id},'${maEsc(e.code)}')" title="이 그룹에서 빼기">&times;</button>
+      </span>`).join('');
     return `
-    <div class="grp-card">
-      <span class="grp-emblem" style="background:${g.color}">${maEsc(initial)}</span>
-      <div class="grp-main">
-        <div class="grp-name">${maEsc(g.name)}</div>
-        <div class="grp-sub">${st.n}개 종목 · ${fmtKRW(st.val)}</div>
+    <div class="grp-block">
+      <div class="grp-card">
+        <span class="grp-emblem" style="background:${g.color}">${maEsc(initial)}</span>
+        <div class="grp-main">
+          <div class="grp-name">${maEsc(g.name)}</div>
+          <div class="grp-sub">${st.codes.size}개 종목 · ${fmtKRW(st.val)}</div>
+        </div>
+        <div class="grp-tgt">
+          <div class="grp-tgt-v">${g.target_pct}%</div>
+          <div class="grp-tgt-l">목표 비중</div>
+          <div class="grp-tgt-bar"><i style="width:${(g.target_pct/maxTgt*100).toFixed(0)}%;background:${g.color}"></i></div>
+        </div>
+        <div class="grp-actions">
+          <button class="icon-btn" onclick="openEditGroup(${g.id})" title="수정">${MAICON.pencil}</button>
+          <button class="icon-btn danger" onclick="deleteGroup(${g.id})" title="삭제">${MAICON.trash}</button>
+        </div>
       </div>
-      <div class="grp-tgt">
-        <div class="grp-tgt-v">${g.target_pct}%</div>
-        <div class="grp-tgt-l">목표 비중</div>
-        <div class="grp-tgt-bar"><i style="width:${(g.target_pct/maxTgt*100).toFixed(0)}%;background:${g.color}"></i></div>
-      </div>
-      <div class="grp-actions">
-        <button class="icon-btn" onclick="openEditGroup(${g.id})" title="수정">${MAICON.pencil}</button>
-        <button class="icon-btn danger" onclick="deleteGroup(${g.id})" title="삭제">${MAICON.trash}</button>
+      <div class="grp-members">
+        ${tags || '<span class="gm-empty">담긴 종목이 없어요</span>'}
+        <button class="gm-add" onclick="openAssign(${g.id})">+ 종목 담기</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// 미분류(그룹 없는) 보유 종목 배너 — 그룹 탭에서 바로 담을 수 있는 진입점
+function renderUnassigned() {
+  const el = document.getElementById('groupsUnassigned');
+  if (!el) return;
+  const none = _holdingsByCode().filter(e => e.gids.has(null));
+  if (!none.length || !groups.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="grp-hint">${MAICON.layers}
+    <span><b>${none.length}개 종목</b>이 아직 그룹에 없어요 — ${maEsc(none.slice(0, 3).map(e => e.code).join(', '))}${none.length > 3 ? ' 외' : ''}</span>
+    <button onclick="openAssign(null, 'none')">한 번에 담기 ›</button></div>`;
+}
+
+// ── 그룹에 종목 담기 모달 ──
+let _asgGroupId = null;      // 담을 그룹
+let _asgInit    = new Set(); // 열었을 때 이 그룹에 있던 코드(해제 시 빼기 판정용)
+let _asgChecked = new Set();
+let _asgFilter  = 'all';     // all | none | in
+
+function _codesInGroup(gid) {
+  return new Set(holdings.filter(h => h.group_id === gid).map(h => String(h.code)));
+}
+
+function openAssign(gid, filter) {
+  if (!groups.length) { mmToast('먼저 그룹을 만들어주세요.'); return; }
+  if (!holdings.length) { mmToast('보유 종목이 없어요. 종목을 먼저 추가해주세요.'); return; }
+  _asgGroupId = gid || groups[0].id;
+  _asgInit    = _codesInGroup(_asgGroupId);
+  _asgChecked = new Set(_asgInit);
+  _asgFilter  = filter || 'all';
+  document.getElementById('assignSearch').value = '';
+  document.getElementById('assignGroupSel').innerHTML =
+    groups.map(g => `<option value="${g.id}">${maEsc(g.name)}</option>`).join('');
+  document.getElementById('assignGroupSel').value = _asgGroupId;
+  document.querySelectorAll('#modalAssign .asg-chip').forEach((b, i) =>
+    b.classList.toggle('active', ['all', 'none', 'in'][i] === _asgFilter));
+  renderAssignList();
+  openModal('modalAssign');
+}
+
+function onAssignGroupChange() {
+  // 그룹을 바꾸면 그 그룹 기준으로 체크 상태를 다시 잡는다(잘못 저장되는 것 방지)
+  _asgGroupId = parseInt(document.getElementById('assignGroupSel').value, 10);
+  _asgInit    = _codesInGroup(_asgGroupId);
+  _asgChecked = new Set(_asgInit);
+  renderAssignList();
+}
+
+function setAssignFilter(f, btn) {
+  _asgFilter = f;
+  document.querySelectorAll('#modalAssign .asg-chip').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderAssignList();
+}
+
+function _assignVisible() {
+  const q = (document.getElementById('assignSearch').value || '').trim().toLowerCase();
+  return _holdingsByCode().filter(e => {
+    if (_asgFilter === 'none' && !e.gids.has(null)) return false;
+    if (_asgFilter === 'in'   && !_asgChecked.has(e.code)) return false;
+    if (q && !(e.code.toLowerCase().includes(q) || (e.name || '').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function renderAssignList() {
+  const list = document.getElementById('assignList');
+  const rows = _assignVisible();
+  document.getElementById('assignCount').textContent = `${_asgChecked.size}종목 선택됨`;
+  if (!rows.length) { list.innerHTML = '<div class="asg-empty">해당하는 종목이 없어요.</div>'; return; }
+  list.innerHTML = rows.map(e => {
+    // 여러 계좌가 서로 다른 그룹일 수 있다 → 현재 소속을 그대로 보여준다
+    const gnames = [...e.gids].map(id => id ? (_groupById(id) || {}) : null);
+    const badge  = gnames.every(g => g === null)
+      ? '<span class="ar-gr none">미분류</span>'
+      : gnames.filter(Boolean).map(g => `<span class="ar-gr" style="background:${g.color}">${maEsc(g.name)}</span>`).join(' ');
+    return `
+    <label class="asg-row">
+      <input type="checkbox" ${_asgChecked.has(e.code) ? 'checked' : ''} onchange="toggleAssign('${maEsc(e.code)}',this.checked)">
+      <span class="ar-main">
+        <span class="ar-name">${maEsc(e.name)} <span style="color:var(--ds-muted);font-weight:600;">${maEsc(e.code)}</span></span>
+        <span class="ar-sub">${maEsc(_acctLabel(e))}</span>
+      </span>
+      ${badge}
+    </label>`;
+  }).join('');
+}
+
+function toggleAssign(code, on) {
+  if (on) _asgChecked.add(code); else _asgChecked.delete(code);
+  document.getElementById('assignCount').textContent = `${_asgChecked.size}종목 선택됨`;
+}
+
+function assignSelectAll(on) {
+  _assignVisible().forEach(e => { if (on) _asgChecked.add(e.code); else _asgChecked.delete(e.code); });
+  renderAssignList();
+}
+
+async function saveAssign() {
+  const codes = [..._asgChecked];
+  const clear = [..._asgInit].filter(c => !_asgChecked.has(c));
+  const res = await fetch('/api/myassets/holdings/group', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ group_id: _asgGroupId, codes, clear_codes: clear })
+  });
+  if (!res.ok) { mmToast('저장하지 못했어요. 잠시 후 다시 시도해주세요.'); return; }
+  closeModal('modalAssign');
+  await loadAll();
+  renderGroups();
+  const g = _groupById(_asgGroupId);
+  mmToast(`${g ? g.name : '그룹'}에 ${codes.length}종목이 담겼어요.`);
+}
+
+async function removeFromGroup(gid, code) {
+  const res = await fetch('/api/myassets/holdings/group', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ group_id: gid, codes: [], clear_codes: [code] })
+  });
+  if (!res.ok) { mmToast('변경하지 못했어요.'); return; }
+  await loadAll();
+  renderGroups();
 }
 
 // ── 모달 ──

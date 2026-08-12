@@ -95,6 +95,12 @@ celery.conf.beat_schedule = {
         'task': 'tasks.refresh_guru_nav',
         'schedule': crontab(hour=11, minute=30),
     },
+    # 갱신 정지 종목 복구 — 매일 22:00 UTC(US 마감 후). 지연 적재 특성상 아무도 안 보는
+    # 종목은 야후 실패 한 번에 영구히 멈춘다(SPCX 사례). 유일한 능동 복구 경로.
+    'refresh-stale-prices': {
+        'task': 'tasks.refresh_stale_prices',
+        'schedule': crontab(hour=22, minute=0),
+    },
     # 데이터 무결성 상시 스캔(B-2②) — 매일 10:30 UTC(스파이크 클린업 후, 워밍업 전).
     # NULL홀 self-heal + 핵심 시계열 신선도 + 합성 손상 스캔. 이상 시 오너 알림+Sentry.
     'data-integrity-scan': {

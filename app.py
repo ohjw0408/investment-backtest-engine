@@ -11,6 +11,7 @@ from modules.auth_manager import (
     init_db, get_or_create_user, get_user_by_id,
     get_groups, upsert_group, delete_group,
     get_holdings, upsert_holding, delete_holding, set_manual_price,
+    assign_holdings_to_group,
     init_holdings_db, get_settings, save_settings,
     init_portfolios_db, get_portfolios, get_portfolio, upsert_portfolio, delete_portfolio,
     get_home_widgets, save_home_widgets,
@@ -1678,7 +1679,9 @@ def _watchlist_quote(code):
         return None
     try:
         closes, currency = _wl_recent_closes(code)
-    except Exception:
+    except Exception as e:
+        # 조용히 삼키면 시세가 왜 비었는지 로그에 아무 흔적이 없다(SPCX 조사에서 두 번 겪음).
+        print(f"[watchlist_quote] {code} 실패: {type(e).__name__}: {e}")
         return _neg_cache()
     if not closes:
         return _neg_cache()
@@ -2751,6 +2754,33 @@ def myassets_manual_price():
             return jsonify({'error': '잘못된 가격'}), 400
     set_manual_price(session['user_id'], int(hid), price)
     return jsonify({'ok': True})
+
+
+@app.route('/api/myassets/holdings/group', methods=['POST'])
+def myassets_assign_holdings_group():
+    """그룹 탭에서 보유 종목을 코드 단위로 담기/빼기 (계좌별 행을 한 번에)."""
+    if not session.get('user_id'):
+        return jsonify({'error': '로그인 필요'}), 401
+    body  = request.get_json(silent=True) or {}
+    raw   = body.get('group_id')
+    codes = body.get('codes') or []
+    clear = body.get('clear_codes') or []
+    if not isinstance(codes, list) or not isinstance(clear, list):
+        return jsonify({'error': '잘못된 요청'}), 400
+    if len(codes) + len(clear) > 500:
+        return jsonify({'error': '한 번에 500종목까지 처리할 수 있습니다.'}), 400
+    if raw in (None, '', 'null'):
+        group_id = None
+    else:
+        try:
+            group_id = int(raw)
+        except (TypeError, ValueError):
+            return jsonify({'error': '잘못된 그룹'}), 400
+    try:
+        n = assign_holdings_to_group(session['user_id'], group_id, codes, clear)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    return jsonify({'ok': True, 'updated': n})
 
 
 @app.route('/api/myassets/group', methods=['POST'])

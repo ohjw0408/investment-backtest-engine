@@ -1,5 +1,16 @@
 # 출시 완성도 개선 마스터플랜
 
+> **진행 상태 (2026-08-12 동기화):**
+> - ✅ **P0 완료·prod 반영** — C-1 백업(+복구 리허설)·C-2 WAL·B-1 합성 손상(오너 결정 (a) 재생성).
+> - ✅ **P1 완료** — C-3 CI 테스트 게이트(deploy.yml)·A-3 dep audit·C-4 로깅/Sentry·A-1 XSS 전수.
+> - ✅ **P2 완료** — F-1 3-상태 전수 감사(`wiki/dev/state-audit`)·E-1 공용 `mmEsc`·E-2 캐시버스팅
+>   `static_v()`·E-3 인라인 JS 외부화(전 페이지)·B-2 데이터 품질 파이프라인(+B-3 조건부 upsert)·
+>   F-4 문구 스타일시트·F-5 접근성·F-6 페이지별 디자인 크리틱(오너 승인 루프)·G-2 진행 단계 UX·D-2 레거시 이동.
+> - ⏳ **잔여** — D-1 app.py 분할(오너: 출시 후)·D-3는 `divrefactoring` 완료로 해소·H-1 테스트 분류·
+>   H-2 스모크 단일 명령(`scripts/smoke.py`)·G-1 성능 P3(오너 체감 시).
+> - ⚠️ **I. 출시 게이팅은 대부분 오너 수동** — Play Console·스크린샷·비공개 테스트·**Google OAuth
+>   Console redirect URI 등록(안 하면 로그인 死)**·Search Console.
+
 작성: 2026-07-02 (Claude Opus 4.8, 코드베이스 전수 감사 기반)
 목표: **토스/도미노 급 완성도로 정식 출시(Google Play + 웹).**
 전제: 기존 플랜(GOOGLE_PLAY_RELEASE_PLAN, LAUNCH_LEGAL_SECURITY_PLAN, 성능최적화_plan)과 중복 없이,

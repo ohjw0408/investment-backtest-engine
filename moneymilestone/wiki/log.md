@@ -51,6 +51,20 @@ API `POST /api/myassets/holdings/group` (`codes`=담기, `clear_codes`=이 그�
 검증 = `tests/test_myassets_groups_browser.js` **15/15 PASS**(실서버·실DB, 라이트/다크/모바일
 스샷 육안 확인, 콘솔 에러 0). 모바일에서 목록이 길어 취소/저장이 밀리던 것도 확인 후 교정.
 
+### prod 배포·검증 (같은 날)
+
+`118df50` 배포 후 `refresh_stale_prices`를 수동으로 6배치 실행:
+**정지 971종 → 14종**(rows_added 15,340). 남은 14종은 야후에 데이터가 없는 것들이다 —
+`STKL`·`OLPX`·`GTLS`·`SATS`·`CPRX`·`TMHC` 등은 조회 자체가 0행(상폐·티커 변경 추정),
+`310960`/`310970`(TIGER 200TR·MSCI Korea TR)은 **거래가 거의 없어 일봉 자체가 없다**
+(`.KS` 라이브 시세는 있는데 어떤 기간을 조회해도 0행. `.KQ`는 이름은 같지만 다른 피드라
+스케일이 안 맞아 **의도적으로 갖다 붙이지 않음**). 전부 `price_refresh_state`에
+연속 실패로 기록돼 7일 쿨다운 — 영구 포기는 아니다.
+
+검증: `/api/symbol/SPCX` = 08-10까지(야후에 08-11 봉이 없음, 08-12는 장중이라 정상 제외),
+정지했던 `AXP`·`TLT`·`VTI`·`MSTY`·`SKYT` 시세 전부 복구, beat에 `refresh-stale-prices`
+(22:00 UTC) 등록 확인, 무결성 스캔 신규 비율 판정 = 12/1031(1.2%) ok.
+
 _작성: Claude_
 
 ## [2026-08-06] DESIGN | 한국식 등락색을 캔들차트로 한정 (전날 전환 범위 축소)

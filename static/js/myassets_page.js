@@ -635,6 +635,25 @@ function allocExact(weights, total) {
 }
 
 // ── 추가매수 ──
+// 두 모드:
+//   'buy'   = 매도 없이, 목표 대비 부족한 그룹에만 신규자금 배분(기존 동작·기본값)
+//   'rebal' = 신규자금 투입 + 리밸런싱. 투입 후 모든 그룹이 목표 비중에 정확히 도달하도록
+//             초과 그룹은 매도까지 제안한다(매도대금은 매수에 그대로 쓰는 것으로 본다).
+let _purMode = 'buy';
+
+const PUR_INTRO = {
+  buy:   '새로 투자할 금액을 입력하면, <b>매도 없이</b> 목표 비중에 가까워지도록 <b>어느 그룹에 얼마씩</b> 넣을지 제안합니다. (목표 대비 부족한 그룹에 우선 배분)',
+  rebal: '새로 투자할 금액을 넣으면서 <b>동시에 리밸런싱</b>합니다. 투입 후 모든 그룹이 <b>목표 비중에 정확히</b> 맞도록, 초과한 그룹은 <b style="color:var(--down)">매도</b>·부족한 그룹은 <b style="color:var(--up)">매수</b>할 금액을 제안합니다.',
+};
+
+function setPurchaseMode(mode) {
+  _purMode = mode;
+  document.querySelectorAll('.pur-mode').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  const intro = document.getElementById('purIntroText');
+  if (intro) intro.innerHTML = PUR_INTRO[mode];
+  calcPurchase();
+}
+
 function setPurchaseAmount(v) {
   document.getElementById('purchaseAmount').value = v;
   calcPurchase();
@@ -642,7 +661,7 @@ function setPurchaseAmount(v) {
 
 function calcPurchase() {
   const resEl  = document.getElementById('purchaseResult');
-  const amount = parseFloat(document.getElementById('purchaseAmount').value) || 0;
+  const amount = Math.round(parseFloat(document.getElementById('purchaseAmount').value) || 0);
 
   const tg = groups.filter(g => g.target_pct > 0);
   const sumTargets = tg.reduce((s, g) => s + g.target_pct, 0);
@@ -656,42 +675,62 @@ function calcPurchase() {
   }
 
   const groupValues = {};
-  let groupedTotal = 0;
   holdings.forEach(h => {
     if (!h.group_id) return;
-    const v = (prices[h.code] || 0) * h.quantity;
-    groupValues[h.group_id] = (groupValues[h.group_id] || 0) + v;
-    groupedTotal += v;
+    groupValues[h.group_id] = (groupValues[h.group_id] || 0) + (prices[h.code] || 0) * h.quantity;
   });
-
+  // 평가액을 먼저 원 단위로 반올림해두면 배분 합계가 입력 금액과 정확히 맞는다
+  const gv = tg.map(g => Math.round(groupValues[g.id] || 0));
+  const groupedTotal = gv.reduce((a, b) => a + b, 0);
   const newTotal = groupedTotal + amount;
-  // 목표가치 대비 부족분(매수만 가능 → 초과그룹은 0). 부족분 비례로 amount 전액 배분.
-  const items = tg.map(g => {
-    const w = g.target_pct / sumTargets;
-    const posDef = Math.max(0, newTotal * w - (groupValues[g.id] || 0));
-    return { g, w, posDef };
-  });
-  const sumPos = items.reduce((s, r) => s + r.posDef, 0);
-  const rawBuys = items.map(r => sumPos > 0 ? amount * r.posDef / sumPos : amount * r.w);
-  const buys = allocExact(rawBuys, amount);
-  const rows = items.map((r, i) => ({ g: r.g, buy: buys[i] })).filter(r => r.buy > 0);
+  const weights  = tg.map(g => g.target_pct / sumTargets);   // 합으로 정규화
+
+  let rows;
+  if (_purMode === 'rebal') {
+    // 목표가치를 원 단위로 정확히 배분 → Σdelta = 입력 금액. 음수 delta = 매도.
+    const tgtVals = allocExact(weights.map(w => newTotal * w), newTotal);
+    rows = tg.map((g, i) => ({ g, delta: tgtVals[i] - gv[i] })).filter(r => r.delta !== 0);
+  } else {
+    // 목표가치 대비 부족분(매수만 가능 → 초과그룹은 0). 부족분 비례로 amount 전액 배분.
+    const posDef = weights.map((w, i) => Math.max(0, newTotal * w - gv[i]));
+    const sumPos = posDef.reduce((a, b) => a + b, 0);
+    const raw    = posDef.map((d, i) => sumPos > 0 ? amount * d / sumPos : amount * weights[i]);
+    const buys   = allocExact(raw, amount);
+    rows = tg.map((g, i) => ({ g, delta: buys[i] })).filter(r => r.delta > 0);
+  }
   if (!rows.length) { resEl.innerHTML = `<div style="color:var(--ds-muted);">배분할 그룹이 없습니다.</div>`; return; }
 
-  const maxBuy = Math.max(...rows.map(r => r.buy));
-  const buyTotal = rows.reduce((s, r) => s + r.buy, 0);
+  const isRebal   = _purMode === 'rebal';
+  const maxAbs    = Math.max(...rows.map(r => Math.abs(r.delta)));
+  const buyTotal  = rows.reduce((s, r) => s + Math.max(0, r.delta), 0);
+  const sellTotal = rows.reduce((s, r) => s - Math.min(0, r.delta), 0);
+
+  const summary = isRebal
+    ? `<div class="pur-total"><span>매도 합계</span><span class="pur-sell">${fmtKRW(sellTotal)}</span></div>
+       <div class="pur-total"><span>매수 합계</span><span class="pur-buy">${fmtKRW(buyTotal)}</span></div>
+       <div class="pur-total" style="font-weight:700;border-top:1.5px solid var(--ds-hairline);padding-top:12px;margin-top:4px;">
+         <span>순투입</span><span class="pur-buy" style="color:var(--ds-ink)">+${fmtKRW(buyTotal - sellTotal)}</span></div>`
+    : `<div class="pur-total" style="font-weight:700;border-top:1.5px solid var(--ds-hairline);padding-top:12px;margin-top:4px;">
+         <span>합계</span><span class="pur-buy" style="color:var(--ds-ink)">+${fmtKRW(buyTotal)}</span></div>`;
+
+  const note = isRebal
+    ? '* 신규 자금 투입 후 <b>모든 그룹이 목표 비중에 정확히</b> 도달하도록 계산합니다(매도대금은 매수에 그대로 쓰는 것으로 봄). 실제 매도에는 <b>세금·거래비용</b>이 붙을 수 있으니 계좌별로 확인하세요.'
+    : '* 목표 대비 부족한 그룹에 우선 배분(매도 없이 목표에 근접). 그룹 내 종목 선택은 계좌별 세금을 고려해 직접 결정하세요.';
+
   resEl.innerHTML = `
-    <div style="font-size:0.82rem;font-weight:700;margin-bottom:4px;">${fmtKRW(amount)} 배분 제안</div>
-    ${rows.map(r => `
+    <div style="font-size:0.82rem;font-weight:700;margin-bottom:4px;">${fmtKRW(amount)} ${isRebal ? '투입 + 리밸런싱' : '배분 제안'}</div>
+    ${rows.map(r => {
+      const sell = r.delta < 0;
+      return `
     <div class="pur-row">
       <span class="rb-dot" style="background:${r.g.color}"></span>
       <span style="min-width:84px;font-weight:600;font-size:0.86rem;">${maEsc(r.g.name)}</span>
-      <span class="pur-bar"><i style="width:${(r.buy/maxBuy*100).toFixed(0)}%;background:${r.g.color}"></i></span>
-      <span class="pur-buy">+${fmtKRW(r.buy)}</span>
-    </div>`).join('')}
-    <div style="display:flex;justify-content:space-between;align-items:center;font-weight:700;padding-top:12px;border-top:1.5px solid var(--ds-hairline);margin-top:4px;">
-      <span>합계</span><span class="pur-buy" style="color:var(--ds-ink)">+${fmtKRW(buyTotal)}</span>
-    </div>
-    <div style="margin-top:12px;font-size:0.76rem;color:var(--ds-muted);line-height:1.5;">* 목표 대비 부족한 그룹에 우선 배분(매도 없이 목표에 근접). 그룹 내 종목 선택은 계좌별 세금을 고려해 직접 결정하세요.</div>
+      <span class="pur-bar"><i style="width:${(Math.abs(r.delta)/maxAbs*100).toFixed(0)}%;background:${sell ? 'var(--down)' : r.g.color}"></i></span>
+      <span class="${sell ? 'pur-sell' : 'pur-buy'}">${isRebal ? (sell ? '매도 ' : '매수 ') + fmtKRW(Math.abs(r.delta)) : '+' + fmtKRW(r.delta)}</span>
+    </div>`;
+    }).join('')}
+    ${summary}
+    <div style="margin-top:12px;font-size:0.76rem;color:var(--ds-muted);line-height:1.5;">${note}</div>
   `;
 }
 

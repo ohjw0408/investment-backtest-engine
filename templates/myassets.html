@@ -350,6 +350,13 @@
 .pur-row .pur-bar { flex: 1; height: 6px; border-radius: 100px; background: var(--ds-strong); position: relative; overflow: hidden; }
 .pur-row .pur-bar i { position: absolute; left: 0; top: 0; height: 100%; border-radius: 100px; }
 .pur-buy { font-family: var(--font-mono); font-weight: 700; color: var(--up); white-space: nowrap; }
+.pur-sell { font-family: var(--font-mono); font-weight: 700; color: var(--down); white-space: nowrap; }
+.pur-modes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.pur-mode { font-size: 0.78rem; font-weight: 600; padding: 7px 15px; border-radius: 100px; border: 1px solid var(--ds-hairline);
+  background: transparent; color: var(--ds-body); cursor: pointer; font-family: inherit; }
+.pur-mode:hover { border-color: var(--ds-muted); }
+.pur-mode.active { background: var(--brand-tint); color: var(--brand-text); border-color: transparent; }
+.pur-total { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; padding: 6px 0; }
 
 /* ── 그룹 관리 카드 ── */
 .grp-sum { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; border-radius: var(--r-md); margin-bottom: 14px; font-size: 0.85rem; font-weight: 600; }
@@ -676,9 +683,13 @@
 
   <!-- 추가매수 탭 -->
   <div id="tab-purchase" data-mtab="rebal" style="display:none;">
-    <div class="ma-intro">{{ mi('plus') }} 새로 투자할 금액을 입력하면, <b>매도 없이</b> 목표 비중에 가까워지도록 <b>어느 그룹에 얼마씩</b> 넣을지 제안합니다. (목표 대비 부족한 그룹에 우선 배분)</div>
+    <div class="ma-intro">{{ mi('plus') }} <span id="purIntroText">새로 투자할 금액을 입력하면, <b>매도 없이</b> 목표 비중에 가까워지도록 <b>어느 그룹에 얼마씩</b> 넣을지 제안합니다. (목표 대비 부족한 그룹에 우선 배분)</span></div>
     <div class="ma-card">
       <div class="ma-card-title">{{ mi('plus') }} 추가 투자금액</div>
+      <div class="pur-modes">
+        <button class="pur-mode active" data-mode="buy" onclick="setPurchaseMode('buy')">구매만</button>
+        <button class="pur-mode" data-mode="rebal" onclick="setPurchaseMode('rebal')">구매 + 리밸런싱</button>
+      </div>
       <div class="input-row" style="max-width:340px;">
         <div class="input-group">
           <input type="number" id="purchaseAmount" class="calc-input" value="1000000" min="0" step="100000" oninput="calcPurchase()">

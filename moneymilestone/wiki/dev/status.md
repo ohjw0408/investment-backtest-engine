@@ -713,3 +713,11 @@ tags: [dev]
 - 배당 인출을 음수 `cash_flow`로 기록 → 배당이 손실로 잡히던 것 수정.
 - `modules/perf_metrics.py` 신설로 TWR·MWR 공용화(3곳 중복 제거).
 - 상세 = `dev/bugs.md` 2026-08-05 세션 2.
+
+## 2026-08-14 추가매수 2모드(구매만 / 구매 + 리밸런싱) ✅
+- 돈을 넣으면서 동시에 리밸런싱하는 경우가 어느 탭에도 없던 구멍을 메움(오너 제보).
+- 오너 결정 = 매도 기준 **목표 정확히 맞춤**(경고밴드 예외 미채택).
+- `구매만` 모드는 기존 동작 그대로 — jsdom 회귀로 고정.
+- 검증: `tests/test_purchase_mode_dom.js` 21/21, `tests/test_purchase_mode_browser.js` 25/25,
+  라이트/다크/모바일 스샷 육안, 콘솔 0.
+- 상세 = `log.md` 2026-08-14. 부수 발견 = `dev/bugs.md` BUG-HIDEAMT-PURCHASE-STALE.

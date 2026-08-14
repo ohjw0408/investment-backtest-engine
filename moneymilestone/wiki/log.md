@@ -1,5 +1,18 @@
 # Log
 
+## [2026-08-14] SEO | 홈 <title> 문구 변경 (구글 검색결과 표기)
+
+오너가 구글 검색결과에서 메인이 `홈 — Money Milestone`으로 뜨는 게 별로라고 판단.
+`templates/index.html:2` `{% block title %}` 를
+**`자산 배분 투자자를 위한 올인원 플랫폼 — Money Milestone`** 으로 변경. 문구는 오너 지정.
+
+- base.html의 `og:title`이 `{{ self.title() }}` 상속이라 **공유 카드 제목도 같이 바뀐다**(의도됨).
+- meta description·canonical은 손대지 않음.
+- 검증: Flask test client로 `/` 렌더 → 200, `<title>`·`og:title` 둘 다 새 문구 확인.
+- ⚠️ 반영은 구글 재크롤링 후(며칠~몇 주). 구글이 title을 자체 재작성할 수도 있고,
+  SERP 제목 폭(~600px) 때문에 뒤쪽 `— Money Milestone`이 잘릴 가능성 있음 — 오너에게 알렸고
+  **현 문구 유지 결정**.
+
 ## [2026-08-12] sync | 세션 마감 전체 동기화 (계획 파일 ↔ 실제 상태)
 
 오너 "정리하고 세션 종료 준비" → README 규칙대로 계획 파일 + wiki 전수 대조.

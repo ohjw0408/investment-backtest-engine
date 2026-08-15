@@ -106,6 +106,14 @@ ev = last_event()
 ok("실적 제목", ev["title"] == "📊 오늘 실적 발표 — AAPL")
 ok("target_url = /symbol/AAPL", ev["meta"]["target_url"] == "/symbol/AAPL")
 
+# ── 5b. 단일 종목 + 금액 = 본문에 종목명 중복 없음 ──────
+t, b = SER._compose_dividend(
+    [{"date": TODAY.isoformat(), "symbol": "SCHD", "dps_krw": 1000.0, "projected": True}],
+    "오늘", ({"SCHD": 8500.0}, {"일반": 8500.0}, 8500.0))
+ok("단일 제목에 종목+금액", t == "💰 오늘 배당락 — 슈드 · 예상 배당 8,500원")
+ok("단일 본문에 종목별 줄 없음", "종목별 슈드" not in b and b.startswith("계좌별"))
+ok("예상일+지급일 안내 동시", "예상일" in b and "지급일" in b)
+
 # ── 5. 해당 날짜 일정 없으면 무발화 ─────────────────────
 fired = SER.run_symbol_event_alerts(loader, today=TODAY + datetime.timedelta(days=5),
                                     rules=alert_store.get_rules(UID))

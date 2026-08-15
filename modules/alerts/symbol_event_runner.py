@@ -131,20 +131,28 @@ def _compose_earnings(events, when):
 
 def _compose_dividend(events, when, amounts=None):
     names = [_display_name(e.get("symbol") or "") for e in events]
-    title = (f"💰 {when} 배당락 — {names[0]}" if len(names) == 1
+    single = len(names) == 1
+    title = (f"💰 {when} 배당락 — {names[0]}" if single
              else f"💰 {when} 배당락 {len(names)}종")
-    lines = [_names_line(names, "종")]
+    lines = []
+    if not (single and amounts):      # 종목 1개 + 금액이면 제목이 이미 다 말한다
+        lines.append(_names_line(names, "종"))
     if amounts:
         by_code, by_account, total = amounts
         title += f" · 예상 배당 {_won(total)}"
-        lines.append("종목별 " + " · ".join(
-            f"{_display_name(c)} {_won(v)}"
-            for c, v in sorted(by_code.items(), key=lambda x: -x[1])[:MAX_LIST]))
+        if not single:
+            lines.append("종목별 " + " · ".join(
+                f"{_display_name(c)} {_won(v)}"
+                for c, v in sorted(by_code.items(), key=lambda x: -x[1])[:MAX_LIST]))
         lines.append("계좌별 " + " · ".join(
             f"{a} {_won(v)}" for a, v in sorted(by_account.items(), key=lambda x: -x[1])))
-        lines.append("세후 원화 환산 · 배당락일 기준 예상액이며 실제 입금일은 종목별 지급일이에요.")
-    elif any(e.get("projected") for e in events):
-        lines.append("과거 배당 패턴으로 추정한 예상일이 포함돼 있어요.")
+    note = []
+    if any(e.get("projected") for e in events):
+        note.append("과거 배당 패턴으로 추정한 예상일")
+    if amounts:
+        note.append("금액은 세후 원화 예상액 · 실제 입금일은 종목별 지급일")
+    if note:
+        lines.append(" · ".join(note) + "이에요.")
     return title, "\n".join(lines)
 
 

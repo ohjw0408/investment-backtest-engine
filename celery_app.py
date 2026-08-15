@@ -74,10 +74,15 @@ celery.conf.beat_schedule = {
         'schedule': crontab(hour=21, minute=30, day_of_week='mon-fri'),
         'args': ('US',),
     },
-    # 증시 캘린더 일정 알림 — 매일 08:00 KST(=23:00 UTC). 당일 일정 묶음 1건.
+    # 증시 캘린더 일정 알림(거시지표·통화정책) — 매일 08:00 KST(=23:00 UTC). 당일 묶음 1건.
     'evaluate-calendar-alerts': {
         'task': 'tasks.evaluate_calendar_alerts',
         'schedule': crontab(hour=23, minute=0),
+    },
+    # 종목 일정 알림(실적 발표·배당락일) — 매일 08:05 KST(=23:05 UTC). 거시와 별도 레인.
+    'evaluate-symbol-event-alerts': {
+        'task': 'tasks.evaluate_symbol_event_alerts',
+        'schedule': crontab(hour=23, minute=5),
     },
     # 가격 오틱(고립 스파이크) 클린업 — 매일 10:00 UTC(US/KR 장 마감 후). 증분 페치가 못 거른
     # 오틱을 DB 전체 이웃 기준으로 제거 → 겹쳐보기 등 raw 읽기경로 self-heal.

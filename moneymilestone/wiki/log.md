@@ -1,5 +1,82 @@
 # Log
 
+## [2026-08-15] FIX+FEATURE | 실적·배당락 알림을 종목 알림으로 이관 (배당락 알림이 6주간 0건이던 원인)
+
+**오너 제보**: "보유 종목 배당락일 알림을 켰는데 받은 기억이 없다. 온 건지 안 온 건지 모르겠다."
++ "배당락일이 왜 거시경제지표랑 한 통에 들어가 있나. 배당금 입금 알림도 있으면 좋겠다."
+
+### 실측 — 진짜 안 왔다
+
+prod `alert_events` user 1의 캘린더 알림 **12건 전부 경제지표/통화정책**. 배당 0, 실적 0.
+러너를 prod에서 그대로 돌리니 `ALERT CODES: ['KRX_GOLD']` 한 종목, 그마저 배당 비대상 필터
+(`market_calendar.py` dcodes)에서 탈락 → **발화 가능성이 수학적으로 0**이었다.
+설정만 정상이었다면 2026-07-30 458730·133690 배당락 2건이 왔어야 했다(엔진은 63건 정상 산출 —
+데이터가 아니라 설정이 죽어 있었다).
+
+### 근본 원인 — `excluded`가 전역 코드 집합인데 체크박스는 그룹마다 중복 렌더
+
+`alerts_page.js`의 저장 로직이 `.ca-sym:not(:checked)` **전체**를 `excluded`로 긁어 담았다.
+같은 코드(458730)가 내 자산·저장 포폴·관심목록 3곳에 렌더되므로,
+
+- 관심목록 카드에서 한 번 끄면 → `excluded`에 들어가 **보유 종목·포폴에서도 동시 사망**
+- 그룹 부모를 끄면 자식 전부 uncheck → 저장 시 그 그룹 종목이 **영구 각인**
+- `syncParent`가 로드 때 부모 체크박스를 자식 기준으로 덮어써 저장된 `sources[g]=true`를 무효화
+- dedupe 없음 → prod DB에 `SPY`·`GLD` 12중복, `PF:1` 같은 비티커까지 섞여 있었다
+
+거기다 `_compose()`가 본문에 `titles[:3]`만 넣는데 `events_for` 조립 순서가
+econ → policy → earnings → dividend라 **배당락은 항상 꼴찌 → "외 N건"으로 잘려 사라졌다.**
+
+### 조치 — 레인 분리(오너 지시)
+
+종목 소스 선택 UI를 통째로 없애고, 실적·배당락을 **종목 알림 룰**(`alert_rules`)로 옮겼다.
+
+| 구분 | 전 | 후 |
+|---|---|---|
+| 거시(경제지표·통화정책) | 캘린더 알림 | 캘린더 알림 (그대로, 23:00 UTC) |
+| 실적 발표·배당락일 | 캘린더 알림에 얹힘 | **종목 알림 › 실적·배당 탭** (`symbol_event_runner`, 23:05 UTC) |
+
+룰 규약(기존 컬럼 재사용): `rule_type='earnings'|'dividend'` · `scope='holdings'|'symbol'` ·
+`window='d0'|'d1'` · `direction='amount'`(배당 금액 동봉).
+`cal_alert_prefs`에서 `show_earnings`·`show_dividend`·`sources`·`excluded` 제거(구버전 컬럼은
+`_CAL_FIELDS` 화이트리스트로 걸러 응답에서 사라진다).
+
+### 배당금 알림 — 지급일은 뺐다(실측 근거)
+
+오너 요청은 "얼마가 어느 계좌에 입금됐는지"였다. 지급일 소스를 실측했다:
+
+```
+AAPL   -> {'Dividend Date': 2026-08-13, 'Ex-Dividend Date': 2026-08-10, ...}
+KO     -> {'Dividend Date': 2026-10-01, ...}
+005930.KS -> {'Ex-Dividend Date': ...}          # 지급일 없음
+SCHD/QQQM/458730.KS/133690.KS -> 404 No fundamentals data
+```
+
+지급일이 오는 건 **미국 개별주의 다음 1회뿐**이고 ETF·한국 종목은 아예 없다(오너 보유는 전부 ETF).
+그래서 지급일 알림은 만들지 않고, **배당락일 기준 예상 배당금**을 본문에 동봉한다 —
+`보유 수량 × 주당 배당금`, 계좌 성격별 세율(ISA·연금저축·IRP 비과세 / KR 15.4% / US 15%)로
+세후 원화 환산, **종목별 + 계좌별** 양쪽 집계. UI·본문에 "실제 입금일과 다르다"고 명시했다.
+
+### 곁가지 수정
+
+`market_calendar.dividend_events`가 예측 플래그를 `e.get("predicted")`로 읽고 있었다 —
+배당엔진이 내보내는 키는 `projected`라 **항상 False**였고, 미래 날짜(`d > today`)만 예상으로
+잡혀 오늘 날짜의 투영 배당락이 확정처럼 표시됐다. `projected`로 정정.
+
+`last_triggered_at`의 날짜 부분을 **평가 기준 KST 날짜**로 기록한다. 서버 로컬(UTC)로 쓰면
+08:05 KST = 전날 23:05 UTC라 같은 KST 날짜에 재실행돼도 중복 차단이 안 걸린다.
+
+### 검증
+
+- `tests/test_symbol_event_runner.py` 신규 16 PASS — 계좌별 금액(일반 16,960 / ISA 20,000),
+  당일 중복 차단, `d1` 전날 알림, 실적 룰, 무발화 케이스
+- `tests/test_calendar_alert_runner.py` 신규 8 PASS — 거시 전용 축소 회귀
+- `tests/test_alerts_api.py` 39 → **50 PASS** (종목 일정 룰 검증 + 캘린더 prefs 축소 11건 추가)
+- `tests/test_alert_runner.py` 10 PASS (기존 가격 룰 무영향)
+- `tests/test_alerts_event_tab_browser.js` 신규 **27/27 PASS** — 서브탭 전환·칩·대상 전환·
+  종목 검색·룰 2종 생성·캘린더 축소 확인·기존 가격 폼 보존·콘솔 에러 0, 라이트/다크 스샷
+
+_작성: Claude_
+
 ## [2026-08-14] FEATURE | 추가매수 2모드 — 구매만 / 구매 + 리밸런싱
 
 **오너 제보**: 리밸런싱(매수·매도)과 추가매수(신규자금 배분)는 각각 되는데, **돈을 넣으면서 동시에

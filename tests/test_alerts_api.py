@@ -156,5 +156,36 @@ r = cl.post("/api/alerts/rules", json={"rule_type": "daily_pct", "portfolio_id":
                                        "direction": "both", "threshold": 2})
 ok("남의/없는 포폴 룰 → 404", r.status_code == 404)
 
+# ── 6. 종목 일정 룰(실적·배당락) 검증 ──
+c, e = v({"rule_type": "dividend", "window": "d0", "with_amount": True})
+ok("배당 룰 code 없음 → scope holdings",
+   e is None and c["scope"] == "holdings" and c["code"] is None and c["direction"] == "amount")
+c, e = v({"rule_type": "dividend", "code": "schd", "window": "d1"})
+ok("배당 룰 code 지정 → scope symbol(대문자화)",
+   e is None and c["scope"] == "symbol" and c["code"] == "SCHD" and c["window"] == "d1")
+c, e = v({"rule_type": "dividend", "code": "SCHD"})
+ok("window 생략 → d0 기본", e is None and c["window"] == "d0")
+_, e = v({"rule_type": "earnings", "window": "52w"})
+ok("잘못된 window → 에러", e is not None)
+c, e = v({"rule_type": "earnings", "with_amount": True})
+ok("실적 룰엔 금액 옵션 미적용", e is None and c.get("direction") is None)
+r = cl.post("/api/alerts/rules", json={"rule_type": "dividend", "window": "d0", "with_amount": True})
+ok("배당 룰 생성 200", r.status_code == 200)
+ok("생성된 배당 룰 조회됨",
+   any(rr["rule_type"] == "dividend" and rr["scope"] == "holdings"
+       for rr in cl.get("/api/alerts/rules").get_json()["rules"]))
+
+# ── 7. 캘린더 알림 설정 = 거시 전용(종목 소스 제거) ──
+r = cl.get("/api/alerts/calendar-prefs").get_json()
+ok("calendar-prefs 종목 소스 미노출",
+   "symbols" not in r and "group_order" not in r)
+ok("calendar-prefs prefs 키 축소",
+   all(k not in r["prefs"] for k in ("show_earnings", "show_dividend", "sources", "excluded")))
+r = cl.post("/api/alerts/calendar-prefs",
+            json={"enabled": True, "show_econ": True, "show_policy": False, "econ_ids": [10]})
+ok("calendar-prefs 저장 200", r.status_code == 200)
+saved = cl.get("/api/alerts/calendar-prefs").get_json()["prefs"]
+ok("저장값 반영", saved["enabled"] == 1 and saved["show_policy"] == 0 and saved["econ_ids"] == [10])
+
 print(f"\n{_p} PASS / {_f} FAIL")
 sys.exit(1 if _f else 0)

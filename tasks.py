@@ -407,6 +407,28 @@ def evaluate_calendar_alerts():
 
 
 @celery.task
+def evaluate_symbol_event_alerts():
+    """매일 08:05 KST Celery Beat — 종목 일정 알림(실적 발표·배당락일). 장 무관.
+
+    거시 캘린더 알림(08:00)과 별도 레인 — 종목 일정이 거시 일정 본문에 밀려
+    잘려나가던 구조를 2026-08-15에 분리했다.
+    """
+    try:
+        from modules.alerts.symbol_event_runner import run_symbol_event_alerts
+        from modules.price_loader import PriceLoader
+        from modules import auth_manager
+        auth_manager.init_db()
+        from modules.alerts import alert_store
+        alert_store.init_alerts_db()
+        fired = run_symbol_event_alerts(PriceLoader())
+        print(f"[evaluate_symbol_event_alerts] {fired} alerts fired")
+        return {"status": "ok", "fired": fired}
+    except Exception as e:
+        print(f"[evaluate_symbol_event_alerts] 오류: {e}")
+        raise
+
+
+@celery.task
 def refresh_index_ohlc():
     """장중 주기 실행(Celery Beat) — 시장지수 index_ohlc를 당일까지 갱신.
 

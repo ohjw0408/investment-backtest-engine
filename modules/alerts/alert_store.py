@@ -52,17 +52,14 @@ CREATE TABLE IF NOT EXISTS device_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
 
--- 증시 캘린더 일정 알림 설정(사용자 1:1). 가격 룰과 독립.
+-- 증시 캘린더 일정 알림 설정(사용자 1:1) = 거시지표·통화정책 전용. 종목 룰과 독립.
+-- 실적·배당락은 2026-08-15에 종목 알림 룰(alert_rules)로 이관 — 여기 컬럼 없음.
 CREATE TABLE IF NOT EXISTS cal_alert_prefs (
     user_id        INTEGER PRIMARY KEY,
     enabled        INTEGER NOT NULL DEFAULT 0,
     show_econ      INTEGER NOT NULL DEFAULT 1,
-    show_earnings  INTEGER NOT NULL DEFAULT 1,
     show_policy    INTEGER NOT NULL DEFAULT 1,
-    show_dividend  INTEGER NOT NULL DEFAULT 1,
     econ_ids       TEXT,
-    sources        TEXT,
-    excluded       TEXT,
     last_sent_date TEXT,
     updated_at     TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -72,7 +69,10 @@ CREATE TABLE IF NOT EXISTS cal_alert_prefs (
 # 사용자당 알림 룰 한도(스팸/부하 방지). 요금제 차등 시 단일 변경점.
 MAX_ALERT_RULES = 50
 
-VALID_TYPES = {"daily_pct", "target_price", "new_high", "new_low", "rebalance_band"}
+# earnings·dividend = 종목 일정 룰(symbol_event_runner). scope='holdings'(보유 전체) 또는
+# 'symbol'(개별), window='d0'(당일)/'d1'(하루 전), direction='amount'(배당 금액 동봉).
+VALID_TYPES = {"daily_pct", "target_price", "new_high", "new_low", "rebalance_band",
+               "earnings", "dividend"}
 
 
 def init_alerts_db():
@@ -298,19 +298,23 @@ def delete_user_device_tokens(user_id):
 # ── 캘린더 일정 알림 설정(cal_alert_prefs) ───────────────
 
 _CAL_DEFAULT = {
-    "enabled": 0, "show_econ": 1, "show_earnings": 1, "show_policy": 1,
-    "show_dividend": 1, "econ_ids": [], "sources": {}, "excluded": [],
+    "enabled": 0, "show_econ": 1, "show_policy": 1, "econ_ids": [],
     "last_sent_date": None,
 }
 
+# 응답/평가에 쓰는 컬럼 화이트리스트 — 구버전 테이블에 남아 있는 show_earnings·
+# show_dividend·sources·excluded(2026-08-15 이관으로 폐기)를 걸러낸다.
+_CAL_FIELDS = ("user_id", "enabled", "show_econ", "show_policy",
+               "econ_ids", "last_sent_date", "updated_at")
+
 
 def _cal_row_to_dict(r):
-    d = dict(r)
-    for k in ("econ_ids", "sources", "excluded"):
-        try:
-            d[k] = json.loads(d[k]) if d.get(k) else _CAL_DEFAULT[k]
-        except Exception:
-            d[k] = _CAL_DEFAULT[k]
+    row = dict(r)
+    d = {k: row.get(k) for k in _CAL_FIELDS}
+    try:
+        d["econ_ids"] = json.loads(d["econ_ids"]) if d.get("econ_ids") else []
+    except Exception:
+        d["econ_ids"] = []
     return d
 
 
@@ -323,24 +327,18 @@ def get_cal_alert_prefs(user_id):
 
 
 def save_cal_alert_prefs(user_id, prefs):
-    """업서트. prefs = {enabled, show_*, econ_ids[list], sources{dict}, excluded[list]}."""
+    """업서트. prefs = {enabled, show_econ, show_policy, econ_ids[list]}."""
     now = datetime.now().isoformat()
     c = _conn()
     c.execute(
-        "INSERT INTO cal_alert_prefs (user_id, enabled, show_econ, show_earnings, "
-        "show_policy, show_dividend, econ_ids, sources, excluded, updated_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?) "
+        "INSERT INTO cal_alert_prefs (user_id, enabled, show_econ, show_policy, "
+        "econ_ids, updated_at) VALUES (?,?,?,?,?,?) "
         "ON CONFLICT(user_id) DO UPDATE SET enabled=excluded.enabled, "
-        "show_econ=excluded.show_econ, show_earnings=excluded.show_earnings, "
-        "show_policy=excluded.show_policy, show_dividend=excluded.show_dividend, "
-        "econ_ids=excluded.econ_ids, sources=excluded.sources, "
-        "excluded=excluded.excluded, updated_at=excluded.updated_at",
+        "show_econ=excluded.show_econ, show_policy=excluded.show_policy, "
+        "econ_ids=excluded.econ_ids, updated_at=excluded.updated_at",
         (user_id, int(bool(prefs.get("enabled"))), int(bool(prefs.get("show_econ", 1))),
-         int(bool(prefs.get("show_earnings", 1))), int(bool(prefs.get("show_policy", 1))),
-         int(bool(prefs.get("show_dividend", 1))),
-         json.dumps(prefs.get("econ_ids") or []),
-         json.dumps(prefs.get("sources") or {}),
-         json.dumps(prefs.get("excluded") or []), now)
+         int(bool(prefs.get("show_policy", 1))),
+         json.dumps(prefs.get("econ_ids") or []), now)
     )
     c.commit()
 

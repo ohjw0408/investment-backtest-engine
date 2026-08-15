@@ -215,7 +215,10 @@ def dividend_events(loader, codes, names=None):
                 d = e.get("date")
                 if not d or d < floor:
                     continue
-                pred = bool(e.get("predicted")) or (d > tk)
+                # 배당엔진 이벤트의 예측 플래그는 'projected'. 'predicted'를 보던 탓에
+                # 항상 False라 미래 날짜(d > tk)만 예상으로 잡혔다 — 오늘 날짜의 투영
+                # 배당락이 확정인 것처럼 표시되던 문제(2026-08-15).
+                pred = bool(e.get("projected")) or (d > tk)
                 code = e.get("code")
                 out.append({"date": d, "type": "dividend", "symbol": code,
                             "dps_krw": e.get("krw_pre"), "dps_usd": e.get("usd_pre"),

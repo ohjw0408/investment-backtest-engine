@@ -809,7 +809,9 @@ async function rrOvLoad(){
   const myTok = ++rrOv._loadTok, basis = rrOv.basis;
   // EX:(즉석 예시 포폴) 시계열은 macro/multi에 없음 → 보존하고 나머지만 조회
   const kept = {};
-  rrOv.items.forEach(it=>{ if(it.key.startsWith('EX:') && rrOv.raw[it.key] && rrOv.raw[it.key].basis === basis) kept[it.key]=rrOv.raw[it.key]; });
+  // 대가 NAV(point_in_time)는 basis와 무관하게 같은 곡선 — 기준 토글마다 재요청할 이유가 없다
+  rrOv.items.forEach(it=>{ const s=rrOv.raw[it.key];
+    if(it.key.startsWith('EX:') && s && (s.basis === basis || s.point_in_time)) kept[it.key]=s; });
   const fetchKeys = rrOv.items.map(it=>it.key).filter(k=>!k.startsWith('EX:'));
   if (fetchKeys.length){
     // 키별 병렬(동시성 4) 요청 + 진행률 — 도착하는 대로 % 채움
@@ -891,6 +893,8 @@ function rrOvRenderCtrl(){
   const el = document.getElementById('rrOvCtrl');
   if (!rrOv.items.length){ el.innerHTML=''; return; }
   const over5 = rrOv.mode==='norm' && rrOvRangeYears() > 5.05;
+  // 대가 NAV는 배당 재투자 내장이라 가격 기준으로 못 바꾼다 — 조용히 다른 곡선을 주는 대신 알린다
+  const guruTr = Object.values(rrOv.raw || {}).some(s => s && s.basis_mismatch);
   const evButtons = RR_RANGE_EVENTS.map(ev =>
     `<button class="qr ev${rrOv.activeEvent===ev.key?' on':''}" data-ev="${ev.key}">${ev.label}</button>`).join('');
   el.innerHTML = `
@@ -912,7 +916,8 @@ function rrOvRenderCtrl(){
       <label><input type="radio" name="rrovbasis" value="price" ${rrOv.basis==='price'?'checked':''}>가격</label></span>
     <span class="grp"><button class="qr" id="rrOvFullscreen" title="차트 전체화면">⛶ 전체화면</button></span>
     <span class="rr-ov-zoomhint" style="font-size:0.72rem;color:var(--text-muted);">💡 그래프를 <b>드래그</b>하면 그 구간만 확대돼요.</span>
-    ${over5?'<span class="rr-ov-warn">⚠ 5년 초과 + 정규화는 작은 차이가 과장돼 보여요</span>':''}`;
+    ${over5?'<span class="rr-ov-warn">⚠ 5년 초과 + 정규화는 작은 차이가 과장돼 보여요</span>':''}
+    ${guruTr?'<span class="rr-ov-warn">⚠ 대가 곡선은 13F 시점별 재현이라 항상 <b>총수익</b> 기준이에요(가격 기준으로 바꿔도 그대로)</span>':''}`;
   document.getElementById('rrOvStart').addEventListener('change',e=>rrOvApplyRange(e.target.value, rrOv.end, -1, null));
   document.getElementById('rrOvEnd').addEventListener('change',e=>rrOvApplyRange(rrOv.start, e.target.value, -1, null));
   el.querySelectorAll('input[name=rrovm]').forEach(r=>r.addEventListener('change',e=>{ rrOv.mode=e.target.value; rrOvRenderCtrl(); rrOvDraw(); }));

@@ -224,6 +224,16 @@
 .bt-hero-sub2 { margin-top: 8px; font-size: var(--fs-body); font-weight: 600; color: var(--ds-body); display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .bt-hero-sub2 .up { color: var(--up); } .bt-hero-sub2 .down { color: var(--down); }
 
+/* 투자대가 시점별 재현 배너(입력 화면) */
+.bt-guru-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-bottom: 12px; padding: 10px 12px;
+  border: 1px solid var(--ds-hairline); border-radius: var(--r-md);
+  background: var(--ds-soft); color: var(--ds-muted);
+  font-size: var(--fs-xs); line-height: 1.5;
+}
+.bt-guru-note b { color: var(--ds-ink); font-weight: 700; }
+
 /* 결과 카드 */
 .bt-card {
   background: var(--ds-canvas); border: 1px solid var(--ds-hairline);
@@ -301,6 +311,8 @@
         <h2 class="bt-fcard-title">종목 구성</h2>
         <div id="favBar"></div>
       </div>
+      <!-- 투자대가 시점별 재현 배너 — 대가 카드에서 넘어왔을 때만. 종목/비중을 손대면 해제된다. -->
+      <div class="bt-guru-note" id="btGuruNote" style="display:none;"></div>
       <div class="ticker-search-wrap">
         <div class="ticker-search-box">
           <span class="ts-icon">{{ nicon('search') }}</span>
@@ -533,6 +545,9 @@
 
     <div id="btResultEmpty" style="display:none;"></div>
     <div id="btResultContent" style="display:none;">
+
+      <!-- 투자대가 시점별 재현 안내(결과) — 무엇을 돌렸는지·무엇이 빠졌는지 -->
+      <div class="bt-guru-note" id="btGuruResultNote" style="display:none;"></div>
 
       <!-- 가상 데이터 경고 배너 -->
       <div id="btSynthWarningBanner" style="display:none;background:var(--gold-pale);border:1px solid var(--gold);border-radius:var(--r-md);padding:12px 16px;margin-bottom:12px;font-size:0.83rem;color:var(--ds-body);">

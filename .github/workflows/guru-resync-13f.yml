@@ -1,0 +1,79 @@
+name: Quarterly Guru 13F Resync
+
+# 투자대가 13F(guru_holdings.db)를 분기 공시 마감 직후 갱신.
+# DB는 git 추적 seed라 CI가 리빌드→커밋→푸시→prod 배포로 운반한다
+# (prod celery beat는 배포 시 git reset --hard로 되돌려져 부적합).
+#
+# 13F 마감 = 분기말 +45일 → 2/14, 5/15, 8/14, 11/14. 그 다음날 돈다.
+# 늦게 내는 제출자(Ackman 등)를 위해 한 주 뒤 한 번 더 돈다.
+on:
+  schedule:
+    - cron: '0 7 15 2,5,8,11 *'   # 마감 다음날 07:00 UTC
+    - cron: '0 7 22 2,5,8,11 *'   # 지각 제출자 회수
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  resync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install requests python-dotenv
+
+      # 키가 없으면 CUSIP→티커가 전멸한다. 빈 DB를 커밋하느니 여기서 멈춘다.
+      - name: Require OpenFIGI key
+        env:
+          OPENFIGI_API_KEY: ${{ secrets.OPENFIGI_API_KEY }}
+        run: |
+          if [ -z "$OPENFIGI_API_KEY" ]; then
+            echo "::error::OPENFIGI_API_KEY 시크릿이 없습니다. CUSIP→티커 매핑이 전멸하므로 중단합니다."
+            exit 1
+          fi
+
+      - name: Snapshot current DB
+        run: cp data/meta/guru_holdings.db /tmp/guru_before.db
+
+      - name: Rebuild 13F holdings
+        env:
+          OPENFIGI_API_KEY: ${{ secrets.OPENFIGI_API_KEY }}
+        run: python scripts/build_guru_db.py
+
+      - name: Guard against regression
+        run: python scripts/guru_db_stats.py --before /tmp/guru_before.db
+
+      - name: Commit if changed
+        id: commit
+        run: |
+          if git diff --quiet -- data/meta/guru_holdings.db; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "새 13F 공시 없음 — 변경 없음"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add data/meta/guru_holdings.db
+            git commit -m "data(gurus): 분기 13F 공시 동기화 (자동)"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to prod
+        if: steps.commit.outputs.changed == 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 178.105.84.213
+          username: root
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            set -e
+            cd /root/investment-backtest-engine
+            git fetch origin main
+            git reset --hard origin/main
+            systemctl restart domino
+            # 새 공시 세그먼트를 비교/겹쳐보기 곡선에 즉시 반영(다음 beat까지 기다리지 않음)
+            venv/bin/python -c "import tasks; print(tasks.refresh_guru_nav())"

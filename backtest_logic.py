@@ -282,6 +282,58 @@ def _run_multi_account_backtest_logic(body: dict, progress_callback=None) -> dic
     }
 
 
+def _guru_pit_schedule(slug, start_date, end_date, loader):
+    """대가 슬러그 → 시점별 비중 스케줄. 재현 불가하면 None(호출측이 고정비중으로 폴백).
+
+    반환 {schedule, tickers, start_date, segments, first_filed}.
+    - 가격 없는 종목은 **세그먼트별로** 제외하고 재정규화(시뮬레이터 NaN 방지)
+    - 요청 구간 밖 세그먼트는 잘라내되, 시작일 직전 것 하나는 시작 비중으로 남긴다
+    - 첫 공시일보다 이른 시작일은 첫 공시일로 당긴다(그 전엔 공시 자체가 없음)
+    """
+    try:
+        from modules.gurus import nav as guru_nav
+    except Exception:
+        return None
+
+    codes = guru_nav.schedule_codes(slug)
+    if not codes:
+        return None
+
+    coverage = {}
+    for code in codes:
+        try:
+            lo, hi = loader.get_date_range_in_db(code)
+        except Exception:
+            lo = hi = None
+        if lo:
+            coverage[code] = (lo, hi or lo)
+
+    full = guru_nav.weight_schedule(slug, coverage=coverage)
+    if not full:
+        return None
+
+    segs   = [s for s in full if s[0] <= end_date]
+    before = [s for s in segs if s[0] <= start_date]
+    after  = [s for s in segs if s[0] >  start_date]
+    segs   = ([before[-1]] if before else []) + after
+    if not segs:
+        return None
+
+    # 가격이 없어 빠진 몫 — 재정규화로 조용히 메우면 안 되므로 UI에 그대로 넘긴다.
+    raw = dict(guru_nav._segments(guru_nav._resolve_cik(slug)))
+    kept = [sum(w for c, w in raw.get(filed, []) if c in ws) for filed, ws in segs]
+    covered_ratio = round(sum(kept) / len(kept), 4) if kept else 0.0
+
+    return {
+        'schedule':      segs,
+        'tickers':       sorted({c for _, w in segs for c in w}),
+        'start_date':    max(start_date, segs[0][0]),
+        'segments':      len(segs),
+        'first_filed':   full[0][0],
+        'covered_ratio': covered_ratio,
+    }
+
+
 def run_backtest_logic(body: dict, progress_callback=None) -> dict:
     # 멀티계좌(accounts 배열) → 단일윈도우 멀티계좌 경로. 단일계좌(legacy 필드) → 기존 경로.
     if body.get('accounts'):
@@ -291,6 +343,7 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
     from modules.simulation.taxable_runner  import TaxableSimulationRunner
     from modules.config.simulation_config   import SimulationConfig
     from modules.rebalance.periodic         import PeriodicRebalance
+    from modules.rebalance.scheduled        import ScheduledRebalance
 
     portfolio_engine = _get_portfolio_engine()
 
@@ -307,11 +360,27 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
     rebal_freq = None if rebal_mode in ('none', 'band') else rebal_mode
     drift      = band_width if rebal_mode == 'band' else None
 
-    strategy = PeriodicRebalance(
-        target_weights      = weights,
-        rebalance_frequency = rebal_freq,
-        drift_threshold     = drift,
-    )
+    # ── 투자대가 시점별(point-in-time) 재현 ────────────────────────────────
+    # body['guru'] = 대가 슬러그. 오면 "오늘 비중을 과거에 소급"하는 대신
+    # 분기 13F 공시일마다 그때의 실제 보유로 갈아끼운다(비교탭 NAV와 같은 세그먼트).
+    guru_slug = str(body.get('guru') or '').strip()
+    guru_pit  = None
+    if guru_slug:
+        guru_pit = _guru_pit_schedule(
+            guru_slug, start_date, end_date, portfolio_engine.loader)
+    if guru_pit:
+        start_date = guru_pit['start_date']
+        tickers    = guru_pit['tickers']
+        weights    = {}   # ScheduledRebalance가 제자리로 채움 — config와 같은 객체 공유
+        strategy   = ScheduledRebalance(guru_pit['schedule'], weights)
+        rebal_freq = None   # 리밸런싱 시점 = 공시일. 주기 리밸은 쓰지 않음
+        drift      = None
+    else:
+        strategy = PeriodicRebalance(
+            target_weights      = weights,
+            rebalance_frequency = rebal_freq,
+            drift_threshold     = drift,
+        )
     config = SimulationConfig(
         start_date           = start_date,
         end_date             = end_date,
@@ -406,6 +475,12 @@ def run_backtest_logic(body: dict, progress_callback=None) -> dict:
 
     return {
         'tax_enabled':    tax_enabled,
+        # 시점별 재현 여부 — UI가 "고정 비중"과 구분해 표기(무엇을 돌렸는지 숨기지 않는다)
+        'guru_pit':       ({'slug': guru_slug, 'segments': guru_pit['segments'],
+                            'start_date': guru_pit['start_date'],
+                            'first_filed': guru_pit['first_filed'],
+                            'covered_ratio': guru_pit['covered_ratio']}
+                           if guru_pit else None),
         'limit_warnings': limit_warnings or None,
         'total_fees':     (float(getattr(result, 'total_fees', 0.0)) if body.get('fee_enabled') else None),  # D4
         'account_type':   account_type if tax_enabled else None,

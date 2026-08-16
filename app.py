@@ -3449,9 +3449,11 @@ def api_portfolio_index_series():
         for i, p in enumerate(ports[:20]):
             if not isinstance(p, dict):
                 continue
-            # 대가(guru 슬러그) = 사전계산 시점별 NAV 곡선(배당 재투자 내장 → TR 기준일 때만).
-            # NAV 없거나 가격 기준 요청이면 기존 현재비중 혼합으로 폴백.
-            if p.get('guru') and total_return:
+            # 대가(guru 슬러그) = 사전계산 시점별 NAV 곡선(배당 재투자 내장 = 항상 TR).
+            # 가격 기준 요청이어도 **현재 비중 소급 곡선으로 조용히 갈아타지 않는다** —
+            # 그건 후견편향이라 곡선의 의미가 달라진다. 곡선 자체 basis를 tr로 표기하고
+            # basis_mismatch를 함께 내려 프론트가 눈에 보이게 알리도록 한다.
+            if p.get('guru'):
                 try:
                     from modules.gurus import nav as guru_nav
                     npts = guru_nav.load_nav(str(p['guru']).strip())
@@ -3461,6 +3463,7 @@ def api_portfolio_index_series():
                     out.append({'key': f'EX:{i}', 'label': str(p.get('name') or '포트폴리오'),
                                 'unit': '총수익 지수(시작=100)', 'basis': 'tr',
                                 'point_in_time': True,
+                                'basis_mismatch': (not total_return),
                                 'points': [[d, v, 0] for d, v in npts]})
                     continue
             tickers = [t for t in (p.get('tickers') or []) if isinstance(t, dict) and t.get('code')]
@@ -3471,6 +3474,8 @@ def api_portfolio_index_series():
                 out.append({'key': f'EX:{i}', 'label': str(p.get('name') or '포트폴리오'),
                             'unit': '총수익 지수(시작=100)' if total_return else '가격 지수(시작=100)',
                             'basis': 'tr' if total_return else 'price',
+                            # 대가인데 NAV가 없어 현재 비중으로 대체된 경우 = 후견편향 곡선
+                            'lookahead': bool(p.get('guru')),
                             'points': pts})
     finally:
         conn.close()

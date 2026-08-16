@@ -46,14 +46,22 @@
     var end = new Date();
     var start = new Date(); start.setFullYear(start.getFullYear() - 5);
     var fmt = function (x) { return x.toISOString().split('T')[0]; };
-    sessionStorage.setItem('mm_bt_preload', JSON.stringify({
+    var pre = {
       tickers: tickers,
       start_date: fmt(start),
       end_date: fmt(end),
       rebal_mode: 'yearly',
       autorun: false,  // 폼만 채우고 분석 화면 표시(자동 실행 X) — 오너 지시
       source: 'example:' + card.dataset.slug,
-    }));
+    };
+    // 투자대가 = 분기 13F 시점별 재현. 슬러그를 넘기면 백엔드가 공시일마다 그때 보유로
+    // 갈아끼운다(오늘 비중을 과거에 소급하는 후견편향 제거). 첫 공시일부터 전 구간.
+    if (card.dataset.type === 'guru') {
+      pre.guru = card.dataset.slug.replace(/^guru-/, '');
+      pre.guru_name = card.dataset.nameko || card.dataset.name;
+      if (card.dataset.firstfiled) pre.start_date = card.dataset.firstfiled;
+    }
+    sessionStorage.setItem('mm_bt_preload', JSON.stringify(pre));
     location.href = '/backtest';
   }
 
@@ -176,9 +184,12 @@
     var mx = holds.reduce(function (m, h) { return Math.max(m, h.weight_norm || 0); }, 0) || 1;
     var rows = holds.map(function (h) {
       var w = Math.floor((h.weight_norm / mx) * 100);
+      // in_sim = 시뮬레이션(비교 곡선·시점별 백테)이 실제로 쓰는 상위 N. 표 전체가
+      // 시뮬 대상인 것처럼 보이던 오해를 막는다.
+      var simTag = h.in_sim ? ' <span class="exm-sim">시뮬</span>' : '';
       return '<tr>' +
         '<td class="num exm-co">' + h.rank + '</td>' +
-        '<td><span class="exm-tic">' + esc(h.ticker) + '</span> <span class="exm-co">' + esc(h.name) + '</span></td>' +
+        '<td><span class="exm-tic">' + esc(h.ticker) + '</span>' + simTag + ' <span class="exm-co">' + esc(h.name) + '</span></td>' +
         '<td class="num exm-w">' + h.weight + '%</td>' +
         '<td class="num"><span class="exm-wbar-wrap"><span class="exm-wbar"><span style="width:' + w + '%"></span></span>' +
           '<span class="exm-w">' + h.weight_norm + '%</span></span></td>' +
@@ -195,7 +206,8 @@
         '<th class="num">비중(13F)</th><th class="num" style="width:130px">포트폴리오 내</th></tr></thead>' +
         '<tbody>' + rows + '</tbody></table>' +
       '<div class="exm-note" style="background:transparent;border:none;padding:8px 0 0;font-size:11px;">' +
-        '‘비중(13F)’ = 전체 공시 대비. ‘포트폴리오 내’ = 국내 시세 커버 종목만 100%로 재정규화(백테스트 기준).</div>';
+        '‘비중(13F)’ = 전체 공시 대비. ‘포트폴리오 내’ = 국내 시세 커버 종목만 100%로 재정규화. ' +
+        '<b>시뮬</b> 표시 = 분석·비교 시뮬레이션이 실제로 사용하는 상위 ' + esc(d.simtop || 10) + '종목(그 안에서 다시 재정규화).</div>';
   }
 
   function openModal(card) {

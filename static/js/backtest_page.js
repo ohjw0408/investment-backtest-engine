@@ -3,6 +3,9 @@
 document.getElementById('btEndDate').value = new Date().toISOString().split('T')[0];
 
 let btTickers = [];
+// 투자대가 시점별 재현 — 대가 카드에서 넘어온 슬러그. 종목/비중을 손대면 즉시 해제한다
+// (편집된 포트폴리오를 "대가의 역사"라고 계속 부르면 거짓말이 된다).
+let btGuru = null, btGuruName = '';
 let _btTaskId = null, _btCancelled = false;
 let btCharts  = {};
 const BT_TASK_KEY = 'mm_task_backtest';
@@ -92,19 +95,28 @@ function btShowInput() {
 function btEditConditions() { btShowInput(); }
 
 // ── 결과 조건 요약 바 ──
-function btBuildCondSummary(body) {
+function btBuildCondSummary(body, result) {
   const el = document.getElementById('btCondSummary');
   if (!el || !body) return;
+  const pit = result && result.guru_pit;
   const tk = (body.tickers || []).map(t => `${t.code} ${Math.round((t.weight||0)*100)}%`).join(' · ');
   const period = (body.start_date || '') + ' ~ ' + (body.end_date || '');
   const seed = fmtKRW(body.initial_capital || 0);
   const mon = (body.monthly_contribution || 0) > 0 ? ' · 월 ' + fmtKRW(body.monthly_contribution) : '';
   const rebalMap = { none:'리밸런싱 안함', monthly:'매월 리밸', quarterly:'분기 리밸', yearly:'매년 리밸', band:'밴드 리밸' };
   const parts = [];
-  if (tk) parts.push(`<span class="bt-cond-item"><b>${btE(tk)}</b></span>`);
+  // 시점별 재현은 비중이 구간마다 달라진다 — 고정 비중 목록을 그대로 두면 거짓 요약이 된다
+  if (pit) parts.push(`<span class="bt-cond-item"><b>${btE(body.guru_name || '투자대가')} 13F 상위 보유</b> · 분기마다 교체</span>`);
+  else if (tk) parts.push(`<span class="bt-cond-item"><b>${btE(tk)}</b></span>`);
   parts.push(`<span class="bt-cond-item">${btE(period)}</span>`);
   parts.push(`<span class="bt-cond-item">${btE(seed)}${btE(mon)}</span>`);
-  parts.push(`<span class="bt-cond-item">${btE(body.dividend_mode === 'hold' ? '배당 현금보유' : '배당 재투자')} · ${btE(rebalMap[body.rebal_mode] || body.rebal_mode || '')}</span>`);
+  if (pit) {
+    // 시점별 재현일 땐 주기 리밸이 아니라 공시일 리밸이므로 그렇게 적는다
+    parts.push(`<span class="bt-cond-item">${btE(body.dividend_mode === 'hold' ? '배당 현금보유' : '배당 재투자')} · 공시일 리밸 ${pit.segments}회</span>`);
+    parts.push(`<span class="bt-cond-item">📜 <b>시점별 13F 재현</b></span>`);
+  } else {
+    parts.push(`<span class="bt-cond-item">${btE(body.dividend_mode === 'hold' ? '배당 현금보유' : '배당 재투자')} · ${btE(rebalMap[body.rebal_mode] || body.rebal_mode || '')}</span>`);
+  }
   if (window.btTaxEnabled) {
     const accs = window.taxAccounts || [];
     const types = accs.length > 1 ? accs.map(a => a.type || '위탁').join('+') : (accs[0]?.type || '위탁');
@@ -166,16 +178,57 @@ function updateBtWeightUI() {
   `).join('');
 }
 
+// ── 투자대가 시점별 재현 배너 ──
+function btRenderGuruNote() {
+  const el = document.getElementById('btGuruNote');
+  if (!el) return;
+  if (!btGuru) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'flex';
+  el.innerHTML = '<span>📜</span><span><b>' + btE(btGuruName || btGuru) + ' 시점별 재현</b> — ' +
+    '분기 13F 공시일마다 <b>그때 실제 보유</b>로 갈아끼워 시뮬레이션합니다. ' +
+    '아래 목록은 가장 최근 공시분이며, 과거 구간은 그 시점 보유가 자동으로 쓰입니다. ' +
+    '종목·비중을 직접 바꾸면 시점별 재현이 해제되고 고정 비중으로 돌아갑니다.</span>';
+}
+// 결과 화면 안내 — 서버가 실제로 시점별로 돌렸을 때만 뜬다.
+// 요청은 했는데 폴백된 경우(다계좌 등)도 숨기지 않고 그대로 알린다.
+function btRenderGuruBanner(pit) {
+  const el = document.getElementById('btGuruResultNote');
+  if (!el) return;
+  const asked = !!(window._btLastBody && window._btLastBody.guru);
+  if (!asked) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'flex';
+  if (!pit) {
+    el.innerHTML = '<span>⚠️</span><span><b>고정 비중으로 계산했습니다</b> — 시점별 재현을 적용하지 못해 ' +
+      '가장 최근 공시 비중을 전 구간에 적용했습니다. 과거 성과가 실제보다 좋게 보일 수 있습니다.</span>';
+    return;
+  }
+  const miss = Math.max(0, Math.round((1 - (pit.covered_ratio || 0)) * 100));
+  el.innerHTML = '<span>📜</span><span><b>시점별 13F 재현</b> — 분기 공시일마다 그때의 실제 보유로 ' +
+    '<b>' + pit.segments + '회</b> 교체하며 계산했습니다(' + btE(pit.start_date) + ' 시작). ' +
+    '공시 45일 지연을 반영해 <b>공시일 종가</b>에 갈아탑니다.' +
+    (miss > 0 ? ' 가격 데이터가 없어 평균 <b>' + miss + '%</b> 비중은 제외하고 나머지로 재정규화했습니다.' : '') +
+    ' 13F는 미국 상장 주식 롱 포지션만 담기므로 채권·현금·공매도·비미국 자산은 반영되지 않습니다.</span>';
+}
+
+// 사용자가 구성을 건드리면 시점별 재현 해제
+function btDropGuru() {
+  if (!btGuru) return;
+  btGuru = null;
+  btRenderGuruNote();
+  mmToast('종목 구성을 바꿔서 시점별 재현을 껐어요. 지금 비중으로 고정 시뮬레이션합니다.', 'ok');
+}
+
 // 비중 변경 — 같은 행 number↔slider 동기 + 바만 갱신(재렌더 없음, 커서/드래그 보존).
 function btW(el, i) {
   const v = Math.max(1, Math.min(100, parseFloat(el.value) || 0));
   if (!btTickers[i]) return;
   btTickers[i].weight = v / 100;
+  btDropGuru();
   const row = el.closest('.ticker-item');
   if (row) row.querySelectorAll('.ticker-weight-input, .ticker-weight-slider').forEach(x => { if (x !== el) x.value = v; });
   btRefreshWeightBar();
 }
-function btRemoveTicker(i) { btTickers.splice(i, 1); updateBtWeightUI(); }
+function btRemoveTicker(i) { btTickers.splice(i, 1); btDropGuru(); updateBtWeightUI(); }
 
 let btSearchTimer = null;
 const btInput    = document.getElementById('btTickerSearch');
@@ -217,6 +270,7 @@ function btAddTicker(code, name) {
   if (btTickers.find(t => t.code === code)) { btDropdown.style.display='none'; return; }
   // 첫 종목만 100%(1.0), 이후는 0%로 조용히 추가(기존 비중 보존). weight는 0~1 스케일.
   btTickers.push({ code, name, weight: btTickers.length === 0 ? 1 : 0 });
+  btDropGuru();
   btInput.value = '';
   btDropdown.style.display = 'none';
   updateBtWeightUI();
@@ -234,6 +288,7 @@ if (window.MMFav) MMFav.init({
       code: t.code, name: t.name || t.code,
       weight: (Number(t.weight) || 0) / 100,
     }));
+    btDropGuru();
     updateBtWeightUI();
   },
 });
@@ -532,6 +587,10 @@ async function runBacktest(_limitOverride) {
       band_width:           Number(document.getElementById('btBandSlider').value) / 100,
       use_synthetic:        document.getElementById('btUseSyntheticCheck')?.checked ?? false,
     };
+    if (btGuru) {
+      window._btLastBody.guru = btGuru;
+      window._btLastBody.guru_name = btGuruName;
+    }
     const accs = window.taxAccounts || [];
     const acct0Type = (window.btTaxEnabled && accs.length) ? (accs[0].type || '위탁') : '위탁';
     const accountsPayload = window.btTaxEnabled
@@ -714,6 +773,9 @@ function btRestoreForm(body) {
     body.tickers.forEach(t => btTickers.push({code: t.code, name: t.name || t.code, weight: t.weight}));
     updateBtWeightUI();
   }
+  btGuru     = body.guru || null;
+  btGuruName = body.guru_name || btGuruName;
+  btRenderGuruNote();
   const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v; };
   set('btStartDate', body.start_date);
   set('btEndDate', body.end_date);
@@ -831,7 +893,8 @@ function renderBacktest(data) {
   btShowResults();
   _btRefreshChartColors();
   document.getElementById('btResultContent').style.display = 'block';
-  btBuildCondSummary(window._btLastBody);
+  btBuildCondSummary(window._btLastBody, data);
+  btRenderGuruBanner(data.guru_pit);
 
   // 가상 데이터 경고 배너
   const btSynthBanner = document.getElementById('btSynthWarningBanner');

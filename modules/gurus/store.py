@@ -92,6 +92,15 @@ def get_guru(slug, limit=25):
         "FROM holdings WHERE cik=? AND period=? ORDER BY rank",
         (g["cik"], g["latest_period"]),
     ).fetchall()
+    # 시뮬레이션(비교 NAV·백테 시점별)이 실제로 쓰는 상위 N — 표에 그대로 표시해
+    # "표는 30종목인데 시뮬은 10종목"이던 불일치를 눈에 보이게 만든다.
+    first_filed = con.execute(
+        "SELECT MIN(filed) FROM filings WHERE cik=?", (g["cik"],)).fetchone()[0]
+    from modules.gurus.nav import TOP_N as SIM_TOP_N
+    sim_tickers = {r[0] for r in con.execute(
+        "SELECT ticker FROM holdings WHERE cik=? AND period=? "
+        "AND ticker IS NOT NULL AND weight>0 ORDER BY rank LIMIT ?",
+        (g["cik"], g["latest_period"], SIM_TOP_N))}
     con.close()
     covered = [r for r in rows if r["covered"]]
     cov_total = sum(r["weight"] for r in covered) or 1.0
@@ -101,13 +110,15 @@ def get_guru(slug, limit=25):
             "rank": r["rank"], "ticker": r["ticker"], "name": r["name"],
             "weight": round(r["weight"] * 100, 1),
             "weight_norm": round(r["weight"] / cov_total * 100, 1),
+            "in_sim": 1 if r["ticker"] in sim_tickers else 0,
         })
     return {
         "slug": g["slug"], "name": g["name"], "name_ko": name_ko(g["slug"], g["name"]), "fund": g["fund"],
         "stance": g["stance"], "stance_label": g["stance_label"], "monogram": g["monogram"],
         "period": g["latest_period"], "period_label": period_label(g["latest_period"]),
-        "filed": g["filed"],
+        "filed": g["filed"], "first_filed": first_filed,
         "n_total": len(rows), "n_covered": len(covered),
         "covered_weight": round(cov_total * 100, 1),
+        "sim_top": SIM_TOP_N,
         "holdings": holdings,
     }

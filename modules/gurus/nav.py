@@ -55,6 +55,47 @@ def _segments(cik):
     return segs
 
 
+def _resolve_cik(slug_or_cik):
+    """슬러그/cik 무엇이 와도 cik로. 없으면 None."""
+    if str(slug_or_cik).isdigit():
+        return str(slug_or_cik)
+    con = sqlite3.connect(_GURU_DB)
+    row = con.execute("SELECT cik FROM gurus WHERE slug=?", (slug_or_cik,)).fetchone()
+    con.close()
+    return row[0] if row else None
+
+
+def weight_schedule(slug_or_cik, coverage=None):
+    """공시일별 목표 비중표 → [("YYYY-MM-DD", {ticker: w}), ...] (합=1, 날짜 오름차순).
+
+    NAV 곡선(build_guru_nav)과 **같은 세그먼트 정의**를 쓴다 — 백테스트가 이걸 그대로
+    타면 비교탭 곡선과 같은 역사를 재현한다(TOP_N 단일 소스).
+    coverage: {ticker: (min_date, max_date)} 가격 보유 범위. 주면 **세그먼트마다**
+    그날 가격이 있는 종목만 남기고 재정규화 — 시뮬레이터에 NaN 가격이 들어가는 것을 막는다.
+    """
+    cik = _resolve_cik(slug_or_cik)
+    if not cik:
+        return []
+    out = []
+    for filed, ws in _segments(cik):
+        if coverage is not None:
+            ws = [(c, w) for c, w in ws
+                  if c in coverage and coverage[c][0] <= filed <= coverage[c][1]]
+        s = sum(w for _, w in ws)
+        if not ws or s <= 0:
+            continue
+        out.append((filed, {c: w / s for c, w in ws}))
+    return out
+
+
+def schedule_codes(slug_or_cik):
+    """그 대가의 전 세그먼트에 등장하는 티커 집합(가격 확보 대상)."""
+    cik = _resolve_cik(slug_or_cik)
+    if not cik:
+        return []
+    return sorted({c for _, ws in _segments(cik) for c, _w in ws})
+
+
 def build_guru_nav(cik, price_conn):
     """cik → [[date, value], ...] (시작=100). 데이터 부족 시 []."""
     import pandas as pd

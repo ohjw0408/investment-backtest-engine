@@ -1,5 +1,66 @@
 # Log
 
+## [2026-08-16] FEATURE | 투자대가 백테스트를 시점별(13F 분기) 재현으로 — 후견편향 제거 + 인접 3건
+
+**오너 지시**: "전부 시작해줘." (같은 날 13F seed Q2 리빌드에 이어 구조 틈 4건 일괄)
+
+### ① 백테스트가 오늘 비중을 과거에 소급하던 문제
+
+대가 카드 "분석하기"는 **최신 분기 상위 30을 그대로** 5년 백테에 꽂았다. 버핏 2016년 구간에
+AAPL 25%가 들어가는데, 그 포지션은 2016년 하반기에야 생겼다. 반면 비교탭은 `guru_nav`로
+진짜 분기 이력을 재생하고 있어 **같은 대가가 버튼에 따라 다른 수익률**을 냈다.
+실측(2016-01~2026-08): 소급 **CAGR 21.5%** vs 시점별 **15.3%** — 6.2%p가 전부 후견편향.
+
+**해법 = 리밸런싱 전략 교체**(엔진 무수정). 루프가 이미
+`should_rebalance(date)` → `generate_orders()`(= `self.target_weights`) 구조라
+`modules/rebalance/scheduled.py: ScheduledRebalance`가 공시일마다 목표 비중 전체를 갈아끼운다.
+dict를 **제자리 갱신**해 `SimulationConfig.target_weights`가 같은 객체를 참조 → 적립금·배당
+재투자 스윕도 그 시점 비중을 따른다.
+
+- 세그먼트 소스 = `modules/gurus/nav.weight_schedule()` — **NAV 곡선과 동일**(비교탭·백테가 한 역사)
+- 가격 없는 종목은 **세그먼트별로** 제외 후 재정규화(전역 제외 아님) → 시뮬레이터 NaN 차단
+- 제외된 평균 비중(`covered_ratio`)을 응답에 실어 UI가 "평균 N% 제외" 명시
+- 시작일이 첫 공시일보다 이르면 첫 공시일로 당김
+- **종목·비중을 손대면 즉시 해제**(`btDropGuru`) → 고정 비중으로 강등되고 배너·조건바가 같이 바뀜
+- 다계좌 경로는 guru를 타지 않음 → `guru_pit: null` → 결과 배너가 "고정 비중으로 계산했습니다" 경고
+
+### ② 오버레이가 가격 기준일 때 조용히 후견편향 곡선으로 갈아타던 것
+
+`app.py` `/api/portfolio/index_series`가 `if p.get('guru') and total_return:` — 가격 기준이면
+NAV를 버리고 **현재 비중 혼합**으로 폴백했다(경고 0). 이제 basis와 무관하게 NAV를 서빙하고
+`basis_mismatch`를 함께 내려 차트 컨트롤에 "대가 곡선은 항상 총수익 기준" 경고를 띄운다.
+NAV 없을 때 현재 비중으로 대체되는 경우도 `lookahead` 플래그로 표시.
+곁가지: 기준 토글마다 대가 곡선을 재요청하던 캐시 조건도 `point_in_time`이면 유지하도록 수정.
+
+### ③ 표 30종목 vs 시뮬 10종목 불일치
+
+`store.get_guru`가 `nav.TOP_N`을 단일 소스로 읽어 시뮬 대상 행에 `in_sim` 플래그를 달고,
+모달 표에 **시뮬** 배지 + 각주로 명시. 지표를 바꾸지 않으므로 기존 곡선 불변.
+
+### ④ 분기 자동 갱신 (P5) — 재발 차단
+
+`.github/workflows/guru-resync-13f.yml`: 13F 마감(2/14·5/15·8/14·11/14) 다음날 + 일주일 뒤
+(지각 제출자 회수) 리빌드 → 커밋 → 배포 → prod `refresh_guru_nav()`.
+**안전망 2겹**: `OPENFIGI_API_KEY` 없으면 시작 자체를 거부(키 없으면 CUSIP→티커 전멸),
+`scripts/guru_db_stats.py`가 리빌드 전후를 비교해 filings·대가 수 감소 또는 매핑률 5%p↑ 하락이면
+커밋을 막는다(티커 전멸 시나리오로 exit 1 확인).
+⚠️ **오너 잔여**: repo secret `OPENFIGI_API_KEY` 등록(미등록이면 워크플로가 매 분기 실패한다).
+
+### 검증
+
+- `tests/test_guru_pit_backtest.py` **7 PASS** — 공시일 전 미교체(미래정보 없음), 늦은 시작 시
+  최신 세그먼트 진입, target_weights 객체 공유, 주문 산출, NAV 세그먼트 일치,
+  **2016년 이전 구간에 AAPL 부재**(후견편향 회귀 가드), 커버리지 필터 재정규화
+- `tests/test_guru_pit_browser.js` **17 PASS** — 모달 시뮬 배지 / 프리로드 슬러그·첫 공시일 /
+  입력·결과 배너 / 조건바 배지·공시일 리밸 횟수 / 편집 시 해제 / 오버레이 가격 기준 유지 + 경고 /
+  라이트·다크 스샷 / **콘솔 에러 0**
+  - 로컬엔 redis·celery worker가 없어 실행이 큐를 못 탄다 → `tests/make_guru_pit_sample.py`로
+    **엔진 실제 출력**을 떨어뜨려 렌더 경로에 흘려 넣는다(지어낸 payload 아님)
+- 기존 `test_guru_13f_parser` `test_guru_nav` `test_rebalance` 등 **6 PASS**
+- `scripts/perf_golden.py check` **4/4 결과 불변** — 고정 비중 경로 무영향
+
+커밋 `ce76462`.
+
 ## [2026-08-16] DATA | 투자대가 13F seed를 2026 Q2로 리빌드 (한 분기 밀려 있던 문제)
 
 **오너 제보**: "DB에 최신 정보 반영 안 된 게 문제."

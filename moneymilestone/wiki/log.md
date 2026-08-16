@@ -1,5 +1,53 @@
 # Log
 
+## [2026-08-16] DATA | 투자대가 13F seed를 2026 Q2로 리빌드 (한 분기 밀려 있던 문제)
+
+**오너 제보**: "DB에 최신 정보 반영 안 된 게 문제."
+
+### 실측
+
+EDGAR에 2026-06-30 분기가 8/13~8/14 올라와 있었으나 `data/meta/guru_holdings.db`의
+`latest_period`는 10명 전원 **2026-03-31**. 갱신 경로가 수동 리빌드뿐이라(P5 분기 워크플로
+`guru-resync-13f.yml` 미착수) 공시가 떠도 아무도 가져오지 않았다.
+
+### 조치
+
+`scripts/build_guru_db.py` 전체 리빌드(2f3fb49) → push → 배포 → prod 확인.
+
+| 항목 | 이전 | 이후 |
+|---|---|---|
+| filings | 471 | 479 |
+| holdings | 9,538 | 9,719 |
+| 미매핑 | 26.2% | 26.0% |
+| 커버 | 72.9% | 73.1% |
+
+- Q2 반영 8명: terry-smith, li-lu, david-tepper, warren-buffett, druckenmiller, howard-marks, ray-dalio, seth-klarman
+- **Ackman = Q2 미제출**(EDGAR에 없음, Q1 유지) / **Burry = 2025-09-30 이후 무공시**(10.5개월).
+  둘 다 stale 2년 컷 미만이라 목록 유지 — 오너 기준(2026-06-25) 그대로.
+- 검증: Buffett Q2 = AAPL 22.04 / AXP 17.14 / KO 10.86 / GOOGL 9.41 / BAC 9.20 — 실제 13F 일치.
+- prod에서 `tasks.refresh_guru_nav()` 수동 트리거(당일 beat 시각 지나서) → 10명 30,325행,
+  세 대가 곡선 모두 2026-08-14까지 연장 확인(buffett 508.71 / terry 665.61 / ackman 793.68).
+
+### 같이 파악한 구조 — 시점별 비중은 절반만 쓰인다
+
+대가 카드 액션 3종의 경로가 서로 다른 엔진을 탄다.
+
+- **"분석하기" → `/backtest`**: `static/js/examples.js:41 analyze()`가 `data-tickers`
+  (= 최신 분기 상위 30, `app.py:565 get_guru(slug, limit=30)`)를 그대로 5년 백테에 꽂는다.
+  **과거 분기 비중을 전혀 모름 = 후견편향.** 백테 엔진에 guru 인지 코드는 0줄.
+- **"비교 담기" → `/risk-return`**: `entry.guru` 슬러그 → `risk_return_logic.py:304
+  _load_guru_series` → `modules/gurus/nav.py`의 사전계산 `guru_nav`.
+  세그먼트 = filed(k)~filed(k+1) 전일, 구간 비중 = 그 분기 **상위 10** 재정규화,
+  공시일 리밸(45일 지연 반영, 미래정보 없음). **여기만 시점별이 맞다.**
+- **"저장"** = 최신 스냅샷(의도된 동작).
+
+**미해결 틈 4건 (오너 결정 대기):**
+1. `/backtest` 핸드오프 시점별화 — 같은 대가가 비교탭과 다른 수익률로 보임
+2. `app.py:3452` `if p.get('guru') and total_return:` — 가격 기준으로 보면 NAV를 버리고
+   현재 비중 혼합으로 **경고 없이 폴백**(후견편향 곡선이 조용히 표시)
+3. TOP_N 불일치 — NAV=10종목 vs UI표·백테 핸드오프=30종목
+4. P5 `guru-resync-13f.yml` 분기 자동화 미착수 → 11월 Q3도 같은 문제 재발
+
 ## [2026-08-15] FIX+FEATURE | 실적·배당락 알림을 종목 알림으로 이관 (배당락 알림이 6주간 0건이던 원인)
 
 **오너 제보**: "보유 종목 배당락일 알림을 켰는데 받은 기억이 없다. 온 건지 안 온 건지 모르겠다."

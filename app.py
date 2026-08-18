@@ -167,7 +167,7 @@ PRICE_DB_PATH  = Path(__file__).parent / "data" / "price_cache" / "price_daily.d
 SHARE_IMG_DIR  = Path(__file__).parent / "share_images"
 SHARE_IMG_DIR.mkdir(exist_ok=True)
 
-from modules.alerts import alert_store
+from modules.alerts import alert_store, live_quote
 init_holdings_db()
 init_portfolios_db()
 alert_store.init_alerts_db()
@@ -1687,6 +1687,21 @@ def _watchlist_quote(code):
         return _neg_cache()
     cur  = closes[-1]
     prev = closes[-2] if len(closes) >= 2 else None
+    # 일봉 DB(price_daily)는 구조적으로 '오늘 봉'을 가질 수 없다 — 트레일링 갭필이
+    # yf.download(start=db_max+1, end=today)인데 end가 배타라 당일 요청은 항상 0행.
+    # 그래서 장중 위젯이 어제 종가·어제 등락률을 '현재가'로 내보내 내자산(라이브 시세)과
+    # 어긋났다(2026-08-18 458730: 위젯 15455 +0.59% vs 내자산 15345 -0.71%).
+    # 알림이 쓰던 live_quote로 마지막 점만 덮는다. 실패 시 기존 일봉 폴백(낡을 뿐 안 깨짐).
+    try:
+        live = live_quote.get_live_price(portfolio_engine.loader, code)
+    except Exception:
+        live = None
+    if live and live.get('cur_is_today'):
+        # 지수 계열은 closes 자체가 index_ohlc(=live_quote와 동일 소스)라 이미 당일 봉 포함.
+        # 주식/ETF는 일봉 DB에 당일이 없으므로 스파크라인에 한 점 덧붙인다.
+        if not live_quote.is_index_like(code):
+            closes = closes + [live['cur']]
+        cur, prev = live['cur'], live['prev']
     change = round((cur - prev) / prev * 100, 2) if prev else 0.0
     is_krw = currency == "KRW"
     prefix = "" if currency == "PT" else ("₩" if is_krw else "$")

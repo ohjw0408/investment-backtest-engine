@@ -1504,6 +1504,21 @@ class PriceLoader:
         prev_price = prices[-2]["close"] if len(prices) > 1 else None
         last_date  = prices[-1]["date"]
 
+        # 헤더 현재가 = 라이브 시세. price_daily는 구조적으로 '오늘 봉'을 못 가진다
+        # (트레일링 갭필이 yf.download(start=db_max+1, end=today), end 배타 → 당일 0행).
+        # 그래서 장중에 상단 숫자만 어제 종가로 굳어 시간봉 차트·내자산과 어긋났다
+        # (2026-08-18 458730: 헤더 15455 vs 실제 15345). 일봉 시계열(prices)은 확정봉만
+        # 담는 원래 계약 그대로 두고, 표시용 현재가/전일가/기준일만 덮는다.
+        try:
+            from modules.alerts import live_quote as _lq
+            _live = _lq.get_live_price(self, code)
+        except Exception:
+            _live = None
+        if _live and _live.get("cur_is_today"):
+            cur_price  = round(float(_live["cur"]), 4)
+            prev_price = round(float(_live["prev"]), 4)
+            last_date  = today
+
         # 52주 고저
         cutoff_1y = (_dt.now() - _td(days=365)).strftime("%Y-%m-%d")
         prices_1y = [p["close"] for p in prices if p["date"] >= cutoff_1y]
